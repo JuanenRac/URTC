@@ -1,0 +1,9 @@
+{
+  "hardware_id": "0x0303CC01",
+  "hmac_key_hex": "555254432d48594452412d554d432d323032362d4348414e47452d4d452d2121",
+  "app_max_size": 114688,
+  "bootloader_max_size": 32768,
+  "flash_page_size": 2048,
+  "bootloader_flash_addr": "0x08000000",
+  "app_flash_addr": "0x08008000"
+}
