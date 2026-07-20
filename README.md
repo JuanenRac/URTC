@@ -31,25 +31,41 @@ The core strength of URTC is its extreme versatility. Instead of swapping out el
 
 To handle such a wide variety of applications, the URTC hardware is fully equipped to control:
 
-* **NEMA Stepper Motors:** supports NEMA 8, NEMA 11, NEMA 14, and NEMA 17 for various feeders, extruders, or grippers.
+* **NEMA Stepper Motors:** supports NEMA 8, NEMA 11, NEMA 14, NEMA 17, NEMA 23 and NEMA 34 Max 2.0A current (3.0A-10A by expansión board) for various feeders, extruders, or grippers.
 * **3-Phase BLDC / Gimbal Motors** for high-precision movement.
 * **Motors with Hall sensors and tachometers** for closed-loop control.
 * **Dedicated inputs** for reflective optical proximity sensors like the TCRT5000, plus a generic active-low endstop/limit-switch input shared across four tool profiles.
 
 ## 🧩 Expansion Connector
 
-A 14-pin header, separate from the tool-specific connectors, for add-on boards that need more than what a given tool profile alone exposes — an extra sensor board, a second TMC2209-driven axis, that kind of thing.
+A 20-pin header, separate from the tool-specific connectors, for add-on boards that need more than what a given tool profile alone exposes — an extra sensor board, a second TMC2209-driven axis (or TMC5160 with mosfets), that kind of thing.
 
-| Pins | Signal |
-|---|---|
-| 2 | 24V |
-| 1 | 3.3V |
-| 1 | 5V |
-| 2 | GND |
-| 2 | I2C2 (SCL/SDA) — its own bus, separate from I2C1/the OLED |
-| 3 | TMC2209 STEP/DIR/EN, for an optional driver on the expansion board |
-| 1 | PWM |
-| 2 | General-purpose GPIO (either one can serve as an EXTI-capable interrupt input if a future add-on needs a fast sensor response, e.g. an endstop) |
+| Pins | Signal |Function
+|---|---|---
+1   | +24V           | Main rail passthrough
+2   | GND            | Ground
+3   | +5V            | Logic power
+4   | EXP_PWM        | PB15 - general-purpose timer PWM output
+5   | EXP_TMC_STEP   | PB12 - optional TMC2209 driver on the expansion board
+6   | EXP_TMC_EN     | PB14
+7   | EXP_I2C2_SCL   | PB10 - own bus, separate from the OLED's I2C1. R48 (4.7k to
+    |                | +3.3V) populated as an external pull-up
+8   | EXP_SPI_CS     | Reserved, not yet wired to the MCU (confirmed against the
+    |                | schematic netlist - connector-side only, single-member net)
+9   | EXP_SPI_MISO   | Reserved, not yet wired to the MCU - same as EXP_SPI_CS
+10  | EXP_GPIO1      | PC14 - general purpose, EXTI-capable
+11  | EXP_GPIO2      | PC15 - general purpose, EXTI-capable
+12  | EXP_SPI_MOSI   | Reserved, not yet wired to the MCU - same as EXP_SPI_CS
+13  | EXP_SPI_SCK    | Reserved, not yet wired to the MCU - same as EXP_SPI_CS
+14  | EXP_I2C2_SDA   | PB11. R44 (4.7k to +3.3V) populated as an external pull-up
+15  | EXP_TMC_DIAG0  | Reserved, not yet wired to the MCU - same as EXP_SPI_CS.
+    |                | Intended for a future TMC2209 stall-detection line
+16  | EXP_TMC_DIR    | PB13
+17  | GND            | Ground
+18  | +3V3           | Logic power
+19  | GND            | Ground
+20  | +24V           | Main rail passthrough (second pin, for higher-current add-ons)
+
 
 **Two separate I2C buses on purpose:** I2C1 drives only the OLED; I2C2 is dedicated to this connector. Anything hanging off the expansion header — an I2C ADC/DAC, a port expander, whatever a given add-on board needs — shares I2C2 with any other expansion-side I2C device, but can't stretch the clock or otherwise interfere with the OLED's own timing on I2C1.
 
