@@ -1,0 +1,210 @@
+=============================================================================
+CONFIGURATION DOCUMENT: URTC - UNIVERSAL TOOL ECOSYSTEM (V1.0)
+MATRIX ASSIGNMENT - URTC/HYDRA-UMC (JUANENBOT/PAROL6)
+MICROCONTROLLER: STM32F303CCT6 (LQFP48 Package - 48 Pins, 256KB Flash)
+AUTHOR: JuanenRac (Electro Hobby 3D) - electrohobby3d@gmail.com
+LICENSE: This document is licensed under CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/).
+         Firmware source is GPL-3.0; hardware design files are CERN-OHL-S v2 - see the repo README.
+NOTE ON PHYSICAL PIN NUMBERS: this document identifies pins
+                   by GPIO signal name only - cross-check physical
+                   pin numbers against the datasheet or Eagle's STM32F303CC
+                   part footprint at layout time.
+=============================================================================
+
+[1] PHYSICAL ID CONFIGURATION PINS
+-----------------------------------------------------------------------------
+* ID4 -> Pin PC13 [Most significant bit] -> Clean digital input
+* ID3 -> Pin PB7  [High-central bit]                     -> Clean digital input
+* ID2 -> Pin PB4  [Central bit]                          -> Clean digital input
+* ID1 -> Pin PF1  [Low-central bit]                      -> Clean digital input
+* ID0 -> Pin PF0  [Least significant bit]                -> Clean digital input
+All five: internal pull-up enabled, active-low (jumper to GND sets that bit).
+
+* Boot and electrical safety note:
+  - BOOT0 is a dedicated pin on this package (pin 44, electrically separate
+    from PB8 - confirmed against the schematic netlist, they sit on two
+    completely different nets), tied to a pushbutton and a 10K pull-down.
+    PF0 (ID0) stays free of any boot-related risk.
+  - PB8 is a separate, ordinary GPIO, genuinely free on this board - see
+    PINOUT.TXT Block 9.
+  - PC13 (ID4) carries no special power-switch current limitation relevant
+    here, since it's only ever read as a simple pulled-up digital input, not
+    driven as an output.
+  - The logic state of the jumpers (JP_ID0 through JP_ID4) is read only once
+    at boot, to initialize the tool ecosystem without interfering with the
+    debug lines.
+
+-----------------------------------------------------------------------------
+[2] MASTER TOOL-HEAD ADDRESSING TABLE (URTC v1.0 BINARY MATRIX, 32 IDs)
+-----------------------------------------------------------------------------
+ID4   ID3   ID2   ID1   ID0  |  ID (HEX)  |  ASSIGNED TOOL / MODULE FUNCTION
+-----------------------------------------------------------------------------
+  0     0     0     0     0   |    0x00    |  TOOL_SOLDERING_IRON (Smart T12 cartridge)
+  0     0     0     0     1   |    0x01    |  TOOL_PASTE_DISPENSER (Syringe stepper motor A)
+  0     0     0     1     0   |    0x02    |  TOOL_LIQUID_DISPENSER (Syringe stepper motor B)
+  0     0     0     1     1   |    0x03    |  TOOL_SCREWDRIVER (Servo / Torque control)
+  0     0     1     0     0   |    0x04    |  TOOL_VACUUM_PICKUP (Vacuum with TCRT optical sensor)
+  0     0     1     0     1   |    0x05    |  TOOL_DRILL (BL4260 motor with FGIN pickup, own dedicated PB9 brake)
+  0     0     1     1     0   |    0x06    |  TOOL_GRIPPER_GIMBAL (SMT rotary gripper)
+  0     0     1     1     1   |    0x07    |  TOOL_GRIPPER_NEMA (Heavy-duty stepper gripper)
+  0     1     0     0     0   |    0x08    |  TOOL_AOI_INSPECTION (Camera + Coaxial LED ring)
+  0     1     0     0     1   |    0x09    |  TOOL_LASER_ENGRAVER (10W optical diode head)
+  0     1     0     1     0   |    0x0A    |  TOOL_3D_PRINTER (FDM Hotend + Direct extruder)
+  0     1     0     1     1   |    0x0B    |  TOOL_SCAN_PROBE (Touch impact probe - EXTI3 max priority)
+  0     1     1     0     0   |    0x0C    |  RESERVED (Unassigned / Preventive high impedance -> TOOL_INVALID)
+  0     1     1     0     1   |    0x0D    |  RESERVED (Unassigned / Preventive high impedance -> TOOL_INVALID)
+  0     1     1     1     0   |    0x0E    |  RESERVED (Unassigned / Preventive high impedance -> TOOL_INVALID)
+  0     1     1     1     1   |    0x0F    |  RESERVED (Unassigned / Preventive high impedance -> TOOL_INVALID)
+  1     0     0     0     0   |    0x10    |  RESERVED (Unassigned / Preventive high impedance -> TOOL_INVALID)
+  1     0     0     0     1   |    0x11    |  RESERVED (Unassigned / Preventive high impedance -> TOOL_INVALID)
+  1     0     0     1     0   |    0x12    |  RESERVED (Unassigned / Preventive high impedance -> TOOL_INVALID)
+  1     0     0     1     1   |    0x13    |  RESERVED (Unassigned / Preventive high impedance -> TOOL_INVALID)
+  1     0     1     0     0   |    0x14    |  RESERVED (Unassigned / Preventive high impedance -> TOOL_INVALID)
+  1     0     1     0     1   |    0x15    |  RESERVED (Unassigned / Preventive high impedance -> TOOL_INVALID)
+  1     0     1     1     0   |    0x16    |  RESERVED (Unassigned / Preventive high impedance -> TOOL_INVALID)
+  1     0     1     1     1   |    0x17    |  RESERVED (Unassigned / Preventive high impedance -> TOOL_INVALID)
+  1     1     0     0     0   |    0x18    |  RESERVED (Unassigned / Preventive high impedance -> TOOL_INVALID)
+  1     1     0     0     1   |    0x19    |  RESERVED (Unassigned / Preventive high impedance -> TOOL_INVALID)
+  1     1     0     1     0   |    0x1A    |  RESERVED (Unassigned / Preventive high impedance -> TOOL_INVALID)
+  1     1     0     1     1   |    0x1B    |  RESERVED (Unassigned / Preventive high impedance -> TOOL_INVALID)
+  1     1     1     0     0   |    0x1C    |  RESERVED (Unassigned / Preventive high impedance -> TOOL_INVALID)
+  1     1     1     0     1   |    0x1D    |  RESERVED (Unassigned / Preventive high impedance -> TOOL_INVALID)
+  1     1     1     1     0   |    0x1E    |  RESERVED (Unassigned / Preventive high impedance -> TOOL_INVALID)
+  1     1     1     1     1   |    0x1F    |  RESERVED (Unassigned / Preventive high impedance -> TOOL_INVALID)
+
+* 0x00-0x0B (12 IDs) are assigned to real tool profiles today. 0x0C-0x1F (20
+  IDs) are headroom for future tools within this same addressing scheme -
+  each reads as TOOL_INVALID until firmware explicitly assigns it, at which
+  point every actuator output is forced to its safe/inert state and
+  system_error_flag is set.
+
+-----------------------------------------------------------------------------
+[3] EXTERIOR AND INTERIOR LIGHTING INTERFACES
+-----------------------------------------------------------------------------
+* Pin PA7  -> `CONN_LED1` ONLY (SPI1_MOSI via DMA, AF5, status LED).
+                       Kept independent from CONN_LED2 below on purpose - no
+                       PCB trace joins the two connectors, they're on separate
+                       pins exactly like before, just with CONN_LED1 moved
+                       from its old bit-banged pin (PA2) to this one.
+* Pin PB1  -> `CONN_LED2` (Direct digital output via Bit-Banging,
+                       unchanged from earlier revisions - independent from
+                       CONN_LED1/PA7 above. Feeds 2-3 LED rings wired in
+                       parallel for camera/inspection lighting; color and
+                       on/off are set via CAN (0x100) - this is the AOI
+                       tool's actual inspection light. PA2, formerly
+                       CONN_LED1's pin, is now free - see [9].)
+* Pin PA15 -> `LED_RUN_ERR` (Single on-PCB local firmware diagnostic
+                       LED. Toggles every 500ms normally, every 100ms once
+                       an error is flagged - any blinking means the main
+                       loop is alive, faster means something's wrong. A
+                       frozen LED, not a "solid" indicator state, means the
+                       loop itself has stopped - see PINOUT.TXT Block 4.)
+
+-----------------------------------------------------------------------------
+[4] DEBUG PORT AND LOCAL DISPLAY
+-----------------------------------------------------------------------------
+* Pin PA13 -> STM_SWDIO (Dedicated ST-Link data line - Debug-exclusive)
+* Pin PA14 -> STM_SWCLK (Dedicated ST-Link clock line - Debug-exclusive)
+* Pin PA9 -> CONN_OLED SCL (Hardware I2C1_SCL, AF4)
+* Pin PA10 -> CONN_OLED SDA (Hardware I2C1_SDA, AF4)
+       * Same 4.7kOhm pull-ups as before (R33, R34), same connector - a real
+         I2C1 peripheral instead of manual GPIO toggling.
+
+-----------------------------------------------------------------------------
+[5] PORT B CRITICAL SIGNAL SWITCHING MATRIX (ANTI-EMI ZONE)
+-----------------------------------------------------------------------------
+* Pin PB3  -> Connected on the `CONN_SEN` connector (Protected by 330R R39)
+  --> [Motor / 3D Printer modes]     : STEP pulse line for the TMC2209 driver.
+  --> [Vacuum Pickup sensor mode]    : Clean digital input from the LM393 comparator.
+  --> [Touch Scan Probe mode]        : Fast edge-triggered impact probe (EXTI3).
+  --> [Soldering/Drill/Laser/AOI]    : NEW - Generic Endstop / limit switch digital
+                                       input (Active Low), polled every 150ms, shown
+                                       on the OLED and reported over CAN (see CANBUS.TXT).
+    * MUTANT ROUTING NOTE: EXTI line 3 can only listen to one GPIO port at a
+      time (SYSCFG->EXTICR). The firmware routes it to Port A (PA3) whenever
+      Drill or 3D-Printer mode is active (their tachometer needs it), and to
+      Port B (PB3) for every other tool - including the new endstop tools,
+      even though those read PB3 by simple polling rather than by interrupt.
+* Pin PB5  -> Connected internally / auxiliary stage
+  --> [Motor / 3D Printer modes]     : DIR direction line for the TMC2209 driver.
+  --> [AOI Inspection mode]          : Not used. The AOI tool's light is the ring on CONN_LED2, now driven via PA7/SPI1 (see [3] above), controlled entirely over CAN.
+* Pin PB6  -> Connected on the `CONN_MOT`/laser-interlock nets
+  --> [Motor / 3D Printer modes]     : TMC2209 enable/disable ENN line.
+  --> [Laser Engraver mode]          : Safety enable line / power interlock.
+  --> [Drill mode]                   : Not used - drill uses its own dedicated pin (PB9), see [7].
+    * NEEDS ATTENTION AT LAYOUT: if CONN_DRILL's physical pin 1
+      ties to PB6 anywhere on this board, make sure it isn't also
+      tied to PB9 (see [7]) on the same net - two GPIO outputs driving the
+      same wire is a real conflict, not just a documentation detail. See
+      PINOUT_CONNECTORS.TXT section 4 for the same note in more depth.
+* Pin PB0  -> Connected on the `CONN_SEN` connector
+  --> [Vacuum Pickup sensor mode]    : TCRT_A0 analog input.
+  --> [3D Printer mode]              : Analog ADC input for the hotend NTC thermistor,
+                                       with a NEW hardware 4.7kOhm Pull-Up to 3.3V (R40)
+                                       forming the voltage divider with the 100kOhm NTC
+                                       (NTC to GND). This is read on ADC_CHANNEL_11, the
+                                       SAME channel as the vacuum pickup - NOT on PA0/
+                                       T12_ADC, despite both being "thermal" readings.
+
+-----------------------------------------------------------------------------
+[6] FIXED POWER AND ANALOG LOGIC ASSIGNMENTS (PA0 and PA1)
+-----------------------------------------------------------------------------
+* Pin PA0  -> T12_ADC / NTC_ADC (Analog ADC Channel 0 reading / Input from the AD8605 op-amp for the T12 thermocouple ONLY - the 3D printer's NTC is on PB0, see [5])
+* Pin PA1  -> T12_PWM / HOTEND_HEATER (Digital/PWM output to the main power MOSFET Q1 gate)
+
+-----------------------------------------------------------------------------
+[7] SECONDARY DYNAMIC ASSIGNMENTS (`CONN_DRILL` EXTERNAL CONTROL WIRING)
+-----------------------------------------------------------------------------
+* Pin PB9  -> [Drill mode] : DRILL_BRAKE (BL4260 brake line, High=Spin / Low=Brake - its own dedicated pin, not shared with the stepper tools' PB6/TMC_ENN. Connected to Pin 1 of `CONN_DRILL` - see the layout note under [5] above.)
+* Pin PA3  -> [Drill / 3D Printer mode] : FGIN (Tachometer input from the BL4260 motor and the EFB0424VHD-CP0 layer fan, connected to Pin 3 of `CONN_DRILL`. Real pulse capture via the EXTI3 interrupt).
+       * MUTANT ROUTINE NOTE: When Drill or 3D-Printer mode is active, the firmware switches the SYSCFG->EXTICR register to route the EXTI3 interrupt channel to Port A (PA3) instead of Port B (PB3).
+* Pin PA4 -> [Drill mode] : FRIN (Direct digital output to Pin 2 of `CONN_DRILL` to reverse the drill shaft's rotation direction).
+* Pin PA8 -> [Drill / 10W Laser / 3D Printer mode] : DRILL_LASER_PWM (Hardware PWM output towards Pin 1 of `CONN_DRILL`, TIM1_CH1/AF6 - the SAME channel for all three, reconfigured to ~20kHz for Drill/Laser or exactly 25kHz for the 3D printer's layer fan. Moved here from PA7, which now carries the LED chain instead - see [3] above. Since TIM1 is fully independent of TIM3's stepper tick, Drill/Laser no longer have to share that timer's 1kHz rate.)
+
+-----------------------------------------------------------------------------
+[8] HOTEND COOLING FAN WIRING (`CONN_FAN1`, NEW)
+-----------------------------------------------------------------------------
+Separate from the layer fan above: this fan cools the hotend's heat break /
+heatsink, not the printed part. Uses the 2 pins that were previously free on
+the earlier design. Own dedicated timer (TIM2), own line within the
+combined 5-9 EXTI vector - no routing conflicts with anything else in the design.
+* Pin PA5 -> HOTEND_FAN_PWM (TIM2_CH1/AF1, 25kHz, towards Pin 3 of `CONN_FAN1`).
+* Pin PA6 -> HOTEND_FAN_FG (Tachometer input via EXTI6, towards Pin 2 of `CONN_FAN1`).
+       * SAFETY NOTE: unlike the layer fan, this fan's watchdog does NOT shut
+         it off on communication loss - leaving it running is the safer
+         failure mode for a heatsink fan. Instead the firmware runs a stall
+         detector: commanded >0 but tachometer reads 0 RPM 3s after starting
+         means the fan has physically failed.
+       * EMI NOTE: verify whether PA5 and PA6 end up physically adjacent on
+         this package's actual layout before ruling out crosstalk between
+         them. PA5 switches at 25kHz - close enough for capacitive crosstalk
+         to inject spurious edges into PA6 that would look like real
+         tachometer pulses and mask a genuine stall, if they end up close
+         together on this package too. The firmware debounces PA6 with a
+         2ms minimum period between counted pulses (well above the ~40us
+         period of 25kHz noise, well below any physically real RPM reading).
+       * No external pull-up populated for HOTEND_FAN_FG (R41/R42 are series
+         protection, not pull-ups) - relies on the MCU's internal pull-up.
+
+-----------------------------------------------------------------------------
+[9] FREE PINS (HEADROOM FOR FUTURE EXPANSION)
+-----------------------------------------------------------------------------
+* Pin PA2  -> FREE (was CONN_LED1's bit-banged data pin, before
+  SPI1/PA7 took over - see [3])
+  PA8 carries the drill/laser/layer-fan
+  PWM - see [7]. PB1 is NOT free - still drives CONN_LED2.
+* Pin PD2  -> FREE. Genuinely unallocated on this package - not claimed by
+  ID4, the drill's dedicated pin, or the expansion connector below.
+* PC13 (ID4), PB9 (drill brake), and PB10-PB15/PC14-PC15 (expansion
+  connector) are all allocated - see [1], [7], and [10].
+
+-----------------------------------------------------------------------------
+[10] EXPANSION CONNECTOR (NEW)
+-----------------------------------------------------------------------------
+A 14-pin header for add-on boards, on its own I2C2 bus - deliberately
+separate from I2C1 (the OLED) so nothing on an expansion board can
+interfere with the display's timing. Full pin-by-pin listing lives in
+PINOUT_CONNECTORS.TXT section 9 and PINOUT.TXT block 10; not duplicated
+here since this document's focus is the tool-identification matrix, and the
+expansion connector doesn't change based on which tool ID is selected.
+=============================================================================

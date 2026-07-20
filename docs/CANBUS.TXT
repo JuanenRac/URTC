@@ -1,0 +1,513 @@
+=============================================================================
+CAN BUS COMMAND MAP - URTC v1.0 (UNIVERSAL ROBOT TOOL CONTROLLER)
+PROJECTS: URTC/HYDRA-UMC (JUANENBOT/PAROL6)
+AUTHOR: JuanenRac (Electro Hobby 3D) - electrohobby3d@gmail.com
+LICENSE: This document is licensed under CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/).
+         Firmware source is GPL-3.0; hardware design files are CERN-OHL-S v2 - see the repo README.
+MCU: STM32F303CCT6 (256KB flash: 30KB bootloader / 2KB metadata / 112KB main
+     application slot / 112KB backup-staging slot). Tool addressing covers
+     32 IDs (ID0-ID4).
+=============================================================================
+
+CRITICAL RECONSTRUCTION NOTE: All multi-byte fields are transmitted in
+BIG-ENDIAN format (Most Significant Byte [MSB] first on the wire). The
+STM32F303 firmware must unpack them strictly respecting this order.
+
+-----------------------------------------------------------------------------
+1. MAXIMUM-PRIORITY COMMANDS (Critical Events / Interrupts)
+-----------------------------------------------------------------------------
+ID: 0x095 [URTC Tool Head -> Master] (INSTANT SEND VIA EXTI INTERRUPT)
+DLC: 1 byte
+Data:
+  - txData[0]: Collision event / surface contact register
+               0x01 = IMPACT DETECTED! (Edge on PB3 - Pin 24)
+  Note: Critically low ID so it always wins hardware arbitration on the CAN
+        bus. This frame bypasses schedulers entirely; it is injected with
+        absolute priority straight from the EXTI3 interrupt callback (PB3
+        pin) to avoid probe damage during high-speed scanning.
+
+-----------------------------------------------------------------------------
+2. GLOBAL COMMANDS (Valid for any active tool)
+-----------------------------------------------------------------------------
+ID: 0x110 [Master -> URTC Tool Head]
+Query active tool + quick state
+DLC: any (payload ignored)
+Data: none needed
+Effect: answers with 0x111. Read-only, no side effects - answered even
+        while a critical error is declared, unlike most commands, since
+        this is exactly the kind of diagnostic that matters most when
+        something's already wrong. A host has no other way to learn which
+        of the 12 tool profiles a board is jumpered for without this,
+        short of probing which tool-specific IDs happen to get a
+        response - which takes time and can't distinguish "no response
+        yet" from "wrong tool for this command".
+
+ID: 0x111 [URTC Tool Head -> Master, answers 0x110]
+Active tool + quick state response
+DLC: 4 bytes
+Data:
+  - txData[0]: Active tool (matches the ToolMode_t enum in STM32F303CC.C):
+               0=Soldering Iron, 1=Paste Dispenser, 2=Liquid Dispenser,
+               3=Screwdriver, 4=Vacuum Pickup, 5=Drill, 6=Gripper Gimbal,
+               7=Gripper NEMA, 8=AOI Inspection, 9=Laser Engraver,
+               10=3D Printer, 11=Scan Probe, 12+ = no tool assigned to
+               this jumper setting (see STM32F303CC.C's TOOL_INVALID note)
+  - txData[1]: system_error_flag (0x01 = a critical fault is currently declared)
+  - txData[2]: can_bus_error_flag (0x01 = a CAN bus fault was seen)
+  - txData[3]: boot_sequence_active (0x01 = still inside the ~5s boot
+               splash window - movement commands are deferred until this clears)
+
+ID: 0x100 [Master -> URTC Tool Head]
+DLC: 8 bytes
+Data:
+  - rxData[0]: Red LED intensity (R) - Status LED color, CONN_LED1 (0-255)
+  - rxData[1]: Green LED intensity (G) - Status LED color, CONN_LED1 (0-255)
+  - rxData[2]: Blue LED intensity (B) - Status LED color, CONN_LED1 (0-255)
+    * CONN_LED1 has an automatic default (see below) - this
+      message is an OVERRIDE, not the only way its color gets set. The
+      override holds for 10s from the last 0x100 received (each new 0x100
+      refreshes that window), then falls back to automatic. A hardware
+      fault always takes over regardless of any active override.
+  - rxData[3]: Display and night-mode control
+               0x00 = Standard mode (OLED at normal brightness / High contrast 0xCF)
+               0x01 = Night mode active (OLED low-power / Minimum contrast 0x0F)
+               0x0F = Display in Standby / Display OFF (anti-burn-in protection)
+  - rxData[4]: Red intensity (R) - Ring LED color, CONN_LED2 (0-255) - NEW
+  - rxData[5]: Green intensity (G) - Ring LED color, CONN_LED2 (0-255) - NEW
+  - rxData[6]: Blue intensity (B) - Ring LED color, CONN_LED2 (0-255) - NEW
+  - rxData[7]: Ring on/off - NEW
+               0x00 = Ring off
+               0x01 = Ring on, solid, at the rxData[4:6] color
+  Note: CONN_LED1 (status LED) automatic scheme, applied whenever no host
+        override from this message is currently held: red if a hardware
+        fault is active (system_error_flag, highest priority, always wins),
+        blue if a CAN frame of any ID arrived within the last 1.5s ("actively
+        functioning"), green otherwise ("idle, waiting for commands"). The
+        local diagnostic LED (PA15) is separate and unrelated to this -
+        5Hz blink while the main loop is alive, solid on for a fault.
+  Note: In TOOL_AOI_INSPECTION mode, rxData[7] (ring on/off) is ignored - the
+        ring there is driven by 0x150 (off/strobe/continuous) instead, so it
+        can flash in sync rather than just switch on/off. rxData[4:6] still
+        updates the stored color even in AOI mode, so a color change takes
+        effect immediately if 0x150's mode is already set to continuous.
+
+-----------------------------------------------------------------------------
+3. MOTION TOOLS (Standard Stepper - Extended Range)
+   Associated with: TOOL_PASTE_DISPENSER (1), TOOL_LIQUID_DISPENSER (2),
+                TOOL_SCREWDRIVER (3), TOOL_GRIPPER_GIMBAL (6), TOOL_GRIPPER_NEMA (7)
+-----------------------------------------------------------------------------
+ID: 0x120 [Master -> URTC Tool Head]
+DLC: 5 bytes
+Data:
+  - rxData[0]: Rotation direction (DIR)
+               0x01 = Clockwise / Forward (GPIO_PIN_SET on PB5)
+               0x00 = Counter-clockwise / Reverse (GPIO_PIN_RESET on PB5)
+  - rxData[1]: Step count - Byte 3 (MSB) [BIG-ENDIAN]
+  - rxData[2]: Step count - Byte 2
+  - rxData[3]: Step count - Byte 1
+  - rxData[4]: Step count - Byte 0 (LSB)
+  Note: Uses lines PB3 (STEP), PB5 (DIR), and PB6 (TMC_ENN). The firmware
+        enables power on receiving the frame (PB6=0) and cuts it once
+        finished (PB6=1) to avoid static overheating.
+
+-----------------------------------------------------------------------------
+4. SOLDERING TOOL
+   Associated with: TOOL_SOLDERING_IRON (0)
+-----------------------------------------------------------------------------
+ID: 0x130 [Master -> URTC Tool Head]
+DLC: 2 bytes
+Data:
+  - rxData[0]: T12 setpoint temperature (°C) - High byte (MSB) [BIG-ENDIAN]
+  - rxData[1]: T12 setpoint temperature (°C) - Low byte (LSB)
+  Note: Sending 0x0000 fully turns off the thermal loop. Setpoint and actual
+        temperature are both shown live on the OLED interface.
+  Note: The firmware includes a 250ms communication watchdog. If a setpoint
+        above 0 is active and no refresh frame arrives, the heater is cut
+        and the system enters Critical Error - the same protection the
+        laser (0x160) has, closing a gap where only the PWM-actuator tools
+        used to have this and the heaters didn't.
+
+ID: 0x135 [URTC Tool Head -> Master] (Automatic telemetry every 150ms)
+DLC: 3 bytes
+Data:
+  - txData[0]: Current T12 temperature (°C) - High byte (MSB) [BIG-ENDIAN]
+  - txData[1]: Current T12 temperature (°C) - Low byte (LSB)
+  - txData[2]: Generic endstop / limit switch state (PB3, NEW)
+               0x01 = Triggered (line pulled low)
+               0x00 = Open
+  Note: Temperature read exclusively via ADC Channel 0 (PA0) through the AD8605
+        op-amp. Endstop polled every 150ms as a plain digital input (not
+        interrupt-driven) - see CANBUS section [5] logic in ECOVIA.TXT for why.
+
+-----------------------------------------------------------------------------
+5. DRILL TOOL (BL4260 Brushless Motor with Integrated Driver)
+   Associated with: TOOL_DRILL (5)
+-----------------------------------------------------------------------------
+ID: 0x140 [Master -> URTC Tool Head]
+DLC: 2 bytes
+Data:
+  - rxData[0]: Motor speed per PWM cycle towards PA8 (0 to 255)
+               0x00 = Full stop (0% duty cycle + active brake on PB6)
+               > 0  = Active speed modulation via TIM1_CH1 (releases brake)
+  - rxData[1]: Rotation direction (FRIN on pin PA4 - Pin 10)
+               0x01 = Counter-clockwise (High level)
+               0x00 = Clockwise (Low level)
+
+ID: 0x147 [URTC Tool Head -> Master] (Automatic telemetry every 150ms)
+DLC: 3 bytes
+Data:
+  - txData[0]: Calculated actual RPM (uint16_t) - High byte (MSB via EXTI3 on PA3) [BIG-ENDIAN]
+  - txData[1]: Calculated actual RPM (uint16_t) - Low byte (LSB)
+  - txData[2]: Generic endstop / limit switch state (PB3, NEW)
+               0x01 = Triggered (line pulled low)
+               0x00 = Open
+  Note: The tachometer (PA3/EXTI3) and the endstop (PB3, plain polled input)
+        are two different physical pins that coexist fine in this tool mode.
+
+-----------------------------------------------------------------------------
+6. VACUUM / PICKUP TOOL (Vacuum pickup with TCRT5000)
+   Associated with: TOOL_VACUUM_PICKUP (4)
+-----------------------------------------------------------------------------
+ID: 0x145 [URTC Tool Head -> Master] (Automatic telemetry every 150ms)
+DLC: 3 bytes
+Data:
+  - txData[0]: 12-bit analog ADC reading (PB0/Channel 8) - High byte (MSB) [BIG-ENDIAN]
+  - txData[1]: 12-bit analog ADC reading (PB0/Channel 8) - Low byte (LSB)
+  - txData[2]: LM393 digital output state (PB3 - Pin 24)
+               0x01 = Object detected / Part picked up
+               0x00 = Empty / No reading
+
+-----------------------------------------------------------------------------
+7. OPTICAL INSPECTION TOOL (AOI Tool Head)
+   Associated with: TOOL_AOI_INSPECTION (8)
+-----------------------------------------------------------------------------
+ID: 0x150 [Master -> URTC Tool Head]
+DLC: 3 bytes
+Data:
+  - rxData[0]: Ring light operating mode (drives the CONN_LED2 ring - see 0x100
+               for setting its color)
+               0x00 = Ring off
+               0x01 = Synchronous strobe flash mode (freeze image)
+               0x02 = Fixed continuous illumination (general inspection)
+  - rxData[1]: Strobe period - High byte (MSB) [BIG-ENDIAN]
+  - rxData[2]: Strobe period - Low byte (LSB)
+  Note: The ring's actual color comes from 0x100's rxData[4:6] - this command
+        only controls the on/off/strobe timing pattern, not the color itself.
+        The strobe pulse flashes the same ring LEDs used for continuous mode.
+
+ID: 0x155 [URTC Tool Head -> Master] (Automatic telemetry every 150ms) - NEW
+DLC: 1 byte
+Data:
+  - txData[0]: Generic endstop / limit switch state (PB3)
+               0x01 = Triggered (line pulled low)
+               0x00 = Open
+  Note: This tool had no outbound telemetry frame before the endstop feature.
+
+-----------------------------------------------------------------------------
+8. COAXIAL DIODE LASER ENGRAVER TOOL, 10W
+   Associated with: TOOL_LASER_ENGRAVER (9)
+-----------------------------------------------------------------------------
+ID: 0x160 [Master -> URTC Tool Head]
+DLC: 2 bytes
+Data:
+  - rxData[0]: Laser diode emission power (PWM: 0 to 255 on PA8/TIM1_CH1)
+  - rxData[1]: Safety/protection control line state / Interlock
+               0x00 = Safe mode (laser locked / PB6 LOW)
+               0x01 = Interlock armed and ready (PB6 HIGH)
+  Note: The firmware includes a 250ms communication watchdog. If power is
+        set and no refresh frames arrive, the PWM is shut off and the
+        interlock opens (PB6=0).
+
+ID: 0x165 [URTC Tool Head -> Master] (Automatic telemetry every 150ms) - NEW
+DLC: 1 byte
+Data:
+  - txData[0]: Generic endstop / limit switch state (PB3)
+               0x01 = Triggered (line pulled low)
+               0x00 = Open
+  Note: This tool had no outbound telemetry frame before the endstop feature.
+
+-----------------------------------------------------------------------------
+9. 3D PRINTING TOOL (Hotend + Extruder + Layer Fan + Hotend Fan Head)
+   Associated with: TOOL_3D_PRINTER (10)
+-----------------------------------------------------------------------------
+ID: 0x170 [Master -> URTC Tool Head] -> Unified Thermal and Motion Control
+DLC: 6 bytes
+Data:
+  - rxData[0]: Nozzle setpoint temperature (°C) - High byte (MSB) [BIG-ENDIAN]
+  - rxData[1]: Nozzle setpoint temperature (°C) - Low byte (LSB)
+  - rxData[2]: Extruder direction (0x01 = Forward / 0x00 = Retract, on PB5)
+  - rxData[3]: Extruder motor steps (PB3) - Byte 2 (MSB of 24-bit value) [BIG-ENDIAN]
+  - rxData[4]: Extruder motor steps - Byte 1
+  - rxData[5]: Extruder motor steps - Byte 0 (LSB)
+  Note: The firmware includes a 250ms communication watchdog on the nozzle
+        setpoint specifically (not the extruder motion). If a setpoint
+        above 0 is active and no refresh frame arrives, the heater is cut
+        and the system enters Critical Error - same protection as the
+        soldering iron (0x130) and laser (0x160).
+
+ID: 0x173 [Master -> URTC Tool Head] -> Layer Fan Control
+DLC: 1 byte
+Data:
+  - rxData[0]: 4-wire Delta fan power (PWM: 0 to 255 towards PA8, 25kHz real
+               via TIM1_CH1 - the same channel used for Drill/Laser, just
+               reconfigured to this tool's exact rate)
+  Note: The firmware includes a 1000ms communication watchdog. If the
+        setpoint is >0 and no refresh frame (0x173) arrives within that
+        window, the PWM shuts off autonomously and the system enters
+        Critical Error. The master must resend 0x173 periodically even if
+        the setpoint doesn't change, just as the laser requires with 0x160.
+        This emergency stop does NOT touch PB6: that line exclusively
+        belongs to the extruder driver's ENN in this same tool mode, and
+        forcing it would cut the motor mid-print every time the fan
+        dropped to 0%.
+
+ID: 0x175 [URTC Tool Head -> Master] -> Thermal Telemetry (every 150ms)
+DLC: 2 bytes
+Data:
+  - txData[0]: Current hotend temperature (ADC Channel 8 on PB0) - High byte (MSB) [BIG-ENDIAN]
+  - txData[1]: Current hotend temperature (ADC Channel 8 on PB0) - Low byte (LSB)
+
+ID: 0x177 [URTC Tool Head -> Master] -> Layer Fan RPM Telemetry (every 150ms)
+DLC: 2 bytes
+Data:
+  - txData[0]: Calculated actual RPM (uint16_t) - High byte (MSB via EXTI3 on PA3) [BIG-ENDIAN]
+  - txData[1]: Calculated actual RPM (uint16_t) - Low byte (LSB)
+
+ID: 0x178 [Master -> URTC Tool Head] -> Hotend Fan Control - NEW
+DLC: 1 byte
+Data:
+  - rxData[0]: Hotend cooling fan power (PWM: 0 to 255 towards PA5, 25kHz real
+               via dedicated TIM2, connector CONN_FAN1)
+  Note: This is a SEPARATE fan from the layer fan (0x173): it cools the
+        hotend's heat break/heatsink, not the printed part. Unlike the layer
+        fan, this one does NOT have a communication-loss shutoff watchdog -
+        losing this fan is more dangerous than a stuck one, so the firmware
+        instead runs a stall detector: if duty is >0 but the tachometer still
+        reads 0 RPM 3 seconds after starting, the fan has physically failed
+        and the system enters Critical Error.
+
+ID: 0x179 [URTC Tool Head -> Master] -> Hotend Fan RPM Telemetry (every 150ms) - NEW
+DLC: 2 bytes
+Data:
+  - txData[0]: Calculated actual RPM (uint16_t) - High byte (MSB via EXTI6 on PA6) [BIG-ENDIAN]
+  - txData[1]: Calculated actual RPM (uint16_t) - Low byte (LSB)
+
+=============================================================================
+CAN BOOTLOADER PROTOCOL - see the README's "Building & Flashing" section
+for the full walkthrough. These IDs are deliberately far from every
+application-runtime ID above (0x095-0x179) so there's no risk of confusing
+a bootloader-protocol frame with a normal command, or vice versa. 0x7F0 is
+handled by the RUNNING APPLICATION; 0x7F1-0x7F4/0x7F7 are handled by the
+BOOTLOADER (which only runs before the application, or after 0x7F0 resets
+into it) - the application and bootloader never both listen for the same
+ID, with one deliberate exception: 0x7F8 (query version) is answered by
+whichever one is currently running, so a host can check what's installed
+without needing to trigger a reset first.
+
+Golden-image update model: every update is written into a backup/staging
+flash slot first, never into the slot currently running. Only after it
+fully passes size, CRC32, and HMAC-SHA256 signature verification does the
+bootloader copy it into the main slot - which is never touched before that
+point. See the README's flash memory layout section for the full reasoning.
+=============================================================================
+
+ID: 0x7F0 [Master -> URTC Tool Head, handled by the APPLICATION]
+Enter bootloader mode
+DLC: 4 bytes
+Data:
+  - rxData[0..3]: Magic payload, must be exactly 0xB0, 0x07, 0x1D, 0x5A
+    Any other payload on this ID is ignored - this isn't just an ID match,
+    specifically to make an accidental trigger from a corrupted or
+    malformed frame extremely unlikely.
+Effect: cuts power to every actuator inline (motors, heaters, laser -
+        not deferred to a future loop iteration), then resets the chip.
+        The bootloader takes over from here.
+
+ID: 0x7F1 [Master -> URTC Tool Head, handled by the BOOTLOADER]
+Start update
+DLC: 8 bytes
+Data:
+  - rxData[0..3]: Total firmware image size in bytes (uint32_t) [BIG-ENDIAN]
+  - rxData[4..7]: Declared HardwareID (uint32_t) [BIG-ENDIAN] - must match
+    this board's own HardwareID exactly, or the update is rejected right
+    here, before a single byte of flash is touched.
+Effect: erases exactly as many 2KB pages of the BACKUP slot as the declared
+        size needs (starting at 0x08024000 - the main slot is not touched).
+        Replies with a 0x7F5 status frame (0x02 = erasing, then
+        0x03 = receiving once erase completes).
+
+ID: 0x7F7 [Master -> URTC Tool Head, handled by the BOOTLOADER]
+HMAC-SHA256 signature chunk
+DLC: 8 bytes
+Data:
+  - rxData[0..7]: 8 bytes of the expected 32-byte HMAC-SHA256 signature,
+    sent as 4 sequential frames covering bytes 0-7, 8-15, 16-23, 24-31 in
+    order. Send all 4 after 0x7F1 and before the first 0x7F2 data frame.
+    Computed over the raw firmware image with a key shared between the
+    bootloader and whatever tool signs the build - proves the image
+    actually came from this project's own build process, not just that it
+    arrived intact (which CRC32 alone only guarantees).
+
+ID: 0x7F2 [Master -> URTC Tool Head, handled by the BOOTLOADER]
+Firmware data
+DLC: 1-8 bytes
+Data:
+  - rxData[0..DLC-1]: Raw firmware binary data, sent sequentially. CAN
+    guarantees in-order delivery on a single bus, so no per-frame sequence
+    number is included - the bootloader just appends whatever arrives to
+    a 2KB page buffer in RAM, writes the page to the BACKUP slot once full
+    (reading every half-word back and comparing it against what was meant
+    to be written before considering the page done), and sends a 0x7F3
+    acknowledgement before accepting the next page's data. A well-behaved
+    master waits for each page's ACK before sending more, to avoid
+    overrunning the bootloader's buffer.
+
+ID: 0x7F3 [URTC Tool Head -> Master, sent by the BOOTLOADER]
+Page written acknowledgement
+DLC: 4 bytes
+Data:
+  - txData[0..3]: Index of the page that was just written (uint32_t)
+    [BIG-ENDIAN], counting from 0 at the start of the backup slot.
+
+ID: 0x7F4 [Master -> URTC Tool Head, handled by the BOOTLOADER]
+End update / verify
+DLC: 8 bytes
+Data:
+  - rxData[0..3]: CRC32 of the complete firmware image (uint32_t)
+    [BIG-ENDIAN] - standard CRC-32 (reflected, polynomial 0xEDB88320,
+    final XOR 0xFFFFFFFF), the same variant Python's zlib.crc32() computes.
+  - rxData[4..5]: Firmware version major (uint16_t) [BIG-ENDIAN]
+  - rxData[6..7]: Firmware version minor (uint16_t) [BIG-ENDIAN]
+Effect: the bootloader checks the backup slot's size, CRC32, and
+        HMAC-SHA256 against what was declared. Only if everything matches
+        does it copy the backup slot into the main slot (page by page, with
+        the same read-back verification as above), then save the new
+        metadata and reset into the updated application (0x7F5 status 0x04,
+        verify OK). On any mismatch - size/incomplete transfer, CRC32,
+        HMAC, or HardwareID - the main slot is never touched, 0x7F5 status
+        0x05 (verify failed) is sent with a specific reason byte (see
+        below), and the bootloader goes back to listening for a fresh
+        attempt. It will never jump into an image that failed any of its
+        checks.
+
+ID: 0x7F5 [URTC Tool Head -> Master, sent by the BOOTLOADER]
+Status
+DLC: 1 byte normally, 2 bytes specifically for status 0x05 (verify failed)
+Data:
+  - txData[0]: 0x01 listening | 0x02 erasing | 0x03 receiving |
+               0x06 verifying | 0x07 copying backup into main slot |
+               0x04 verify OK (about to jump) | 0x05 verify failed |
+               0xFF error (e.g. declared size of 0 or larger than the
+               112KB slot)
+  - txData[1] (only present when txData[0] == 0x05): reason code -
+               0x01 incomplete transfer (didn't receive the declared size
+               or all 4 HMAC chunks) | 0x02 CRC32 mismatch (transfer
+               corruption) | 0x03 HMAC signature mismatch (not signed with
+               this project's key) | 0x04 HardwareID mismatch (image built
+               for different hardware - checked before a single byte is
+               written, reported here for one consistent "why did it fail"
+               path rather than the generic 0xFF error)
+
+ID: 0x7F6 [URTC Tool Head -> Master, sent by the BOOTLOADER, every ~1s
+while listening or mid-update]
+Heartbeat
+DLC: 2 bytes
+Data:
+  - txData[0]: same status codes as 0x7F5 (always just the bare status
+    byte here, never the 2-byte verify-fail-with-reason form - the
+    heartbeat's own second byte is always the progress percent below, not
+    a reason code)
+  - txData[1]: progress percent, 0-100, or 0xFF where not applicable (e.g.
+    while listening)
+Effect: none - purely informational. Lets the master distinguish "node is
+        alive but hasn't started listening yet" from "node is completely
+        unresponsive," and gives visibility into a stuck bootloader without
+        waiting for a timeout.
+
+ID: 0x7F8 [Master -> URTC Tool Head, handled by BOTH the application AND
+the bootloader, whichever is currently running]
+Query version
+DLC: any (payload ignored)
+Data: none needed
+Effect: whichever side is currently running answers with 0x7F9. Unlike
+        every other ID in this section, this one isn't bootloader-specific -
+        it works whether the board is running its normal application or
+        sitting in the bootloader, so a host can check what's currently
+        installed without first triggering a reset via 0x7F0 just to find
+        out. Safe to send at any time; read-only, no side effects either side.
+
+ID: 0x7F9 [URTC Tool Head -> Master, sent by whichever side answered 0x7F8]
+Version response
+DLC: 8 bytes
+Data:
+  - txData[0]: 0x00 = answering as the running application, 0x01 =
+    answering as the bootloader
+  - txData[1..4]: HardwareID (uint32_t) [BIG-ENDIAN]
+  - txData[5..6]: Firmware version major (uint16_t) [BIG-ENDIAN]
+  - txData[7]: Firmware version minor (uint8_t)
+Notes: when the bootloader answers (txData[0]=0x01), the HardwareID/version
+       reported are whatever the metadata page currently says about the
+       main slot - i.e. what's actually installed and would run if jumped
+       to, not necessarily "what the bootloader itself is". If the
+       bootloader has no valid metadata (blank chip, or every check
+       failed), it reports HardwareID=0 as a sentinel - a real
+       THIS_HARDWARE_ID is never zero, so a host can tell "bootloader
+       running with nothing valid installed" apart from "bootloader
+       running, main slot looks fine, just hasn't jumped yet for some
+       other reason" (e.g. an update was requested). See 0x7FA below for
+       the bootloader's OWN version, sent alongside this frame whenever
+       the bootloader itself is the one answering.
+
+ID: 0x7FA [URTC Tool Head -> Master, sent ONLY by the BOOTLOADER,
+alongside 0x7F9, whenever the bootloader is the one answering 0x7F8]
+Bootloader version response
+DLC: 3 bytes
+Data:
+  - txData[0]: Bootloader version major (uint8_t)
+  - txData[1]: Bootloader version minor (uint8_t)
+  - txData[2]: Bootloader version patch (uint8_t)
+Notes: this is BOOTLOADER.C's own version (BOOTLOADER_VERSION_MAJOR/MINOR/
+       PATCH in the source) - a separate thing from 0x7F9's Firmware
+       version major/minor, which describes the installed APPLICATION,
+       not the bootloader itself. The application never sends this frame -
+       it has no way to know a currently-flashed bootloader's version
+       other than this, so if the application is the one answering 0x7F8,
+       only 0x7F9 arrives and this one doesn't. A host that wants both
+       needs the board sitting in the bootloader when it asks (e.g. right
+       after 0x7F0, or on a fresh boot before the application has been
+       jumped to).
+
+=============================================================================
+  0x095 -> Instant impact register (Touch probe - MAXIMUM PRIORITY)
+  0x100 -> Status + ring LED control / OLED night mode, EXTENDED (DLC:8)
+  0x110 -> Query active tool + quick state, NEW (DLC:any)
+  0x111 -> Active tool + quick state response, NEW (DLC:4)
+  0x120 -> Stepper motor control (Dispensers, Screwdriver, Grippers - DLC:5)
+  0x130 -> T12 setpoint temperature (Soldering iron - DLC:2)
+  0x135 -> T12 thermal telemetry + endstop (Soldering iron - DLC:3)
+  0x140 -> BL4260 speed and direction control (Smart drill - DLC:2)
+  0x145 -> ADC telemetry / Digital input (Vacuum pickup - DLC:3)
+  0x147 -> Actual RPM telemetry + endstop, uint16_t (Drill - DLC:3)
+  0x150 -> Ring off/strobe/continuous control (AOI tool head - DLC:3)
+  0x155 -> Endstop telemetry, NEW (AOI tool head - DLC:1)
+  0x160 -> Laser power and interlock (Laser engraver - DLC:2 - 250ms watchdog)
+  0x165 -> Endstop telemetry, NEW (Laser engraver - DLC:1)
+  0x170 -> Unified thermal setpoint and extruder motion (3D printer - DLC:6)
+  0x173 -> Delta layer fan PWM power control (3D printer - DLC:1)
+  0x175 -> Hotend thermal telemetry (3D printer - DLC:2)
+  0x177 -> Layer fan actual RPM telemetry, uint16_t (3D printer - DLC:2)
+  0x178 -> Hotend fan PWM power control, NEW (3D printer - DLC:1)
+  0x179 -> Hotend fan actual RPM telemetry, uint16_t, NEW (3D printer - DLC:2)
+  --- CAN bootloader protocol (see dedicated section above) ---
+  0x7F0 -> Enter bootloader mode (Application, magic payload - DLC:4)
+  0x7F1 -> Start update, size + HardwareID (Bootloader - DLC:8)
+  0x7F2 -> Firmware data, to backup slot (Bootloader - DLC:1-8)
+  0x7F3 -> Page written acknowledgement (Bootloader - DLC:4)
+  0x7F4 -> End update / verify, CRC32 + version (Bootloader - DLC:8)
+  0x7F5 -> Status (Bootloader - DLC:1, or 2 for verify-fail + reason)
+  0x7F6 -> Heartbeat, status + progress, ~1s (Bootloader - DLC:2)
+  0x7F7 -> HMAC-SHA256 signature chunk, x4 (Bootloader - DLC:8)
+  0x7F8 -> Query version (App or Bootloader, whichever's running - DLC:any)
+  0x7F9 -> Version response (App or Bootloader - DLC:8)
+  0x7FA -> Bootloader's own version, Bootloader-only, alongside 0x7F9 (DLC:3)
+=============================================================================

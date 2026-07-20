@@ -1,0 +1,169 @@
+================================================================================
+FINAL BILL OF MATERIALS (BOM) - UNIVERSAL TOOL HEAD BOARD v1.0 (URTC)
+================================================================================
+AUTHOR: JuanenRac (Electro Hobby 3D) - electrohobby3d@gmail.com
+LICENSE: This document is licensed under CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/).
+         Firmware source is GPL-3.0; hardware design files are CERN-OHL-S v2 - see the repo README.
+Power Specification: 24V DC input / 5V output + 3.3V logic (+ isolated 3.3VB for the OLED)
+Identification System: 5-bit matrix via jumpers (ID0-ID4)
+SOURCE: Reference designators, values, and packages below are taken directly
+        from URTC_V1.0.sch's exported BOM/netlist, not independently
+        re-verified against a physical board.
+================================================================================
+
+--------------------------------------------------------------------------------
+1. POWER SUPPLY AND REGULATION (24V INPUT -> 5V -> 3.3V / 3.3VB)
+--------------------------------------------------------------------------------
+RefDes      Qty        Value / Model       Package         Notes / Description
+--------------------------------------------------------------------------------
+U1          1          LMR14020SDDA        VREG (HSOIC-8)  Buck step-down regulator (24V -> 5V main output)
+U2          1          AP2112K-3.3TRG1     SOT23-5         Linear 3.3V logic regulator LDO, main +3V3 rail
+U3          1          AP2112K-3.3TRG1     SOT23-5         Second, identical LDO - dedicated +3V3B rail for
+                                                            the OLED only (CONN_OLED2), isolated from digital noise
+                                                            on the main +3V3 rail
+L1          1          SRP4020TA-1R5M      SMD (IND)       1.5uH shielded inductor, buck converter
+D1          1          B240A-13-F          SMA (DO-214)    Schottky diode 2A/40V - buck flyback
+C1,C15,C16  3          10uF/50V            C1206           24V input filter capacitors
+C2,C21      2          22uF/10V            C0805           +5V output filter capacitors
+C3,C22,C25  3          4.7uF/6.3V          C0603           +3V3/+3V3B clean output capacitors
+C4          1          10nF                C0402           Buck soft-start capacitor
+CBOOT       1          100nF               C0402           Buck bootstrap capacitor (BOOT/SW pins)
+C20         1          100uF/35V           SANYO-OSCON C6  Electrolytic bulk capacitor, 24V input
+C17         1          4.7uF/50V           C1206           TMC2209 5VOUT stabilization capacitor
+C23,C24     2          10uF/6.3V           C0603           +3V3B local filtering
+C26,C27     2          2.2uF/6.3V          C0603           OLED charge-pump capacitors (C1P/C1N/C2P/C2N)
+R1          1          100K                R0402           +5V feedback divider, high side
+R2          1          19K1                R0402           +5V feedback divider, low side
+R3          1          100K                R0402           Buck EN pull-up to 24V
+R4          1          91K                 R0402           Buck oscillator frequency-set resistor
+R46         1          330R                R0402           +3V3B power-present LED series resistor
+R47         1          330R                R0402           +5V power-present LED series resistor
++3V3        1          LED-0603            0603            +3V3 rail power-present indicator
++3V3B       1          LED-0603            0603            +3V3B (OLED) rail power-present indicator
++5V         1          LED-0603            0603            +5V rail power-present indicator
+
+--------------------------------------------------------------------------------
+2. CENTRAL CONTROL CORE, CAN BUS, AND PROGRAMMING
+--------------------------------------------------------------------------------
+RefDes      Qty        Value / Model       Package         Notes / Description
+--------------------------------------------------------------------------------
+U7          1          STM32F303CCT6       LQFP48-7x7      ARM Cortex-M4F microcontroller (256KB Flash,
+                                                            48KB SRAM [40KB main + 8KB CCM], native CAN,
+                                                            hardware FPU). Datasheet: STM32F303xB/xC family.
+U4          1          TJA1057             SOIC-8          High-speed industrial CAN transceiver
+C5,C6,C8,C18 4         100nF               C0402           Local decoupling, +3V3 lines at U7/U4
+C9          1          100nF               C0402           Anti-noise capacitor on STM_RST
+R5          1          120R                R0402           CAN bus termination resistor (CAN_H/CAN_L)
+R6          1          10K                 R0402           BOOT0 pull-down (dedicated pin 44 on U7 - NOT
+                                                            the same pin as PB8, which is a separate, free
+                                                            GPIO - see PINOUT.TXT Block 1)
+R31         1          1K                  R0402           BOOT button pull-up to +3V3 (series with BOOT0)
+R33,R34     2          4K7                 R0402           I2C1 pull-ups to +3V3 (OLED_SDA/OLED_SCL, PA9/PA10)
+R44         1          4K7                 R0402           I2C2 pull-up to +3V3 (EXP_I2C2_SDA, expansion connector)
+R48         1          4K7                 R0402           I2C2 pull-up to +3V3 (EXP_I2C2_SCL, expansion connector)
+BOOT        1          KMR2                6mm SMT         Bootloader-select pushbutton (BOOT0 -> +3V3 via R31)
+RESET       1          KMR2                6mm SMT         MCU reset pushbutton (STM_RST -> GND)
+STM_JTAG    1          SWD-1X5-SMD         2.54mm, 5-pin   ST-Link programming header (VCC/GND/RST/SWDIO/SWCLK)
+
+[PHYSICAL ADDRESSING MATRIX - SOLDER JUMPERS]
+ID0-ID4     5          Solder Jumper NC    MODERNDEVICE_SJ Solder-blob jumpers for 32-address physical ID
+                                                            (ID0/ID1 on PF0/PF1, ID2 on PB4, ID3 on PB7,
+                                                            ID4 on PC13)
+
+--------------------------------------------------------------------------------
+3. T12 / HOTEND HEATER STAGE AND ANALOG FRONT-END
+--------------------------------------------------------------------------------
+RefDes      Qty        Value / Model       Package         Notes / Description
+--------------------------------------------------------------------------------
+Q1          1          AOD4184A            TO-252 (DPAK)   Power N-MOSFET, T12/hotend heater switching (PA1)
+U5          1          AD8605ART           SOT23-5         Rail-to-rail precision op-amp, T12 thermocouple
+D2          1          BZT52C33S           SOD323-R        Zener protection diode, ADC input (T12_ADC, PA0)
+D3          1          SD05                SOD-323         TVS protection diode, analog/OLED line
+C10         1          10nF                C0402           Analog filter capacitor on T12_ADC (PA0)
+R10         1          47R                 R0402           Gate series/transient-limiting resistor, Q1
+R11         1          10K                 R0402           Gate pull-down resistor, Q1
+R12         1          10K                 R0402           T12 thermocouple input filter resistor
+R13         1          249K                R0402           Op-amp feedback/gain resistor
+R14,R15     2          1K                  R0402           Op-amp bias/gain resistors
+R45         1          390K                R0402           IREF-related resistor (OLED analog reference network)
+
+--------------------------------------------------------------------------------
+4. DRILL / LASER / FAN / SENSOR SIGNAL CONDITIONING
+--------------------------------------------------------------------------------
+RefDes      Qty        Value / Model       Package         Notes / Description
+--------------------------------------------------------------------------------
+R9          1          10K                 R0402           Pull-down to GND on DRILL_LASER_PWM (PA8)
+R16         1          10K                 R0402           Pull-up to +3V3 on DRILL_FGIN
+R27         1          220R                R0402           Series protection, DRILL_FRIN (PA4)
+R28         1          0R (bridge)         R0402           Direct bridge, DRILL_LASER_PWM path
+R29         1          0R (bridge)         R0402           Direct bridge, DRILL_FGIN path
+R30         1          220R                R0402           Series protection, TOOL_ENABLE_BRAKE (PB6)
+R36         1          220R                R0402           Series protection, DRILL_FGIN (PA3)
+R37         1          100R                R0402           Series protection, DRILL_LASER_PWM (PA8)
+R38         1          330R                R0402           Series protection, TCRT_A0 (PB0)
+R39         1          330R                R0402           Series protection, STEP_TCRT_D0_TOUCH_IN (PB3)
+R40         1          4K7                 R0402           Pull-up to +3V3, TCRT_A0 (PB0) - NTC divider
+R41         1          220R                R0402           Series protection, HOTEND_FAN_PWM (PA5)
+R42         1          220R                R0402           Series protection, HOTEND_FAN_FG (PA6)
+R43         1          220R                R0402           Series protection, DRILL_BRAKE (PB9's own
+                                                            dedicated pin, separate from the shared stepper
+                                                            TMC_ENN on PB6 - see PINOUT.TXT Block 6/7)
+
+--------------------------------------------------------------------------------
+5. STEPPER MOTOR DRIVER STAGE (TMC2209, ON-BOARD)
+--------------------------------------------------------------------------------
+RefDes      Qty        Value / Model       Package         Notes / Description
+--------------------------------------------------------------------------------
+U6          1          TMC2209-LA          QFN50 (5x5mm)   Stepper motor driver (PB5=DIR, PB6=!EN, PB3=STEP)
+P1          1          20K trimmer         RTRIM3103       Motor current VREF adjustment potentiometer
+R19,R20     2          0R11 (0.5W)         R1206           Current-sense resistors, phase A/B
+C11-C14     4          100nF               C0402           Local decoupling capacitors, U6
+C19         1          22nF                C0603           Charge pump capacitor (CPI/CPO)
+R17,R18     2          10K                 R0402           Pull-ups to +3V3, MS1/MS2 microstep config
+R21,R22,R24 3          20K                 R0402           UART/diagnostics configuration resistors
+R23         1          0R (bridge)         R0402           VREF ground reference bridge
+R25,R26     2          NC                  R0402           Unpopulated (SpreadCycle option, not used)
+MS1,MS2     2          Solder Jumper NC    MODERNDEVICE_SJ Microstep configuration solder jumpers
+
+--------------------------------------------------------------------------------
+6. LOCAL DIAGNOSTIC LIGHTING AND STATUS INDICATION
+--------------------------------------------------------------------------------
+RefDes      Qty        Value / Model       Package         Notes / Description
+--------------------------------------------------------------------------------
+RUN         1          LED-0603            0603            Firmware run/error diagnostic LED (PA15)
+R7          1          330R                R0402           Series resistor, CONN_LED1 status LED (LED_STATE)
+R8          1          330R                R0402           Series resistor, CONN_LED2 ring (LED_RING)
+R32         1          330R                R0402           RUN LED series/limiting resistor (PA15)
+
+--------------------------------------------------------------------------------
+7. OLED DISPLAY (SSD1306/SSD1315-COMPATIBLE, DIRECT-MOUNT)
+--------------------------------------------------------------------------------
+RefDes      Qty        Value / Model       Package         Notes / Description
+--------------------------------------------------------------------------------
+CONN_OLED2  1          SSD1306/SSD1315     FPC30           WiseChip UG-2864 0.96" 128x64 OLED panel, direct
+                                                            30-pin FPC mount (renamed from LCD1 in the
+                                                            schematic) - see README's OLED section for the
+                                                            alternate CONN_OLED (breakout module) path;
+                                                            the two are mutually exclusive
+
+--------------------------------------------------------------------------------
+8. PHYSICAL CONNECTOR BLOCK (TOOL HEAD INTERCONNECT)
+--------------------------------------------------------------------------------
+RefDes      Qty        Value / Model       Package         Notes / Description
+--------------------------------------------------------------------------------
+CONN_MAIN       1      B4B-XH-2            2.54mm, 4-pin   Main 24V power + CAN bus input
+CONN_T12        1      B3B-XH-2            2.54mm, 3-pin   T12 soldering iron / raw heater power
+CONN_OLED       1      JST4-B4B-PH-K       2.00mm, 4-pin   External OLED breakout module port (I2C1) -
+                                                            alternate to CONN_OLED2's direct mount, see section 7
+CONN_DRILL      1      B6B-XH-2            2.54mm, 6-pin   Multi-function Drill/Laser/Layer-fan connector
+CONN_FAN1       1      JST4-B4B-PH-K       2.00mm, 4-pin   Hotend cooling fan (PWM/FG/+5V/GND)
+CONN_SEN        1      JST4-B4B-PH-K       2.00mm, 4-pin   Impact probe / endstop / NTC / TCRT sensor input
+CONN_MOT        1      B4B-XH-2            2.54mm, 4-pin   NEMA/extruder stepper motor phase output
+CONN_LED1       1      JST3-B3B-PH-K       2.00mm, 3-pin   External status LED (single WS2812, host-colored)
+CONN_LED2       1      JST3-B3B-PH-K       2.00mm, 3-pin   Camera/illumination LED ring
+CONN_EXPANSION  1      WR-PHD 1.27mm       1.27mm, 20-pin  Add-on board header (grew from 14 to 20 pins -
+                                                            6 new pins reserved for a future SPI bus and a
+                                                            TMC2209 diagnostic line, not yet wired to the
+                                                            MCU) - see PINOUT_CONNECTORS.TXT
+                                                            section 9 for the full pin-by-pin breakdown
+================================================================================

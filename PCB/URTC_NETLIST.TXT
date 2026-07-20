@@ -1,0 +1,516 @@
+Netlist
+
+Exported from URTC_V1.0.sch at 18/07/2026 0:08
+
+EAGLE Version 9.5.2 Copyright (c) 1988-2019 Autodesk, Inc.
+
+Net                   Part           Pad      Pin        Sheet
+
++3V3                  C18            1        1          1
+                      C3             1        1          1
+                      C5             1        1          1
+                      C6             1        1          1
+                      C8             1        1          1
+                      CONN_EXPANSION 18       18         1
+                      CONN_OLED      2        2          1
+                      D3             C        C          1
+                      R16            1        1          1
+                      R17            2        2          1
+                      R18            2        2          1
+                      R26            2        2          1
+                      R31            1        1          1
+                      R33            1        1          1
+                      R34            1        1          1
+                      R35            2        2          1
+                      R40            2        2          1
+                      R44            2        2          1
+                      R48            2        2          1
+                      STM_JTAG       1-VCC    VCC        1
+                      U2             5        VOUT       1
+                      U4             5        SPLIT      1
+                      U5             5        VCC        1
+                      U6             15       VCC_IO     1
+                      U7             1        VBAT       1
+                      U7             24       VDD        1
+                      U7             36       VDD        1
+                      U7             48       VDD        1
+                      U7             9        VDDA       1
+
++3V3B                 C22            1        1          1
+                      C25            1        1          1
+                      C28            1        1          1
+                      CONN_OLED2     11       BS1        1
+                      CONN_OLED2     6        VBAT       1
+                      CONN_OLED2     9        VDD        1
+                      R46            2        2          1
+                      U3             5        VOUT       1
+
++5V                   C2             1        1          1
+                      C21            1        1          1
+                      C7             1        1          1
+                      CONN_EXPANSION 3        3          1
+                      CONN_FAN1      1        1          1
+                      CONN_LED1      3        3          1
+                      CONN_LED2      3        3          1
+                      CONN_SEN       4        4          1
+                      L1             1        1          1
+                      R3             1        1          1
+                      R47            2        2          1
+                      U2             1        VIN        1
+                      U2             3        EN         1
+                      U3             1        VIN        1
+                      U3             3        EN         1
+                      U4             3        VDD        1
+
++24V                  CONN_EXPANSION 1        1          1
+                      CONN_EXPANSION 20       20         1
+
+5VOUT                 C17            1        1          1
+                      R24            2        2          1
+                      U6             8        5VOUT      1
+
+444                   R13            1        1          1
+                      R15            1        1          1
+                      U5             1        OUT        1
+
+BOOT0                 BOOT           1        P          1
+                      BOOT           3        P1         1
+                      R6             2        2          1
+                      U7             44       BOOT0      1
+
+CAN_H                 CONN_MAIN      3        3          1
+                      R5             2        2          1
+                      U4             7        CANH       1
+
+CAN_L                 CONN_MAIN      4        4          1
+                      R5             1        1          1
+                      U4             6        CANL       1
+
+DIR                   U6             19       DIR        1
+                      U7             41       PB5        1
+
+DRILL_BRAKE           CONN_DRILL     1        1          1
+                      R43            2        2          1
+
+DRILL_FGIN            R16            2        2          1
+                      R29            1        1          1
+                      R36            1        1          1
+
+DRILL_FRIN            CONN_DRILL     3        3          1
+                      R27            1        1          1
+
+DRILL_LASER_PWM       R28            1        1          1
+                      R37            1        1          1
+                      R9             2        2          1
+
+EXP_GPIO1             CONN_EXPANSION 10       10         1
+                      U7             3        PC14       1
+
+EXP_GPIO2             CONN_EXPANSION 11       11         1
+                      U7             4        PC15       1
+
+EXP_I2C2_SCL          CONN_EXPANSION 7        7          1
+                      R48            1        1          1
+                      U7             21       PB10       1
+
+EXP_I2C2_SDA          CONN_EXPANSION 14       14         1
+                      R44            1        1          1
+                      U7             22       PB11       1
+
+EXP_PWM               CONN_EXPANSION 4        4          1
+                      U7             28       PB15       1
+
+EXP_SPI_CS            CONN_EXPANSION 8        8          1
+
+EXP_SPI_MISO          CONN_EXPANSION 9        9          1
+
+EXP_SPI_MOSI          CONN_EXPANSION 12       12         1
+
+EXP_SPI_SCK           CONN_EXPANSION 13       13         1
+
+EXP_TMC_DIAG0         CONN_EXPANSION 15       15         1
+
+EXP_TMC_DIR           CONN_EXPANSION 16       16         1
+                      U7             26       PB13       1
+
+EXP_TMC_EN            CONN_EXPANSION 6        6          1
+                      U7             27       PB14       1
+
+EXP_TMC_STEP          CONN_EXPANSION 5        5          1
+                      U7             25       PB12       1
+
+GND                   +3V3           C        C          1
+                      +3V3B          C        C          1
+                      +5V            C        C          1
+                      C1             2        2          1
+                      C10            2        2          1
+                      C11            2        2          1
+                      C13            2        2          1
+                      C14            2        2          1
+                      C15            2        2          1
+                      C16            2        2          1
+                      C17            2        2          1
+                      C18            2        2          1
+                      C2             2        2          1
+                      C20            -        -          1
+                      C21            2        2          1
+                      C22            2        2          1
+                      C23            2        2          1
+                      C24            2        2          1
+                      C25            2        2          1
+                      C28            2        2          1
+                      C3             2        2          1
+                      C4             2        2          1
+                      C5             2        2          1
+                      C6             2        2          1
+                      C7             2        2          1
+                      C8             2        2          1
+                      C9             2        2          1
+                      CONN_DRILL     5        5          1
+                      CONN_EXPANSION 17       17         1
+                      CONN_EXPANSION 19       19         1
+                      CONN_EXPANSION 2        2          1
+                      CONN_FAN1      4        4          1
+                      CONN_LED1      1        1          1
+                      CONN_LED2      1        1          1
+                      CONN_MAIN      2        2          1
+                      CONN_OLED      1        1          1
+                      CONN_OLED2     1        GND        1
+                      CONN_OLED2     10       BS0        1
+                      CONN_OLED2     12       BS2        1
+                      CONN_OLED2     29       AGND       1
+                      CONN_OLED2     30       GND        1
+                      CONN_OLED2     8        GND        1
+                      CONN_SEN       1        1          1
+                      D1             A        A          1
+                      D2             A        A          1
+                      D3             A        A          1
+                      ID0            2        2          1
+                      ID1            2        2          1
+                      ID2            2        2          1
+                      ID3            2        2          1
+                      ID4            2        2          1
+                      MS1            1        1          1
+                      MS2            1        1          1
+                      P1             1        E          1
+                      Q1             3        S          1
+                      R11            1        1          1
+                      R14            2        2          1
+                      R19            2        2          1
+                      R2             1        1          1
+                      R20            2        2          1
+                      R21            2        2          1
+                      R22            2        2          1
+                      R25            2        2          1
+                      R4             1        1          1
+                      R45            1        1          1
+                      R49            1        1          1
+                      R6             1        1          1
+                      R9             1        1          1
+                      RESET          2        S          1
+                      RESET          4        S1         1
+                      RUN            C        C          1
+                      STM_JTAG       2-GND    GND        1
+                      U1             7        GND        1
+                      U1             9        THERMALPAD 1
+                      U2             2        GND        1
+                      U3             2        GND        1
+                      U4             2        VSS        1
+                      U4             8        STBY       1
+                      U5             2        GND        1
+                      U6             18       GND        1
+                      U6             20       STDBY      1
+                      U6             29       EXP        1
+                      U6             3        GND        1
+                      U7             23       VSS        1
+                      U7             35       VSS        1
+                      U7             47       VSS        1
+                      U7             8        VSSA       1
+
+HOTEND_FAN_FG         CONN_FAN1      2        2          1
+                      R42            1        1          1
+
+HOTEND_FAN_PWM        CONN_FAN1      3        3          1
+                      R41            1        1          1
+
+ID0                   ID0            1        1          1
+                      U7             5        OSC_IN     1
+
+ID1                   ID1            1        1          1
+                      U7             6        OSC_OUT    1
+
+ID2                   ID2            1        1          1
+                      U7             40       PB4        1
+
+ID3                   ID3            1        1          1
+                      U7             43       PB7        1
+
+ID4                   ID4            1        1          1
+                      U7             2        PC13       1
+
+LED_RING              CONN_LED2      2        2          1
+                      R8             1        1          1
+
+LED_STATE             CONN_LED1      2        2          1
+                      R7             1        1          1
+
+N$1                   CBOOT          2        2          1
+                      U1             1        BOOT       1
+
+N$2                   CBOOT          1        1          1
+                      D1             C        K          1
+                      L1             2        2          1
+                      U1             8        SW         1
+
+N$3                   R1             2        2          1
+                      U1             3        EN         1
+
+N$5                   R4             2        2          1
+                      U1             4        RT/SYNC    1
+
+N$6                   C4             1        1          1
+                      U1             6        SS         1
+
+N$7                   R2             2        2          1
+                      R3             2        2          1
+                      U1             5        FB         1
+
+N$9                   CONN_DRILL     4        4          1
+                      R28            2        2          1
+
+N$10                  R8             2        2          1
+                      U7             19       PB1        1
+
+N$11                  Q1             1        G          1
+                      R10            1        1          1
+                      R11            2        2          1
+
+N$12                  C10            1        1          1
+                      R12            1        1          1
+                      U5             3        +IN        1
+
+N$13                  CONN_DRILL     2        2          1
+                      R29            2        2          1
+
+N$14                  R13            2        2          1
+                      R14            1        1          1
+                      U5             4        -IN        1
+
+N$15                  U6             11       DIAG       1
+
+N$16                  P1             3        A          1
+                      R24            1        1          1
+
+N$17                  CONN_MOT       1        1          1
+                      U6             24       OA1        1
+
+N$18                  R19            1        1          1
+                      U6             23       BRA        1
+
+N$19                  CONN_MOT       2        2          1
+                      U6             21       OA2        1
+
+N$20                  CONN_MOT       4        4          1
+                      U6             1        OB2        1
+
+N$21                  R20            1        1          1
+                      U6             27       BRB        1
+
+N$22                  C12            1        1          1
+                      U6             6        VCP        1
+
+N$23                  CONN_MOT       3        3          1
+                      U6             26       OB1        1
+
+N$24                  R25            1        1          1
+                      R26            1        1          1
+                      U6             7        SPREAD     1
+
+N$25                  U6             25       NC         1
+
+N$26                  R21            1        1          1
+                      U6             14       !PD!_UART  1
+
+N$27                  C19            1        1          1
+                      U6             5        CPI        1
+
+N$28                  C19            2        2          1
+                      U6             4        CPO        1
+
+N$29                  R22            1        1          1
+                      U6             13       CLK        1
+
+N$30                  MS2            2        2          1
+                      R17            1        1          1
+                      U6             10       MS2_AD1    1
+
+N$31                  MS1            2        2          1
+                      R18            1        1          1
+                      U6             9        MS1_AD0    1
+
+N$32                  R30            1        1          1
+                      U7             42       PB6        1
+
+N$33                  U6             12       INDEX      1
+
+N$34                  R23            1        1          1
+                      U6             17       VREF       1
+
+N$35                  P1             2        S          1
+                      R23            2        2          1
+
+N$36                  BOOT           2        S          1
+                      BOOT           4        S1         1
+                      R31            2        2          1
+
+N$37                  C1             1        1          1
+                      C11            1        1          1
+                      C12            2        2          1
+                      C13            1        1          1
+                      C14            1        1          1
+                      C15            1        1          1
+                      C16            1        1          1
+                      C20            +        +          1
+                      CONN_DRILL     6        6          1
+                      CONN_MAIN      1        1          1
+                      CONN_T12       1        1          1
+                      R1             1        1          1
+                      U1             2        VIN        1
+                      U6             22       VS         1
+                      U6             28       VS         1
+
+N$38                  R32            2        2          1
+                      U7             38       PA15       1
+
+N$39                  R32            1        1          1
+                      RUN            A        A          1
+
+N$40                  U7             45       PB8        1
+
+N$41                  +3V3           A        A          1
+                      R35            1        1          1
+
+N$42                  R27            2        2          1
+                      U7             14       PA4        1
+
+N$43                  R36            2        2          1
+                      U7             13       PA3        1
+
+N$44                  R37            2        2          1
+                      U7             29       PA8        1
+
+N$45                  R38            2        2          1
+                      U7             18       PB0        1
+
+N$46                  R39            2        2          1
+                      U7             39       PB3        1
+
+N$47                  R41            2        2          1
+                      U7             15       PA5        1
+
+N$48                  R42            2        2          1
+                      U7             16       PA6        1
+
+N$49                  R7             2        2          1
+                      U7             17       PA7        1
+
+N$52                  CONN_OLED2     16       RW         1
+
+N$53                  CONN_OLED2     17       E/!RD      1
+
+N$54                  CONN_OLED2     21       D3         1
+
+N$55                  CONN_OLED2     22       D4         1
+
+N$56                  CONN_OLED2     23       D5         1
+
+N$57                  CONN_OLED2     24       D6         1
+
+N$58                  CONN_OLED2     25       D7         1
+
+N$59                  CONN_OLED2     26       IREF       1
+                      R45            2        2          1
+
+N$60                  C23            1        1          1
+                      CONN_OLED2     28       VCC        1
+
+N$61                  C24            1        1          1
+                      CONN_OLED2     27       VCOMH      1
+
+N$62                  C27            1        1          1
+                      CONN_OLED2     4        C1P        1
+
+N$63                  C27            2        2          1
+                      CONN_OLED2     5        C1N        1
+
+N$64                  C26            1        1          1
+                      CONN_OLED2     2        C2P        1
+
+N$65                  C26            2        2          1
+                      CONN_OLED2     3        C2N        1
+
+N$66                  +3V3B          A        A          1
+                      R46            1        1          1
+
+N$67                  +5V            A        A          1
+                      R47            1        1          1
+
+N$70                  U7             20       PB2        1
+
+N$71                  R43            1        1          1
+                      U7             46       PB9        1
+
+N$73                  U7             12       PA2        1
+
+RX_STM32              U4             4        RXD        1
+                      U7             32       PA11       1
+
+STEP_TCRT_D0_TOUCH_IN CONN_SEN       3        3          1
+                      R39            1        1          1
+                      U6             16       STEP       1
+
+STM_RST               C9             1        1          1
+                      RESET          1        P          1
+                      RESET          3        P1         1
+                      STM_JTAG       3-RST    RST        1
+                      U7             7        NRST       1
+
+STM_SCL               CONN_OLED      3        3          1
+                      CONN_OLED2     18       D0/SCK     1
+                      R34            2        2          1
+                      U7             30       PA9        1
+
+STM_SDA               CONN_OLED      4        4          1
+                      CONN_OLED2     19       D1/DIN/SDA 1
+                      CONN_OLED2     20       D2/SDA     1
+                      R33            2        2          1
+                      U7             31       PA10       1
+
+STM_SWCLK             STM_JTAG       4-SWDCLK SWCLK      1
+                      U7             37       PA14       1
+
+STM_SWDIO             STM_JTAG       5-SWDIO  SWDIO      1
+                      U7             34       PA13       1
+
+T12-                  CONN_T12       2        2          1
+                      Q1             4        D          1
+                      R12            2        2          1
+
+T12_ADC               D2             C        C          1
+                      R15            2        2          1
+                      U7             10       PA0-WKUP   1
+
+T12_PWM               R10            2        2          1
+                      U7             11       PA1        1
+
+TCRT_A0               CONN_SEN       2        2          1
+                      R38            1        1          1
+                      R40            1        1          1
+
+TOOL_ENABLE_BRAKE     R30            2        2          1
+                      R49            2        2          1
+                      U6             2        !EN        1
+
+TX_STM32              U4             1        TXD        1
+                      U7             33       PA12       1
+

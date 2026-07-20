@@ -1,0 +1,236 @@
+=========================================================================================
+URTC v1.0 - PINOUT AND CONNECTOR MAP
+=========================================================================================
+PLATFORM: URTC v1.0 (Universal Robot Tool Controller)
+MCU: STM32F303CCT6, LQFP48, 256KB flash
+AUTHOR: JuanenRac (Electro Hobby 3D) - electrohobby3d@gmail.com
+LICENSE: This document is licensed under CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/).
+         Firmware source is GPL-3.0; hardware design files are CERN-OHL-S v2 - see the repo README.
+UPDATED INTEGRATION: Delta EFB0424VHD-CP0 (layer fan), Same Sky CFM-4010 (hotend
+                     fan example), T12, Hotend NTC, Drill, Laser, Hardware I2C1,
+                     Generic Endstop (Soldering/Drill/Laser/AOI)
+=========================================================================================
+
+-----------------------------------------------------------------------------------------
+1. CONN_MAIN (Power Input and CAN Bus)
+   Type: B4B-XH-2 (2.54mm pitch)
+-----------------------------------------------------------------------------------------
+PIN | SIGNAL    | FUNCTION
+-----------------------------------------------------------------------------------------
+1   | +24V      | Main power supply (goes to the regulator and drivers)
+2   | GND       | Common power ground
+3   | CAN_H     | CAN Bus High (to TJA1057)
+4   | CAN_L     | CAN Bus Low (to TJA1057)
+    |
+    | NOTE: whether this board carries a fixed 120-ohm termination
+    |       resistor across CAN_H/CAN_L, or leaves it unpopulated/optional
+    |       via a solder-bridge, isn't specified anywhere in this project's
+    |       documentation yet. Doesn't matter if this board is always the
+    |       last node on the bus - matters a lot if it's ever used as a
+    |       middle node in a daisy chain, where a second fixed 120-ohm
+    |       resistor would drag the bus impedance well below the 120-ohm
+    |       (two terminators in parallel) the standard expects. Worth
+    |       settling and documenting explicitly once the actual PCB
+    |       decision is made.
+
+-----------------------------------------------------------------------------------------
+2. CONN_T12 (Soldering Iron / Raw Power Heater)
+   Type: B3B-XH-2 (2.54mm pitch)
+-----------------------------------------------------------------------------------------
+PIN | SIGNAL    | T12 SOLDERING MODE                | 3D MODE (HOTEND HEATER)
+-----------------------------------------------------------------------------------------
+1   | +24V      | Cartridge positive supply         | Hotend positive supply
+2   | T12-      | Q1 MOSFET control (PA1/PWM)       | Q1 MOSFET control (PA1/PWM)
+3   | NC        | No connection on board            | No connection on board
+    |           | NOTE: the hotend's NTC thermistor does NOT connect here - see CONN_SEN.
+
+-----------------------------------------------------------------------------------------
+3. CONN_OLED (Local Display Interface, Hardware I2C1)
+   Type: JST4-B4B-PH-K (2.00mm pitch)
+-----------------------------------------------------------------------------------------
+PIN | SIGNAL    | FIRMWARE LOGIC FUNCTION
+-----------------------------------------------------------------------------------------
+1   | GND       | Ground
+2   | +3.3V     | Display logic power
+3   | SCL       | PA9 (Hardware I2C1_SCL, AF4)
+4   | SDA       | PA10 (Hardware I2C1_SDA, AF4)
+    |           | CHANGED: was PA5/PA6 software-emulated I2C on the previous MCU
+    |           | package. Same R33/R34 4.7kOhm pull-ups, now a real peripheral.
+
+------------------------------------------------------------------------------------------------
+4. CONN_DRILL (Multi-function: Drill / Laser / 4-Wire Fan)
+   Type: B6B-XH-2 (2.54mm pitch)
+------------------------------------------------------------------------------------------------
+PIN | SIGNAL       | DRILL MODE           | 3D MODE (DELTA FAN)              | LASER MODE
+------------------------------------------------------------------------------------------------
+1   | ENABLE/BRAKE | PB9 (BL4260 brake,   | PB6 (Extruder ENN - NOT the fan) | PB6 (Safety interlock)
+    |              |  own dedicated pin,  |                                   |
+    |              |  see note below)     |                                   |
+2   | FGIN         | PA3 (Tachometer)     | PA3 (Tachometer / BLUE wire)     | NC
+3   | FRIN         | PA4 (Rotation IN/OUT)| NC                               | NC
+4   | PWM          | PA8 (Speed control)  | PA8 (25kHz real PWM / YELLOW wire,| PA8 (Emission power)
+    |              |                      |  TIM1_CH1, same channel as       |
+    |              |                      |  drill/laser, reconfigured per-  |
+    |              |                      |  tool - moved here from PA7 to   |
+    |              |                      |  free that pin for the LED chain)|
+5   | GND          | Ground               | Ground (BLACK wire)              | Ground
+6   | +24V         | Power supply         | Power supply (RED wire)          | Power supply
+    |              |                      |                                  |
+    | CORRECTED: wire colors were previously swapped in this doc (had FG=Yellow,
+    |   PWM=Blue). Cross-checked against the actual Delta EFB0424VHD-CP0
+    |   datasheet: BLUE=FG, YELLOW=PWM. Re-check your harness if already built
+    |   against the old documentation.
+    | NOTE: the fan's "emergency stop" is a 1000ms CAN communication watchdog
+    |       that zeroes the PWM autonomously - it does NOT touch PB6, since that
+    |       line is already the extruder driver's enable in this same tool mode.
+    | NOTE (NEEDS YOUR ATTENTION AT LAYOUT): Drill mode's ENABLE/BRAKE uses
+    |       its own dedicated pin, PB9 - not shared with the stepper tools'
+    |       TMC_ENN. This table still shows PB6 for
+    |       3D/Laser mode on this same connector pin, matching the existing
+    |       multi-mode pattern used throughout this document - but check
+    |       whether that's actually what you want wired here: if CONN_DRILL's
+    |       physical pin 1 ties BOTH PB6 and PB9 to the same net, make sure
+    |       firmware never drives both as outputs at once for a mode where
+    |       only one should be active (rather than assuming that's already
+    |       handled safely). The simpler alternative is rewiring this pin to
+    |       PB9 only, and moving the 3D-printer extruder-enable connection
+    |       elsewhere (e.g. CONN_MOT, which already carries the real TMC2209
+    |       driver lines for that tool) - whichever you decide, this is a
+    |       trace-level call for your own Eagle work, not something assumed
+    |       resolved by this document.
+
+------------------------------------------------------------------------------------------------
+4b. CONN_FAN1 (Hotend Cooling Fan, NEW)
+    Type: JST4-B4B-PH-K (2.00mm pitch)
+------------------------------------------------------------------------------------------------
+PIN | SIGNAL | FUNCTION
+------------------------------------------------------------------------------------------------
+1   | +5V    | Fan power supply
+2   | FG     | PA6 (Tachometer, EXTI6) - series-protected by R42
+3   | PWM    | PA5 (TIM2_CH1/AF1, 25kHz) - series-protected by R41
+4   | GND    | Ground
+    |
+    | NOTE: separate fan from the one on CONN_DRILL. This one cools the
+    | hotend's heat break/heatsink; the CONN_DRILL fan cools the printed part.
+    | Example reference part: Same Sky CFM-4010 series (40x40mm, 5V or 12V,
+    | tachometer + PWM variant "-22-"). Confirm wire colors against whichever
+    | specific fan you actually mount - conventions vary between manufacturers
+    | (this is NOT the same color scheme as the Delta fan above).
+
+------------------------------------------------------------------------------------------------
+5. CONN_SEN (External Sensors, Endstops, and Telemetry)
+   Type: JST4-B4B-PH-K (2.00mm pitch)
+------------------------------------------------------------------------------------------------
+PIN | SIGNAL    | VACUUM MODE (TCRT5000)| 3D MODE (NTC THERMISTOR)     | ENDSTOP MODE (NEW)
+    |           |                       |                              | Soldering/Drill/Laser/AOI/Probe
+------------------------------------------------------------------------------------------------
+1   | GND       | Ground                | To ground (NTC Pin 1)        | Ground
+2   | TCRT_A0   | PB0 (ADC_CH11)        | PB0 (ADC_CH11, NTC Pin 2 -   | NC
+    |           |                       |  hardware 4.7k Pull-Up to    |
+    |           |                       |  3.3V via R40 forms the      |
+    |           |                       |  divider with the 100k NTC)  |
+3   | TOUCH     | PB3 (Digital IN LM393)| NC                           | PB3 (Endstop/Probe Switch,
+    |           |                       |                              |  active low, 330R R39 protected)
+4   | +5V       | Sensor VCC supply     | NC                           | Probe VCC / NC
+    |           |                       |                              |
+    | NOTE: For Soldering/Drill/Laser/AOI, PB3 is polled every 150ms as a plain
+    |       digital input (not interrupt-driven), since EXTI line 3 is reserved
+    |       for the Scan Probe (PB3) and Drill/3D-Printer tachometer (PA3) uses.
+    |       Reported on the OLED and over CAN (0x135/0x147 extended DLC, plus new
+    |       0x155/0x165 for AOI/Laser - see CANBUS.TXT).
+
+------------------------------------------------------------------------------------------------
+6. CONN_MOT (NEMA Motor for Hotend Extruder, NEMA Gripper, NEMA Dispensers, and Gimbal Gripper)
+   Type: B4B-XH-2 (2.54mm pitch)
+   Controlled by: TMC2209 (PB3=STEP, PB5=DIR, PB6=ENN)
+------------------------------------------------------------------------------------------------
+PIN | SIGNAL    | NEMA MODE (GRIPPER/EXTRUDER/DISPENSERS)    | GIMBAL MODE (3-Phase BLDC)
+------------------------------------------------------------------------------------------------
+1   | OA1       | Coil A - Wire 1                            | Phase 1
+2   | OA2       | Coil A - Wire 2                            | Phase 2
+3   | OB1       | Coil B - Wire 1                            | Phase 3
+4   | OB2       | Coil B - Wire 2                            | 75ohm/3W resistor to Pin 3
+
+------------------------------------------------------------------------------------------------
+7. CONN_LED1 (Lighting - Robot Exterior Status)
+   Type: JST3-B3B-PH-K (2.00mm pitch)
+-----------------------------------------------------------------------------------------
+PIN | SIGNAL      | FIRMWARE LOGIC FUNCTION
+-----------------------------------------------------------------------------------------
+1   | GND         | Ground
+2   | DATA_STATE  | PA7 (SPI1_MOSI via DMA - independent from CONN_LED2
+    |             | below, deliberately kept on its own pin/transfer so no
+    |             | new PCB trace is needed between the two connectors.)
+3   | +5V         | LED strip power
+
+-----------------------------------------------------------------------------------------
+8. CONN_LED2 (Lighting - Camera/Inspection Coaxial Ring)
+   Type: JST3-B3B-PH-K (2.00mm pitch)
+-----------------------------------------------------------------------------------------
+PIN | SIGNAL    | FIRMWARE LOGIC FUNCTION
+-----------------------------------------------------------------------------------------
+1   | GND       | Ground
+2   | DATA_RING  | PB1 (Bit-banged, unchanged from earlier revisions -
+    |            | independent from CONN_LED1's PA7/SPI1 above)
+3   | +5V       | LED ring power
+    |           | Feeds 2-3 addressable LED rings wired in PARALLEL on this
+    |           | single data line (they mirror the same pattern - not
+    |           | independently addressable from each other). Color and
+    |           | on/off are set over CAN via 0x100 (rxData[4:6]=color,
+    |           | rxData[7]=on/off). This is the AOI tool's actual inspection
+    |           | light - see CANBUS.TXT 0x150 for its off/strobe/continuous
+    |           | timing control.
+
+------------------------------------------------------------------------------------------------
+9. CONN_EXPANSION (Add-on board header)
+   Type: 20-pin, 1.27mm pitch, Würth eiCan series (grew from 14 pins - see BOM.TXT)
+------------------------------------------------------------------------------------------------
+PIN | SIGNAL         | FUNCTION
+------------------------------------------------------------------------------------------------
+1   | +24V           | Main rail passthrough
+2   | GND            | Ground
+3   | +5V            | Logic power
+4   | EXP_PWM        | PB15 - general-purpose timer PWM output
+5   | EXP_TMC_STEP   | PB12 - optional TMC2209 driver on the expansion board
+6   | EXP_TMC_EN     | PB14
+7   | EXP_I2C2_SCL   | PB10 - own bus, separate from the OLED's I2C1. R48 (4.7k to
+    |                | +3.3V) populated as an external pull-up
+8   | EXP_SPI_CS     | Reserved, not yet wired to the MCU (confirmed against the
+    |                | schematic netlist - connector-side only, single-member net)
+9   | EXP_SPI_MISO   | Reserved, not yet wired to the MCU - same as EXP_SPI_CS
+10  | EXP_GPIO1      | PC14 - general purpose, EXTI-capable
+11  | EXP_GPIO2      | PC15 - general purpose, EXTI-capable
+12  | EXP_SPI_MOSI   | Reserved, not yet wired to the MCU - same as EXP_SPI_CS
+13  | EXP_SPI_SCK    | Reserved, not yet wired to the MCU - same as EXP_SPI_CS
+14  | EXP_I2C2_SDA   | PB11. R44 (4.7k to +3.3V) populated as an external pull-up
+15  | EXP_TMC_DIAG0  | Reserved, not yet wired to the MCU - same as EXP_SPI_CS.
+    |                | Intended for a future TMC2209 stall-detection line
+16  | EXP_TMC_DIR    | PB13
+17  | GND            | Ground
+18  | +3V3           | Logic power
+19  | GND            | Ground
+20  | +24V           | Main rail passthrough (second pin, for higher-current add-ons)
+    |                |
+    | NOTE: the 4 EXP_SPI_* pins and EXP_TMC_DIAG0 are physically present on
+    |       this connector (pins 8, 9, 12, 13, 15) but not yet connected to
+    |       any MCU pin - confirmed against the schematic netlist, each is a
+    |       single-member net today. They're reserved headroom for a future
+    |       SPI-based add-on and TMC2209 diagnostics, not currently usable.
+    | NOTE: an I2C ADC/DAC chip or a port-expander chip on the add-on board
+    |       both hang off EXP_I2C2_SCL/EXP_I2C2_SDA like any other I2C device
+    |       - no dedicated pins needed for those specifically. See
+    |       PINOUT.TXT Block 10 and the README's "Expansion Connector"
+    |       section.
+
+========================================================================================
+FREE MCU PINS (not on any connector): PA2 (formerly CONN_LED1's bit-banged
+pin, before SPI1/PA7 took over - see PINOUT.TXT block 9). PB1 is NOT free -
+still drives CONN_LED2, unchanged. PA8 is NOT free anymore either - see the
+drill/laser PWM table above. PC13 carries ID4 (not free), PB9
+carries the drill's dedicated brake (not free), PB10-PB15/PC14-PC15 feed
+CONN_EXPANSION above (not free - unchanged from the 14-pin connector; the
+20-pin version's new pins are connector-only, not new MCU-pin usage).
+PD2 remains free/unallocated.
+========================================================================================
+END OF FILE
+========================================================================================

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <rect x="2" y="2" width="124" height="124" rx="26" fill="#14171C"/>
+  <rect x="2" y="2" width="124" height="124" rx="26" fill="none" stroke="#22252D" stroke-width="3"/>
+  <!-- Muy simplificado para legibilidad a 16px: un solo anillo grueso + un
+       punto de conexion, en vez de las 4 herramientas del revolver completo -->
+  <circle cx="64" cy="64" r="36" fill="none" stroke="#00ADB5" stroke-width="13"/>
+  <circle cx="64" cy="64" r="15" fill="#14171C" stroke="#EEEEEE" stroke-width="7"/>
+  <circle cx="64" cy="20" r="9" fill="#FF5722"/>
+</svg>

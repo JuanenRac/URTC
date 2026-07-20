@@ -1,0 +1,26 @@
+# URTC License and Copyright Notice
+
+URTC (Universal Robot Tool Controller) is (c) 2026 JuanenRac (Electro Hobby 3D).
+
+This notice must be included in any distributions of this project or derivative works.
+
+Because this project consists of several different types of content, individual parts are made available under different licenses:
+
+1. The firmware located at `./firmware` (application and CAN bootloader alike) is available under the **GNU General Public License v3.0 (GPL-3.0)**.
+   Full text: https://www.gnu.org/licenses/gpl-3.0.html
+
+2. The PC tools located at `./tools` (URTC Flasher and URTC Tester, and any binary built from either) are source code, licensed the same way and for the same reason as the firmware: **GNU General Public License v3.0 (GPL-3.0)**.
+   Full text: https://www.gnu.org/licenses/gpl-3.0.html
+
+3. The hardware designs (Eagle schematic/board files, gerbers, and the 3D-printable parts) located at `./PCB` and `./3D` are available under the **CERN Open Hardware Licence v2 - Strongly Reciprocal (CERN-OHL-S v2)**.
+   Full text: https://cern-ohl.web.cern.ch/
+
+4. The documentation (README, service manual, and the reference files under `./docs`, including `./tools/flasher/README.md` and `./tools/tester/README.md`) is available under **Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)**.
+   Full text: https://creativecommons.org/licenses/by-sa/4.0/
+
+If you build on this project: code changes to the firmware or the flashing tool should stay GPL-3.0, hardware modifications should stay CERN-OHL-S, and documentation derivatives should stay CC BY-SA - each with attribution back to this project and its author.
+
+---
+
+Author: JuanenRac (Electro Hobby 3D)
+Contact: electrohobby3d@gmail.com

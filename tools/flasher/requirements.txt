@@ -1,0 +1,10 @@
+pyserial>=3.5
+
+# Optional, for section "4. Program complete chip via SWD/JTAG":
+# - pyOCD: pip install pyocd (installs the `pyocd` command used via subprocess -
+#   this script never does `import pyocd`, so it isn't a hard dependency of
+#   the script itself, only of that one section being enabled)
+# - or STM32CubeProgrammer, installed separately from ST (not a pip package)
+# Neither is required for CAN-based updates (sections 1-3) or for running
+# this script at all - the SWD section just disables itself if it finds
+# neither tool on the system.

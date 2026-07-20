@@ -1,0 +1,274 @@
+=============================================================================
+URTC - UNIVERSAL ROBOT TOOL CONTROLLER (V1.0)
+FINAL PINOUT ASSIGNMENT -  URTC/HYDRA-UMC (JUANENBOT/PAROL6)
+MICROCONTROLLER: STM32F303CCT6 (LQFP48-7x7 Package - 48 Pins, 256KB Flash)
+AUTHOR: JuanenRac (Electro Hobby 3D) - electrohobby3d@gmail.com
+LICENSE: This document is licensed under CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/).
+         Firmware source is GPL-3.0; hardware design files are CERN-OHL-S v2 - see the repo README.
+NOTE ON PHYSICAL PIN NUMBERS: this document identifies pins by their GPIO
+                   signal name (PA0, PB5, etc.) - that's what the firmware
+                   actually cares about, and what's verified against the
+                   real HAL headers for this chip. The physical LQFP48 pin
+                   NUMBER for each signal is NOT independently re-verified
+                   here; cross-check it against the datasheet's pinout
+                   table or Eagle's own STM32F303CC part footprint at
+                   layout time rather than trusting a number transcribed
+                   into this text file.
+=============================================================================
+
+-----------------------------------------------------------------------------
+[BLOCK 1: POWER SUPPLY AND BOOT SYSTEM]
+-----------------------------------------------------------------------------
+NRST        -> STM_RST Active-Low Reset Line (SWD connector / Reset button to ground)
+VSS (x2-3)  -> PCB global ground (GND) - this package has several ground
+               pins; tie all of them to the ground plane.
+VDD (x2-3)  -> Digital power (+3.3V) - several VDD pins on this package;
+               populate the standard 100nF decoupling cap at each one.
+BOOT0       -> Dedicated pin (not a GPIO alternate function on this chip -
+               electrically separate from PB8). Pulled LOW by default via
+               R6 (10k to GND), so the chip boots from this project's own
+               bootloader at 0x08000000 on every normal power-up. A
+               momentary pushbutton pulls it HIGH through R31 (to +3.3V)
+               when held during reset, for the rare case of needing ST's
+               own factory system bootloader (UART/DFU) instead - e.g. if
+               this project's own bootloader region were ever somehow
+               unusable and JTAG weren't convenient. Not used in day-to-day
+               operation.
+PB8         -> FREE. A separate, ordinary GPIO pin on this package -
+               genuinely unconnected on this board, not tied to BOOT0 or
+               anything else. See Block 9.
+VDDA        -> Analog power (+3.3V) + 100nF capacitor
+VBAT        -> Tie to VDD through a small-signal diode, or to VDD directly,
+               per the datasheet's battery-less recommendation - this design
+               has no RTC backup battery.
+
+* DIRECT ELECTRICAL INDICATOR (POWER LED):
+  - Fixed +3.3V line connected to the indicator LED's anode via a 330Ohm/470Ohm resistor to GND.
+  - Visual diagnostic: On = regulated voltage present on the board / Off = power failure.
+
+-----------------------------------------------------------------------------
+[BLOCK 2: TOOL DETECTION, ID MATRIX]
+-----------------------------------------------------------------------------
+PB7   -> ID3 (Bit 3 / Clean digital input)
+PB4   -> ID2 (Bit 2 / Clean digital input)
+PF1   -> ID1 (Bit 1 / Clean digital input)
+PF0   -> ID0 (Bit 0 - Least significant / Clean digital input)
+PC13  -> ID4 (Bit 4 - Most significant / Clean digital input). Gives 32
+         possible tool IDs (only 0-11 are assigned to real tools today;
+         12-31 read as TOOL_INVALID and force every actuator to its safe
+         state). PC13 is otherwise
+         unused on this design (no RTC/LSE crystal populated), and carries
+         no special power-switch current limitation relevant to a simple
+         pulled-up digital input like this one.
+All five: internal pull-up enabled, active-low (jumper to GND = bit set).
+
+-----------------------------------------------------------------------------
+[BLOCK 3: COMMUNICATIONS, DEDICATED PROGRAMMING, AND OLED INTERFACE]
+-----------------------------------------------------------------------------
+PA11  -> RX_STM32 (AF9, to the TJA1057 CAN transceiver's RXD pin)
+PA12  -> TX_STM32 (AF9, to the TJA1057 CAN transceiver's TXD pin)
+         * CRITICAL NOTE: these two pins are isolated exclusively for the CAN bus.
+PA13-SWDIO -> STM_SWDIO (Dedicated ST-Link programmer data line)
+PA14-SWCLK -> STM_SWCLK (Dedicated ST-Link clock line)
+
+PA9   -> STM_SCL (Hardware I2C1_SCL, AF4) - OLED bus, see Block 4/README.
+PA10  -> STM_SDA (Hardware I2C1_SDA, AF4) - OLED bus.
+         * PCB NOTE: Requires two 4.7kOhm Pull-Up resistors
+           (R33, R34) fixed to +3.3V.
+         * I2C1's kernel clock is HSI-sourced (8MHz), independent
+           of the 64MHz system clock - see CANBUS.TXT / firmware
+           comments for the timing register derivation.
+         * This is now ONE of two I2C buses on the board - see Block 10 for
+           the expansion connector's separate I2C2. Deliberately kept apart
+           so nothing on an expansion board can stretch the clock or
+           otherwise interfere with the OLED's own timing.
+
+-----------------------------------------------------------------------------
+[BLOCK 4: STATUS, ALERT, AND CAMERA LIGHTING]
+-----------------------------------------------------------------------------
+PA7   -> LED_STATE (SPI1_MOSI via DMA, AF5. Drives ONLY the
+         status LED on CONN_LED1 - a single WS2812B, host-color-controlled
+         via CAN 0x100 - see README's "Digital Status LED" section. Kept
+         independent from the ring below on purpose, so the two connectors
+         don't need a PCB trace joining them.)
+PB1   -> LED_RING (Digital output to the CONN_LED2 connector,
+         bit-banged. Color/on-off for the ring set via CAN 0x100/0x150;
+         separate pin from CONN_LED1 above.)
+PA15  -> LED_RUN_ERR (Active-High digital output to the on-PCB firmware diagnostic LED)
+         * SPECIFICATION: 330Ohm series resistor to the indicator LED's anode to GND.
+         * LOCAL VISUAL DIAGNOSTIC LOGIC: the main loop toggles this pin every
+           500ms in normal operation and every 100ms once system_error_flag
+           is set - the LED blinks noticeably faster as an attention-getting
+           alert, it doesn't switch to a separate "solid" state.
+           - Blinking (either rate): main loop is alive. Slow (~1Hz) is
+             normal; fast (5Hz) means system_error_flag is set - check the
+             OLED/CAN telemetry for which fault.
+           - Not blinking (frozen on or off): the toggle itself has stopped
+             running - main loop is hung, or no firmware is loaded/running
+             at all. This isn't a deliberate indicator state; it's just what
+             a stopped loop looks like from outside.
+
+-----------------------------------------------------------------------------
+[BLOCK 5: ASSIGNED POWER AND THERMAL TOOLS (FIXED)]
+-----------------------------------------------------------------------------
+PA0   -> T12_ADC / NTC_ADC (Analog ADC1_IN1 channel input)
+         * [T12 mode]: From the AD8605 op-amp / Measures the thermocouple's millivolts.
+         * NOTE: The 3D printer's hotend NTC does NOT use this pin - see PB0 below.
+PA1   -> T12_PWM / HOTEND_HEATER (Digital/PWM output to main power MOSFET Q1's gate)
+         * [T12 mode]: T12 cartridge activation pulse.
+         * [3D mode]: Heater block activation.
+
+-----------------------------------------------------------------------------
+[BLOCK 6: RELOCATED SWITCHING MATRIX (PORT B, ANTI-EMI SAFETY)]
+-----------------------------------------------------------------------------
+PB3   -> [Motor/3D Printer mode]     : STEP_TCRT_D0_TOUCH_IN (Extruder TMC driver pulses)
+       -> [Vacuum Pickup sensor mode] : STEP_TCRT_D0_TOUCH_IN (Digital input from the LM393 comparator)
+       -> [Scan Probe mode]           : STEP_TCRT_D0_TOUCH_IN (Native EXTI3 edge-triggered interrupt input)
+       -> [Soldering/Drill/Laser/AOI] : STEP_TCRT_D0_TOUCH_IN (Generic Endstop / limit
+                                           switch digital input, active low, polled every 150ms)
+         * CRITICAL TIMING NOTE: PB3 carries absolute vector priority for the probe (NVIC Priority 0).
+         * R39 (330 Ohm) in series for protection against shorts on this line.
+         * PROTOCOL NOTE: EXTI line 3 can only be routed to one port at a time
+           (SYSCFG->EXTICR). The firmware routes it to Port A (PA3) for
+           Drill/3D-Printer tachometer duty, and to Port B (PB3) for every
+           other tool - see ECOVIA.TXT [5] for the full mutant-routing logic.
+PB5   -> [Motor/3D Printer mode]    : DIR (Extruder TMC driver direction)
+       -> [Other modes]              : High impedance (preventive floating input)
+PB6   -> [Motor/3D Printer mode]    : TOOL_ENABLE_BRAKE (Low=Active / High=Free)
+       -> [Laser mode]               : LASER_SAFETY_PIN (physical interlock, High=armed / Low=locked)
+         * HARDWARE NOTE: firmware actively drives this LOW before any
+           planned reset (bootloader entry, emergency stop, etc.), but
+           every GPIO on this chip reverts to high-impedance analog input
+           for a brief window during ANY reset (planned or not - a brownout,
+           a watchdog trip, ESD) before firmware runs far enough to
+           reconfigure it. This is not something software can close - the
+           physical fix is a pull-down resistor (e.g. 10k) on this net at
+           the laser driver's enable input, so "floating" reads as "locked"
+           rather than whatever an internal pull-up on the laser driver
+           side would otherwise assume.
+       -> [Other modes]              : High impedance
+         * NO LONGER carries the drill's brake line - see Block 7, PB9. This
+           separation means the drill's braking and the stepper tools'
+           enable can never toggle each other's pin by accident, regardless
+           of firmware ordering.
+
+-----------------------------------------------------------------------------
+[BLOCK 7: REASSIGNED SPECIAL PERIPHERALS]
+-----------------------------------------------------------------------------
+PA8   -> [Drill / 10W Laser mode]    : DRILL_LASER_PWM (TIM1_CH1, AF6, ~20kHz)
+       -> [3D Printer mode]           : DRILL_LASER_PWM (TIM1_CH1, AF6, 25kHz exact for
+                                           the EFB0424VHD-CP0 layer fan - same channel,
+                                           reconfigured per-tool, see firmware comments)
+         * Connected to the CONN_DRILL connector
+PB9   -> [Drill mode]                : DRILL_BRAKE (BL4260 brake line, own dedicated pin.
+                                           High=Spin / Low=Brake, see Block 6 note.
+                                           Connected to CONN_DRILL.
+         * CRITICAL SAFETY NOTE: "High=Spin / Low=Brake" describes what
+           firmware actively drives once it's running - it says nothing
+           about what the physical brake mechanism itself does when this
+           line is unpowered or floating (before Post_Init configures it
+           as an output, or if the wire ever breaks). The brake hardware
+           needs to be a fail-safe (normally-closed) design: spring-engaged
+           when de-energized, requiring active power to RELEASE the shaft,
+           not active power to engage the brake. Built the other way
+           around (normally-open, needing power to brake), a floating PB9
+           during the boot window - or any wire fault - could read as
+           "release" to the optocoupler/driver and let a spinning bit drop
+           under its own weight with nothing holding it. A pull-down
+           resistor on this net (matching the LASER_SAFETY_PIN note above)
+           ensures floating reads as LOW=brake, but only helps if the
+           brake mechanism itself is also fail-safe by design - the
+           firmware-level polarity alone can't guarantee this.
+PB0   -> [Vacuum Pickup sensor mode] : TCRT_A0 (Direct analog input to ADC1_IN11 channel)
+       -> [3D Printer mode]           : Hotend 100kOhm NTC thermistor to ground, with a
+                                           hardware 4.7kOhm pull-up to 3.3V (R40) forming the
+                                           divider. Connected via CONN_SEN, NOT CONN_T12.
+         * Connected on the CONN_SEN connector
+PA3   -> [Drill mode]                : FGIN (Tachometer input / EXTI3 capture for actual RPM)
+       -> [3D Printer mode]           : FGIN (Tachometer input for the EFB0424VHD-CP0 layer fan)
+         * Connected to the CONN_DRILL connector
+PA4   -> [Drill mode]                : FRIN (Digital rotation direction output / Drill connector)
+       -> [3D Printer mode]           : NOT USED
+         * Connected to the CONN_DRILL connector
+
+-----------------------------------------------------------------------------
+[BLOCK 8: HOTEND COOLING FAN (CONN_FAN1)]
+-----------------------------------------------------------------------------
+PA5   -> [3D Printer mode] : HOTEND_FAN_PWM (TIM2_CH1/AF1, 25kHz)
+          * Connected to Pin 3 of the CONN_FAN1 connector.
+          * Separate timer (TIM2) and separate fan from the layer
+            fan on PA8 - this one cools the heat break/heatsink.
+          * Runs continuously during an emergency stop (it's a cooling fan,
+            not something that can itself cause harm by continuing to spin)
+            - only the drill/laser/layer-fan PWM and the stepper enable
+              line are forced off.
+PA6   -> [3D Printer mode] : HOTEND_FAN_FG (Tachometer, EXTI9_5 vector)
+          * Connected to Pin 2 of the CONN_FAN1 connector.
+          * Own line within the 5-9 combined vector - no routing
+            conflict with the EXTI3 sharing used elsewhere in the design.
+          * No external pull-up populated for this net (R41/R42
+            are series protection only) - relies on the internal
+            MCU pull-up.
+
+-----------------------------------------------------------------------------
+[BLOCK 9: FREE PINS FOR FUTURE EXPANSION]
+-----------------------------------------------------------------------------
+PA2   -> FREE (was LED_STATE's bit-banged pin, before SPI1/PA7 took over
+          that role).
+PB2   -> FREE. Confirmed unconnected against the schematic netlist - not
+          tied to anything else on the board.
+PB8   -> FREE. Electrically separate from BOOT0 - see Block 1. Confirmed
+          unconnected against the schematic netlist.
+PD2   -> FREE. Not currently allocated to anything, including the
+          expansion connector in Block 10.
+
+-----------------------------------------------------------------------------
+[BLOCK 10: EXPANSION CONNECTOR (20-PIN, UPDATED FROM 14-PIN)]
+-----------------------------------------------------------------------------
+A dedicated header for add-on boards, separate from every tool-specific
+connector. Full pin-by-pin breakdown (power rails, ground, and the signal
+assignments below) lives in PINOUT_CONNECTORS.TXT; this block just lists
+which MCU pins feed it. The MCU-side pins below are unchanged from the
+14-pin connector - the 6 new pins (EXP_SPI_CS/MISO/MOSI/SCK and
+EXP_TMC_DIAG0) are reserved on the connector for a future SPI bus and a
+TMC2209 stall-diagnostic line, but aren't wired to the MCU yet (confirmed
+against the schematic netlist: each is a single-member net, connector-side
+only). Nothing below changes because of this - it's purely more headroom
+on the physical connector for later.
+
+PB10  -> EXP_I2C2_SCL (I2C2_SCL, AF4 - confirmed against the schematic
+          netlist). R48 (4.7k to +3.3V) populated as an external pull-up.
+         * SOFTWARE NOTE: these same two pins commonly also carry
+           USART3_TX/RX under AF7 on STM32F3 parts. Nothing in this
+           firmware initializes USART3 or touches these pins under any AF
+           other than 4, so there's no active conflict today - but if a
+           future debug console, RTOS shell, or copy-pasted init code ever
+           enables USART3 without being told about this connector, it
+           would silently steal the expansion bus's clock line. Worth a
+           comment at any future USART3 init site pointing back here.
+PB11  -> EXP_I2C2_SDA (I2C2_SDA, AF4 - confirmed against the schematic
+          netlist). R44 (4.7k to +3.3V) populated as an external pull-up.
+PB12  -> EXP_TMC_STEP (general-purpose output, for an optional TMC2209 on
+          the expansion board)
+PB13  -> EXP_TMC_DIR
+PB14  -> EXP_TMC_EN
+PB15  -> EXP_PWM (general-purpose timer-capable output; confirm the exact
+          timer/channel against the datasheet's AF table at layout time)
+PC14  -> EXP_GPIO1 (general purpose; EXTI-capable if a future add-on needs
+          a fast interrupt-driven input, e.g. an endstop)
+PC15  -> EXP_GPIO2 (same notes as EXP_GPIO1)
+    * SILICON NOTE: SYSCFG_EXTICR maps each bit NUMBER (0-15) to one port
+      at a time, shared across every port on the chip - using EXTI on
+      PC14 claims "bit 14" for the whole MCU, not just this pin, and same
+      for PC15/"bit 15". Nothing else in this design currently asks for
+      EXTI on bit 14 or 15 (PB14/PB15 are used as plain outputs here, not
+      interrupt inputs), so there's no active conflict today - but if a
+      future addition ever wants EXTI on PB14 or PB15 too, it can't
+      coexist with EXP_GPIO1/2 doing the same. Worth keeping in mind
+      before building that expectation into anything.
+
+I2C2 is electrically separate from I2C1 (the OLED's bus, PA9/PA10) on
+purpose - see Block 3's note and the README's "Expansion Connector"
+section for the reasoning.
+
+=============================================================================
