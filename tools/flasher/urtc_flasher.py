@@ -1390,9 +1390,7 @@ def validate_swd_image_file(path, max_size, label, expected_base_addr=None):
     """Validates a file selected for the SWD/JTAG section (bootloader or
     application image), which - unlike the CAN path's fixed APP_MAX_SIZE
     .bin-only assumption - needs a caller-specified slot size (32KB
-    bootloader vs 112KB app) and has to handle .hex/.elf as well as .bin.
-    This plugs the gap where those file pickers previously accepted
-    anything with no check at all."""
+    bootloader vs 112KB app) and has to handle .hex/.elf as well as .bin."""
     try:
         size = os.path.getsize(path)
     except OSError as e:
@@ -1768,7 +1766,7 @@ class FlasherGUI:
         # iconphoto (not iconbitmap) since it works identically on both
         # Windows and Linux from a plain PNG - iconbitmap's own .ico
         # support is Windows-only. Silently skipped if missing, same
-        # reasoning as the banner used to have: cosmetic, never worth a crash.
+        # reasoning as the banner elsewhere in this file: cosmetic, never worth a crash.
         try:
             self._icon_img = tk.PhotoImage(file=ICON_IMAGE_PATH)
             root.iconphoto(True, self._icon_img)
@@ -2111,13 +2109,12 @@ class FlasherGUI:
             messagebox.showerror("Export failed", str(e))
 
     def on_close(self):
-        # Closing the window mid-flash used to just kill the process - no
-        # warning, no chance to close the transport cleanly. A CAN OTA
-        # update left interrupted this way is still safe (golden-image
-        # backup slot), but the board is left waiting on a bootloader
-        # timeout rather than resuming normal operation right away, and an
-        # SWD/JTAG full-chip flash has no such safety net at all - worth a
-        # confirmation either way rather than a silent kill.
+        # A confirmation here matters more than it might for an ordinary
+        # window: a CAN OTA update interrupted mid-flash is still safe
+        # (golden-image backup slot), but the board is left waiting on a
+        # bootloader timeout rather than resuming normal operation right
+        # away, and an SWD/JTAG full-chip flash has no such safety net at
+        # all - both worth a deliberate choice rather than a silent kill.
         flashing = bool(
             (self._flash_thread and self._flash_thread.is_alive())
             or (self._swd_flash_thread and self._swd_flash_thread.is_alive())

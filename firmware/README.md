@@ -263,8 +263,8 @@ total** ("up to two I2Cs") — there's no I2C3 on this density variant at
 all, unlike some larger STM32F3 parts. Both existing buses are already
 committed (I2C1→OLED, I2C2→`CONN_EXPANSION`), and a third, bit-banged bus
 - the same approach used for `CONN_EXPANSION`'s SPI - isn't an option
-either: every previously-free GPIO pin on this board is already spoken
-for by that SPI bus (see section on `CONN_EXPANSION` in
+either: every other GPIO pin on this board is already committed to
+something (see section on `CONN_EXPANSION` in
 `PINOUT_CONNECTORS.TXT`). Sharing I2C1 (not I2C2) is deliberate: I2C2
 stays reserved purely for whatever an unknown future expansion board
 turns out to need, while this EEPROM is a core board component - it

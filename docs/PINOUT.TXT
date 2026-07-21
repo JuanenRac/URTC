@@ -34,9 +34,9 @@ BOOT0       -> Dedicated pin (not a GPIO alternate function on this chip -
                this project's own bootloader region were ever somehow
                unusable and JTAG weren't convenient. Not used in day-to-day
                operation.
-PB8         -> FREE. A separate, ordinary GPIO pin on this package -
-               genuinely unconnected on this board, not tied to BOOT0 or
-               anything else. See Block 9.
+PB8         -> EXP_SPI_MISO. A separate, ordinary GPIO pin on this
+               package - electrically independent of BOOT0. See Block 9
+               for the expansion connector's SPI bus this pin is part of.
 VDDA        -> Analog power (+3.3V) + 100nF capacitor
 VBAT        -> Tie to VDD through a small-signal diode, or to VDD directly,
                per the datasheet's battery-less recommendation - this design
@@ -225,14 +225,12 @@ PA2   -> EXP_SPI_CS (bit-banged, software-timed - see PINOUT_CONNECTORS.TXT's
           CONN_EXPANSION note for why this isn't a hardware SPI peripheral)
 PB2   -> EXP_SPI_SCK
 PB8   -> EXP_SPI_MISO
-PB15  -> EXP_SPI_MOSI (was EXP_PWM - see Block 10's note. An earlier revision
-          used PD2 for this signal; PD2 does not exist on this chip's LQFP48
-          package - confirmed against the official STM32F303xB/xC
-          datasheet's per-package pin table, which shows Port D entirely
-          absent from this package, not just PD2 specifically. Caught on
-          review, not a deliberate choice.)
-         * No MCU pins remain free/unallocated on this design as of this
-           revision - these were the last four.
+PB15  -> EXP_SPI_MOSI
+         * No MCU pins remain free/unallocated on this design - these are
+           the last four. Port D is not present at all on this chip's
+           LQFP48 package (confirmed against the official STM32F303xB/xC
+           datasheet's per-package pin table) - worth knowing before
+           assuming any Port D pin is available on this footprint.
 
 -----------------------------------------------------------------------------
 [BLOCK 10: EXPANSION CONNECTOR (20-PIN, UPDATED FROM 14-PIN)]
@@ -240,12 +238,10 @@ PB15  -> EXP_SPI_MOSI (was EXP_PWM - see Block 10's note. An earlier revision
 A dedicated header for add-on boards, separate from every tool-specific
 connector. Full pin-by-pin breakdown (power rails, ground, and the signal
 assignments below) lives in PINOUT_CONNECTORS.TXT; this block just lists
-which MCU pins feed it. EXP_SPI_CS/MISO/MOSI/SCK are now wired - see
-Block 9 above - as a bit-banged (not hardware peripheral) SPI bus, for a
-future TMC5160 or other SPI-configurable chip on the expansion board.
-EXP_TMC_DIAG0 remains a connector-only no-connect (not wired to any MCU
-pin) - see PINOUT_CONNECTORS.TXT's CONN_EXPANSION note for the full
-reasoning on both of these.
+which MCU pins feed it. EXP_SPI_CS/MISO/MOSI/SCK form a bit-banged (not
+hardware peripheral) SPI bus - see Block 9 above - for a TMC5160 or other
+SPI-configurable chip on the expansion board. See
+PINOUT_CONNECTORS.TXT's CONN_EXPANSION note for the full reasoning.
 
 PB10  -> EXP_I2C2_SCL (I2C2_SCL, AF4 - confirmed against the schematic
           netlist). R48 (4.7k to +3.3V) populated as an external pull-up.
@@ -264,18 +260,14 @@ PB12  -> EXP_TMC_STEP (general-purpose output - universal STEP pulse line,
           use it the same way)
 PB13  -> EXP_TMC_DIR
 PB14  -> EXP_TMC_EN
-PB15  -> EXP_SPI_MOSI (see Block 9 - moved here from PD2, which doesn't
-          exist on this package)
+PB15  -> EXP_SPI_MOSI (see Block 9)
 PC14  -> EXP_GPIO1 (general purpose; EXTI-capable if a future add-on needs
           a fast interrupt-driven input, e.g. an endstop)
-PC15  -> EXP_TMC_DIAG0 (a TMC5160's stall/fault diagnostic line - this was
-          EXP_GPIO2 in an earlier revision; reused rather than needing a
-          new pin, since EXP_GPIO1/2 were already reserved for exactly
-          this kind of use. Currently read via a simple polled CAN query
-          (0x182/0x183) - not yet a hardware EXTI interrupt; see
-          PINOUT_CONNECTORS.TXT's CONN_EXPANSION note for the full
-          reasoning and why that's a natural future addition, not built
-          speculatively ahead of a concrete need.)
+PC15  -> EXP_TMC_DIAG0 (a TMC5160's stall/fault diagnostic line, using the
+          same EXTI-capable headroom as EXP_GPIO1. Currently read via a
+          simple polled CAN query (0x182/0x183) - not yet a hardware EXTI
+          interrupt; see PINOUT_CONNECTORS.TXT's CONN_EXPANSION note for
+          the full reasoning.)
     * SILICON NOTE: SYSCFG_EXTICR maps each bit NUMBER (0-15) to one port
       at a time, shared across every port on the chip - using EXTI on
       PC14 claims "bit 14" for the whole MCU, not just this pin, and same

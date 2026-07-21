@@ -59,7 +59,7 @@ A 20-pin header, separate from the tool-specific connectors, for add-on boards t
 
 **A TMC2209 or a TMC5160, not necessarily both.** Both chips use the same STEP/DIR/EN interface for actual motion, so that part is universal. Where they differ is configuration/diagnostics: a TMC2209 uses its own single-wire UART for that, while a TMC5160 uses SPI — and since the two are mutually exclusive on any given expansion board, the 4 SPI pins double as a natural home for a TMC2209's single UART line too, rather than needing yet another dedicated pin nobody uses at the same time as the SPI bus. The bit-banged SPI bus talks the exact protocol a TMC5160 expects (SPI Mode 3, MSB first, CS held low for the whole transaction — see `CANBUS.TXT`'s `0x180`/`0x181` for the generic byte-passthrough command that drives it) rather than this firmware needing to know that chip's specific register layout. A TMC5160's DIAG0 stall/fault line is wired too (`0x182`/`0x183`) — it reuses one of the two general-purpose GPIO pins, which were already earmarked for exactly this kind of fast interrupt-driven input.
 
-Full pin-by-pin detail — which MCU pin backs which signal, and the reasoning behind a couple of layout constraints this chip's 48-pin package turned out to have — lives in `PINOUT_CONNECTORS.TXT` and `firmware/README.md`.
+Full pin-by-pin detail — which MCU pin backs which signal, and the reasoning behind a couple of layout constraints this chip's 48-pin package has — lives in `PINOUT_CONNECTORS.TXT` and `firmware/README.md`.
 
 ## 💾 Parameter Persistence
 
@@ -76,7 +76,7 @@ Through its dynamic switching logic, the firmware natively manages the following
 3. **Thermal Paste / Liquid Dispenser:** fluidity management for high-viscosity pastes or liquid adhesives. [Jumper/wiring config →](images/TOOL_LIQUID_DISPENSER.png)
 4. **Smart Electric Screwdriver:** rotation and stop control based on torque limits or end-stops. [Jumper/wiring config →](images/TOOL_SCREWDRIVER.png)
 5. **Vacuum / Pneumatic Gripper:** vacuum pump control and pressure level reading for safe Pick-and-Place operations. [Jumper/wiring config →](images/TOOL_VACUUM_PICKUP.png)
-6. **Drill (BL4260):** PWM speed control, direction switching, and dynamic electric braking with real-time RPM readings, on its own dedicated enable/brake line (no longer shared with the stepper-tool driver enable). Generic endstop input available. [Jumper/wiring config →](images/TOOL_DRILL.png)
+6. **Drill (BL4260):** PWM speed control, direction switching, and dynamic electric braking with real-time RPM readings, on its own dedicated enable/brake line, independent from the stepper-tool driver enable. Generic endstop input available. [Jumper/wiring config →](images/TOOL_DRILL.png)
 7. **Gimbal Gripper:** high-sensitivity manipulation using 3-phase brushless gimbal motors. [Jumper/wiring config →](images/TOOL_GRIPPER_GIMBAL.png)
 8. **NEMA Gripper:** robust clamping force controlled via a heavy-duty stepper motor. [Jumper/wiring config →](images/TOOL_GRIPPER_NEMA.png)
 9. **AOI (Automated Optical Inspection) System:** synchronous stroboscopic control of the LED lighting array for machine vision camera capture. Generic endstop input available. [Jumper/wiring config →](images/TOOL_AOI_INSPECTION.png)
@@ -97,13 +97,13 @@ Both physical variants below are the same panel electrically (SSD1306 or SSD1315
 * **Top 16 pixels (pages 0-1): yellow.** URTC uses this strip for whatever's most useful to see at a glance without reading closely — the CAN-activity indicator, live hero readings, or (on the boot splash / invalid-tool screens) short status text.
 * **Bottom 48 pixels (pages 2-7): blue.** Everything else — tool icons, detailed telemetry, the animated JuanenBOT face on the splash screen, the big blinking ERROR wordmark.
 
-Both land on the same I2C1 bus and the same `OLED_Init()` — the firmware can't tell which of the two is attached, and doesn't need to. They're mutually exclusive on a given board (see `BOM.TXT`'s `CONN_OLED2` note (renamed from `LCD1` in the schematic)).
+Both land on the same I2C1 bus and the same `OLED_Init()` — the firmware can't tell which of the two is attached, and doesn't need to. They're mutually exclusive on a given board (see `BOM.TXT`'s `CONN_OLED2` note - this document's name for what the schematic calls `LCD1`).
 
 #### Option A — direct mount (`CONN_OLED2`, the footprint actually populated on the board)
 
 <img src="images/OLED_DIRECT_MOUNT.jpg" width="220">
 
-A bare panel with no separate breakout PCB — just the glass and its 30-pin FPC ribbon, soldered straight into the `CONN_OLED2` footprint (`FPC30`, WiseChip UG-2864, renamed from `LCD1` in the schematic — see `BOM.TXT` and `URTC_NETLIST.TXT`). Of the 30 pins, only a subset is actually wired — the rest is the panel's parallel-interface bus (`D2`–`D7`, `RW`, `E/!RD`), left unconnected since the board only ever talks to it over I2C:
+A bare panel with no separate breakout PCB — just the glass and its 30-pin FPC ribbon, soldered straight into the `CONN_OLED2` footprint (`FPC30`, WiseChip UG-2864, this document's name for what the schematic calls `LCD1` — see `BOM.TXT` and `URTC_NETLIST.TXT`). Of the 30 pins, only a subset is actually wired — the rest is the panel's parallel-interface bus (`D2`–`D7`, `RW`, `E/!RD`), left unconnected since the board only ever talks to it over I2C:
 
 | CONN_OLED2 pin(s) | Net | Function |
 |---|---|---|
@@ -409,7 +409,7 @@ Or build a standalone binary that doesn't need Python installed: `build_exe.bat`
 A live CAN bus exerciser, not a flashing tool — it never touches flash,
 only runtime commands and telemetry against whatever firmware is already
 running. Connects the same way the flasher does, then asks the board
-(over a new `0x110`/`0x111` query pair — see `CANBUS.TXT`) which of the
+(over the `0x110`/`0x111` query pair — see `CANBUS.TXT`) which of the
 12 tool profiles it's currently jumpered for, and builds a single panel
 showing only that tool's own controls and live telemetry — a soldering
 iron's setpoint-and-readback, a drill's speed/direction/RPM, the AOI
@@ -435,9 +435,7 @@ python3 urtc_tester.py         # Linux
 ```
 
 Or build a standalone binary the same way as the flasher: `build_exe.bat`
-/ `./build_exe.sh`. Requires firmware built with `0x110`/`0x111` support
-(this repo's current firmware has it) - older firmware won't answer the
-active-tool query. See `tools/tester/README.md` for the full per-tool
+/ `./build_exe.sh`. See `tools/tester/README.md` for the full per-tool
 control/telemetry table.
 
 ## 📋 Changelog
@@ -464,13 +462,13 @@ always move together.
 
 The core firmware is built as a highly optimized, single-file monolithic architecture to ensure deterministic timing (hardware ISRs drive everything from OLED rendering to the diagnostic LED heartbeat).
 
-**Firmware (`STM32F303CC.C`):** feature-complete for all 12 tool profiles — thermal PID control, per-tool telemetry, communication watchdogs, stall/fault detection, and the OLED's own live diagnostics. Versioned independently of the bootloader (see the Changelog below). Recent additions: a hardware I2C1 migration, the layer-fan and generic-endstop features, an active-tool query pair (`0x110`/`0x111`) for the Tester tool, a generic SPI passthrough (`0x180`/`0x181`) for whatever ends up on the expansion connector, and an onboard EEPROM that persists setpoints across a power loss (`0x190`/`0x191`).
+**Firmware (`STM32F303CC.C`):** feature-complete for all 12 tool profiles — thermal PID control, per-tool telemetry, communication watchdogs, stall/fault detection, and the OLED's own live diagnostics, alongside an active-tool query pair (`0x110`/`0x111`), a generic SPI passthrough (`0x180`/`0x181`) for the expansion connector, and an onboard EEPROM that persists setpoints across a power loss (`0x190`/`0x191`). Versioned independently of the bootloader (see the Changelog below).
 
 **Bootloader (`BOOTLOADER.C`):** feature-complete golden-image A/B update system — HMAC-SHA256 signed OTA updates over CAN, a backup slot that guarantees a failed update never bricks the board, and its own version reporting (`0x7FA`) independent of the application. Compiles and links clean; see the bench-test caveat above before trusting it unattended with real actuators connected.
 
 **PC tools (`tools/`):** both `URTC Flasher` (CAN OTA updates + full-chip SWD/JTAG programming) and `URTC Tester` (live per-tool control/telemetry exerciser) are feature-complete for what they set out to do, each with their own README covering setup and every control in detail.
 
-**Hardware:** still the earlier stage of the two — schematic and BOM are actively evolving (most recently: the expansion connector's SPI bus, and the onboard persistence EEPROM), no populated board exists yet to validate any of the above against real silicon. Everything above compiles, links, and has been reasoned through carefully, but "builds correctly" and "verified on hardware" are two different claims — see the safety notice at the top of this README, and treat a first bring-up with the caution any new board deserves.
+**Hardware:** schematic and BOM are still being finalized; no populated board exists yet to validate any of the above against real silicon. Everything above compiles, links, and has been reasoned through carefully, but "builds correctly" and "verified on hardware" are two different claims — see the safety notice at the top of this README, and treat a first bring-up with the caution any new board deserves.
 
 If anyone in the community is working on custom end-effectors, smart tool-changers, or advanced tool integration for PAROL6, Faze4, or any other robot arm platform, I'd love to chat, swap ideas, or dive deeper into the CAN commands!
 

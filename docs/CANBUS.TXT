@@ -44,10 +44,10 @@ Data:
                0x00 = Standard mode (OLED at normal brightness / High contrast 0xCF)
                0x01 = Night mode active (OLED low-power / Minimum contrast 0x0F)
                0x0F = Display in Standby / Display OFF (anti-burn-in protection)
-  - rxData[4]: Red intensity (R) - Ring LED color, CONN_LED2 (0-255) - NEW
-  - rxData[5]: Green intensity (G) - Ring LED color, CONN_LED2 (0-255) - NEW
-  - rxData[6]: Blue intensity (B) - Ring LED color, CONN_LED2 (0-255) - NEW
-  - rxData[7]: Ring on/off - NEW
+  - rxData[4]: Red intensity (R) - Ring LED color, CONN_LED2 (0-255)
+  - rxData[5]: Green intensity (G) - Ring LED color, CONN_LED2 (0-255)
+  - rxData[6]: Blue intensity (B) - Ring LED color, CONN_LED2 (0-255)
+  - rxData[7]: Ring on/off
                0x00 = Ring off
                0x01 = Ring on, solid, at the rxData[4:6] color
   Note: CONN_LED1 (status LED) automatic scheme, applied whenever no host
@@ -257,7 +257,7 @@ DLC: 3 bytes
 Data:
   - txData[0]: Current T12 temperature (°C) - High byte (MSB) [BIG-ENDIAN]
   - txData[1]: Current T12 temperature (°C) - Low byte (LSB)
-  - txData[2]: Generic endstop / limit switch state (PB3, NEW)
+  - txData[2]: Generic endstop / limit switch state (PB3)
                0x01 = Triggered (line pulled low)
                0x00 = Open
   Note: Temperature read exclusively via ADC Channel 0 (PA0) through the AD8605
@@ -283,7 +283,7 @@ DLC: 3 bytes
 Data:
   - txData[0]: Calculated actual RPM (uint16_t) - High byte (MSB via EXTI3 on PA3) [BIG-ENDIAN]
   - txData[1]: Calculated actual RPM (uint16_t) - Low byte (LSB)
-  - txData[2]: Generic endstop / limit switch state (PB3, NEW)
+  - txData[2]: Generic endstop / limit switch state (PB3)
                0x01 = Triggered (line pulled low)
                0x00 = Open
   Note: The tachometer (PA3/EXTI3) and the endstop (PB3, plain polled input)
@@ -320,7 +320,7 @@ Data:
         only controls the on/off/strobe timing pattern, not the color itself.
         The strobe pulse flashes the same ring LEDs used for continuous mode.
 
-ID: 0x155 [URTC Tool Head -> Master] (Automatic telemetry every 150ms) - NEW
+ID: 0x155 [URTC Tool Head -> Master] (Automatic telemetry every 150ms)
 DLC: 1 byte
 Data:
   - txData[0]: Generic endstop / limit switch state (PB3)
@@ -343,7 +343,7 @@ Data:
         set and no refresh frames arrive, the PWM is shut off and the
         interlock opens (PB6=0).
 
-ID: 0x165 [URTC Tool Head -> Master] (Automatic telemetry every 150ms) - NEW
+ID: 0x165 [URTC Tool Head -> Master] (Automatic telemetry every 150ms)
 DLC: 1 byte
 Data:
   - txData[0]: Generic endstop / limit switch state (PB3)
@@ -398,7 +398,7 @@ Data:
   - txData[0]: Calculated actual RPM (uint16_t) - High byte (MSB via EXTI3 on PA3) [BIG-ENDIAN]
   - txData[1]: Calculated actual RPM (uint16_t) - Low byte (LSB)
 
-ID: 0x178 [Master -> URTC Tool Head] -> Hotend Fan Control - NEW
+ID: 0x178 [Master -> URTC Tool Head] -> Hotend Fan Control
 DLC: 1 byte
 Data:
   - rxData[0]: Hotend cooling fan power (PWM: 0 to 255 towards PA5, 25kHz real
@@ -411,7 +411,7 @@ Data:
         reads 0 RPM 3 seconds after starting, the fan has physically failed
         and the system enters Critical Error.
 
-ID: 0x179 [URTC Tool Head -> Master] -> Hotend Fan RPM Telemetry (every 150ms) - NEW
+ID: 0x179 [URTC Tool Head -> Master] -> Hotend Fan RPM Telemetry (every 150ms)
 DLC: 2 bytes
 Data:
   - txData[0]: Calculated actual RPM (uint16_t) - High byte (MSB via EXTI6 on PA6) [BIG-ENDIAN]
@@ -604,16 +604,16 @@ Notes: this is BOOTLOADER.C's own version (BOOTLOADER_VERSION_MAJOR/MINOR/
 
 =============================================================================
   0x095 -> Instant impact register (Touch probe - MAXIMUM PRIORITY)
-  0x100 -> Status + ring LED control / OLED night mode, EXTENDED (DLC:8)
-  0x110 -> Query active tool + quick state, NEW (DLC:any)
-  0x111 -> Active tool + quick state response, NEW (DLC:4)
-  0x180 -> Expansion SPI passthrough request, NEW (DLC:2-8)
-  0x181 -> Expansion SPI passthrough response, NEW (DLC:2-8)
-  0x182 -> Query EXP_TMC_DIAG0 level, NEW (DLC:any)
-  0x183 -> EXP_TMC_DIAG0 level response, NEW (DLC:1)
-  0x190 -> Query recovered EEPROM state, NEW (DLC:any)
-  0x191 -> Recovered EEPROM state response, NEW (DLC:8)
-  0x192 -> Erase recovered EEPROM state, magic payload, NEW (DLC:4)
+  0x100 -> Status + ring LED control / OLED night mode (DLC:8)
+  0x110 -> Query active tool + quick state (DLC:any)
+  0x111 -> Active tool + quick state response (DLC:4)
+  0x180 -> Expansion SPI passthrough request (DLC:2-8)
+  0x181 -> Expansion SPI passthrough response (DLC:2-8)
+  0x182 -> Query EXP_TMC_DIAG0 level (DLC:any)
+  0x183 -> EXP_TMC_DIAG0 level response (DLC:1)
+  0x190 -> Query recovered EEPROM state (DLC:any)
+  0x191 -> Recovered EEPROM state response (DLC:8)
+  0x192 -> Erase recovered EEPROM state, magic payload (DLC:4)
   --- Per-tool commands (see dedicated sections above) ---
   0x120 -> Stepper motor control (Dispensers, Screwdriver, Grippers - DLC:5)
   0x130 -> T12 setpoint temperature (Soldering iron - DLC:2)
@@ -622,15 +622,15 @@ Notes: this is BOOTLOADER.C's own version (BOOTLOADER_VERSION_MAJOR/MINOR/
   0x145 -> ADC telemetry / Digital input (Vacuum pickup - DLC:3)
   0x147 -> Actual RPM telemetry + endstop, uint16_t (Drill - DLC:3)
   0x150 -> Ring off/strobe/continuous control (AOI tool head - DLC:3)
-  0x155 -> Endstop telemetry, NEW (AOI tool head - DLC:1)
+  0x155 -> Endstop telemetry, (AOI tool head - DLC:1)
   0x160 -> Laser power and interlock (Laser engraver - DLC:2 - 250ms watchdog)
-  0x165 -> Endstop telemetry, NEW (Laser engraver - DLC:1)
+  0x165 -> Endstop telemetry, (Laser engraver - DLC:1)
   0x170 -> Unified thermal setpoint and extruder motion (3D printer - DLC:6)
   0x173 -> Delta layer fan PWM power control (3D printer - DLC:1)
   0x175 -> Hotend thermal telemetry (3D printer - DLC:2)
   0x177 -> Layer fan actual RPM telemetry, uint16_t (3D printer - DLC:2)
-  0x178 -> Hotend fan PWM power control, NEW (3D printer - DLC:1)
-  0x179 -> Hotend fan actual RPM telemetry, uint16_t, NEW (3D printer - DLC:2)
+  0x178 -> Hotend fan PWM power control, (3D printer - DLC:1)
+  0x179 -> Hotend fan actual RPM telemetry, uint16_t, (3D printer - DLC:2)
   --- CAN bootloader protocol (see dedicated section above) ---
   0x7F0 -> Enter bootloader mode (Application, magic payload - DLC:4)
   0x7F1 -> Start update, size + HardwareID (Bootloader - DLC:8)

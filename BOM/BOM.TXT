@@ -151,10 +151,10 @@ R32         1          330R                R0402           RUN LED series/limiti
 RefDes      Qty        Value / Model       Package         Notes / Description
 --------------------------------------------------------------------------------
 CONN_OLED2  1          SSD1306/SSD1315     FPC30           WiseChip UG-2864 0.96" 128x64 OLED panel, direct
-                                                            30-pin FPC mount (renamed from LCD1 in the
-                                                            schematic) - see README's OLED section for the
-                                                            alternate CONN_OLED (breakout module) path;
-                                                            the two are mutually exclusive
+                                                            30-pin FPC mount (this document's name for what
+                                                            the schematic calls LCD1) - see README's OLED
+                                                            section for the alternate CONN_OLED (breakout
+                                                            module) path; the two are mutually exclusive
 
 --------------------------------------------------------------------------------
 8. PHYSICAL CONNECTOR BLOCK (TOOL HEAD INTERCONNECT)
@@ -171,9 +171,9 @@ CONN_SEN        1      JST4-B4B-PH-K       2.00mm, 4-pin   Impact probe / endsto
 CONN_MOT        1      B4B-XH-2            2.54mm, 4-pin   NEMA/extruder stepper motor phase output
 CONN_LED1       1      JST3-B3B-PH-K       2.00mm, 3-pin   External status LED (single WS2812, host-colored)
 CONN_LED2       1      JST3-B3B-PH-K       2.00mm, 3-pin   Camera/illumination LED ring
-CONN_EXPANSION  1      WR-PHD 1.27mm       1.27mm, 20-pin  Add-on board header (grew from 14 to 20 pins -
-                                                            6 new pins reserved for a future SPI bus and a
-                                                            TMC2209 diagnostic line, not yet wired to the
-                                                            MCU) - see PINOUT_CONNECTORS.TXT
-                                                            section 9 for the full pin-by-pin breakdown
+CONN_EXPANSION  1      WR-PHD 1.27mm       1.27mm, 20-pin  Add-on board header - STEP/DIR/EN for an optional
+                                                            TMC2209 or TMC5160 driver, a bit-banged SPI bus and
+                                                            TMC5160 diagnostic line, and a separate I2C2 bus -
+                                                            see PINOUT_CONNECTORS.TXT section 9 for the full
+                                                            pin-by-pin breakdown
 ================================================================================

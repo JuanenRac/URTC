@@ -79,6 +79,11 @@ Serial/SLCAN instead (required on Windows; optional on Linux):
 
 If your adapter already runs SLCAN firmware, skip straight to step 2 below.
 
+A received SLCAN line whose actual length doesn't match what its own
+declared DLC implies is treated as malformed and skipped, rather than
+parsed from its first N hex characters regardless of what follows -
+worth knowing if you're debugging against a noisy or non-standard adapter.
+
 ## 2. Install and run
 
 **Windows:**
@@ -94,6 +99,10 @@ python3 -m pip install -r requirements.txt
 python3 urtc_flasher.py
 ```
 Or build a standalone binary with `./build_exe.sh` (`chmod +x` it first).
+
+Both scripts pass `--noconfirm` to PyInstaller, so rebuilding over an
+existing `dist/URTC_Flasher` replaces it directly rather than waiting on
+a "replace it?" prompt that's easy to miss in a script's output.
 
 **On startup**, the banner shows centered on screen for 5 seconds before
 the main window appears - it's not part of the main window itself (which
@@ -301,18 +310,15 @@ or vice versa, both work. Both file pickers validate the selected file
 confidently checking it - a plausible initial stack pointer) before
 letting you proceed, the same way the CAN path's firmware picker already did.
 
-**Connection is checked before anything destructive runs.** An earlier
-version of this tool did not do this: a real test with no probe connected
-at all still logged a full "complete" message, because
-STM32CubeProgrammer's own exit code turned out not to be a reliable
-success/failure signal by itself. Every run now starts with a dedicated
-connection check (`pyocd list --probes`, or a connect-only
-`-c port=SWD` for STM32CubeProgrammer) that requires **positive evidence**
-of a real probe/target - not just the absence of an error - before the
-mass-erase step ever runs. Every subsequent command's output is also
-screened for known failure text as a second layer, in case a tool's exit
-code alone isn't trustworthy again in some other situation this hasn't
-hit yet.
+**Connection is checked before anything destructive runs**, requiring
+**positive evidence** of a real probe/target rather than just the
+absence of an error - STM32CubeProgrammer's own exit code isn't a
+reliable success/failure signal by itself, so a dedicated connection
+check (`pyocd list --probes`, or a connect-only `-c port=SWD` for
+STM32CubeProgrammer) runs before the mass-erase step ever does. Every
+subsequent command's output is also screened for known failure text as a
+second layer, in case a tool's exit code alone isn't trustworthy in some
+other situation either.
 
 **Dry run is on by default.** The first time, leave it checked and hit
 "Flash Complete Chip" - it prints the exact commands to the log without
@@ -352,7 +358,7 @@ anyway), `130` cancelled with Ctrl+C. Only covers the CAN OTA update path
 now, given how much more is at stake if a scripted run gets a wrong
 file/target combination wrong with nobody watching.
 
-## 8. Auto-retry and session logs
+## 8. Reliability during a CAN update, and session logs
 
 If a page's ACK doesn't arrive within the normal 3s window during a CAN
 update, the tool retries the *wait* (not a resend of the page's data) up
@@ -361,7 +367,11 @@ ACK that was delayed or lost on a noisy bus without the underlying data
 being lost. It deliberately does not resend page data on a timeout - if
 the original data actually arrived fine and only the ACK was lost,
 resending would make the bootloader read those bytes as the start of the
-*next* page, desyncing the transfer.
+*next* page, desyncing the transfer. Each retry also checks the
+bootloader's own heartbeat (sent roughly once a second) against what
+receiving the current page in full would imply - when they're
+consistent, the log says so, which is real evidence the data got
+through and only the ACK was lost, not just a longer wait and a hope.
 
 Every session also writes a timestamped log file to `tools/flasher/logs/`
 (`urtc_flasher_YYYYMMDD_HHMMSS.log`), independent of the on-screen log -
@@ -369,7 +379,7 @@ useful for handing a full trace to whoever wrote the firmware if
 something goes wrong in the field. This folder is created automatically
 and is safe to delete; nothing reads old logs back in.
 
-## 9. Bitrate, option bytes, and debug bundles
+## 9. Diagnostics — bus activity, bitrate, and debug bundles
 
 **Bitrate selector + auto-detect** (Serial/SLCAN only): URTC's bus is fixed
 at 500 kbit/s, which stays the default - this is for a misconfigured
@@ -378,6 +388,72 @@ each standard SLCAN bitrate in turn against a version query and stops at
 the first one that gets a real response; not connected yet when you click
 it. SocketCAN's bitrate is set at the OS level (`ip link`), so this
 control is disabled for that transport - there's nothing here for it to try.
+
+**Bus activity** ("Check (2s)", next to Query): counts real protocol
+frames actually seen over a fixed 2-second window on whichever transport
+is connected. This is deliberately **not** the same thing as a true CAN
+bus-load percentage or the controller's own error counters (REC/TEC) -
+those need a netlink query (SocketCAN) or adapter-specific extensions
+(SLCAN) this tool doesn't have a standard, dependency-free way to get.
+What it does give: a genuine, directly-measured "is anything talking on
+this bus, and roughly how often" signal, on either transport. For
+SocketCAN specifically, it also shows the 2-second delta of Linux's own
+interface statistics (`/sys/class/net/<iface>/statistics/`) - basic
+rx/tx/error/drop counters every interface exposes, read as plain files,
+no extra dependency. Connecting over SocketCAN also reads
+`/sys/class/net/<iface>/carrier` - a plain 0/1 file every Linux interface
+exposes. When a CAN controller goes bus-off, the kernel driver calls
+`netif_carrier_off()`, so "no carrier" here is real evidence of a bus-off
+or similarly dead link, logged as a warning with the exact recovery
+command (`sudo ip link set <iface> down && sudo ip link set <iface> up
+type can bitrate 500000 restart-ms 100`). This tool doesn't run that
+command itself - clearing a real bus-off needs the interface taken down
+and back up at the kernel level, which needs root and counts as changing
+system network configuration, not something to do silently on your behalf.
+
+**Export Debug Bundle** (above the log): saves a `.zip` with the current
+on-screen log, basic system diagnostics (OS, Python version, which tools
+were found, current transport/port/bitrate), and the currently-selected
+CAN firmware file - useful for handing a complete picture to whoever wrote
+the firmware if something goes wrong in the field, instead of copying log
+text by hand.
+
+## 10. SWD/JTAG — file formats, slot verification, and probe selection
+
+**File formats**: the SWD section's bootloader/application pickers accept
+`.bin`, `.hex`, and `.elf`/`.axf`. ELF/AXF is parsed with a small amount
+of hand-written struct-unpacking (ELF header + program headers only - no
+symbols, no section headers), deliberately not using `pyelftools`: this
+project stays at zero non-stdlib dependencies, and full ELF parsing is
+more than this specific plausibility check needs. Verified against the
+actual compiled `BOOTLOADER.elf`/`APP.elf` from this project's own build -
+both correctly validate at their real load addresses
+(`0x08000000`/`0x08008000`), not just synthetic test files. 32-bit
+little-endian ARM only, which is all a Cortex-M target ever is. A `.hex`
+file's declared size is the actual occupied byte count, not the address
+span from its lowest to highest record - so a sparse file (a small block
+of real firmware plus a distant, separate block of option bytes or
+calibration data, which some STM32 toolchains bundle into one export)
+validates on its real content rather than the gap between them. A raw
+firmware image under a non-`.bin` extension (`.img`, `.rom`, or no
+extension at all - selectable via the file picker's "All files" option)
+gets its base address from which slot you're loading it into, the same
+as a `.bin` would.
+
+**Bootloader/application slot verification**: the file pickers verify
+each image is meant for the slot it's being put into, not just that it
+looks like *some* valid firmware. A bootloader image and an application
+image both have an equally plausible stack pointer - same chip, same RAM
+- so that check alone can't tell them apart if one ends up in the
+other's slot. What can: a linked image's **reset handler** is a real,
+absolute address baked in at link time, and it only ever points inside
+the region it was actually linked for. Verified against this project's
+own real compiled `BOOTLOADER.bin`/`APP.bin`: their reset handlers are
+`0x080030F1` and `0x0800C725` respectively, each correctly inside its
+own slot's address range and outside the other's - so putting either one
+in the wrong slot is caught and blocked, not silently accepted. Same
+logic applies to `.hex`/`.elf`, checked against their own embedded load
+address instead.
 
 **Check Option Bytes** (section 4, STM32CubeProgrammer only - pyOCD doesn't
 expose this the same way via CLI): a read-only `-ob displ` dump, no
@@ -392,151 +468,44 @@ around SWD risk:
   SWD), RDP2 disables the debug port forever by ST's own design. This
   check exists to catch it before a full-chip operation, not after.
 
-**Export Debug Bundle** (above the log): saves a `.zip` with the current
-on-screen log, basic system diagnostics (OS, Python version, which tools
-were found, current transport/port/bitrate), and the currently-selected
-CAN firmware file - useful for handing a complete picture to whoever wrote
-the firmware if something goes wrong in the field, instead of copying log
-text by hand.
-
-## 10. Bus activity check, and native .ELF/.AXF support
-
-**Bus activity** ("Check (2s)", next to Query): counts real protocol
-frames actually seen over a fixed 2-second window on whichever transport
-is connected. This is deliberately **not** the same thing as a true CAN
-bus-load percentage or the controller's own error counters (REC/TEC) -
-those need a netlink query (SocketCAN) or adapter-specific extensions
-(SLCAN) this tool doesn't have a standard, dependency-free way to get.
-What it does give: a genuine, directly-measured "is anything talking on
-this bus, and roughly how often" signal, on either transport. For
-SocketCAN specifically, it also shows the 2-second delta of Linux's own
-interface statistics (`/sys/class/net/<iface>/statistics/`) - basic
-rx/tx/error/drop counters every interface exposes, read as plain files,
-no extra dependency.
-
-**Native .ELF/.AXF support**: the SWD section's bootloader/application
-pickers now accept `.elf`/`.axf` alongside `.bin`/`.hex`. Parsed with a
-small amount of hand-written struct-unpacking (ELF header + program
-headers only - no symbols, no section headers), deliberately not using
-`pyelftools`: this project has stayed at zero non-stdlib dependencies
-throughout, and full ELF parsing is more than this specific plausibility
-check needs. Tested against the actual compiled `BOOTLOADER.elf`/`APP.elf`
-from this project's own build - both correctly validated at their real
-load addresses (`0x08000000`/`0x08008000`), not just synthetic test files.
-32-bit little-endian ARM only, which is all a Cortex-M target ever is.
-
-## 11. Catching a swapped bootloader/application file, and other fixes
-
-**Bootloader/application cross-check** (section 4): the file pickers now
-also verify the image is meant for the slot it's being put into, not just
-that it looks like *some* valid firmware. A bootloader image and an
-application image both have an equally plausible stack pointer - same
-chip, same RAM - so that check alone couldn't tell them apart if one
-ended up in the other's slot. What can: a linked image's **reset
-handler** is a real, absolute address baked in at link time, and it only
-ever points inside the region it was actually linked for. Verified
-against this project's own real compiled `BOOTLOADER.bin`/`APP.bin`:
-their reset handlers are `0x080030F1` and `0x0800C725` respectively, each
-correctly inside its own slot's address range and outside the other's -
-so putting either one in the wrong slot is now caught and blocked, not
-silently accepted. Same logic applies to `.hex`/`.elf`, checked against
-their own embedded load address instead.
-
-**`build_exe.bat`/`build_exe.sh` now pass `--noconfirm`** to PyInstaller.
-Without it, rebuilding over an existing `dist/URTC_Flasher` stops and
-waits for a "replace it?" prompt that's easy to miss in a script's output
-- the old file was being silently left in place when that prompt never
-got answered.
-
-**Specific verify-failure reasons** (needed a bootloader change,
-not just the flasher): `BOOTLOADER.C` now sends a reason byte alongside
-status `0x05` (verify failed) - incomplete transfer, CRC32 mismatch, HMAC
-mismatch, or HardwareID mismatch, instead of every failure looking
-identical. HardwareID mismatch used to report the generic `0xFF` error
-code; it now uses this same reason-coded path for one consistent "why did
-it fail" answer. See `CANBUS.TXT` for the exact frame format. **This
-changes the bootloader's CAN protocol slightly (DLC 1->2 specifically for
-status 0x05)** - reflash the bootloader from this same delivery alongside
-this version of the flasher, and rebuild it together with the same
-version of `STM32F303CC.C` if you change either again later.
-
-## 12. Multiple probes, verified pyOCD writes, and transfer telemetry
-
 **Probe selection** (section 4): if more than one ST-Link/probe is
-connected at once, every command now requires picking one explicitly from
-the Probe dropdown - there's no more "whichever one the OS happens to
+connected at once, every command requires picking one explicitly from
+the Probe dropdown - there's no "whichever one the OS happens to
 enumerate first". With exactly one probe connected, it's auto-selected;
-with zero or several, you'll need to hit Refresh and choose. This applies
-to the full-chip flash and the option-bytes check alike, since both are
+with zero or several, hit Refresh and choose. This applies to the
+full-chip flash and the option-bytes check alike, since both are
 destructive-adjacent enough that guessing the wrong board is a real risk
 on a multi-device bench.
 
-**pyOCD writes are now verified with an explicit read-back**, not just
-trusted on exit code. pyOCD's own `flash` command already skips
-rewriting pages that already match (a speed optimization, not a
-verification report), so this adds a `commander compare` step against
-both images after writing - a genuine byte-for-byte check, matching what
-STM32CubeProgrammer's `-v` flag already did. Only for `.bin`: `compare`
+**pyOCD writes are verified with an explicit read-back**, not just
+trusted on exit code. pyOCD's own `flash` command skips rewriting pages
+that already match (a speed optimization, not a verification report), so
+this tool adds a `commander compare` step against both images after
+writing - a genuine byte-for-byte check, matching what
+STM32CubeProgrammer's `-v` flag already does. Only for `.bin`: `compare`
 checks flash content against the file's raw bytes, which wouldn't
 correctly match a `.hex`/`.elf` file's own encoding even after a
 successful flash, so those two formats skip this specific step and rely
 on pyOCD's own internal write-time verification instead.
 
-**Transfer telemetry**: the log now shows effective KB/s and elapsed time
+## 11. Transfer telemetry and verify-failure detail
+
+**Transfer telemetry**: the log shows effective KB/s and elapsed time
 per page during a CAN update, plus a summary line at the end (total time,
 average KB/s, how many page-ACK retries happened). Purely informational -
 doesn't change flashing behavior, just makes it easier to tell "this is
 just slow" from "something's actually wrong" at a glance.
 
-**Memory-map values are now configurable too** - `urtc_config.json` (see
-below) can override `app_max_size`, `bootloader_max_size`,
-`flash_page_size`, `bootloader_flash_addr`, and `app_flash_addr` on top of
-the HMAC key and HardwareID it already supported, useful if this tool is
-ever adapted to a different chip variant or partition scheme.
+**Specific verify-failure reasons**: if verification fails during a CAN
+update, `BOOTLOADER.C` sends a reason byte alongside status `0x05`
+(verify failed) - incomplete transfer, CRC32 mismatch, HMAC mismatch, or
+HardwareID mismatch, rather than every failure looking identical. See
+`CANBUS.TXT` for the exact frame format (`0x7F5`, DLC 2 for this specific
+status). This tool and the bootloader agree on this frame format, so
+flash both together if you're building a custom bootloader with a
+different version of the protocol.
 
-**SocketCAN carrier check**: connecting now also reads
-`/sys/class/net/<iface>/carrier` - a plain 0/1 file every Linux interface
-exposes. When a CAN controller goes bus-off, the kernel driver genuinely
-does call `netif_carrier_off()`, so "no carrier" here is real evidence of
-a bus-off or similarly dead link, logged as a warning with the exact
-recovery command (`sudo ip link set <iface> down && sudo ip link set
-<iface> up type can bitrate 500000 restart-ms 100`). This tool doesn't
-run that command itself - clearing a real bus-off needs the interface
-taken down and back up at the kernel level, which needs root and counts
-as changing system network configuration, not something to do silently
-on the user's behalf.
-
-## 13. Smaller robustness fixes
-
-A handful of edge cases fixed alongside the above:
-
-- **Config file with a plain number**: `urtc_config.json`'s `hardware_id`
-  now accepts either a JSON string (`"0x0303CC01"`) or a plain JSON number
-  (`50580689`) - previously only the string form worked, and a number
-  crashed the tool at startup entirely rather than falling back gracefully.
-- **Sparse `.hex` files**: a `.hex` with a small block of real firmware
-  plus a distant, separate block (option bytes, calibration data - some
-  STM32 toolchains do bundle these into a single export) no longer gets
-  rejected as if it were hundreds of megabytes. Size is now checked as
-  actual occupied bytes, not the address span from the lowest to the
-  highest record.
-- **Raw binaries under other extensions**: a raw firmware image named
-  `.img`, `.rom`, or with no extension at all (selectable via the file
-  picker's "All files" option) now correctly gets the base address it
-  needs, instead of silently getting none just because its name isn't
-  literally `.bin`.
-- **SLCAN line-length validation**: a received line whose actual length
-  doesn't match what its own declared DLC implies is now treated as
-  malformed and skipped, rather than parsed from its first N hex
-  characters regardless of what follows.
-- **Page-ACK retries are more than a passive wait**: each retry now also
-  checks the bootloader's own heartbeat (already sent roughly once a
-  second) against what receiving the current page in full would imply -
-  when they're consistent, the log says so, which is real evidence the
-  data got through and only the ACK was lost, not just a longer wait and
-  a hope.
-
-## 14. Optional EEPROM erase before flashing
+## 12. Optional EEPROM erase before flashing
 
 Section 3 has a checkbox, **"Also erase the persistence EEPROM before
 flashing"** - off by default. If checked, it sends the magic-payload
@@ -594,4 +563,10 @@ Every field is optional - only override what's actually changing. Missing
 file falls back silently to the compiled-in defaults; a present-but-broken
 file logs a warning and also falls back, rather than crashing the tool
 over a typo. Whichever source is active gets logged at startup, so it's
-always visible which values a given session actually used.
+always visible which values a given session actually used. `hardware_id`
+accepts either a JSON string (`"0x0303CC01"`) or a plain JSON number
+(`50580689`) - whichever is more natural for however the file gets
+generated. `app_max_size`, `bootloader_max_size`, `flash_page_size`,
+`bootloader_flash_addr`, and `app_flash_addr` are also overridable here,
+alongside the signing key and HardwareID above - useful if this tool is
+ever adapted to a different chip variant or partition scheme.

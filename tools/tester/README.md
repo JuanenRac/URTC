@@ -100,13 +100,6 @@ tied to which tool is active -
   **Erase EEPROM...** wipes it (`0x192`, with a confirmation dialog first
   - this can't be undone).
 
-**Requires firmware built with `0x110`/`0x111` support.** This is a new
-addition (see `CANBUS.TXT`) - a board running firmware from before this
-tester existed won't answer the active-tool query, and detection will
-report no response. Reflash with the firmware from this same delivery to
-get it (rebuilding requires no source changes beyond what's already
-included - see the repo's `BUILD_REPORT.md`).
-
 ## 4. Tool coverage
 
 Every one of the 12 profiles has its own panel, built directly from

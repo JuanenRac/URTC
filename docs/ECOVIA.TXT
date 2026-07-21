@@ -83,16 +83,12 @@ ID4   ID3   ID2   ID1   ID0  |  ID (HEX)  |  ASSIGNED TOOL / MODULE FUNCTION
 -----------------------------------------------------------------------------
 * Pin PA7  -> `CONN_LED1` ONLY (SPI1_MOSI via DMA, AF5, status LED).
                        Kept independent from CONN_LED2 below on purpose - no
-                       PCB trace joins the two connectors, they're on separate
-                       pins exactly like before, just with CONN_LED1 moved
-                       from its old bit-banged pin (PA2) to this one.
+                       PCB trace joins the two connectors; each has its own pin.
 * Pin PB1  -> `CONN_LED2` (Direct digital output via Bit-Banging,
-                       unchanged from earlier revisions - independent from
-                       CONN_LED1/PA7 above. Feeds 2-3 LED rings wired in
-                       parallel for camera/inspection lighting; color and
+                       independent from CONN_LED1/PA7 above. Feeds 2-3 LED rings
+                       wired in parallel for camera/inspection lighting; color and
                        on/off are set via CAN (0x100) - this is the AOI
-                       tool's actual inspection light. PA2, formerly
-                       CONN_LED1's pin, is now free - see [9].)
+                       tool's actual inspection light.)
 * Pin PA15 -> `LED_RUN_ERR` (Single on-PCB local firmware diagnostic
                        LED. Toggles every 500ms normally, every 100ms once
                        an error is flagged - any blinking means the main
@@ -159,15 +155,14 @@ ID4   ID3   ID2   ID1   ID0  |  ID (HEX)  |  ASSIGNED TOOL / MODULE FUNCTION
 * Pin PA3  -> [Drill / 3D Printer mode] : FGIN (Tachometer input from the BL4260 motor and the EFB0424VHD-CP0 layer fan, connected to Pin 3 of `CONN_DRILL`. Real pulse capture via the EXTI3 interrupt).
        * MUTANT ROUTINE NOTE: When Drill or 3D-Printer mode is active, the firmware switches the SYSCFG->EXTICR register to route the EXTI3 interrupt channel to Port A (PA3) instead of Port B (PB3).
 * Pin PA4 -> [Drill mode] : FRIN (Direct digital output to Pin 2 of `CONN_DRILL` to reverse the drill shaft's rotation direction).
-* Pin PA8 -> [Drill / 10W Laser / 3D Printer mode] : DRILL_LASER_PWM (Hardware PWM output towards Pin 1 of `CONN_DRILL`, TIM1_CH1/AF6 - the SAME channel for all three, reconfigured to ~20kHz for Drill/Laser or exactly 25kHz for the 3D printer's layer fan. Moved here from PA7, which now carries the LED chain instead - see [3] above. Since TIM1 is fully independent of TIM3's stepper tick, Drill/Laser no longer have to share that timer's 1kHz rate.)
+* Pin PA8 -> [Drill / 10W Laser / 3D Printer mode] : DRILL_LASER_PWM (Hardware PWM output towards Pin 1 of `CONN_DRILL`, TIM1_CH1/AF6 - the SAME channel for all three, reconfigured to ~20kHz for Drill/Laser or exactly 25kHz for the 3D printer's layer fan. TIM1 is fully independent of TIM3's stepper tick, so Drill/Laser aren't bound to that timer's 1kHz rate.)
 
 -----------------------------------------------------------------------------
-[8] HOTEND COOLING FAN WIRING (`CONN_FAN1`, NEW)
+[8] HOTEND COOLING FAN WIRING (`CONN_FAN1`)
 -----------------------------------------------------------------------------
 Separate from the layer fan above: this fan cools the hotend's heat break /
-heatsink, not the printed part. Uses the 2 pins that were previously free on
-the earlier design. Own dedicated timer (TIM2), own line within the
-combined 5-9 EXTI vector - no routing conflicts with anything else in the design.
+heatsink, not the printed part. Own dedicated timer (TIM2), own line within
+the combined 5-9 EXTI vector - no routing conflicts with anything else in the design.
 * Pin PA5 -> HOTEND_FAN_PWM (TIM2_CH1/AF1, 25kHz, towards Pin 3 of `CONN_FAN1`).
 * Pin PA6 -> HOTEND_FAN_FG (Tachometer input via EXTI6, towards Pin 2 of `CONN_FAN1`).
        * SAFETY NOTE: unlike the layer fan, this fan's watchdog does NOT shut
@@ -189,22 +184,23 @@ combined 5-9 EXTI vector - no routing conflicts with anything else in the design
 -----------------------------------------------------------------------------
 [9] FREE PINS (HEADROOM FOR FUTURE EXPANSION)
 -----------------------------------------------------------------------------
-* Pin PA2  -> FREE (was CONN_LED1's bit-banged data pin, before
-  SPI1/PA7 took over - see [3])
-  PA8 carries the drill/laser/layer-fan
-  PWM - see [7]. PB1 is NOT free - still drives CONN_LED2.
-* Pin PD2  -> FREE. Genuinely unallocated on this package - not claimed by
-  ID4, the drill's dedicated pin, or the expansion connector below.
-* PC13 (ID4), PB9 (drill brake), and PB10-PB15/PC14-PC15 (expansion
-  connector) are all allocated - see [1], [7], and [10].
+None - every GPIO pin on this design is committed to something. PA2, PB2,
+PB8, and PB15 form the expansion connector's bit-banged SPI bus (see
+[10] below); PA8 carries the drill/laser/layer-fan PWM - see [7]; PB1
+drives CONN_LED2; PC13 (ID4), PB9 (drill brake), and PB10-PB14/PC14-PC15
+(expansion connector) are all allocated - see [1], [7], and [10]. Port D
+is not present at all on this chip's LQFP48 package (confirmed against
+the official STM32F303xB/xC datasheet's per-package pin table).
 
 -----------------------------------------------------------------------------
-[10] EXPANSION CONNECTOR (NEW)
+[10] EXPANSION CONNECTOR
 -----------------------------------------------------------------------------
-A 14-pin header for add-on boards, on its own I2C2 bus - deliberately
+A 20-pin header for add-on boards, on its own I2C2 bus - deliberately
 separate from I2C1 (the OLED) so nothing on an expansion board can
-interfere with the display's timing. Full pin-by-pin listing lives in
-PINOUT_CONNECTORS.TXT section 9 and PINOUT.TXT block 10; not duplicated
-here since this document's focus is the tool-identification matrix, and the
-expansion connector doesn't change based on which tool ID is selected.
+interfere with the display's timing. Also carries a bit-banged SPI bus
+and a TMC5160 diagnostic line for an optional stepper driver. Full
+pin-by-pin listing lives in PINOUT_CONNECTORS.TXT section 9 and
+PINOUT.TXT blocks 9-10; not duplicated here since this document's focus
+is the tool-identification matrix, and the expansion connector doesn't
+change based on which tool ID is selected.
 =============================================================================
