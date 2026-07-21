@@ -91,6 +91,40 @@ Data:
         updates the stored color even in AOI mode, so a color change takes
         effect immediately if 0x150's mode is already set to continuous.
 
+ID: 0x180 [Master -> URTC Tool Head]
+Expansion SPI passthrough (CONN_EXPANSION)
+DLC: 2-8
+Data:
+  - rxData[0]: N - how many of the following bytes to clock over the
+               expansion connector's SPI bus (1-7; a value >7 or larger
+               than what DLC actually carries is silently clamped down to
+               whichever is smaller, rather than treated as an error)
+  - rxData[1..N]: the N bytes to send, in order
+Effect: asserts EXP_SPI_CS_PIN low, clocks all N bytes (SPI Mode 3 -
+        confirmed against the TMC5160 datasheet's own SPI Interface
+        section, not assumed), releases EXP_SPI_CS_PIN high, answers with
+        0x181. Blocked while a critical error is declared, same as every
+        actuation command other than 0x100 - this drives signals to an
+        external device, unlike the purely-diagnostic 0x110/0x111 pair.
+        Generic byte transport: this firmware doesn't interpret the
+        TMC5160's (or any other chip's) specific register protocol at
+        all - that's left to whatever's on the master side of this
+        connection, since the actual expansion board isn't finalized yet.
+        Firmware-side implementation: ExpansionSPI_TransferByte() in
+        STM32F303CC.C.
+
+ID: 0x181 [URTC Tool Head -> Master, answers 0x180]
+Expansion SPI passthrough response
+DLC: 2-8
+Data:
+  - txData[0]: N, matching the request
+  - txData[1..N]: the N bytes read back on MISO during that same
+               transfer - SPI is inherently full-duplex, so every byte
+               sent is also a byte received, whether or not the caller
+               cares about the response for a particular byte position
+               (e.g. the address byte of a TMC5160 write access reads
+               back a don't-care value, per that chip's own datasheet)
+
 -----------------------------------------------------------------------------
 3. MOTION TOOLS (Standard Stepper - Extended Range)
    Associated with: TOOL_PASTE_DISPENSER (1), TOOL_LIQUID_DISPENSER (2),
@@ -482,6 +516,8 @@ Notes: this is BOOTLOADER.C's own version (BOOTLOADER_VERSION_MAJOR/MINOR/
   0x100 -> Status + ring LED control / OLED night mode, EXTENDED (DLC:8)
   0x110 -> Query active tool + quick state, NEW (DLC:any)
   0x111 -> Active tool + quick state response, NEW (DLC:4)
+  0x180 -> Expansion SPI passthrough request, NEW (DLC:2-8)
+  0x181 -> Expansion SPI passthrough response, NEW (DLC:2-8)
   0x120 -> Stepper motor control (Dispensers, Screwdriver, Grippers - DLC:5)
   0x130 -> T12 setpoint temperature (Soldering iron - DLC:2)
   0x135 -> T12 thermal telemetry + endstop (Soldering iron - DLC:3)

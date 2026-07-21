@@ -211,16 +211,20 @@ PA6   -> [3D Printer mode] : HOTEND_FAN_FG (Tachometer, EXTI9_5 vector)
             MCU pull-up.
 
 -----------------------------------------------------------------------------
-[BLOCK 9: FREE PINS FOR FUTURE EXPANSION]
+[BLOCK 9: EXPANSION SPI BUS (bit-banged) - see Block 10 note for why]
 -----------------------------------------------------------------------------
-PA2   -> FREE (was LED_STATE's bit-banged pin, before SPI1/PA7 took over
-          that role).
-PB2   -> FREE. Confirmed unconnected against the schematic netlist - not
-          tied to anything else on the board.
-PB8   -> FREE. Electrically separate from BOOT0 - see Block 1. Confirmed
-          unconnected against the schematic netlist.
-PD2   -> FREE. Not currently allocated to anything, including the
-          expansion connector in Block 10.
+PA2   -> EXP_SPI_CS (bit-banged, software-timed - see PINOUT_CONNECTORS.TXT's
+          CONN_EXPANSION note for why this isn't a hardware SPI peripheral)
+PB2   -> EXP_SPI_SCK
+PB8   -> EXP_SPI_MISO
+PB15  -> EXP_SPI_MOSI (was EXP_PWM - see Block 10's note. An earlier revision
+          used PD2 for this signal; PD2 does not exist on this chip's LQFP48
+          package - confirmed against the official STM32F303xB/xC
+          datasheet's per-package pin table, which shows Port D entirely
+          absent from this package, not just PD2 specifically. Caught on
+          review, not a deliberate choice.)
+         * No MCU pins remain free/unallocated on this design as of this
+           revision - these were the last four.
 
 -----------------------------------------------------------------------------
 [BLOCK 10: EXPANSION CONNECTOR (20-PIN, UPDATED FROM 14-PIN)]
@@ -228,13 +232,12 @@ PD2   -> FREE. Not currently allocated to anything, including the
 A dedicated header for add-on boards, separate from every tool-specific
 connector. Full pin-by-pin breakdown (power rails, ground, and the signal
 assignments below) lives in PINOUT_CONNECTORS.TXT; this block just lists
-which MCU pins feed it. The MCU-side pins below are unchanged from the
-14-pin connector - the 6 new pins (EXP_SPI_CS/MISO/MOSI/SCK and
-EXP_TMC_DIAG0) are reserved on the connector for a future SPI bus and a
-TMC2209 stall-diagnostic line, but aren't wired to the MCU yet (confirmed
-against the schematic netlist: each is a single-member net, connector-side
-only). Nothing below changes because of this - it's purely more headroom
-on the physical connector for later.
+which MCU pins feed it. EXP_SPI_CS/MISO/MOSI/SCK are now wired - see
+Block 9 above - as a bit-banged (not hardware peripheral) SPI bus, for a
+future TMC5160 or other SPI-configurable chip on the expansion board.
+EXP_TMC_DIAG0 remains a connector-only no-connect (not wired to any MCU
+pin) - see PINOUT_CONNECTORS.TXT's CONN_EXPANSION note for the full
+reasoning on both of these.
 
 PB10  -> EXP_I2C2_SCL (I2C2_SCL, AF4 - confirmed against the schematic
           netlist). R48 (4.7k to +3.3V) populated as an external pull-up.
@@ -248,12 +251,13 @@ PB10  -> EXP_I2C2_SCL (I2C2_SCL, AF4 - confirmed against the schematic
            comment at any future USART3 init site pointing back here.
 PB11  -> EXP_I2C2_SDA (I2C2_SDA, AF4 - confirmed against the schematic
           netlist). R44 (4.7k to +3.3V) populated as an external pull-up.
-PB12  -> EXP_TMC_STEP (general-purpose output, for an optional TMC2209 on
-          the expansion board)
+PB12  -> EXP_TMC_STEP (general-purpose output - universal STEP pulse line,
+          for either a TMC2209 or a TMC5160 on the expansion board; both
+          use it the same way)
 PB13  -> EXP_TMC_DIR
 PB14  -> EXP_TMC_EN
-PB15  -> EXP_PWM (general-purpose timer-capable output; confirm the exact
-          timer/channel against the datasheet's AF table at layout time)
+PB15  -> EXP_SPI_MOSI (see Block 9 - moved here from PD2, which doesn't
+          exist on this package)
 PC14  -> EXP_GPIO1 (general purpose; EXTI-capable if a future add-on needs
           a fast interrupt-driven input, e.g. an endstop)
 PC15  -> EXP_GPIO2 (same notes as EXP_GPIO1)

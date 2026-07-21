@@ -190,47 +190,111 @@ PIN | SIGNAL         | FUNCTION
 1   | +24V           | Main rail passthrough
 2   | GND            | Ground
 3   | +5V            | Logic power
-4   | EXP_PWM        | PB15 - general-purpose timer PWM output
-5   | EXP_TMC_STEP   | PB12 - optional TMC2209 driver on the expansion board
-6   | EXP_TMC_EN     | PB14
+4   | EXP_SPI_MOSI   | PB15 - bit-banged (software) SPI, not a hardware SPI peripheral.
+    |                | Was EXP_PWM in an earlier revision - see the note below for why it
+    |                | moved here. See the SPI note below for why bit-banged.
+5   | EXP_TMC_STEP   | PB12 - STEP pulses. Universal to any STEP/DIR driver on the
+    |                | expansion board (TMC2209 and TMC5160 both use this the same way)
+6   | EXP_TMC_EN     | PB14 - driver enable, universal same as EXP_TMC_STEP
 7   | EXP_I2C2_SCL   | PB10 - own bus, separate from the OLED's I2C1. R48 (4.7k to
     |                | +3.3V) populated as an external pull-up
-8   | EXP_SPI_CS     | Reserved, not yet wired to the MCU (confirmed against the
-    |                | schematic netlist - connector-side only, single-member net)
-9   | EXP_SPI_MISO   | Reserved, not yet wired to the MCU - same as EXP_SPI_CS
+8   | EXP_SPI_CS     | PA2 - bit-banged, same bus as EXP_SPI_MOSI
+9   | EXP_SPI_MISO   | PB8 - bit-banged, same bus as EXP_SPI_MOSI
 10  | EXP_GPIO1      | PC14 - general purpose, EXTI-capable
 11  | EXP_GPIO2      | PC15 - general purpose, EXTI-capable
-12  | EXP_SPI_MOSI   | Reserved, not yet wired to the MCU - same as EXP_SPI_CS
-13  | EXP_SPI_SCK    | Reserved, not yet wired to the MCU - same as EXP_SPI_CS
+12  | (no-connect)   | Not wired to an MCU pin. Was meant to carry EXP_SPI_MOSI via PD2
+    |                | in an earlier revision of this design - PD2 does not exist on this
+    |                | chip's LQFP48 package (confirmed against the official
+    |                | STM32F303xB/xC datasheet's per-package pin table: the LQFP48 column
+    |                | shows a dash for PD2, and in fact for every single Port D pin -
+    |                | Port D is not broken out on this package at all). EXP_SPI_MOSI
+    |                | moved to pin 4 (PB15) instead - see that entry's note.
+13  | EXP_SPI_SCK    | PB2 - bit-banged, same bus as EXP_SPI_MOSI
 14  | EXP_I2C2_SDA   | PB11. R44 (4.7k to +3.3V) populated as an external pull-up
-15  | EXP_TMC_DIAG0  | Reserved, not yet wired to the MCU - same as EXP_SPI_CS.
-    |                | Intended for a future TMC2209 stall-detection line
-16  | EXP_TMC_DIR    | PB13
+15  | EXP_TMC_DIAG0  | NOT wired to an MCU pin (see note below) - this pin on the
+    |                | connector is currently a no-connect
+16  | EXP_TMC_DIR    | PB13 - direction, universal same as EXP_TMC_STEP
 17  | GND            | Ground
 18  | +3V3           | Logic power
 19  | GND            | Ground
 20  | +24V           | Main rail passthrough (second pin, for higher-current add-ons)
     |                |
-    | NOTE: the 4 EXP_SPI_* pins and EXP_TMC_DIAG0 are physically present on
-    |       this connector (pins 8, 9, 12, 13, 15) but not yet connected to
-    |       any MCU pin - confirmed against the schematic netlist, each is a
-    |       single-member net today. They're reserved headroom for a future
-    |       SPI-based add-on and TMC2209 diagnostics, not currently usable.
+    | NOTE - why EXP_SPI_MOSI is on PB15/pin 4, not PD2/pin 12 as in an earlier
+    |       revision: PD2 was assumed available based on this document's own
+    |       earlier "free pins" listing, which turned out to not have been
+    |       checked against this specific package's actual pinout - a real
+    |       error, not a deliberate design choice, caught on review. The
+    |       official datasheet confirms Port D isn't present on LQFP48 at
+    |       all. PB15 (previously EXP_PWM, not used by any current firmware
+    |       logic) took its place - a reasonable trade since it was reserved,
+    |       unused headroom either way, and it usefully doubles as the shared
+    |       UART line for a TMC2209 populated instead of a TMC5160 (see the
+    |       TMC2209/TMC5160 note below) - a role PD2 couldn't have filled
+    |       even if it did exist, since it was never part of the shared
+    |       STEP/DIR/EN group of pins.
+    | NOTE - why bit-banged SPI, not a hardware peripheral: this chip's
+    |       hardware SPI2 defaults to PB12/13/14/15 - exactly the pins
+    |       already committed to EXP_TMC_STEP/DIR/EN and (now) EXP_SPI_MOSI
+    |       above, so using it here would mean re-routing those first. SPI3's
+    |       standard pins (PC10/PC11/PC12, confirmed against the same
+    |       official datasheet's LQFP48-specific pin table) aren't present
+    |       on this package at all either - only on the larger LQFP64/LQFP100
+    |       variants of the same silicon. Bit-banged SPI on 4 of the board's
+    |       remaining free pins avoids re-routing anything already committed,
+    |       and this firmware already has a working precedent for bit-banged
+    |       serial timing (the WS2812B ring driver on PB1) - SPI's per-bit
+    |       timing requirements are far more forgiving than WS2812B's, so
+    |       this is a comfortably proven approach for this codebase, not a
+    |       novel one. TMC5160 configuration doesn't need anywhere near a
+    |       hardware peripheral's top speed to work correctly. Confirmed
+    |       against the TMC5160's own datasheet: it specifies SPI Mode 3
+    |       (CPOL=1, CPHA=1) explicitly by name, which the firmware's
+    |       bit-banged implementation matches exactly - see
+    |       ExpansionSPI_TransferByte() in STM32F303CC.C.
+    | NOTE - why EXP_TMC_DIAG0 isn't wired: with the pin budget corrected
+    |       above, this board still has exactly 4 MCU pins available with no
+    |       other commitment (PA2, PB2, PB8, PB15), all four already spoken
+    |       for by the SPI bus - one short of the 5th needed for DIAG0. DIAG0
+    |       is a hardware interrupt line for immediate stall/fault
+    |       notification; without it, the same information (TMC5160's
+    |       DRV_STATUS register - stall flag, overtemperature warning,
+    |       open-load) is still readable over the SPI bus above, just via
+    |       periodic polling instead of an instant interrupt. Wiring a
+    |       dedicated DIAG0 line would need sacrificing something else
+    |       already assigned here - worth a deliberate decision, not a side
+    |       effect of this change.
     | NOTE: an I2C ADC/DAC chip or a port-expander chip on the add-on board
     |       both hang off EXP_I2C2_SCL/EXP_I2C2_SDA like any other I2C device
     |       - no dedicated pins needed for those specifically. See
     |       PINOUT.TXT Block 10 and the README's "Expansion Connector"
     |       section.
+    | NOTE - TMC2209 and TMC5160 sharing: the expansion board is expected to
+    |       carry one or the other, not necessarily both - a TMC2209 uses
+    |       only EXP_TMC_STEP/DIR/EN plus its own single-wire UART
+    |       (TMCUART, half-duplex), never the 4 EXP_SPI_* pins, which have
+    |       no meaning to that chip at all. Since the two populate options
+    |       are mutually exclusive on any given board, EXP_SPI_MOSI (PB15,
+    |       pin 4) doubles as a natural home for a TMC2209's single UART
+    |       line when that's the chip actually populated - no separate
+    |       dedicated UART pin was added, since one is never needed at the
+    |       same time as the SPI bus is. If a specific board design ever
+    |       does want both chips populated together, EXP_TMC_STEP/DIR/EN can
+    |       still be wired to both drivers in parallel like any shared
+    |       STEP/DIR bus, but the TMC2209 would then need its own separate
+    |       UART pin rather than sharing pin 4 with the TMC5160's MOSI -
+    |       that configuration isn't part of this revision.
 
 ========================================================================================
-FREE MCU PINS (not on any connector): PA2 (formerly CONN_LED1's bit-banged
-pin, before SPI1/PA7 took over - see PINOUT.TXT block 9). PB1 is NOT free -
-still drives CONN_LED2, unchanged. PA8 is NOT free anymore either - see the
-drill/laser PWM table above. PC13 carries ID4 (not free), PB9
-carries the drill's dedicated brake (not free), PB10-PB15/PC14-PC15 feed
-CONN_EXPANSION above (not free - unchanged from the 14-pin connector; the
-20-pin version's new pins are connector-only, not new MCU-pin usage).
-PD2 remains free/unallocated.
+FREE MCU PINS (not on any connector): none of PA2, PB2, PB8, PB15 remain free
+as of this revision - all four are now committed to the bit-banged
+EXP_SPI_* bus above. PB1 is NOT free - still drives CONN_LED2, unchanged.
+PA8 is NOT free either - see the drill/laser PWM table above. PC13 carries
+ID4 (not free), PB9 carries the drill's dedicated brake (not free),
+PB10-PB14/PC14-PC15 feed CONN_EXPANSION above (not free). No MCU pins
+remain unallocated on this design as of this revision. Port D is not
+present at all on this chip's LQFP48 package (confirmed against the
+official STM32F303xB/xC datasheet's per-package pin table) - not a source
+of any free pins on this board, ever, regardless of what's used elsewhere.
 ========================================================================================
 END OF FILE
 ========================================================================================

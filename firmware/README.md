@@ -228,7 +228,9 @@ and `BOOT0` are electrically independent nets on this board (confirmed
 against the netlist), so pressing **BOOT** never interferes with tool
 identification.
 
+---
 
+## 5. CAN protocol — summary (see `CANBUS.TXT` for the full byte-level reference)
 
 - **500 kbit/s, standard 11-bit IDs.** No extended (29-bit) IDs are used
   anywhere in this protocol.
