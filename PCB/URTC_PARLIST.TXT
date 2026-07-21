@@ -1,6 +1,6 @@
 Partlist
 
-Exported from URTC_V1.0.sch at 18/07/2026 0:09
+Exported from URTC_V1.0.sch at 21/07/2026 16:56
 
 EAGLE Version 9.5.2 Copyright (c) 1988-2019 Autodesk, Inc.
 
@@ -40,6 +40,8 @@ C25            10uF/6.3V                   C-USC0603                   C0603    
 C26            2.2uF/6.3V                  C-USC0603                   C0603                rcl                                               1
 C27            2.2uF/6.3V                  C-USC0603                   C0603                rcl                                               1
 C28            100nF                       C-USC0402                   C0402                rcl                                               1
+C29            100nF                       C-USC0402                   C0402                rcl                                               1
+C30            100nF                       C-USC0402                   C0402                rcl                                               1
 CBOOT          100nF                       C-USC0402                   C0402                rcl                                               1
 CONN_DRILL     B6B-XH-2                    B6B-XH-2                    B6B-XH               AG-CON_JST                                        1
 CONN_EXPANSION 62202021121                 62202021121                 62202021121          Wuerth_Elektronik_eiCan_Pin_&_Socked_Headers_v1.4 1
@@ -124,3 +126,4 @@ U4             TJA1057                     TJA1057                     SOIC127P6
 U5             AD8605ART                   AD8605ART                   SOT23-5              AD8605ART                                         1
 U6             TMC2209-LA                  TMC2209-LA                  QFN50P500X500X90-29N TMC2209-LA                                        1
 U7             STM32F303CCT                STM32F303CCT                LQFP48               micro-stm_v3                                      1
+U8             FM24CL64B                   FM24-SG                     SO8                  ramtron-2                                         1

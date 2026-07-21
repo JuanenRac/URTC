@@ -63,7 +63,7 @@ Full pin-by-pin detail — which MCU pin backs which signal, and the reasoning b
 
 ## 💾 Parameter Persistence
 
-An onboard FL24LC64 EEPROM (64Kbit, I2C) keeps a periodically-updated snapshot of the active tool's setpoints and the global LED/OLED settings, so a sudden power loss doesn't leave "what was this board doing" as unknowable as the loss itself was unplanned. It shares the OLED's I2C1 bus rather than getting one of its own — this MCU only has two I2C peripherals total, and both were already spoken for (see `firmware/README.md` section 6 for the full reasoning).
+An onboard FM24CL64B EEPROM (F-RAM 64Kbit, I2C) keeps a periodically-updated snapshot of the active tool's setpoints and the global LED/OLED settings, so a sudden power loss doesn't leave "what was this board doing" as unknowable as the loss itself was unplanned. It shares the OLED's I2C1 bus rather than getting one of its own — this MCU only has two I2C peripherals total, and both were already spoken for (see `firmware/README.md` section 6 for the full reasoning).
 
 **Recovered state is queryable, never auto-applied to anything hazardous.** On boot, whatever was saved becomes readable over CAN (`0x190`/`0x191`) — but a heater setpoint, laser power, or motor command is never silently re-armed on its own. Only the safe, passive settings (LED colors, OLED mode) get restored directly. Deliberately re-sending a setpoint after actually reviewing what happened is left as the master controller's call, not something this board decides by itself the instant power comes back.
 

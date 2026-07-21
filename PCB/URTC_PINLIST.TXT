@@ -1,6 +1,6 @@
 Pinlist
 
-Exported from URTC_V1.0.sch at 18/07/2026 0:09
+Exported from URTC_V1.0.sch at 21/07/2026 16:56
 
 EAGLE Version 9.5.2 Copyright (c) 1988-2019 Autodesk, Inc.
 
@@ -104,6 +104,12 @@ C27            1        1          pas      N$62
 C28            1        1          pas      +3V3B
                2        2          pas      GND
 
+C29            1        1          pas      +3V3
+               2        2          pas      GND
+
+C30            1        1          pas      +3V3
+               2        2          pas      GND
+
 CBOOT          1        1          pas      N$2
                2        2          pas      N$1
 
@@ -115,24 +121,24 @@ CONN_DRILL     1        1          pas      DRILL_BRAKE
                6        6          pas      N$37
 
 CONN_EXPANSION 1        1          pas      +24V
-               2        2          pas      GND
-               3        3          pas      +5V
-               4        4          pas      EXP_PWM
+               2        2          pas      +24V
+               3        3          pas      GND
+               4        4          pas      +5V
                5        5          pas      EXP_TMC_STEP
                6        6          pas      EXP_TMC_EN
                7        7          pas      EXP_I2C2_SCL
                8        8          pas      EXP_SPI_CS
                9        9          pas      EXP_SPI_MISO
                10       10         pas      EXP_GPIO1
-               11       11         pas      EXP_GPIO2
+               11       11         pas      EXP_TMC_DIAG0
                12       12         pas      EXP_SPI_MOSI
                13       13         pas      EXP_SPI_SCK
                14       14         pas      EXP_I2C2_SDA
-               15       15         pas      EXP_TMC_DIAG0
-               16       16         pas      EXP_TMC_DIR
-               17       17         pas      GND
-               18       18         pas      +3V3
-               19       19         pas      GND
+               15       15         pas      EXP_TMC_DIR
+               16       16         pas      GND
+               17       17         pas      +3V3
+               18       18         pas      GND
+               19       19         pas      +24V
                20       20         pas      +24V
 
 CONN_FAN1      1        1          pas      +5V
@@ -472,7 +478,7 @@ U6             1        OB2        out      N$20
 U7             1        VBAT       pwr      +3V3
                2        PC13       io       ID4
                3        PC14       io       EXP_GPIO1
-               4        PC15       io       EXP_GPIO2
+               4        PC15       io       EXP_TMC_DIAG0
                5        OSC_IN     io       ID0
                6        OSC_OUT    io       ID1
                7        NRST       io       STM_RST
@@ -480,7 +486,7 @@ U7             1        VBAT       pwr      +3V3
                9        VDDA       pwr      +3V3
                10       PA0-WKUP   io       T12_ADC
                11       PA1        io       T12_PWM
-               12       PA2        io       N$73
+               12       PA2        io       EXP_SPI_CS
                13       PA3        io       N$43
                14       PA4        io       N$42
                15       PA5        io       N$47
@@ -488,7 +494,7 @@ U7             1        VBAT       pwr      +3V3
                17       PA7        io       N$49
                18       PB0        io       N$45
                19       PB1        io       N$10
-               20       PB2        io       N$70
+               20       PB2        io       EXP_SPI_SCK
                21       PB10       io       EXP_I2C2_SCL
                22       PB11       io       EXP_I2C2_SDA
                23       VSS        pwr      GND
@@ -496,7 +502,7 @@ U7             1        VBAT       pwr      +3V3
                25       PB12       io       EXP_TMC_STEP
                26       PB13       io       EXP_TMC_DIR
                27       PB14       io       EXP_TMC_EN
-               28       PB15       io       EXP_PWM
+               28       PB15       io       EXP_SPI_MOSI
                29       PA8        io       N$44
                30       PA9        io       STM_SCL
                31       PA10       io       STM_SDA
@@ -513,8 +519,17 @@ U7             1        VBAT       pwr      +3V3
                42       PB6        io       N$32
                43       PB7        io       ID3
                44       BOOT0      in       BOOT0
-               45       PB8        io       N$40
+               45       PB8        io       EXP_SPI_MISO
                46       PB9        io       N$71
                47       VSS        pwr      GND
                48       VDD        pwr      +3V3
+
+U8             1        A0         pas      GND
+               2        A1         pas      GND
+               3        A2         pas      GND
+               4        GND        pwr      GND
+               5        SDA        io       STM_SDA
+               6        SCL        in       STM_SCL
+               7        WP         in       GND
+               8        VCC        pwr      +3V3
 

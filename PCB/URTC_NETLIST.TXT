@@ -1,17 +1,19 @@
 Netlist
 
-Exported from URTC_V1.0.sch at 18/07/2026 0:08
+Exported from URTC_V1.0.sch at 21/07/2026 16:56
 
 EAGLE Version 9.5.2 Copyright (c) 1988-2019 Autodesk, Inc.
 
 Net                   Part           Pad      Pin        Sheet
 
 +3V3                  C18            1        1          1
+                      C29            1        1          1
                       C3             1        1          1
+                      C30            1        1          1
                       C5             1        1          1
                       C6             1        1          1
                       C8             1        1          1
-                      CONN_EXPANSION 18       18         1
+                      CONN_EXPANSION 17       17         1
                       CONN_OLED      2        2          1
                       D3             C        C          1
                       R16            1        1          1
@@ -35,6 +37,7 @@ Net                   Part           Pad      Pin        Sheet
                       U7             36       VDD        1
                       U7             48       VDD        1
                       U7             9        VDDA       1
+                      U8             8        VCC        1
 
 +3V3B                 C22            1        1          1
                       C25            1        1          1
@@ -48,7 +51,7 @@ Net                   Part           Pad      Pin        Sheet
 +5V                   C2             1        1          1
                       C21            1        1          1
                       C7             1        1          1
-                      CONN_EXPANSION 3        3          1
+                      CONN_EXPANSION 4        4          1
                       CONN_FAN1      1        1          1
                       CONN_LED1      3        3          1
                       CONN_LED2      3        3          1
@@ -63,6 +66,8 @@ Net                   Part           Pad      Pin        Sheet
                       U4             3        VDD        1
 
 +24V                  CONN_EXPANSION 1        1          1
+                      CONN_EXPANSION 19       19         1
+                      CONN_EXPANSION 2        2          1
                       CONN_EXPANSION 20       20         1
 
 5VOUT                 C17            1        1          1
@@ -106,9 +111,6 @@ DRILL_LASER_PWM       R28            1        1          1
 EXP_GPIO1             CONN_EXPANSION 10       10         1
                       U7             3        PC14       1
 
-EXP_GPIO2             CONN_EXPANSION 11       11         1
-                      U7             4        PC15       1
-
 EXP_I2C2_SCL          CONN_EXPANSION 7        7          1
                       R48            1        1          1
                       U7             21       PB10       1
@@ -117,20 +119,22 @@ EXP_I2C2_SDA          CONN_EXPANSION 14       14         1
                       R44            1        1          1
                       U7             22       PB11       1
 
-EXP_PWM               CONN_EXPANSION 4        4          1
-                      U7             28       PB15       1
-
 EXP_SPI_CS            CONN_EXPANSION 8        8          1
+                      U7             12       PA2        1
 
 EXP_SPI_MISO          CONN_EXPANSION 9        9          1
+                      U7             45       PB8        1
 
 EXP_SPI_MOSI          CONN_EXPANSION 12       12         1
+                      U7             28       PB15       1
 
 EXP_SPI_SCK           CONN_EXPANSION 13       13         1
+                      U7             20       PB2        1
 
-EXP_TMC_DIAG0         CONN_EXPANSION 15       15         1
+EXP_TMC_DIAG0         CONN_EXPANSION 11       11         1
+                      U7             4        PC15       1
 
-EXP_TMC_DIR           CONN_EXPANSION 16       16         1
+EXP_TMC_DIR           CONN_EXPANSION 15       15         1
                       U7             26       PB13       1
 
 EXP_TMC_EN            CONN_EXPANSION 6        6          1
@@ -159,7 +163,9 @@ GND                   +3V3           C        C          1
                       C24            2        2          1
                       C25            2        2          1
                       C28            2        2          1
+                      C29            2        2          1
                       C3             2        2          1
+                      C30            2        2          1
                       C4             2        2          1
                       C5             2        2          1
                       C6             2        2          1
@@ -167,9 +173,9 @@ GND                   +3V3           C        C          1
                       C8             2        2          1
                       C9             2        2          1
                       CONN_DRILL     5        5          1
-                      CONN_EXPANSION 17       17         1
-                      CONN_EXPANSION 19       19         1
-                      CONN_EXPANSION 2        2          1
+                      CONN_EXPANSION 16       16         1
+                      CONN_EXPANSION 18       18         1
+                      CONN_EXPANSION 3        3          1
                       CONN_FAN1      4        4          1
                       CONN_LED1      1        1          1
                       CONN_LED2      1        1          1
@@ -226,6 +232,11 @@ GND                   +3V3           C        C          1
                       U7             35       VSS        1
                       U7             47       VSS        1
                       U7             8        VSSA       1
+                      U8             1        A0         1
+                      U8             2        A1         1
+                      U8             3        A2         1
+                      U8             4        GND        1
+                      U8             7        WP         1
 
 HOTEND_FAN_FG         CONN_FAN1      2        2          1
                       R42            1        1          1
@@ -385,8 +396,6 @@ N$38                  R32            2        2          1
 N$39                  R32            1        1          1
                       RUN            A        A          1
 
-N$40                  U7             45       PB8        1
-
 N$41                  +3V3           A        A          1
                       R35            1        1          1
 
@@ -455,12 +464,8 @@ N$66                  +3V3B          A        A          1
 N$67                  +5V            A        A          1
                       R47            1        1          1
 
-N$70                  U7             20       PB2        1
-
 N$71                  R43            1        1          1
                       U7             46       PB9        1
-
-N$73                  U7             12       PA2        1
 
 RX_STM32              U4             4        RXD        1
                       U7             32       PA11       1
@@ -479,12 +484,14 @@ STM_SCL               CONN_OLED      3        3          1
                       CONN_OLED2     18       D0/SCK     1
                       R34            2        2          1
                       U7             30       PA9        1
+                      U8             6        SCL        1
 
 STM_SDA               CONN_OLED      4        4          1
                       CONN_OLED2     19       D1/DIN/SDA 1
                       CONN_OLED2     20       D2/SDA     1
                       R33            2        2          1
                       U7             31       PA10       1
+                      U8             5        SDA        1
 
 STM_SWCLK             STM_JTAG       4-SWDCLK SWCLK      1
                       U7             37       PA14       1
