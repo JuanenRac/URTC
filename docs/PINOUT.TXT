@@ -268,16 +268,24 @@ PB15  -> EXP_SPI_MOSI (see Block 9 - moved here from PD2, which doesn't
           exist on this package)
 PC14  -> EXP_GPIO1 (general purpose; EXTI-capable if a future add-on needs
           a fast interrupt-driven input, e.g. an endstop)
-PC15  -> EXP_GPIO2 (same notes as EXP_GPIO1)
+PC15  -> EXP_TMC_DIAG0 (a TMC5160's stall/fault diagnostic line - this was
+          EXP_GPIO2 in an earlier revision; reused rather than needing a
+          new pin, since EXP_GPIO1/2 were already reserved for exactly
+          this kind of use. Currently read via a simple polled CAN query
+          (0x182/0x183) - not yet a hardware EXTI interrupt; see
+          PINOUT_CONNECTORS.TXT's CONN_EXPANSION note for the full
+          reasoning and why that's a natural future addition, not built
+          speculatively ahead of a concrete need.)
     * SILICON NOTE: SYSCFG_EXTICR maps each bit NUMBER (0-15) to one port
       at a time, shared across every port on the chip - using EXTI on
       PC14 claims "bit 14" for the whole MCU, not just this pin, and same
       for PC15/"bit 15". Nothing else in this design currently asks for
-      EXTI on bit 14 or 15 (PB14/PB15 are used as plain outputs here, not
-      interrupt inputs), so there's no active conflict today - but if a
-      future addition ever wants EXTI on PB14 or PB15 too, it can't
-      coexist with EXP_GPIO1/2 doing the same. Worth keeping in mind
-      before building that expectation into anything.
+      EXTI on bit 14 or 15 (PB14 is a plain output; PB15 is bit-banged SPI
+      MOSI, also not EXTI-configured), so there's no active conflict today
+      - but if a future addition ever wants EXTI on PB14 or PB15 too, it
+      can't coexist with EXP_GPIO1 or a future EXP_TMC_DIAG0 interrupt
+      doing the same. Worth keeping in mind before building that
+      expectation into anything.
 
 I2C2 is electrically separate from I2C1 (the OLED's bus, PA9/PA10) on
 purpose - see Block 3's note and the README's "Expansion Connector"

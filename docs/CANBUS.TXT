@@ -29,34 +29,6 @@ Data:
 -----------------------------------------------------------------------------
 2. GLOBAL COMMANDS (Valid for any active tool)
 -----------------------------------------------------------------------------
-ID: 0x110 [Master -> URTC Tool Head]
-Query active tool + quick state
-DLC: any (payload ignored)
-Data: none needed
-Effect: answers with 0x111. Read-only, no side effects - answered even
-        while a critical error is declared, unlike most commands, since
-        this is exactly the kind of diagnostic that matters most when
-        something's already wrong. A host has no other way to learn which
-        of the 12 tool profiles a board is jumpered for without this,
-        short of probing which tool-specific IDs happen to get a
-        response - which takes time and can't distinguish "no response
-        yet" from "wrong tool for this command".
-
-ID: 0x111 [URTC Tool Head -> Master, answers 0x110]
-Active tool + quick state response
-DLC: 4 bytes
-Data:
-  - txData[0]: Active tool (matches the ToolMode_t enum in STM32F303CC.C):
-               0=Soldering Iron, 1=Paste Dispenser, 2=Liquid Dispenser,
-               3=Screwdriver, 4=Vacuum Pickup, 5=Drill, 6=Gripper Gimbal,
-               7=Gripper NEMA, 8=AOI Inspection, 9=Laser Engraver,
-               10=3D Printer, 11=Scan Probe, 12+ = no tool assigned to
-               this jumper setting (see STM32F303CC.C's TOOL_INVALID note)
-  - txData[1]: system_error_flag (0x01 = a critical fault is currently declared)
-  - txData[2]: can_bus_error_flag (0x01 = a CAN bus fault was seen)
-  - txData[3]: boot_sequence_active (0x01 = still inside the ~5s boot
-               splash window - movement commands are deferred until this clears)
-
 ID: 0x100 [Master -> URTC Tool Head]
 DLC: 8 bytes
 Data:
@@ -91,6 +63,34 @@ Data:
         updates the stored color even in AOI mode, so a color change takes
         effect immediately if 0x150's mode is already set to continuous.
 
+ID: 0x110 [Master -> URTC Tool Head]
+Query active tool + quick state
+DLC: any (payload ignored)
+Data: none needed
+Effect: answers with 0x111. Read-only, no side effects - answered even
+        while a critical error is declared, unlike most commands, since
+        this is exactly the kind of diagnostic that matters most when
+        something's already wrong. A host has no other way to learn which
+        of the 12 tool profiles a board is jumpered for without this,
+        short of probing which tool-specific IDs happen to get a
+        response - which takes time and can't distinguish "no response
+        yet" from "wrong tool for this command".
+
+ID: 0x111 [URTC Tool Head -> Master, answers 0x110]
+Active tool + quick state response
+DLC: 4 bytes
+Data:
+  - txData[0]: Active tool (matches the ToolMode_t enum in STM32F303CC.C):
+               0=Soldering Iron, 1=Paste Dispenser, 2=Liquid Dispenser,
+               3=Screwdriver, 4=Vacuum Pickup, 5=Drill, 6=Gripper Gimbal,
+               7=Gripper NEMA, 8=AOI Inspection, 9=Laser Engraver,
+               10=3D Printer, 11=Scan Probe, 12+ = no tool assigned to
+               this jumper setting (see STM32F303CC.C's TOOL_INVALID note)
+  - txData[1]: system_error_flag (0x01 = a critical fault is currently declared)
+  - txData[2]: can_bus_error_flag (0x01 = a CAN bus fault was seen)
+  - txData[3]: boot_sequence_active (0x01 = still inside the ~5s boot
+               splash window - movement commands are deferred until this clears)
+
 ID: 0x180 [Master -> URTC Tool Head]
 Expansion SPI passthrough (CONN_EXPANSION)
 DLC: 2-8
@@ -124,6 +124,31 @@ Data:
                cares about the response for a particular byte position
                (e.g. the address byte of a TMC5160 write access reads
                back a don't-care value, per that chip's own datasheet)
+
+ID: 0x182 [Master -> URTC Tool Head]
+Query EXP_TMC_DIAG0 level
+DLC: any (payload ignored)
+Data: none needed
+Effect: answers with 0x183 - the current level of CONN_EXPANSION's
+        EXP_TMC_DIAG0 line (PC15), a TMC5160's stall/fault diagnostic
+        output. Simple polled read, not an interrupt-driven push - a
+        real hardware EXTI on this pin (matching the scan probe's own
+        pattern on PB3) is a natural future addition once a concrete
+        expansion board makes clear what latency actually matters here,
+        not built speculatively ahead of that.
+
+ID: 0x183 [URTC Tool Head -> Master, answers 0x182]
+EXP_TMC_DIAG0 level response
+DLC: 1 byte
+Data:
+  - txData[0]: 1 if the line reads high, 0 if low. Internal pull-up
+               enabled on this pin, so a board with nothing populated on
+               the expansion connector reads a stable 1, not a
+               floating/noisy value - the TMC5160 datasheet describes
+               DIAG0 as open-drain in this mode, active by pulling low,
+               and recommends an external pull-up (47k or less) on the
+               expansion board itself for a cleaner signal than this
+               MCU-side internal pull-up alone provides.
 
 ID: 0x190 [Master -> URTC Tool Head]
 Query recovered EEPROM state
@@ -584,9 +609,12 @@ Notes: this is BOOTLOADER.C's own version (BOOTLOADER_VERSION_MAJOR/MINOR/
   0x111 -> Active tool + quick state response, NEW (DLC:4)
   0x180 -> Expansion SPI passthrough request, NEW (DLC:2-8)
   0x181 -> Expansion SPI passthrough response, NEW (DLC:2-8)
+  0x182 -> Query EXP_TMC_DIAG0 level, NEW (DLC:any)
+  0x183 -> EXP_TMC_DIAG0 level response, NEW (DLC:1)
   0x190 -> Query recovered EEPROM state, NEW (DLC:any)
   0x191 -> Recovered EEPROM state response, NEW (DLC:8)
   0x192 -> Erase recovered EEPROM state, magic payload, NEW (DLC:4)
+  --- Per-tool commands (see dedicated sections above) ---
   0x120 -> Stepper motor control (Dispensers, Screwdriver, Grippers - DLC:5)
   0x130 -> T12 setpoint temperature (Soldering iron - DLC:2)
   0x135 -> T12 thermal telemetry + endstop (Soldering iron - DLC:3)

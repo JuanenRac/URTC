@@ -409,6 +409,8 @@ CAN_ID_3DP_HOTEND_FAN_CMD = 0x178  # Hotend fan PWM
 CAN_ID_3DP_HOTEND_FAN_RPM = 0x179  # Hotend fan actual RPM
 CAN_ID_EXP_SPI_CMD        = 0x180  # Generic SPI passthrough request, for CONN_EXPANSION
 CAN_ID_EXP_SPI_RESP       = 0x181  # Answers CAN_ID_EXP_SPI_CMD
+CAN_ID_QUERY_DIAG0        = 0x182  # Query EXP_TMC_DIAG0's current level
+CAN_ID_DIAG0_RESP         = 0x183  # Answers CAN_ID_QUERY_DIAG0
 CAN_ID_QUERY_EEPROM_STATE = 0x190  # Query the FL24LC64's recovered state
 CAN_ID_EEPROM_STATE_RESP  = 0x191  # Answers CAN_ID_QUERY_EEPROM_STATE, also sent after an erase
 CAN_ID_ERASE_EEPROM       = 0x192  # Magic-payload erase - see ERASE_EEPROM_MAGIC below
@@ -1056,16 +1058,40 @@ class TesterGUI:
 
         ttk.Separator(parent, orient="horizontal").grid(row=5, column=0, columnspan=2, sticky="ew", pady=4)
 
+        # EXP_TMC_DIAG0 level (0x182/0x183) - a TMC5160's stall/fault
+        # diagnostic line. Simple polled read, not a live/pushed value.
+        diag_row = ttk.Frame(parent)
+        diag_row.grid(row=6, column=0, columnspan=2, sticky="w", padx=4, pady=(4, 2))
+        ttk.Button(diag_row, text="Query DIAG0", command=self._query_diag0).pack(side="left")
+        self.diag0_var = tk.StringVar(value="(not queried yet)")
+        ttk.Label(diag_row, textvariable=self.diag0_var, font=("Courier", 9)).pack(side="left", padx=(8, 0))
+
+        ttk.Separator(parent, orient="horizontal").grid(row=7, column=0, columnspan=2, sticky="ew", pady=4)
+
         # EEPROM recovered-state query/erase (0x190/0x191/0x192).
         ttk.Label(parent, text="Persistence EEPROM (FL24LC64, shares I2C1 with the OLED):").grid(
-            row=6, column=0, columnspan=2, sticky="w", padx=4, pady=(4, 2))
+            row=8, column=0, columnspan=2, sticky="w", padx=4, pady=(4, 2))
         btn_row = ttk.Frame(parent)
-        btn_row.grid(row=7, column=0, columnspan=2, sticky="w", padx=4)
+        btn_row.grid(row=9, column=0, columnspan=2, sticky="w", padx=4)
         ttk.Button(btn_row, text="Query State", command=self._query_eeprom_state).pack(side="left")
         ttk.Button(btn_row, text="Erase EEPROM...", command=self._erase_eeprom).pack(side="left", padx=(8, 0))
         self.eeprom_state_var = tk.StringVar(value="(not queried yet)")
         ttk.Label(parent, textvariable=self.eeprom_state_var, wraplength=380, justify="left").grid(
-            row=8, column=0, columnspan=2, sticky="w", padx=4, pady=(4, 4))
+            row=10, column=0, columnspan=2, sticky="w", padx=4, pady=(4, 4))
+
+    def _query_diag0(self):
+        if self.bus is None:
+            messagebox.showerror("Not connected", "Connect to the adapter first.")
+            return
+        self.bus.send(CAN_ID_QUERY_DIAG0, b"")
+        response = self.bus.wait_for_one(CAN_ID_DIAG0_RESP, timeout=1.0)
+        if response is None or len(response) < 1:
+            self.diag0_var.set("no response")
+            self.log("Queried 0x182 - no 0x183 response.")
+            return
+        level = "HIGH (inactive/pulled up)" if response[0] else "LOW (asserted)"
+        self.diag0_var.set(level)
+        self.log(f"EXP_TMC_DIAG0 level: {level}")
 
     def _send_expansion_spi(self):
         if self.bus is None:
@@ -1651,7 +1677,7 @@ def _show_splash_then(root, on_done):
 def main():
     root = tk.Tk()
     root.withdraw()
-    root.geometry(_center_geometry(root, 1116, 930))
+    root.geometry(_center_geometry(root, 1116, 970))
     app = TesterGUI(root)
 
     def _reveal_main():

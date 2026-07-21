@@ -90,6 +90,10 @@ tied to which tool is active -
   TMC5160-register-aware, matching the firmware's own approach. Useful
   for exercising the bus itself before a specific expansion board's
   register protocol is worth building a dedicated panel for.
+- **DIAG0 level**: **Query DIAG0** reads the current state of a TMC5160's
+  stall/fault diagnostic line (`0x182`/`0x183`) - HIGH (inactive) or LOW
+  (asserted). A simple polled read, not a live/pushed value - hit the
+  button again to refresh it.
 - **Persistence EEPROM**: **Query State** reads back whatever the board
   last saved before a power loss (`0x190`/`0x191`) - which tool it was,
   the setpoint, whether a critical error was active at the time.

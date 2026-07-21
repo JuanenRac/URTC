@@ -236,8 +236,8 @@ identification.
   anywhere in this protocol.
 - **ID ranges:** `0x095` (max-priority scan-probe event) · `0x100`/`0x110`/`0x111`/
   `0x190`/`0x191`/`0x192` (global commands, valid regardless of active tool) ·
-  `0x120`–`0x179` (per-tool commands/telemetry) · `0x180`/`0x181`
-  (expansion SPI passthrough) · `0x7F0`–`0x7FA` (bootloader/version).
+  `0x120`–`0x179` (per-tool commands/telemetry) · `0x180`–`0x183`
+  (expansion SPI passthrough + DIAG0 query) · `0x7F0`–`0x7FA` (bootloader/version).
 - **Big-endian byte order** for every multi-byte numeric field, throughout.
 - **Telemetry is push, not poll:** tools with sensors broadcast their
   readings unsolicited, on a fixed period (typically 150 ms), rather than

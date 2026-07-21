@@ -49,14 +49,15 @@ A 20-pin header, separate from the tool-specific connectors, for add-on boards t
 | 2 | I2C2 (SCL/SDA) — its own bus, separate from I2C1/the OLED |
 | 3 | STEP/DIR/EN — universal to either driver chip below |
 | 4 | Bit-banged SPI (CS/SCK/MISO/MOSI) — for a TMC5160's configuration/diagnostics interface, or any other SPI-configurable chip |
-| 2 | General-purpose GPIO (either one can serve as an EXTI-capable interrupt input if a future add-on needs a fast sensor response, e.g. an endstop) |
-| 2 | Reserved, currently no-connects (one from an earlier SPI pin revision, one reserved for a future TMC5160 DIAG0 line — see `PINOUT_CONNECTORS.TXT`) |
+| 1 | General-purpose GPIO (EXTI-capable interrupt input if a future add-on needs a fast sensor response, e.g. an endstop) |
+| 1 | TMC5160 DIAG0 (stall/fault diagnostic line, polled via `0x182`/`0x183`) |
+| 2 | Reserved, currently no-connects — see `PINOUT_CONNECTORS.TXT` |
 
 20 pins total.
 
 **Two separate I2C buses on purpose:** I2C1 drives only the OLED; I2C2 is dedicated to this connector. Anything hanging off the expansion header — an I2C ADC/DAC, a port expander, whatever a given add-on board needs — shares I2C2 with any other expansion-side I2C device, but can't stretch the clock or otherwise interfere with the OLED's own timing on I2C1.
 
-**A TMC2209 or a TMC5160, not necessarily both.** Both chips use the same STEP/DIR/EN interface for actual motion, so that part is universal. Where they differ is configuration/diagnostics: a TMC2209 uses its own single-wire UART for that, while a TMC5160 uses SPI — and since the two are mutually exclusive on any given expansion board, the 4 SPI pins double as a natural home for a TMC2209's single UART line too, rather than needing yet another dedicated pin nobody uses at the same time as the SPI bus. The bit-banged SPI bus talks the exact protocol a TMC5160 expects (SPI Mode 3, MSB first, CS held low for the whole transaction — see `CANBUS.TXT`'s `0x180`/`0x181` for the generic byte-passthrough command that drives it) rather than this firmware needing to know that chip's specific register layout.
+**A TMC2209 or a TMC5160, not necessarily both.** Both chips use the same STEP/DIR/EN interface for actual motion, so that part is universal. Where they differ is configuration/diagnostics: a TMC2209 uses its own single-wire UART for that, while a TMC5160 uses SPI — and since the two are mutually exclusive on any given expansion board, the 4 SPI pins double as a natural home for a TMC2209's single UART line too, rather than needing yet another dedicated pin nobody uses at the same time as the SPI bus. The bit-banged SPI bus talks the exact protocol a TMC5160 expects (SPI Mode 3, MSB first, CS held low for the whole transaction — see `CANBUS.TXT`'s `0x180`/`0x181` for the generic byte-passthrough command that drives it) rather than this firmware needing to know that chip's specific register layout. A TMC5160's DIAG0 stall/fault line is wired too (`0x182`/`0x183`) — it reuses one of the two general-purpose GPIO pins, which were already earmarked for exactly this kind of fast interrupt-driven input.
 
 Full pin-by-pin detail — which MCU pin backs which signal, and the reasoning behind a couple of layout constraints this chip's 48-pin package turned out to have — lives in `PINOUT_CONNECTORS.TXT` and `firmware/README.md`.
 

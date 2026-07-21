@@ -205,7 +205,9 @@ PIN | SIGNAL         | FUNCTION
 8   | EXP_SPI_CS     | PA2 - bit-banged, same bus as EXP_SPI_MOSI
 9   | EXP_SPI_MISO   | PB8 - bit-banged, same bus as EXP_SPI_MOSI
 10  | EXP_GPIO1      | PC14 - general purpose, EXTI-capable
-11  | EXP_GPIO2      | PC15 - general purpose, EXTI-capable
+11  | EXP_TMC_DIAG0  | PC15 - a TMC5160's stall/fault diagnostic line. This pin was
+    |                | EXP_GPIO2 in an earlier revision - see the note below for why it
+    |                | moved here rather than needing a new pin.
 12  | (no-connect)   | Not wired to an MCU pin. Was meant to carry EXP_SPI_MOSI via PD2
     |                | in an earlier revision of this design - PD2 does not exist on this
     |                | chip's LQFP48 package (confirmed against the official
@@ -215,8 +217,9 @@ PIN | SIGNAL         | FUNCTION
     |                | moved to pin 4 (PB15) instead - see that entry's note.
 13  | EXP_SPI_SCK    | PB2 - bit-banged, same bus as EXP_SPI_MOSI
 14  | EXP_I2C2_SDA   | PB11. R44 (4.7k to +3.3V) populated as an external pull-up
-15  | EXP_TMC_DIAG0  | NOT wired to an MCU pin (see note below) - this pin on the
-    |                | connector is currently a no-connect
+15  | (no-connect)   | Not wired to an MCU pin. This was EXP_TMC_DIAG0's originally
+    |                | reserved position - see pin 11's entry above for where that
+    |                | signal actually ended up instead, and why.
 16  | EXP_TMC_DIR    | PB13 - direction, universal same as EXP_TMC_STEP
 17  | GND            | Ground
 18  | +3V3           | Logic power
@@ -255,18 +258,27 @@ PIN | SIGNAL         | FUNCTION
     |       (CPOL=1, CPHA=1) explicitly by name, which the firmware's
     |       bit-banged implementation matches exactly - see
     |       ExpansionSPI_TransferByte() in STM32F303CC.C.
-    | NOTE - why EXP_TMC_DIAG0 isn't wired: with the pin budget corrected
-    |       above, this board still has exactly 4 MCU pins available with no
-    |       other commitment (PA2, PB2, PB8, PB15), all four already spoken
-    |       for by the SPI bus - one short of the 5th needed for DIAG0. DIAG0
-    |       is a hardware interrupt line for immediate stall/fault
-    |       notification; without it, the same information (TMC5160's
-    |       DRV_STATUS register - stall flag, overtemperature warning,
-    |       open-load) is still readable over the SPI bus above, just via
-    |       periodic polling instead of an instant interrupt. Wiring a
-    |       dedicated DIAG0 line would need sacrificing something else
-    |       already assigned here - worth a deliberate decision, not a side
-    |       effect of this change.
+    | NOTE - EXP_TMC_DIAG0 resolution: an earlier revision of this document
+    |       concluded this needed a 5th free pin the board didn't have,
+    |       framing it as competing against the SPI bus above for the same
+    |       small pool of genuinely-unused pins. That framing missed
+    |       something on review: EXP_GPIO1/EXP_GPIO2 (pins 10/11) were
+    |       already reserved specifically for "a future add-on needs a
+    |       fast interrupt-driven input" - which is exactly what DIAG0 is.
+    |       No new pin was needed once DIAG0 was evaluated against pins
+    |       already set aside for this exact purpose, rather than only
+    |       against the fully-unallocated ones. Confirmed no EXTI conflict
+    |       before making the change: nothing else in this firmware uses
+    |       bit 15 of SYSCFG_EXTICR (shared across every port for that bit
+    |       number, regardless of which port's pin 15 is involved).
+    |       EXP_GPIO1 (pin 10) remains available as genuinely
+    |       general-purpose, unallocated headroom - only EXP_GPIO2 was
+    |       reassigned. Currently exposed as a simple polled query
+    |       (`0x182`/`0x183` - see CANBUS.TXT), not yet a hardware EXTI
+    |       interrupt the way the scan probe's own PB3 is - that's a
+    |       natural future addition once a concrete expansion board makes
+    |       clear what latency actually matters here, not built
+    |       speculatively ahead of that need.
     | NOTE: an I2C ADC/DAC chip or a port-expander chip on the add-on board
     |       both hang off EXP_I2C2_SCL/EXP_I2C2_SDA like any other I2C device
     |       - no dedicated pins needed for those specifically. See
