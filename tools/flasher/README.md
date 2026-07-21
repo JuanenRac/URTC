@@ -536,6 +536,34 @@ A handful of edge cases fixed alongside the above:
   data got through and only the ACK was lost, not just a longer wait and
   a hope.
 
+## 14. Optional EEPROM erase before flashing
+
+Section 3 has a checkbox, **"Also erase the persistence EEPROM before
+flashing"** - off by default. If checked, it sends the magic-payload
+erase command (`0x192` - see `CANBUS.TXT`) to the board's onboard
+FL24LC64 persistence EEPROM before the update sequence starts, wiping
+whatever tool-parameter state it had saved.
+
+**Not required for a normal update.** A version mismatch in the saved
+record's own layout is already detected and safely ignored on the next
+boot (see `firmware/README.md`'s parameter-persistence section) - this
+checkbox exists for a genuinely clean slate, not because skipping it
+would leave anything broken.
+
+**Only works while the application is running** - the bootloader itself
+doesn't handle `0x192` at all, only `STM32F303CC.C` does. This checkbox
+is silently skipped (with a log line explaining why) if the "board is
+currently running the application" checkbox above it is unchecked, since
+in that case the board's assumed to already be sitting in the bootloader.
+
+**A missing confirmation doesn't stop the flash.** If the erase command's
+own confirmation frame doesn't come back within 2 seconds, this is logged
+as a warning and the actual firmware update proceeds anyway - erasing is
+a secondary, optional step alongside the real point of this tool, not
+something that should abort an otherwise-successful update over its own
+confirmation frame going missing. Check the EEPROM state separately
+(`URTC Tester`'s own Query State button) if that matters to you.
+
 ## Changing the HMAC key / HardwareID
 
 The shared signing key lives in two places that must always match:

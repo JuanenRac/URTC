@@ -81,6 +81,21 @@ they don't move to the dynamic panel. In AOI Inspection mode specifically,
 the ring's on/off here is ignored in favor of that tool's own strobe
 control (per `CANBUS.TXT`) - color still applies either way.
 
+**Expansion Board** (section 3, also always visible): two independent
+things living on `CONN_EXPANSION`, covered together since neither is
+tied to which tool is active -
+- **SPI passthrough**: type space-separated hex bytes (1-7 of them, e.g.
+  `01 02 03`), hit Send, and see exactly what came back on MISO during
+  that same transfer (`0x180`/`0x181`) - a raw byte transport, not
+  TMC5160-register-aware, matching the firmware's own approach. Useful
+  for exercising the bus itself before a specific expansion board's
+  register protocol is worth building a dedicated panel for.
+- **Persistence EEPROM**: **Query State** reads back whatever the board
+  last saved before a power loss (`0x190`/`0x191`) - which tool it was,
+  the setpoint, whether a critical error was active at the time.
+  **Erase EEPROM...** wipes it (`0x192`, with a confirmation dialog first
+  - this can't be undone).
+
 **Requires firmware built with `0x110`/`0x111` support.** This is a new
 addition (see `CANBUS.TXT`) - a board running firmware from before this
 tester existed won't answer the active-tool query, and detection will

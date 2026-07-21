@@ -61,6 +61,16 @@ R31         1          1K                  R0402           BOOT button pull-up t
 R33,R34     2          4K7                 R0402           I2C1 pull-ups to +3V3 (OLED_SDA/OLED_SCL, PA9/PA10)
 R44         1          4K7                 R0402           I2C2 pull-up to +3V3 (EXP_I2C2_SDA, expansion connector)
 R48         1          4K7                 R0402           I2C2 pull-up to +3V3 (EXP_I2C2_SCL, expansion connector)
+U8          1          FL24LC64            SOIC-8          64Kbit I2C EEPROM, parameter persistence across power
+                                                            loss - shares I2C1 with the OLED (U7 only has two I2C
+                                                            peripherals total, both already committed elsewhere -
+                                                            see PINOUT.TXT's I2C1 block for the full reasoning).
+                                                            A0/A1/A2 (chip-select address pins) and WP (write-
+                                                            protect) all tied directly to GND - address 0x50
+                                                            (doesn't collide with the OLED's own fixed 0x3C), write
+                                                            operations always enabled. Package assumed SOIC-8,
+                                                            standard for this family - confirm against the
+                                                            specific manufacturer datasheet at layout time.
 BOOT        1          KMR2                6mm SMT         Bootloader-select pushbutton (BOOT0 -> +3V3 via R31)
 RESET       1          KMR2                6mm SMT         MCU reset pushbutton (STM_RST -> GND)
 STM_JTAG    1          SWD-1X5-SMD         2.54mm, 5-pin   ST-Link programming header (VCC/GND/RST/SWDIO/SWCLK)

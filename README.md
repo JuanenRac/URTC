@@ -18,7 +18,7 @@ Here is the complete breakdown of what it is, what it does, and the hardware eco
 
 ## ⚙️ What is URTC?
 
-URTC is an all-in-one, compact control board powered by an STM32 microcontroller (STM32F303CCT6, LQFP48). It communicates with the main robot controller via CAN bus, allowing for real-time, low-latency execution of complex tasks right at the tool head or axis. It features an onboard OLED display for instant diagnostics — animated boot splash, per-tool animated icons, live telemetry on a two-tone panel — a single-pixel RGB status LED plus an addressable RGB LED ring for camera illumination, a 14-pin expansion connector for add-on boards, and dedicated analog and high-current power stages.
+URTC is an all-in-one, compact control board powered by an STM32 microcontroller (STM32F303CCT6, LQFP48). It communicates with the main robot controller via CAN bus, allowing for real-time, low-latency execution of complex tasks right at the tool head or axis. It features an onboard OLED display for instant diagnostics — animated boot splash, per-tool animated icons, live telemetry on a two-tone panel — a single-pixel RGB status LED plus an addressable RGB LED ring for camera illumination, a 20-pin expansion connector for add-on boards, an onboard EEPROM that persists the active tool's setpoints across a power loss, and dedicated analog and high-current power stages.
 
 ## 🛠️ Scalable Architecture & Tool Matrix
 
@@ -31,40 +31,40 @@ The core strength of URTC is its extreme versatility. Instead of swapping out el
 
 To handle such a wide variety of applications, the URTC hardware is fully equipped to control:
 
-* **NEMA Stepper Motors:** supports NEMA 8, NEMA 11, NEMA 14, NEMA 17, NEMA 23 and NEMA 34 Max 2.0A current (3.0A-10A by expansión board) for various feeders, extruders, or grippers.
+* **NEMA Stepper Motors:** NEMA 8, 11, 14, and 17 run directly off the onboard TMC2209, same as NEMA 23 and 34 — up to **2.0A** on any of them via the main board's driver stage. For NEMA 23/34 at their full rated torque, a TMC5160 on the expansion connector (see below) supports up to **10A**, current-scaled by the external MOSFETs/sense resistor chosen for that board — the onboard 2.0A limit doesn't apply once a motor's moved to the expansion driver.
 * **3-Phase BLDC / Gimbal Motors** for high-precision movement.
 * **Motors with Hall sensors and tachometers** for closed-loop control.
 * **Dedicated inputs** for reflective optical proximity sensors like the TCRT5000, plus a generic active-low endstop/limit-switch input shared across four tool profiles.
 
 ## 🧩 Expansion Connector
 
-A 20-pin header, separate from the tool-specific connectors, for add-on boards that need more than what a given tool profile alone exposes — an extra sensor board, a second TMC2209-driven axis (or TMC5160 with mosfets), that kind of thing.
+A 20-pin header, separate from the tool-specific connectors, for add-on boards that need more than what a given tool profile alone exposes — an extra stepper axis (TMC2209 or TMC5160), a second sensor board, that kind of thing.
 
-| Pins | Signal |Function
-|---|---|---|
-1   | +24V           | Main rail passthrough|
-2   | GND            | Ground|
-3   | +5V            | Logic power|
-4   | EXP_PWM        | PB15 - general-purpose timer PWM output|
-5   | EXP_TMC_STEP   | PB12 - optional TMC2209 driver on the expansion board|
-6   | EXP_TMC_EN     | PB14|
-7   | EXP_I2C2_SCL   | PB10 - own bus, separate from the OLED's I2C1. R48 (4.7k to +3.3V) populated as an external pull-up|
-8   | EXP_SPI_CS     | Reserved, not yet wired to the MCU (confirmed against the schematic netlist - connector-side only, single-member net)|
-9   | EXP_SPI_MISO   | Reserved, not yet wired to the MCU - same as EXP_SPI_CS|
-10  | EXP_GPIO1      | PC14 - general purpose, EXTI-capable|
-11  | EXP_GPIO2      | PC15 - general purpose, EXTI-capable|
-12  | EXP_SPI_MOSI   | Reserved, not yet wired to the MCU - same as EXP_SPI_CS|
-13  | EXP_SPI_SCK    | Reserved, not yet wired to the MCU - same as EXP_SPI_CS|
-14  | EXP_I2C2_SDA   | PB11. R44 (4.7k to +3.3V) populated as an external pull-up|
-15  | EXP_TMC_DIAG0  | Reserved, not yet wired to the MCU - same as EXP_SPI_CS. Intended for a future TMC2209 stall-detection line|
-16  | EXP_TMC_DIR    | PB13|
-17  | GND            | Ground|
-18  | +3V3           | Logic power|
-19  | GND            | Ground|
-20  | +24V           | Main rail passthrough (second pin, for higher-current add-ons)|
+| Pins | Signal |
+|---|---|
+| 2 | 24V |
+| 1 | 3.3V |
+| 1 | 5V |
+| 3 | GND |
+| 2 | I2C2 (SCL/SDA) — its own bus, separate from I2C1/the OLED |
+| 3 | STEP/DIR/EN — universal to either driver chip below |
+| 4 | Bit-banged SPI (CS/SCK/MISO/MOSI) — for a TMC5160's configuration/diagnostics interface, or any other SPI-configurable chip |
+| 2 | General-purpose GPIO (either one can serve as an EXTI-capable interrupt input if a future add-on needs a fast sensor response, e.g. an endstop) |
+| 2 | Reserved, currently no-connects (one from an earlier SPI pin revision, one reserved for a future TMC5160 DIAG0 line — see `PINOUT_CONNECTORS.TXT`) |
 
+20 pins total.
 
 **Two separate I2C buses on purpose:** I2C1 drives only the OLED; I2C2 is dedicated to this connector. Anything hanging off the expansion header — an I2C ADC/DAC, a port expander, whatever a given add-on board needs — shares I2C2 with any other expansion-side I2C device, but can't stretch the clock or otherwise interfere with the OLED's own timing on I2C1.
+
+**A TMC2209 or a TMC5160, not necessarily both.** Both chips use the same STEP/DIR/EN interface for actual motion, so that part is universal. Where they differ is configuration/diagnostics: a TMC2209 uses its own single-wire UART for that, while a TMC5160 uses SPI — and since the two are mutually exclusive on any given expansion board, the 4 SPI pins double as a natural home for a TMC2209's single UART line too, rather than needing yet another dedicated pin nobody uses at the same time as the SPI bus. The bit-banged SPI bus talks the exact protocol a TMC5160 expects (SPI Mode 3, MSB first, CS held low for the whole transaction — see `CANBUS.TXT`'s `0x180`/`0x181` for the generic byte-passthrough command that drives it) rather than this firmware needing to know that chip's specific register layout.
+
+Full pin-by-pin detail — which MCU pin backs which signal, and the reasoning behind a couple of layout constraints this chip's 48-pin package turned out to have — lives in `PINOUT_CONNECTORS.TXT` and `firmware/README.md`.
+
+## 💾 Parameter Persistence
+
+An onboard FL24LC64 EEPROM (64Kbit, I2C) keeps a periodically-updated snapshot of the active tool's setpoints and the global LED/OLED settings, so a sudden power loss doesn't leave "what was this board doing" as unknowable as the loss itself was unplanned. It shares the OLED's I2C1 bus rather than getting one of its own — this MCU only has two I2C peripherals total, and both were already spoken for (see `firmware/README.md` section 6 for the full reasoning).
+
+**Recovered state is queryable, never auto-applied to anything hazardous.** On boot, whatever was saved becomes readable over CAN (`0x190`/`0x191`) — but a heater setpoint, laser power, or motor command is never silently re-armed on its own. Only the safe, passive settings (LED colors, OLED mode) get restored directly. Deliberately re-sending a setpoint after actually reviewing what happened is left as the master controller's call, not something this board decides by itself the instant power comes back.
 
 ## 💼 Natively Automated Tool Catalog (The 12 Firmware Profiles)
 
@@ -461,7 +461,15 @@ always move together.
 
 ## 🔍 Current Status
 
-The core firmware is built as a highly optimized, single-file monolithic architecture to ensure deterministic timing (hardware ISRs drive everything from OLED rendering to the diagnostic LED heartbeat). Both firmware and hardware are actively evolving — recent work includes a from-scratch OLED redesign, a hardware I2C1 migration, and the layer-fan and generic-endstop features described above.
+The core firmware is built as a highly optimized, single-file monolithic architecture to ensure deterministic timing (hardware ISRs drive everything from OLED rendering to the diagnostic LED heartbeat).
+
+**Firmware (`STM32F303CC.C`):** feature-complete for all 12 tool profiles — thermal PID control, per-tool telemetry, communication watchdogs, stall/fault detection, and the OLED's own live diagnostics. Versioned independently of the bootloader (see the Changelog below). Recent additions: a hardware I2C1 migration, the layer-fan and generic-endstop features, an active-tool query pair (`0x110`/`0x111`) for the Tester tool, a generic SPI passthrough (`0x180`/`0x181`) for whatever ends up on the expansion connector, and an onboard EEPROM that persists setpoints across a power loss (`0x190`/`0x191`).
+
+**Bootloader (`BOOTLOADER.C`):** feature-complete golden-image A/B update system — HMAC-SHA256 signed OTA updates over CAN, a backup slot that guarantees a failed update never bricks the board, and its own version reporting (`0x7FA`) independent of the application. Compiles and links clean; see the bench-test caveat above before trusting it unattended with real actuators connected.
+
+**PC tools (`tools/`):** both `URTC Flasher` (CAN OTA updates + full-chip SWD/JTAG programming) and `URTC Tester` (live per-tool control/telemetry exerciser) are feature-complete for what they set out to do, each with their own README covering setup and every control in detail.
+
+**Hardware:** still the earlier stage of the two — schematic and BOM are actively evolving (most recently: the expansion connector's SPI bus, and the onboard persistence EEPROM), no populated board exists yet to validate any of the above against real silicon. Everything above compiles, links, and has been reasoned through carefully, but "builds correctly" and "verified on hardware" are two different claims — see the safety notice at the top of this README, and treat a first bring-up with the caution any new board deserves.
 
 If anyone in the community is working on custom end-effectors, smart tool-changers, or advanced tool integration for PAROL6, Faze4, or any other robot arm platform, I'd love to chat, swap ideas, or dive deeper into the CAN commands!
 
@@ -479,10 +487,10 @@ Because this project consists of several different types of content, individual 
 
 1. The **firmware** located at `./firmware` (application and CAN bootloader alike) is available under the **GNU General Public License v3.0 (GPL-3.0)**. Full text at https://www.gnu.org/licenses/gpl-3.0.html.
 
-2. The **PC flashing tool** at `./tools` is source code, licensed the same way and for the same reason as the firmware: **GNU General Public License v3.0 (GPL-3.0)**. This covers `urtc_flasher.py` itself and any `.exe` built from it via `build_exe.bat` — distributing the compiled tool means distributing something GPL-3.0 covers, same as distributing a compiled firmware `.bin` does.
+2. The **PC tools** at `./tools` are source code, licensed the same way and for the same reason as the firmware: **GNU General Public License v3.0 (GPL-3.0)**. This covers `urtc_flasher.py` and `urtc_tester.py` themselves and any `.exe`/binary built from either via their respective `build_exe.bat`/`build_exe.sh` — distributing a compiled tool means distributing something GPL-3.0 covers, same as distributing a compiled firmware `.bin` does.
 
 3. The **hardware designs** (Eagle schematic/board files, gerbers, and the 3D-printable parts under `./PCB` and `./3D`) are available under the **CERN Open Hardware Licence v2 - Strongly Reciprocal (CERN-OHL-S v2)**. Full text at https://cern-ohl.web.cern.ch/.
 
-4. The **documentation** (this README, the service manual, and the reference files under `./docs`, including `./tools/flasher/README.md`) is available under **Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)**. Full text at https://creativecommons.org/licenses/by-sa/4.0/.
+4. The **documentation** (this README, the service manual, and the reference files under `./docs`, including `./tools/flasher/README.md` and `./tools/tester/README.md`) is available under **Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)**. Full text at https://creativecommons.org/licenses/by-sa/4.0/.
 
 If you build on this project, keep the licensing split in mind: code changes to the firmware or the flashing tool should stay GPL-3.0, hardware modifications should stay CERN-OHL-S, and documentation derivatives should stay CC BY-SA - each with attribution back to this project.

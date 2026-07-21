@@ -56,6 +56,10 @@ PIN | SIGNAL    | FIRMWARE LOGIC FUNCTION
 4   | SDA       | PA10 (Hardware I2C1_SDA, AF4)
     |           | CHANGED: was PA5/PA6 software-emulated I2C on the previous MCU
     |           | package. Same R33/R34 4.7kOhm pull-ups, now a real peripheral.
+    |           | NOTE: this same I2C1 bus (PA9/PA10) also reaches the on-board
+    |           | FL24LC64 parameter-persistence EEPROM - a directly-soldered
+    |           | chip with no connector of its own, not something plugged in
+    |           | here. See PINOUT.TXT's I2C1 block and BOM.TXT for the part.
 
 ------------------------------------------------------------------------------------------------
 4. CONN_DRILL (Multi-function: Drill / Laser / 4-Wire Fan)

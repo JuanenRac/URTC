@@ -125,6 +125,72 @@ Data:
                (e.g. the address byte of a TMC5160 write access reads
                back a don't-care value, per that chip's own datasheet)
 
+ID: 0x190 [Master -> URTC Tool Head]
+Query recovered EEPROM state
+DLC: any (payload ignored)
+Data: none needed
+Effect: answers with 0x191 - whatever was loaded from the FL24LC64
+        persistence EEPROM at boot (see STM32F303CC.C's SavedState_Load).
+        Read-only, no side effects, and deliberately does NOT itself
+        re-apply anything to a live setpoint - see the note on 0x191
+        below for why. Answered even during a declared critical error,
+        same reasoning as 0x110/0x111: read-only diagnostics stay
+        available exactly when something's already gone wrong.
+
+ID: 0x191 [URTC Tool Head -> Master, answers 0x190]
+Recovered EEPROM state response
+DLC: 8 bytes
+Data:
+  - txData[0]: 1 if a valid saved state was found and loaded, 0 if not
+               (blank/uninitialized EEPROM, checksum mismatch from a
+               corrupted/interrupted save, or the EEPROM didn't respond
+               at all - all three look the same from here: nothing
+               trustworthy to report)
+  - txData[1]: which tool profile this saved state was recorded under
+               (matches the ToolMode_t values - see 0x111)
+  - txData[2]: 1 if a critical error was active at the moment of the
+               last save (i.e. the board may have gone down mid-fault,
+               not just mid-power-loss)
+  - txData[3:4]: temperature setpoint at the last save (soldering iron
+               or 3D-printer nozzle, whichever the recorded tool was -
+               they share one field since only one is ever relevant for
+               a given board's fixed active_tool)
+  - txData[5]: speed/power setpoint at the last save (drill speed or
+               laser power, same one-or-the-other reasoning)
+  - txData[6]: 1 if the drill was set to reverse, or the laser interlock
+               was armed, whichever was relevant (0 otherwise)
+  - txData[7]: 3D-printer layer fan power at the last save
+Notes: this is a compact summary, not the full ~26-byte record kept in
+       RAM (recovered_state in STM32F303CC.C) - a single CAN frame can't
+       carry that much. Nothing here gets applied to a live setpoint
+       automatically on boot, by design: a heater, the laser, or a motor
+       quietly re-arming itself the instant the board powers back up
+       would undermine every communication watchdog documented
+       elsewhere in this file. This tells a host what the board was
+       doing before it went down; deliberately re-commanding the same
+       setpoint (or a different one) afterward is the host's decision to
+       make, not something this board does on its own initiative.
+
+ID: 0x192 [Master -> URTC Tool Head]
+Erase recovered EEPROM state
+DLC: 4 bytes, magic payload E3 A5 E0 FF
+Data:
+  - rxData[0..3]: must be exactly E3 A5 E0 FF - any other payload (or any
+               other DLC) is silently ignored. Same reasoning as 0x7F0's
+               own magic trigger: a corrupted or malformed frame landing
+               on this ID by chance shouldn't be able to wipe a real
+               saved record.
+Effect: overwrites the entire saved-state region of the EEPROM with
+        0xFF (matching erased-flash convention), clears recovered_state
+        and had_valid_recovered_state in RAM immediately (not just on
+        the next boot), and answers with 0x191 reporting
+        had_valid_recovered_state=0 to confirm. Unlike 0x110/0x190,
+        this is NOT answered during a declared critical error - it's a
+        destructive write, even though not physically hazardous the way
+        an actuator command would be, so it stays behind the same
+        error-gate as everything else that isn't a pure read-only
+        diagnostic.
+
 -----------------------------------------------------------------------------
 3. MOTION TOOLS (Standard Stepper - Extended Range)
    Associated with: TOOL_PASTE_DISPENSER (1), TOOL_LIQUID_DISPENSER (2),
@@ -518,6 +584,9 @@ Notes: this is BOOTLOADER.C's own version (BOOTLOADER_VERSION_MAJOR/MINOR/
   0x111 -> Active tool + quick state response, NEW (DLC:4)
   0x180 -> Expansion SPI passthrough request, NEW (DLC:2-8)
   0x181 -> Expansion SPI passthrough response, NEW (DLC:2-8)
+  0x190 -> Query recovered EEPROM state, NEW (DLC:any)
+  0x191 -> Recovered EEPROM state response, NEW (DLC:8)
+  0x192 -> Erase recovered EEPROM state, magic payload, NEW (DLC:4)
   0x120 -> Stepper motor control (Dispensers, Screwdriver, Grippers - DLC:5)
   0x130 -> T12 setpoint temperature (Soldering iron - DLC:2)
   0x135 -> T12 thermal telemetry + endstop (Soldering iron - DLC:3)

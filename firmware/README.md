@@ -234,9 +234,10 @@ identification.
 
 - **500 kbit/s, standard 11-bit IDs.** No extended (29-bit) IDs are used
   anywhere in this protocol.
-- **ID ranges:** `0x095` (max-priority scan-probe event) · `0x100`/`0x110`/`0x111`
-  (global commands, valid regardless of active tool) · `0x120`–`0x179`
-  (per-tool commands/telemetry) · `0x7F0`–`0x7FA` (bootloader/version).
+- **ID ranges:** `0x095` (max-priority scan-probe event) · `0x100`/`0x110`/`0x111`/
+  `0x190`/`0x191`/`0x192` (global commands, valid regardless of active tool) ·
+  `0x120`–`0x179` (per-tool commands/telemetry) · `0x180`/`0x181`
+  (expansion SPI passthrough) · `0x7F0`–`0x7FA` (bootloader/version).
 - **Big-endian byte order** for every multi-byte numeric field, throughout.
 - **Telemetry is push, not poll:** tools with sensors broadcast their
   readings unsolicited, on a fixed period (typically 150 ms), rather than
@@ -249,7 +250,81 @@ identification.
 
 ---
 
-## 6. Build system
+## 6. Parameter persistence — FL24LC64 EEPROM (shared I2C1)
+
+A 64Kbit I2C EEPROM, directly soldered to the board (no connector), holds
+a periodically-updated snapshot of the active tool's setpoints and the
+global LED/OLED settings — so a sudden power loss doesn't leave "what was
+this board doing" as unknowable as the loss itself was unplanned.
+
+**Why I2C1, not a bus of its own:** confirmed against ST's own product
+page for this exact part, the STM32F303CC has **only two I2C peripherals
+total** ("up to two I2Cs") — there's no I2C3 on this density variant at
+all, unlike some larger STM32F3 parts. Both existing buses are already
+committed (I2C1→OLED, I2C2→`CONN_EXPANSION`), and a third, bit-banged bus
+- the same approach used for `CONN_EXPANSION`'s SPI - isn't an option
+either: every previously-free GPIO pin on this board is already spoken
+for by that SPI bus (see section on `CONN_EXPANSION` in
+`PINOUT_CONNECTORS.TXT`). Sharing I2C1 (not I2C2) is deliberate: I2C2
+stays reserved purely for whatever an unknown future expansion board
+turns out to need, while this EEPROM is a core board component - it
+makes more sense paired with the OLED, another core component this
+firmware already knows how to share a bus with correctly, than diluting
+the connector's own dedicated bus. Address `0x50` (A0/A1/A2 tied to GND)
+doesn't collide with the OLED's own fixed `0x3C`.
+
+**What gets saved:** the temperature setpoint (soldering iron or 3D
+printer nozzle - only one is ever relevant for a board's fixed
+`active_tool`), drill speed/direction, laser power/interlock, 3D-printer
+fan speeds, the status/ring LED colors, OLED night mode, and whether a
+critical error was active at the moment of the last save. A simple
+additive checksum (not the OTA update's HMAC-SHA256 - proportionate to
+what this actually needs to catch: a blank chip or an interrupted write,
+not a security boundary) guards against trusting a corrupted or
+never-written record.
+
+**Written periodically, not on every change** — checked every 500ms,
+actually written only when something differs from what's already on the
+chip, and even then rate-limited to at most once every 3 seconds. This
+EEPROM family is rated for roughly a million write cycles per address;
+comfortably enough for occasional real changes over the life of the
+board, but not something to spend carelessly if a setpoint were ever
+changed in a tight loop somewhere.
+
+**Deliberately does not auto-resume anything hazardous.** On boot, the
+saved record is loaded into RAM and made queryable over CAN (`0x190`/
+`0x191`) — but a heater setpoint, laser power, or motor command is never
+re-applied automatically. Doing so would mean a power blip (or a
+deliberate power cycle for entirely unrelated reasons) could silently
+resume a potentially hazardous operation with nobody watching, which
+would undermine every communication watchdog described elsewhere in
+this document. The safe, passive settings (LED colors, OLED mode) ARE
+restored directly, since there's no hazard in remembering what color an
+LED was. Recovering a hazardous setpoint, if actually wanted, is left as
+a deliberate decision for whatever's on the other end of `0x190`/`0x191`
+to make - not something this board decides on its own initiative.
+
+Two of this board's shared pins have no dedicated RAM variable tracking
+their current value (drill direction, laser interlock) - the CAN
+handlers write them straight to their GPIO pin. The save routine reads
+these back directly via `HAL_GPIO_ReadPin` (which reflects what's
+actually being driven for a pin configured as an output, not just an
+external voltage) rather than adding new tracking variables and touching
+those existing handlers.
+
+**Erasing it (`0x192`):** a magic-payload command (same reasoning as
+`0x7F0`'s own magic trigger - a corrupted or malformed frame shouldn't
+be able to wipe a real saved record) overwrites the saved region with
+`0xFF` and clears the in-RAM copy immediately, not just on the next
+boot. Only the application handles this, not the bootloader - both PC
+tools expose it: `URTC Tester` as a standalone diagnostic button, `URTC
+Flasher` as an optional checkbox that runs it before a normal CAN update
+(while the application is still up, since that's a requirement, not a
+convenience). See `CANBUS.TXT` for the exact frame format.
+
+---
+
+## 7. Build system
 
 Toolchain, HAL/CMSIS sourcing, linker scripts, and the one real
 compile-time bug this project's own build process caught (a switch-
@@ -261,7 +336,7 @@ layout in section 1 above exactly.
 
 ---
 
-## 7. Related reference files
+## 8. Related reference files
 
 | File | Covers |
 |---|---|

@@ -88,6 +88,10 @@ CAN_ID_HEARTBEAT        = 0x7F6
 CAN_ID_HMAC_CHUNK       = 0x7F7
 CAN_ID_QUERY_VERSION    = 0x7F8
 CAN_ID_VERSION_RESPONSE = 0x7F9
+CAN_ID_QUERY_EEPROM_STATE = 0x190  # Query the FL24LC64's recovered state (application-side, not the bootloader)
+CAN_ID_EEPROM_STATE_RESP = 0x191   # Answers CAN_ID_QUERY_EEPROM_STATE, also sent after an erase
+CAN_ID_ERASE_EEPROM = 0x192        # Magic-payload erase - see ERASE_EEPROM_MAGIC below
+ERASE_EEPROM_MAGIC = bytes([0xE3, 0xA5, 0xE0, 0xFF])
 CAN_ID_BOOTLOADER_VERSION_RESPONSE = 0x7FA  # sent only by the bootloader, alongside 0x7F9, when it's the one answering
 
 STATUS_NAMES = {
@@ -1101,12 +1105,36 @@ def validate_firmware_file(path):
     except OSError as e:
         return False, f"can't read file: {e}", size
 
-    initial_sp = struct.unpack("<I", header[0:4])[0]
+    initial_sp, reset_handler = struct.unpack("<II", header[0:8])
     if not (0x20000000 <= initial_sp <= 0x2000A000):
         return False, (
             f"first word (0x{initial_sp:08X}) doesn't look like a valid "
             f"initial stack pointer for this chip's RAM - probably not a "
             f"real URTC image, or a corrupted one"
+        ), size
+
+    # The stack pointer alone can't tell a bootloader image from an
+    # application image - both slots share the same RAM, so both pass the
+    # check above equally. This was a real gap: this exact cross-check
+    # already existed for the SWD/JTAG path's own file pickers (see
+    # validate_swd_image_file), but was never applied here - so
+    # URTC_BOOTLOADER.bin could sit in firmware/ and get listed as "looks
+    # valid" for a CAN-OTA update, which only ever writes to the
+    # application slot. The reset handler is a real, absolute code address
+    # baked in at link time, and always points inside the image's OWN
+    # slot - verified against this project's actual compiled
+    # BOOTLOADER.bin/APP.bin, whose reset handlers land at 0x080030F1 and
+    # 0x0800C725 respectively, each correctly inside its own range and
+    # outside the other's.
+    if not (APP_FLASH_ADDR <= reset_handler < APP_FLASH_ADDR + APP_MAX_SIZE):
+        return False, (
+            f"reset handler (0x{reset_handler:08X}) doesn't point inside "
+            f"the application slot (0x{APP_FLASH_ADDR:08X}-"
+            f"0x{APP_FLASH_ADDR + APP_MAX_SIZE:08X}) - this looks like a "
+            f"bootloader image, not an application image. A CAN-OTA update "
+            f"only ever writes to the application slot, so this file can't "
+            f"go through this path regardless of size - use the SWD/JTAG "
+            f"section instead if you actually need to update the bootloader."
         ), size
 
     return True, "looks valid", size
@@ -1505,6 +1533,25 @@ class URTCFlasher:
                 return data
         raise FlashError(f"Timed out waiting for CAN ID 0x{expected_id:03X}")
 
+    def erase_eeprom(self):
+        """Sends 0x192 (magic-payload erase) to a currently-running
+        application, wiping the persistence EEPROM's saved state. Only
+        the application handles this - the bootloader doesn't - so this
+        has to run before trigger_bootloader_entry(), not after. A missing
+        confirmation is logged, not raised - this is a secondary, optional
+        step alongside the actual firmware update, and losing just the
+        confirmation frame shouldn't abort the whole flash the way a
+        genuine protocol failure in flash() itself should."""
+        self.log("Erasing persistence EEPROM (0x192)...")
+        self.can.send_frame(CAN_ID_ERASE_EEPROM, ERASE_EEPROM_MAGIC)
+        try:
+            self._wait_for(CAN_ID_EEPROM_STATE_RESP, timeout=2.0)
+            self.log("EEPROM erase confirmed.")
+        except FlashError:
+            self.log("EEPROM erase sent, but got no confirmation within 2s - "
+                      "continuing with the flash anyway. Check the EEPROM state "
+                      "separately (e.g. via URTC Tester) if this matters.")
+
     def trigger_bootloader_entry(self):
         """Sends 0x7F0 to a currently-running application to make it reset
         into the bootloader. Skip this if the board is already sitting in
@@ -1875,10 +1922,27 @@ class FlasherGUI:
             foreground="gray", wraplength=380, justify="left",
         ).grid(row=1, column=0, columnspan=3, sticky="w", padx=8)
 
+        self.erase_eeprom_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(
+            act_frame,
+            text="Also erase the persistence EEPROM before flashing",
+            variable=self.erase_eeprom_var,
+        ).grid(row=2, column=0, columnspan=3, sticky="w", **pad)
+        ttk.Label(
+            act_frame,
+            text="Optional, off by default. Wipes the board's saved tool-parameter "
+                 "state (see CANBUS.TXT 0x190-0x192) - not required for a normal "
+                 "update, since a version mismatch is already detected and ignored "
+                 "automatically, but useful for a genuinely clean slate. Only works "
+                 "while the application is running (needs the trigger checkbox above "
+                 "checked too) - the bootloader itself doesn't handle this command.",
+            foreground="gray", wraplength=380, justify="left",
+        ).grid(row=3, column=0, columnspan=3, sticky="w", padx=8)
+
         self.flash_btn = ttk.Button(act_frame, text="Flash Firmware", command=self.start_flash)
-        self.flash_btn.grid(row=2, column=0, **pad)
+        self.flash_btn.grid(row=4, column=0, **pad)
         self.cancel_btn = ttk.Button(act_frame, text="Cancel", command=self.cancel_flash, state="disabled")
-        self.cancel_btn.grid(row=2, column=1, **pad)
+        self.cancel_btn.grid(row=4, column=1, **pad)
 
         # --- SWD/JTAG full-chip programming frame (advanced, separate risk profile) ---
         swd_frame = ttk.LabelFrame(
@@ -2451,6 +2515,14 @@ class FlasherGUI:
                 progress_cb=lambda pct: self.root.after(0, lambda: self.progress.configure(value=pct)),
                 stop_flag=lambda: self._stop_requested,
             )
+            if self.erase_eeprom_var.get():
+                if not self.trigger_var.get():
+                    self.log("Skipping EEPROM erase: needs the application running "
+                              "(the trigger checkbox above is unchecked, so the board "
+                              "is assumed to already be in the bootloader, which doesn't "
+                              "handle this command).")
+                else:
+                    flasher.erase_eeprom()
             if self.trigger_var.get():
                 flasher.trigger_bootloader_entry()
             flasher.flash(self.firmware_path)
@@ -2859,7 +2931,7 @@ def main():
         sys.exit(run_cli(argv))
     root = tk.Tk()
     root.withdraw()  # hidden until the splash finishes, rather than flashing empty then populated
-    root.geometry(_center_geometry(root, 1286, 850))
+    root.geometry(_center_geometry(root, 1286, 1020))
     app = FlasherGUI(root)
 
     def _reveal_main():

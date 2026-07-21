@@ -407,6 +407,12 @@ CAN_ID_3DP_HOTEND_TELEM   = 0x175  # Hotend actual temperature
 CAN_ID_3DP_LAYER_FAN_RPM  = 0x177  # Layer fan actual RPM
 CAN_ID_3DP_HOTEND_FAN_CMD = 0x178  # Hotend fan PWM
 CAN_ID_3DP_HOTEND_FAN_RPM = 0x179  # Hotend fan actual RPM
+CAN_ID_EXP_SPI_CMD        = 0x180  # Generic SPI passthrough request, for CONN_EXPANSION
+CAN_ID_EXP_SPI_RESP       = 0x181  # Answers CAN_ID_EXP_SPI_CMD
+CAN_ID_QUERY_EEPROM_STATE = 0x190  # Query the FL24LC64's recovered state
+CAN_ID_EEPROM_STATE_RESP  = 0x191  # Answers CAN_ID_QUERY_EEPROM_STATE, also sent after an erase
+CAN_ID_ERASE_EEPROM       = 0x192  # Magic-payload erase - see ERASE_EEPROM_MAGIC below
+ERASE_EEPROM_MAGIC = bytes([0xE3, 0xA5, 0xE0, 0xFF])
 CAN_ID_QUERY_VERSION     = 0x7F8  # Answered by app or bootloader, whichever's running
 CAN_ID_VERSION_RESPONSE  = 0x7F9
 
@@ -648,13 +654,20 @@ class TesterGUI:
         global_frame.pack(fill="x", **pad)
         self._build_global_panel(global_frame)
 
+        # --- Expansion board (CONN_EXPANSION) - also global, not tied to
+        # any specific active_tool, so built once here the same as the
+        # panel above. ---
+        exp_frame = ttk.LabelFrame(left_col, text="3. Expansion Board (SPI + EEPROM)")
+        exp_frame.pack(fill="x", **pad)
+        self._build_expansion_panel(exp_frame)
+
         # --- Dynamic per-tool frame - populated by rebuild_tool_panel()
         # once the active tool is known. Its own inner frame is destroyed
         # and rebuilt from scratch on every detect, rather than trying to
         # selectively show/hide 12 pre-built panels at once - simpler, and
         # matches the "only show what's actually relevant right now" goal
         # directly instead of hiding the other 11 behind the scenes. ---
-        self.tool_frame = ttk.LabelFrame(right_col, text="3. Tool Controls")
+        self.tool_frame = ttk.LabelFrame(right_col, text="4. Tool Controls")
         self.tool_frame.pack(fill="both", expand=True, **pad)
         self.tool_panel_inner = ttk.Frame(self.tool_frame)
         self.tool_panel_inner.pack(fill="both", expand=True)
@@ -930,7 +943,7 @@ class TesterGUI:
     def rebuild_tool_panel(self, tool_id):
         self._clear_tool_panel()
         name = TOOL_NAMES.get(tool_id, "No tool assigned")
-        self.tool_frame.config(text=f"3. Tool Controls - {name}")
+        self.tool_frame.config(text=f"4. Tool Controls - {name}")
         builder = {
             0: self._build_soldering_iron_panel,
             1: self._build_motion_panel, 2: self._build_motion_panel,
@@ -1017,6 +1030,119 @@ class TesterGUI:
         self.bus.send(CAN_ID_GLOBAL_STATUS, data)
         self.log(f"Sent 0x100: status RGB=({data[0]},{data[1]},{data[2]}), night={self.night_mode_var.get()}, "
                   f"ring RGB=({data[4]},{data[5]},{data[6]}), ring_on={self.ring_on.get()}")
+
+    def _build_expansion_panel(self, parent):
+        # CONN_EXPANSION's bit-banged SPI bus (0x180/0x181) - a generic
+        # byte passthrough, not TMC5160-register-aware, matching the
+        # firmware's own approach (see CANBUS.TXT): this tool doesn't
+        # need to know that chip's specific protocol either, just send
+        # and show raw bytes.
+        self.spi_send_var = tk.StringVar(value="01 02 03 04")
+        ttk.Label(parent, text="SPI bytes to send (hex, space-separated):").grid(
+            row=0, column=0, columnspan=2, sticky="w", padx=4, pady=(4, 0))
+        ttk.Entry(parent, textvariable=self.spi_send_var, width=30).grid(
+            row=1, column=0, sticky="w", padx=4, pady=2)
+        ttk.Button(parent, text="Send", command=self._send_expansion_spi).grid(row=1, column=1, padx=4)
+        self.spi_response_var = tk.StringVar(value="(nothing sent yet)")
+        ttk.Label(parent, text="Response:").grid(row=2, column=0, sticky="w", padx=4, pady=(4, 0))
+        ttk.Label(parent, textvariable=self.spi_response_var, font=("Courier", 9)).grid(
+            row=3, column=0, columnspan=2, sticky="w", padx=4)
+        ttk.Label(
+            parent,
+            text="Up to 7 bytes per transfer (CS held low for the whole thing) - matches "
+                 "what a single 0x180 frame can carry (1 length byte + up to 7 data bytes).",
+            foreground="gray", wraplength=380, justify="left",
+        ).grid(row=4, column=0, columnspan=2, sticky="w", padx=4, pady=(0, 8))
+
+        ttk.Separator(parent, orient="horizontal").grid(row=5, column=0, columnspan=2, sticky="ew", pady=4)
+
+        # EEPROM recovered-state query/erase (0x190/0x191/0x192).
+        ttk.Label(parent, text="Persistence EEPROM (FL24LC64, shares I2C1 with the OLED):").grid(
+            row=6, column=0, columnspan=2, sticky="w", padx=4, pady=(4, 2))
+        btn_row = ttk.Frame(parent)
+        btn_row.grid(row=7, column=0, columnspan=2, sticky="w", padx=4)
+        ttk.Button(btn_row, text="Query State", command=self._query_eeprom_state).pack(side="left")
+        ttk.Button(btn_row, text="Erase EEPROM...", command=self._erase_eeprom).pack(side="left", padx=(8, 0))
+        self.eeprom_state_var = tk.StringVar(value="(not queried yet)")
+        ttk.Label(parent, textvariable=self.eeprom_state_var, wraplength=380, justify="left").grid(
+            row=8, column=0, columnspan=2, sticky="w", padx=4, pady=(4, 4))
+
+    def _send_expansion_spi(self):
+        if self.bus is None:
+            messagebox.showerror("Not connected", "Connect to the adapter first.")
+            return
+        try:
+            tx_bytes = bytes(int(b, 16) for b in self.spi_send_var.get().split())
+        except ValueError:
+            messagebox.showerror("Bad input", "Enter space-separated hex bytes, e.g. 01 02 03")
+            return
+        if not (1 <= len(tx_bytes) <= 7):
+            messagebox.showerror("Bad input", "Enter between 1 and 7 bytes.")
+            return
+        data = bytes([len(tx_bytes)]) + tx_bytes
+        # wait_for_one's own registration happens inside the call, so
+        # sending first here (rather than registering the wait before
+        # sending) is fine - the round trip for a handful of bit-banged
+        # SPI bytes is comfortably within the 1s timeout either way.
+        self.bus.send(CAN_ID_EXP_SPI_CMD, data)
+        response = self.bus.wait_for_one(CAN_ID_EXP_SPI_RESP, timeout=1.0)
+        if response is None:
+            self.spi_response_var.set("(no response - board not running this firmware version, or not connected)")
+            self.log(f"Sent 0x180 ({tx_bytes.hex(' ')}) - no 0x181 response.")
+            return
+        n = response[0] if len(response) > 0 else 0
+        rx_bytes = response[1:1 + n]
+        self.spi_response_var.set(rx_bytes.hex(" ") if rx_bytes else "(empty)")
+        self.log(f"Sent 0x180 ({tx_bytes.hex(' ')}), received back: {rx_bytes.hex(' ')}")
+
+    def _query_eeprom_state(self):
+        if self.bus is None:
+            messagebox.showerror("Not connected", "Connect to the adapter first.")
+            return
+        self.bus.send(CAN_ID_QUERY_EEPROM_STATE, b"")
+        response = self.bus.wait_for_one(CAN_ID_EEPROM_STATE_RESP, timeout=1.0)
+        self._show_eeprom_state(response)
+
+    def _show_eeprom_state(self, response):
+        if response is None or len(response) < 8:
+            self.eeprom_state_var.set("No response - board not running this firmware version, or not connected.")
+            self.log("Queried 0x190 - no 0x191 response.")
+            return
+        valid, tool_id, had_error, temp_hi, temp_lo, speed, dir_or_interlock, fan = response[:8]
+        if not valid:
+            self.eeprom_state_var.set("No valid saved state (blank EEPROM, or nothing saved yet).")
+            self.log("EEPROM state: nothing valid saved.")
+            return
+        temp = (temp_hi << 8) | temp_lo
+        tool_name = TOOL_NAMES.get(tool_id, f"unknown ({tool_id})")
+        text = (f"Last saved under: {tool_name}\n"
+                f"Temperature setpoint: {temp}°C  |  Speed/power: {speed}  |  "
+                f"Direction/interlock: {'on' if dir_or_interlock else 'off'}  |  Fan: {fan}\n"
+                f"Critical error active at last save: {'YES' if had_error else 'no'}")
+        self.eeprom_state_var.set(text)
+        self.log(f"EEPROM state: tool={tool_name}, temp={temp}, speed/power={speed}, "
+                  f"dir/interlock={dir_or_interlock}, fan={fan}, had_error={had_error}")
+
+    def _erase_eeprom(self):
+        if self.bus is None:
+            messagebox.showerror("Not connected", "Connect to the adapter first.")
+            return
+        if not messagebox.askyesno(
+            "Erase EEPROM?",
+            "This permanently erases the saved parameter state on the board's "
+            "persistence EEPROM. This cannot be undone. Continue?",
+            icon="warning",
+        ):
+            return
+        self.bus.send(CAN_ID_ERASE_EEPROM, ERASE_EEPROM_MAGIC)
+        response = self.bus.wait_for_one(CAN_ID_EEPROM_STATE_RESP, timeout=1.0)
+        if response is None:
+            self.log("Sent EEPROM erase (0x192) - no confirmation response received.")
+            messagebox.showwarning("No confirmation", "Erase command sent, but no response came back to confirm it.")
+            return
+        self.log("EEPROM erased and confirmed.")
+        self._show_eeprom_state(response)
+        messagebox.showinfo("Erased", "EEPROM erased and confirmed by the board.")
 
     # -------------------------------------------------------------------
     # Per-tool panels. Each is only ever built for the ONE tool the board
@@ -1525,7 +1651,7 @@ def _show_splash_then(root, on_done):
 def main():
     root = tk.Tk()
     root.withdraw()
-    root.geometry(_center_geometry(root, 1116, 660))
+    root.geometry(_center_geometry(root, 1116, 930))
     app = TesterGUI(root)
 
     def _reveal_main():
