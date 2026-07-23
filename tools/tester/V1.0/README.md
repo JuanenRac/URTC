@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="/images/URTC_LOGO_TESTER.svg" alt="URTC Tester Logo" width="100%">
+</p>
+
 # URTC Tester (Windows / Linux)
 
 **Version:** 1.0 · **Author:** JuanenRac (Electro Hobby 3D) &lt;electrohobby3d@gmail.com&gt;
@@ -81,9 +85,16 @@ they don't move to the dynamic panel. In AOI Inspection mode specifically,
 the ring's on/off here is ignored in favor of that tool's own strobe
 control (per `CANBUS.TXT`) - color still applies either way.
 
-**Expansion Board** (section 3, also always visible): two independent
-things living on `CONN_EXPANSION`, covered together since neither is
-tied to which tool is active -
+**Expansion Board** (section 3, always visible): `CONN_EXPANSION`'s own
+SPI bus and DIAG0 line - nothing else lives on this connector today -
+
+**Persistence F-RAM** (section 4, also always visible, but deliberately
+separate from Expansion Board above): the FM24CL64B shares I2C1 with the
+OLED - a core board component, not something wired to `CONN_EXPANSION`
+at all. An earlier version of this tool bundled the two together under
+"Expansion Board", which implied a connection between them that was
+never real - the expansion connector itself has no F-RAM, no EEPROM,
+nothing non-volatile on it.
 - **SPI passthrough**: type space-separated hex bytes (1-7 of them, e.g.
   `01 02 03`), hit Send, and see exactly what came back on MISO during
   that same transfer (`0x180`/`0x181`) - a raw byte transport, not
@@ -94,11 +105,54 @@ tied to which tool is active -
   stall/fault diagnostic line (`0x182`/`0x183`) - HIGH (inactive) or LOW
   (asserted). A simple polled read, not a live/pushed value - hit the
   button again to refresh it.
-- **Persistence EEPROM**: **Query State** reads back whatever the board
+- **Persistence F-RAM**: **Query State** reads back whatever the board
   last saved before a power loss (`0x190`/`0x191`) - which tool it was,
   the setpoint, whether a critical error was active at the time.
-  **Erase EEPROM...** wipes it (`0x192`, with a confirmation dialog first
+  **Erase F-RAM...** wipes it (`0x192`, with a confirmation dialog first
   - this can't be undone).
+
+**Custom CAN Frame** (section 6, also always visible): a raw ID + hex
+bytes entry with one-shot and periodic send - for a command that doesn't
+have its own control here yet, or for testing something not (or not yet)
+documented in `CANBUS.TXT`. No validation beyond ID range and DLC≤8;
+whatever this sends is exactly what goes on the bus. Same section also
+opens the **Raw Bus Monitor** (see below).
+
+**Run Self-Test** (next to Detect): runs a small set of safe, at-rest
+communication checks for whichever tool is currently detected - confirms
+the active-tool query and version query both respond, then (for tools
+with telemetry) sends a safe setpoint/speed/power of 0 and checks the
+expected telemetry arrives. Deliberately never sends anything that would
+actually heat, fire, or spin at meaningful power - this verifies the
+communication round-trip works, not that an actuator physically responds,
+since confirming that needs a human watching anyway. Asks for
+confirmation before sending anything. Tools with no telemetry (plain
+motion) or that are purely event-driven (scan probe) get an info-only
+note instead of a real pass/fail.
+
+**Live temperature graphs**: the soldering iron and 3D-printer nozzle
+panels both show a small rolling line graph alongside their live
+temperature reading - a plain Tkinter Canvas widget, not a new
+dependency (matplotlib/pyqtgraph would break this tool's zero-dependency
+policy beyond pyserial). Fixed Y-axis scale (0 to that tool's own
+setpoint ceiling) rather than auto-scaling, so the trend is easy to read
+at a glance rather than the scale shifting under it.
+
+**Raw Bus Monitor** (opened from the Custom CAN Frame section): a
+separate window showing every frame seen, any ID, independent of the
+active tool panel - a live-scrolling table (Time/ID/DLC/Data/Δt),
+Pause/Clear, and an approximate bus-load/frame-rate readout (updated
+once a second; the load figure doesn't model bit-stuffing overhead, so
+treat it as a rough diagnostic figure, not a certified measurement).
+**Export .trc...**/**Export .asc...** save the currently-shown table as a
+simplified PEAK PCAN-View / Vector CANalyzer-style trace file
+respectively - close enough to be readable by most tools that expect
+those formats, not guaranteed byte-identical to what the real
+applications produce. If `urtc_custom_ids.json` exists next to this
+script (optional, not included by default - `{"0x199": "My Sensor"}`),
+the ID column shows that friendly name alongside the raw hex ID -
+useful for anyone testing a custom expansion board's own traffic without
+needing to modify this tool's source.
 
 ## 4. Tool coverage
 

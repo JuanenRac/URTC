@@ -22,6 +22,7 @@ started. Zero non-stdlib dependencies beyond pyserial, matching the flasher.
 
 import sys
 import os
+import json
 import time
 import re
 import logging
@@ -61,6 +62,34 @@ if getattr(sys, "frozen", False):
 else:
     base_dir = os.path.dirname(os.path.abspath(__file__))
 LOGS_FOLDER = os.path.normpath(os.path.join(base_dir, "logs"))
+CUSTOM_IDS_PATH = os.path.normpath(os.path.join(base_dir, "urtc_custom_ids.json"))
+
+
+def _load_custom_id_names():
+    """Optional, not included by default: urtc_custom_ids.json next to
+    this script, mapping hex ID strings to friendly names - e.g.
+    {"0x199": "My Expansion Sensor"}. Lets someone testing a custom
+    expansion board or addition give their own IDs a readable name in the
+    Raw Bus Monitor without needing to modify this tool's source at all.
+    Missing file is silent (this is opt-in); a present-but-broken file is
+    logged and ignored rather than crashing the tool over a typo."""
+    if not os.path.isfile(CUSTOM_IDS_PATH):
+        return {}
+    try:
+        with open(CUSTOM_IDS_PATH) as f:
+            raw = json.load(f)
+        result = {}
+        for key, name in raw.items():
+            try:
+                result[int(key, 0)] = str(name)
+            except (ValueError, TypeError):
+                continue  # one bad entry doesn't invalidate the rest of the file
+        return result
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+CUSTOM_ID_NAMES = _load_custom_id_names()
 
 if getattr(sys, "frozen", False):
     BANNER_IMAGE_PATH = os.path.normpath(os.path.join(sys._MEIPASS, "assets", "urtc_tester_banner.png"))
@@ -428,10 +457,10 @@ CAN_ID_EXP_SPI_CMD        = 0x180  # Generic SPI passthrough request, for CONN_E
 CAN_ID_EXP_SPI_RESP       = 0x181  # Answers CAN_ID_EXP_SPI_CMD
 CAN_ID_QUERY_DIAG0        = 0x182  # Query EXP_TMC_DIAG0's current level
 CAN_ID_DIAG0_RESP         = 0x183  # Answers CAN_ID_QUERY_DIAG0
-CAN_ID_QUERY_EEPROM_STATE = 0x190  # Query the FL24LC64's recovered state
-CAN_ID_EEPROM_STATE_RESP  = 0x191  # Answers CAN_ID_QUERY_EEPROM_STATE, also sent after an erase
-CAN_ID_ERASE_EEPROM       = 0x192  # Magic-payload erase - see ERASE_EEPROM_MAGIC below
-ERASE_EEPROM_MAGIC = bytes([0xE3, 0xA5, 0xE0, 0xFF])
+CAN_ID_QUERY_FRAM_STATE = 0x190  # Query the FM24CL64B's recovered state
+CAN_ID_FRAM_STATE_RESP  = 0x191  # Answers CAN_ID_QUERY_FRAM_STATE, also sent after an erase
+CAN_ID_ERASE_FRAM       = 0x192  # Magic-payload erase - see ERASE_FRAM_MAGIC below
+ERASE_FRAM_MAGIC = bytes([0xE3, 0xA5, 0xE0, 0xFF])
 CAN_ID_QUERY_VERSION     = 0x7F8  # Answered by app or bootloader, whichever's running
 CAN_ID_VERSION_RESPONSE  = 0x7F9
 
@@ -658,6 +687,8 @@ class TesterGUI:
         self.active_tool_label.grid(row=row, column=1, columnspan=3, sticky="w", **pad)
         self.detect_btn = ttk.Button(conn_frame, text="Detect", command=self.detect_active_tool)
         self.detect_btn.grid(row=row, column=4, **pad)
+        self.selftest_btn = ttk.Button(conn_frame, text="Run Self-Test...", command=self._run_self_test)
+        self.selftest_btn.grid(row=row, column=5, **pad)
         row += 1
 
         # ID jumper pins (ID4 down to ID0, matching ECOVIA.TXT's documented
@@ -699,15 +730,23 @@ class TesterGUI:
         # --- Expansion board (CONN_EXPANSION) - also global, not tied to
         # any specific active_tool, so built once here the same as the
         # panel above. ---
-        exp_frame = ttk.LabelFrame(left_col, text="3. Expansion Board (SPI + EEPROM)")
+        exp_frame = ttk.LabelFrame(left_col, text="3. Expansion Board (SPI)")
         exp_frame.pack(fill="x", **pad)
         self._build_expansion_panel(exp_frame)
+
+        # --- Persistence F-RAM - a core board component (shares I2C1 with
+        # the OLED), not part of the expansion connector at all, so this
+        # gets its own section rather than living inside "Expansion Board"
+        # the way an earlier version of this tool had it. ---
+        fram_frame = ttk.LabelFrame(left_col, text="4. Persistence F-RAM")
+        fram_frame.pack(fill="x", **pad)
+        self._build_fram_panel(fram_frame)
 
         # --- Custom/arbitrary CAN frame injector - also global. Useful for
         # exercising a command that doesn't have its own dedicated panel
         # control yet, testing something not (or not yet) documented in
         # CANBUS.TXT, or just sending a raw frame to see what happens. ---
-        custom_frame = ttk.LabelFrame(left_col, text="5. Custom CAN Frame")
+        custom_frame = ttk.LabelFrame(left_col, text="6. Custom CAN Frame")
         custom_frame.pack(fill="x", **pad)
         self._build_custom_frame_panel(custom_frame)
 
@@ -717,7 +756,7 @@ class TesterGUI:
         # selectively show/hide 12 pre-built panels at once - simpler, and
         # matches the "only show what's actually relevant right now" goal
         # directly instead of hiding the other 11 behind the scenes. ---
-        self.tool_frame = ttk.LabelFrame(right_col, text="4. Tool Controls")
+        self.tool_frame = ttk.LabelFrame(right_col, text="5. Tool Controls")
         self.tool_frame.pack(fill="both", expand=True, **pad)
         self.tool_panel_inner = ttk.Frame(self.tool_frame)
         self.tool_panel_inner.pack(fill="both", expand=True)
@@ -1046,7 +1085,7 @@ class TesterGUI:
         self._clear_tool_panel()
         self._current_tool_id = tool_id
         name = TOOL_NAMES.get(tool_id, "No tool assigned")
-        self.tool_frame.config(text=f"4. Tool Controls - {name}")
+        self.tool_frame.config(text=f"5. Tool Controls - {name}")
         builder = {
             0: self._build_soldering_iron_panel,
             1: self._build_motion_panel, 2: self._build_motion_panel,
@@ -1167,18 +1206,111 @@ class TesterGUI:
         self.diag0_var = tk.StringVar(value="(not queried yet)")
         ttk.Label(diag_row, textvariable=self.diag0_var, font=("Courier", 9)).pack(side="left", padx=(8, 0))
 
-        ttk.Separator(parent, orient="horizontal").grid(row=7, column=0, columnspan=2, sticky="ew", pady=4)
-
-        # EEPROM recovered-state query/erase (0x190/0x191/0x192).
-        ttk.Label(parent, text="Persistence EEPROM (FL24LC64, shares I2C1 with the OLED):").grid(
-            row=8, column=0, columnspan=2, sticky="w", padx=4, pady=(4, 2))
+    def _build_fram_panel(self, parent):
+        # F-RAM recovered-state query/erase (0x190/0x191/0x192). Deliberately
+        # NOT part of the expansion panel above, even though an earlier
+        # version of this tool bundled them together: the FM24CL64B shares
+        # I2C1 with the OLED (a core board component), it has nothing to do
+        # with CONN_EXPANSION's own I2C2/SPI bus at all - the expansion
+        # connector itself has no F-RAM, no EEPROM, nothing non-volatile on
+        # it, and grouping them together implied a connection that isn't
+        # real.
+        ttk.Label(parent, text="Persistence F-RAM (FM24CL64B, shares I2C1 with the OLED):").grid(
+            row=0, column=0, columnspan=2, sticky="w", padx=4, pady=(4, 2))
         btn_row = ttk.Frame(parent)
-        btn_row.grid(row=9, column=0, columnspan=2, sticky="w", padx=4)
-        ttk.Button(btn_row, text="Query State", command=self._query_eeprom_state).pack(side="left")
-        ttk.Button(btn_row, text="Erase EEPROM...", command=self._erase_eeprom).pack(side="left", padx=(8, 0))
-        self.eeprom_state_var = tk.StringVar(value="(not queried yet)")
-        ttk.Label(parent, textvariable=self.eeprom_state_var, wraplength=380, justify="left").grid(
-            row=10, column=0, columnspan=2, sticky="w", padx=4, pady=(4, 4))
+        btn_row.grid(row=1, column=0, columnspan=2, sticky="w", padx=4)
+        ttk.Button(btn_row, text="Query State", command=self._query_fram_state).pack(side="left")
+        ttk.Button(btn_row, text="Erase F-RAM...", command=self._erase_fram).pack(side="left", padx=(8, 0))
+        self.fram_state_var = tk.StringVar(value="(not queried yet)")
+        ttk.Label(parent, textvariable=self.fram_state_var, wraplength=380, justify="left").grid(
+            row=2, column=0, columnspan=2, sticky="w", padx=4, pady=(4, 4))
+
+    # Tool-specific self-test steps: (description, cmd_id_or_None, cmd_data,
+    # expect_id_or_None). Every command here is a safe, at-rest value
+    # (0 setpoint, 0 speed, 0 power) - this verifies the communication
+    # round-trip works, not that an actuator physically responds, since
+    # confirming the latter needs a human watching anyway. Tools with no
+    # telemetry (plain motion) or that are purely event-driven (scan
+    # probe) get an info-only entry rather than a real pass/fail, since
+    # there's nothing to safely verify without a physical trigger.
+    _SELF_TEST_STEPS = {
+        0: [("Soldering iron: safe setpoint (0°C) elicits telemetry",
+             CAN_ID_SOLDER_SETPOINT, struct.pack(">H", 0), CAN_ID_SOLDER_TELEMETRY)],
+        5: [("Drill: safe speed (0) elicits telemetry",
+             CAN_ID_DRILL_CMD, bytes([0, 0]), CAN_ID_DRILL_TELEMETRY)],
+        9: [("Laser: safe power/interlock (0/0) elicits endstop telemetry",
+             CAN_ID_LASER_CMD, bytes([0, 0]), CAN_ID_LASER_TELEMETRY)],
+        10: [("3D printer: safe nozzle setpoint (0°C) elicits hotend telemetry",
+              CAN_ID_3DP_THERMAL_MOTION, struct.pack(">H", 0) + bytes([0, 0, 0, 0]), CAN_ID_3DP_HOTEND_TELEM)],
+        8: [("AOI: endstop telemetry arrives (no command needed - continuous)", None, None, CAN_ID_AOI_TELEMETRY)],
+        4: [("Vacuum: ADC telemetry arrives (no command needed - continuous)", None, None, CAN_ID_VACUUM_TELEMETRY)],
+        11: [("Scan probe is event-driven (only sends on physical impact) - "
+              "cannot verify without triggering it by hand", None, None, None)],
+    }
+    _MOTION_TOOL_IDS = (1, 2, 3, 6, 7)
+
+    def _run_self_test(self):
+        if self.bus is None:
+            messagebox.showerror("Not connected", "Connect to the adapter first.")
+            return
+        if self.active_tool_id is None:
+            messagebox.showerror("Not detected", "Run Detect first, so this knows which tool to test.")
+            return
+        steps = self._SELF_TEST_STEPS.get(self.active_tool_id)
+        is_motion = self.active_tool_id in self._MOTION_TOOL_IDS
+        if not messagebox.askyesno(
+            "Run self-test?",
+            "This sends a small number of safe, at-rest commands (setpoint/speed/power "
+            "all 0) to verify the board responds as expected for its detected tool - "
+            "nothing here heats, fires, or spins anything at meaningful power. Continue?",
+        ):
+            return
+
+        win = tk.Toplevel(self.root)
+        win.title(f"Self-Test - {TOOL_NAMES.get(self.active_tool_id, '?')}")
+        win.geometry("480x260")
+        text = tk.Text(win, state="disabled", wrap="word")
+        text.pack(fill="both", expand=True, padx=8, pady=8)
+
+        def _append(line):
+            def _do():
+                if not text.winfo_exists():
+                    return
+                text.config(state="normal")
+                text.insert("end", line + "\n")
+                text.config(state="disabled")
+                text.see("end")
+            self.root.after(0, _do)
+
+        def _worker():
+            _append(f"Testing: {TOOL_NAMES.get(self.active_tool_id, '?')}\n")
+            # Generic checks first - meaningful for every tool.
+            self.bus.send(CAN_ID_QUERY_ACTIVE_TOOL, b"")
+            resp = self.bus.wait_for_one(CAN_ID_ACTIVE_TOOL_RESP, timeout=1.5)
+            ok = resp is not None and len(resp) >= 1 and resp[0] == self.active_tool_id
+            _append(f"[{'PASS' if ok else 'FAIL'}] Active-tool query (0x110) confirms detected tool")
+
+            self.bus.send(CAN_ID_QUERY_VERSION, b"\x00")
+            resp = self.bus.wait_for_one(CAN_ID_VERSION_RESPONSE, timeout=1.5)
+            _append(f"[{'PASS' if resp is not None else 'FAIL'}] Version query (0x7F8) gets a response")
+
+            if is_motion:
+                _append("[INFO] This tool has no telemetry to verify - STEP/DIR/EN "
+                        "commands are one-shot with no response by design.")
+            elif steps:
+                for description, cmd_id, cmd_data, expect_id in steps:
+                    if expect_id is None:
+                        _append(f"[INFO] {description}")
+                        continue
+                    if cmd_id is not None:
+                        self.bus.send(cmd_id, cmd_data)
+                    resp = self.bus.wait_for_one(expect_id, timeout=1.5)
+                    _append(f"[{'PASS' if resp is not None else 'FAIL'}] {description}")
+            else:
+                _append("[INFO] No self-test steps defined for this tool yet.")
+            _append("\nDone.")
+
+        threading.Thread(target=_worker, daemon=True).start()
 
     def _open_bus_monitor(self):
         if self.bus is None:
@@ -1190,11 +1322,13 @@ class TesterGUI:
 
         win = tk.Toplevel(self.root)
         win.title("Raw Bus Monitor")
-        win.geometry("640x420")
+        win.geometry("640x460")
         self._bus_monitor_win = win
         self._bus_monitor_paused = False
         self._bus_monitor_last_tick = None
         self._bus_monitor_row_count = 0
+        self._bus_monitor_window_frames = 0
+        self._bus_monitor_window_bits = 0
 
         top_row = ttk.Frame(win)
         top_row.pack(fill="x", padx=6, pady=6)
@@ -1211,6 +1345,52 @@ class TesterGUI:
             self._bus_monitor_last_tick = None
 
         ttk.Button(top_row, text="Clear", command=_clear).pack(side="left", padx=(8, 0))
+
+        def _export(fmt):
+            rows = [tree.item(item)["values"] for item in tree.get_children()]
+            if not rows:
+                messagebox.showinfo("Nothing to export", "The table is empty.")
+                return
+            ext = ".trc" if fmt == "trc" else ".asc"
+            path = filedialog.asksaveasfilename(defaultextension=ext, filetypes=[(f"{fmt.upper()} files", f"*{ext}")])
+            if not path:
+                return
+            try:
+                with open(path, "w") as f:
+                    if fmt == "trc":
+                        # Simplified PEAK PCAN-View trace format - the key
+                        # structural elements (header, one line per frame
+                        # with index/offset/type/ID/DLC/data), not
+                        # guaranteed byte-identical to what PCAN-View's own
+                        # exporter produces for every possible viewer.
+                        f.write(";$FILEVERSION=1.1\n;$STARTTIME=0\n;$COLUMNS=N,O,T,I,d,l,D\n;\n")
+                        f.write(";   Message Number\n;   Time Offset (ms)\n;   Type\n"
+                                ";   ID (hex)\n;   Data Length Code\n;   Data Bytes (hex)\n")
+                        f.write(";" + "-" * 80 + "\n")
+                        for i, (ts, can_id, dlc, data, dt) in enumerate(rows, start=1):
+                            id_hex = str(can_id).replace("0x", "").zfill(4)
+                            data_hex = str(data).replace(" ", " ") if data != "(empty)" else ""
+                            f.write(f"{i:>6}) {i * 10:>10.1f}  Rx    {id_hex}  {dlc}   {data_hex}\n")
+                    else:
+                        # Simplified Vector ASCII (.asc) trace format -
+                        # same caveat as .trc above: the recognizable shape
+                        # of the format, not a byte-perfect match to every
+                        # CANalyzer/CANoe version's own output.
+                        f.write("date " + time.strftime("%a %b %d %H:%M:%S.000 %Y") + "\n")
+                        f.write("base hex  timestamps absolute\n")
+                        f.write("internal events logged\n")
+                        f.write("Begin Triggerblock " + time.strftime("%a %b %d %H:%M:%S.000 %Y") + "\n")
+                        for i, (ts, can_id, dlc, data, dt) in enumerate(rows):
+                            id_hex = str(can_id).replace("0x", "")
+                            data_hex = str(data) if data != "(empty)" else ""
+                            f.write(f"   {i * 0.01:.6f} 1  {id_hex:<15} Rx   d {dlc} {data_hex}\n")
+                        f.write("End TriggerBlock\n")
+                self.log(f"Exported {len(rows)} frames to {path}")
+            except OSError as e:
+                messagebox.showerror("Export failed", str(e))
+
+        ttk.Button(top_row, text="Export .trc...", command=lambda: _export("trc")).pack(side="left", padx=(8, 0))
+        ttk.Button(top_row, text="Export .asc...", command=lambda: _export("asc")).pack(side="left", padx=(4, 0))
         ttk.Label(
             top_row, text="Shows every frame seen, any ID - independent of the active tool panel.",
             foreground="gray",
@@ -1219,7 +1399,7 @@ class TesterGUI:
         columns = ("time", "id", "dlc", "data", "dt")
         tree = ttk.Treeview(win, columns=columns, show="headings", height=18)
         for col, label, width in (
-            ("time", "Time", 90), ("id", "ID", 60), ("dlc", "DLC", 40),
+            ("time", "Time", 90), ("id", "ID", 160), ("dlc", "DLC", 40),
             ("data", "Data (hex)", 220), ("dt", "Δt (ms)", 70),
         ):
             tree.heading(col, text=label)
@@ -1237,10 +1417,24 @@ class TesterGUI:
             self._bus_monitor_last_tick = now
             ts = time.strftime("%H:%M:%S", time.localtime(now)) + f".{int(now * 1000) % 1000:03d}"
 
+            # Approximate bit count for this frame - standard 11-bit-ID CAN
+            # framing overhead (SOF, ID, control, CRC, ACK, EOF, IFS) is
+            # about 47 bits before bit-stuffing, plus 8 bits per data byte.
+            # Bit-stuffing itself isn't modeled (it depends on the actual
+            # bit pattern, not just the frame length), so this is a
+            # deliberately approximate, likely-slight-underestimate - a
+            # diagnostic aid for spotting gross bus loading, not a
+            # certified measurement.
+            self._bus_monitor_window_bits += 47 + 8 * len(data)
+            self._bus_monitor_window_frames += 1
+
             def _append():
                 if not tree.winfo_exists():
                     return
-                tree.insert("", "end", values=(ts, f"0x{can_id:03X}", len(data), data.hex(" "), dt_ms))
+                id_display = f"0x{can_id:03X}"
+                if can_id in CUSTOM_ID_NAMES:
+                    id_display += f" ({CUSTOM_ID_NAMES[can_id]})"
+                tree.insert("", "end", values=(ts, id_display, len(data), data.hex(" "), dt_ms))
                 self._bus_monitor_row_count += 1
                 if self._bus_monitor_row_count > 500:
                     # Bounded, same reasoning as every other unbounded-growth
@@ -1255,6 +1449,23 @@ class TesterGUI:
             self.root.after(0, _append)
 
         self.bus.register_sniffer(_on_frame)
+
+        stats_var = tk.StringVar(value="Frames/s: -- | Bus load: -- % (approx, 500 kbit/s)")
+        ttk.Label(win, textvariable=stats_var, foreground="gray").pack(
+            side="bottom", fill="x", padx=6, pady=(0, 6))
+
+        def _update_stats():
+            if not win.winfo_exists():
+                return
+            frames = self._bus_monitor_window_frames
+            bits = self._bus_monitor_window_bits
+            self._bus_monitor_window_frames = 0
+            self._bus_monitor_window_bits = 0
+            load_pct = min(100.0, bits / 500000 * 100)
+            stats_var.set(f"Frames/s: {frames} | Bus load: {load_pct:.1f}% (approx, 500 kbit/s)")
+            win.after(1000, _update_stats)
+
+        win.after(1000, _update_stats)
 
         def _on_close():
             self.bus.unregister_sniffer(_on_frame) if self.bus is not None else None
@@ -1398,23 +1609,23 @@ class TesterGUI:
         self.spi_response_var.set(rx_bytes.hex(" ") if rx_bytes else "(empty)")
         self.log(f"Sent 0x180 ({tx_bytes.hex(' ')}), received back: {rx_bytes.hex(' ')}")
 
-    def _query_eeprom_state(self):
+    def _query_fram_state(self):
         if self.bus is None:
             messagebox.showerror("Not connected", "Connect to the adapter first.")
             return
-        self.bus.send(CAN_ID_QUERY_EEPROM_STATE, b"")
-        response = self.bus.wait_for_one(CAN_ID_EEPROM_STATE_RESP, timeout=1.0)
-        self._show_eeprom_state(response)
+        self.bus.send(CAN_ID_QUERY_FRAM_STATE, b"")
+        response = self.bus.wait_for_one(CAN_ID_FRAM_STATE_RESP, timeout=1.0)
+        self._show_fram_state(response)
 
-    def _show_eeprom_state(self, response):
+    def _show_fram_state(self, response):
         if response is None or len(response) < 8:
-            self.eeprom_state_var.set("No response - board not running this firmware version, or not connected.")
+            self.fram_state_var.set("No response - board not running this firmware version, or not connected.")
             self.log("Queried 0x190 - no 0x191 response.")
             return
         valid, tool_id, had_error, temp_hi, temp_lo, speed, dir_or_interlock, fan = response[:8]
         if not valid:
-            self.eeprom_state_var.set("No valid saved state (blank EEPROM, or nothing saved yet).")
-            self.log("EEPROM state: nothing valid saved.")
+            self.fram_state_var.set("No valid saved state (uninitialized F-RAM, or nothing saved yet).")
+            self.log("F-RAM state: nothing valid saved.")
             return
         temp = (temp_hi << 8) | temp_lo
         tool_name = TOOL_NAMES.get(tool_id, f"unknown ({tool_id})")
@@ -1422,30 +1633,30 @@ class TesterGUI:
                 f"Temperature setpoint: {temp}°C  |  Speed/power: {speed}  |  "
                 f"Direction/interlock: {'on' if dir_or_interlock else 'off'}  |  Fan: {fan}\n"
                 f"Critical error active at last save: {'YES' if had_error else 'no'}")
-        self.eeprom_state_var.set(text)
-        self.log(f"EEPROM state: tool={tool_name}, temp={temp}, speed/power={speed}, "
+        self.fram_state_var.set(text)
+        self.log(f"F-RAM state: tool={tool_name}, temp={temp}, speed/power={speed}, "
                   f"dir/interlock={dir_or_interlock}, fan={fan}, had_error={had_error}")
 
-    def _erase_eeprom(self):
+    def _erase_fram(self):
         if self.bus is None:
             messagebox.showerror("Not connected", "Connect to the adapter first.")
             return
         if not messagebox.askyesno(
-            "Erase EEPROM?",
+            "Erase F-RAM?",
             "This permanently erases the saved parameter state on the board's "
-            "persistence EEPROM. This cannot be undone. Continue?",
+            "persistence F-RAM. This cannot be undone. Continue?",
             icon="warning",
         ):
             return
-        self.bus.send(CAN_ID_ERASE_EEPROM, ERASE_EEPROM_MAGIC)
-        response = self.bus.wait_for_one(CAN_ID_EEPROM_STATE_RESP, timeout=1.0)
+        self.bus.send(CAN_ID_ERASE_FRAM, ERASE_FRAM_MAGIC)
+        response = self.bus.wait_for_one(CAN_ID_FRAM_STATE_RESP, timeout=1.0)
         if response is None:
-            self.log("Sent EEPROM erase (0x192) - no confirmation response received.")
+            self.log("Sent F-RAM erase (0x192) - no confirmation response received.")
             messagebox.showwarning("No confirmation", "Erase command sent, but no response came back to confirm it.")
             return
-        self.log("EEPROM erased and confirmed.")
-        self._show_eeprom_state(response)
-        messagebox.showinfo("Erased", "EEPROM erased and confirmed by the board.")
+        self.log("F-RAM erased and confirmed.")
+        self._show_fram_state(response)
+        messagebox.showinfo("Erased", "F-RAM erased and confirmed by the board.")
 
     # -------------------------------------------------------------------
     # Per-tool panels. Each is only ever built for the ONE tool the board
@@ -1506,6 +1717,46 @@ class TesterGUI:
         except tk.TclError:
             return default
 
+    def _create_live_graph(self, parent, y_max, width=340, height=100, max_points=60):
+        """Builds a simple live-scrolling line graph on a plain Canvas -
+        deliberately not matplotlib/pyqtgraph, to keep this project at
+        zero non-stdlib dependencies beyond pyserial. Y axis is fixed at
+        0..y_max (the tool's own known setpoint ceiling, e.g. 450 for the
+        soldering iron) rather than auto-scaling to whatever's been seen -
+        a fixed, predictable scale is easier to read at a glance than one
+        that keeps shifting. Returns add_point(value); each call appends
+        one value and redraws, dropping the oldest once max_points is
+        reached (a rolling window, not an ever-growing history - this is
+        for watching a live trend, not logging one)."""
+        canvas = tk.Canvas(parent, width=width, height=height, bg="#1a1a1a", highlightthickness=1,
+                           highlightbackground="#444")
+        canvas.pack(fill="x", padx=4, pady=(2, 6))
+        values = []
+
+        def add_point(value):
+            values.append(max(0, min(y_max, value)))
+            if len(values) > max_points:
+                values.pop(0)
+            if not canvas.winfo_exists():
+                return
+            canvas.delete("all")
+            # Faint horizontal gridlines at 0%/50%/100% of y_max, purely
+            # for scale reference.
+            for frac in (0.0, 0.5, 1.0):
+                y = height - frac * height
+                canvas.create_line(0, y, width, y, fill="#333")
+            if len(values) < 2:
+                return
+            step_x = width / max(1, max_points - 1)
+            points = []
+            for i, v in enumerate(values):
+                x = i * step_x
+                y = height - (v / y_max) * height
+                points.extend([x, y])
+            canvas.create_line(*points, fill="#00ADB5", width=2, smooth=False)
+
+        return add_point
+
     def _build_soldering_iron_panel(self, parent):
         setpoint = tk.IntVar(value=0)
         active = tk.BooleanVar(value=False)
@@ -1537,6 +1788,9 @@ class TesterGUI:
         ttk.Label(parent, textvariable=temp_var, font=("", 11, "bold")).grid(row=2, column=1, sticky="w")
         ttk.Label(parent, text="Endstop / limit switch:").grid(row=3, column=0, sticky="w", padx=4, pady=2)
         ttk.Label(parent, textvariable=endstop_var).grid(row=3, column=1, sticky="w")
+        graph_frame = ttk.Frame(parent)
+        graph_frame.grid(row=4, column=0, columnspan=3, sticky="w", padx=4)
+        add_temp_point = self._create_live_graph(graph_frame, y_max=450)
 
         def _on_telemetry(data):
             if len(data) < 3:
@@ -1545,6 +1799,7 @@ class TesterGUI:
             endstop = data[2]
             self.root.after(0, lambda: temp_var.set(f"{temp} °C"))
             self.root.after(0, lambda: endstop_var.set("TRIGGERED" if endstop else "open"))
+            self.root.after(0, lambda: add_temp_point(temp))
 
         self.bus.register(CAN_ID_SOLDER_TELEMETRY, _on_telemetry)
 
@@ -1863,12 +2118,16 @@ class TesterGUI:
         ttk.Label(parent, textvariable=layer_rpm_var).grid(row=11, column=1, sticky="w")
         ttk.Label(parent, text="Hotend fan RPM:").grid(row=12, column=0, sticky="w", padx=4, pady=2)
         ttk.Label(parent, textvariable=hotend_rpm_var).grid(row=12, column=1, sticky="w")
+        graph_frame = ttk.Frame(parent)
+        graph_frame.grid(row=13, column=0, columnspan=4, sticky="w", padx=4)
+        add_nozzle_temp_point = self._create_live_graph(graph_frame, y_max=300)
 
         def _on_hotend_temp(data):
             if len(data) < 2:
                 return
             temp = struct.unpack(">H", data[0:2])[0]
             self.root.after(0, lambda: hotend_temp_var.set(f"{temp} °C"))
+            self.root.after(0, lambda: add_nozzle_temp_point(temp))
 
         def _on_layer_rpm(data):
             if len(data) < 2:
@@ -1982,7 +2241,7 @@ def _show_splash_then(root, on_done):
 def main():
     root = tk.Tk()
     root.withdraw()
-    root.geometry(_center_geometry(root, 1116, 1220))
+    root.geometry(_center_geometry(root, 1250, 1260))
     app = TesterGUI(root)
 
     def _reveal_main():

@@ -18,7 +18,7 @@ Here is the complete breakdown of what it is, what it does, and the hardware eco
 
 ## ⚙️ What is URTC?
 
-URTC is an all-in-one, compact control board powered by an STM32 microcontroller (STM32F303CCT6, LQFP48). It communicates with the main robot controller via CAN bus, allowing for real-time, low-latency execution of complex tasks right at the tool head or axis. It features an onboard OLED display for instant diagnostics — animated boot splash, per-tool animated icons, live telemetry on a two-tone panel — a single-pixel RGB status LED plus an addressable RGB LED ring for camera illumination, a 20-pin expansion connector for add-on boards, an onboard EEPROM that persists the active tool's setpoints across a power loss, and dedicated analog and high-current power stages.
+URTC is an all-in-one, compact control board powered by an STM32 microcontroller (STM32F303CCT6, LQFP48). It communicates with the main robot controller via CAN bus, allowing for real-time, low-latency execution of complex tasks right at the tool head or axis. It features an onboard OLED display for instant diagnostics — animated boot splash, per-tool animated icons, live telemetry on a two-tone panel — a single-pixel RGB status LED plus an addressable RGB LED ring for camera illumination, a 20-pin expansion connector for add-on boards, an onboard F-RAM that persists the active tool's setpoints across a power loss, and dedicated analog and high-current power stages.
 
 ## 🛠️ Scalable Architecture & Tool Matrix
 
@@ -42,7 +42,7 @@ A 20-pin header, separate from the tool-specific connectors, for add-on boards t
 
 | Pins | Signal |
 |---|---|
-| 2 | 24V |
+| 4 | 24V |
 | 1 | 3.3V |
 | 1 | 5V |
 | 3 | GND |
@@ -51,7 +51,6 @@ A 20-pin header, separate from the tool-specific connectors, for add-on boards t
 | 4 | Bit-banged SPI (CS/SCK/MISO/MOSI) — for a TMC5160's configuration/diagnostics interface, or any other SPI-configurable chip |
 | 1 | General-purpose GPIO (EXTI-capable interrupt input if a future add-on needs a fast sensor response, e.g. an endstop) |
 | 1 | TMC5160 DIAG0 (stall/fault diagnostic line, polled via `0x182`/`0x183`) |
-| 2 | Reserved, currently no-connects — see `PINOUT_CONNECTORS.TXT` |
 
 20 pins total.
 
@@ -63,7 +62,7 @@ Full pin-by-pin detail — which MCU pin backs which signal, and the reasoning b
 
 ## 💾 Parameter Persistence
 
-An onboard FM24CL64B EEPROM (F-RAM 64Kbit, I2C) keeps a periodically-updated snapshot of the active tool's setpoints and the global LED/OLED settings, so a sudden power loss doesn't leave "what was this board doing" as unknowable as the loss itself was unplanned. It shares the OLED's I2C1 bus rather than getting one of its own — this MCU only has two I2C peripherals total, and both were already spoken for (see `firmware/README.md` section 6 for the full reasoning).
+An onboard FM24CL64B F-RAM (64Kbit, I2C) keeps a periodically-updated snapshot of the active tool's setpoints and the global LED/OLED settings, so a sudden power loss doesn't leave "what was this board doing" as unknowable as the loss itself was unplanned. It shares the OLED's I2C1 bus rather than getting one of its own — this MCU only has two I2C peripherals total, and both were already spoken for (see `firmware/README.md` section 6 for the full reasoning).
 
 **Recovered state is queryable, never auto-applied to anything hazardous.** On boot, whatever was saved becomes readable over CAN (`0x190`/`0x191`) — but a heater setpoint, laser power, or motor command is never silently re-armed on its own. Only the safe, passive settings (LED colors, OLED mode) get restored directly. Deliberately re-sending a setpoint after actually reviewing what happened is left as the master controller's call, not something this board decides by itself the instant power comes back.
 
@@ -457,12 +456,13 @@ always move together.
 | Version | Notes |
 |---|---|
 | **1.0.0** | Initial versioned release. HMAC-SHA256 signed OTA updates, golden-image A/B backup slot, and `0x7FA` - the bootloader's own version, reported alongside `0x7F9` (the installed application's version) whenever the bootloader itself answers a version query. |
+| **1.0.1** | Anti-rollback protection (a validly-signed image older than what's installed is rejected - `0x05` verify-fail reason `0x05`), stricter jump-to-application checks (stack alignment, Thumb-state and address-range validation on the reset vector), a corrected RAM bound matching this chip's actual 40KB of contiguous SRAM, and general hardening around the OLED/CAN/flash timing paths. |
 
 ## 🔍 Current Status
 
 The core firmware is built as a highly optimized, single-file monolithic architecture to ensure deterministic timing (hardware ISRs drive everything from OLED rendering to the diagnostic LED heartbeat).
 
-**Firmware (`STM32F303CC.C`):** feature-complete for all 12 tool profiles — thermal PID control, per-tool telemetry, communication watchdogs, stall/fault detection, and the OLED's own live diagnostics, alongside an active-tool query pair (`0x110`/`0x111`), a generic SPI passthrough (`0x180`/`0x181`) for the expansion connector, and an onboard EEPROM that persists setpoints across a power loss (`0x190`/`0x191`). Versioned independently of the bootloader (see the Changelog below).
+**Firmware (`STM32F303CC.C`):** feature-complete for all 12 tool profiles — thermal PID control, per-tool telemetry, communication watchdogs, stall/fault detection, and the OLED's own live diagnostics, alongside an active-tool query pair (`0x110`/`0x111`), a generic SPI passthrough (`0x180`/`0x181`) for the expansion connector, and an onboard F-RAM that persists setpoints across a power loss (`0x190`/`0x191`). Versioned independently of the bootloader (see the Changelog below).
 
 **Bootloader (`BOOTLOADER.C`):** feature-complete golden-image A/B update system — HMAC-SHA256 signed OTA updates over CAN, a backup slot that guarantees a failed update never bricks the board, and its own version reporting (`0x7FA`) independent of the application. Compiles and links clean; see the bench-test caveat above before trusting it unattended with real actuators connected.
 

@@ -98,10 +98,10 @@ CAN_ID_HEARTBEAT        = 0x7F6
 CAN_ID_HMAC_CHUNK       = 0x7F7
 CAN_ID_QUERY_VERSION    = 0x7F8
 CAN_ID_VERSION_RESPONSE = 0x7F9
-CAN_ID_QUERY_EEPROM_STATE = 0x190  # Query the FL24LC64's recovered state (application-side, not the bootloader)
-CAN_ID_EEPROM_STATE_RESP = 0x191   # Answers CAN_ID_QUERY_EEPROM_STATE, also sent after an erase
-CAN_ID_ERASE_EEPROM = 0x192        # Magic-payload erase - see ERASE_EEPROM_MAGIC below
-ERASE_EEPROM_MAGIC = bytes([0xE3, 0xA5, 0xE0, 0xFF])
+CAN_ID_QUERY_FRAM_STATE = 0x190  # Query the FM24CL64B's recovered state (application-side, not the bootloader)
+CAN_ID_FRAM_STATE_RESP = 0x191   # Answers CAN_ID_QUERY_FRAM_STATE, also sent after an erase
+CAN_ID_ERASE_FRAM = 0x192        # Magic-payload erase - see ERASE_FRAM_MAGIC below
+ERASE_FRAM_MAGIC = bytes([0xE3, 0xA5, 0xE0, 0xFF])
 CAN_ID_BOOTLOADER_VERSION_RESPONSE = 0x7FA  # sent only by the bootloader, alongside 0x7F9, when it's the one answering
 
 STATUS_NAMES = {
@@ -1717,23 +1717,23 @@ class URTCFlasher:
                 return data
         raise FlashError(f"Timed out waiting for CAN ID 0x{expected_id:03X}")
 
-    def erase_eeprom(self):
+    def erase_fram(self):
         """Sends 0x192 (magic-payload erase) to a currently-running
-        application, wiping the persistence EEPROM's saved state. Only
+        application, wiping the persistence F-RAM's saved state. Only
         the application handles this - the bootloader doesn't - so this
         has to run before trigger_bootloader_entry(), not after. A missing
         confirmation is logged, not raised - this is a secondary, optional
         step alongside the actual firmware update, and losing just the
         confirmation frame shouldn't abort the whole flash the way a
         genuine protocol failure in flash() itself should."""
-        self.log("Erasing persistence EEPROM (0x192)...")
-        self.can.send_frame(CAN_ID_ERASE_EEPROM, ERASE_EEPROM_MAGIC)
+        self.log("Erasing persistence F-RAM (0x192)...")
+        self.can.send_frame(CAN_ID_ERASE_FRAM, ERASE_FRAM_MAGIC)
         try:
-            self._wait_for(CAN_ID_EEPROM_STATE_RESP, timeout=2.0)
-            self.log("EEPROM erase confirmed.")
+            self._wait_for(CAN_ID_FRAM_STATE_RESP, timeout=2.0)
+            self.log("F-RAM erase confirmed.")
         except FlashError:
-            self.log("EEPROM erase sent, but got no confirmation within 2s - "
-                      "continuing with the flash anyway. Check the EEPROM state "
+            self.log("F-RAM erase sent, but got no confirmation within 2s - "
+                      "continuing with the flash anyway. Check the F-RAM state "
                       "separately (e.g. via URTC Tester) if this matters.")
 
     def trigger_bootloader_entry(self):
@@ -2106,11 +2106,11 @@ class FlasherGUI:
             foreground="gray", wraplength=380, justify="left",
         ).grid(row=1, column=0, columnspan=3, sticky="w", padx=8)
 
-        self.erase_eeprom_var = tk.BooleanVar(value=False)
+        self.erase_fram_var = tk.BooleanVar(value=False)
         ttk.Checkbutton(
             act_frame,
-            text="Also erase the persistence EEPROM before flashing",
-            variable=self.erase_eeprom_var,
+            text="Also erase the persistence F-RAM before flashing",
+            variable=self.erase_fram_var,
         ).grid(row=2, column=0, columnspan=3, sticky="w", **pad)
         ttk.Label(
             act_frame,
@@ -2698,14 +2698,14 @@ class FlasherGUI:
                 progress_cb=lambda pct: self.root.after(0, lambda: self.progress.configure(value=pct)),
                 stop_flag=lambda: self._stop_requested,
             )
-            if self.erase_eeprom_var.get():
+            if self.erase_fram_var.get():
                 if not self.trigger_var.get():
-                    self.log("Skipping EEPROM erase: needs the application running "
+                    self.log("Skipping F-RAM erase: needs the application running "
                               "(the trigger checkbox above is unchecked, so the board "
                               "is assumed to already be in the bootloader, which doesn't "
                               "handle this command).")
                 else:
-                    flasher.erase_eeprom()
+                    flasher.erase_fram()
             if self.trigger_var.get():
                 flasher.trigger_bootloader_entry()
             flasher.flash(self.firmware_path)

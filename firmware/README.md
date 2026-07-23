@@ -250,12 +250,22 @@ identification.
 
 ---
 
-## 6. Parameter persistence — FL24LC64 EEPROM (shared I2C1)
+## 6. Parameter persistence — FM24CL64B F-RAM (shared I2C1)
 
-A 64Kbit I2C EEPROM, directly soldered to the board (no connector), holds
+A 64Kbit I2C F-RAM, directly soldered to the board (no connector), holds
 a periodically-updated snapshot of the active tool's setpoints and the
 global LED/OLED settings — so a sudden power loss doesn't leave "what was
 this board doing" as unknowable as the loss itself was unplanned.
+
+**F-RAM, not EEPROM:** pin/protocol-compatible with a serial I2C EEPROM of
+the same capacity (same control-byte/address scheme - it's a drop-in
+replacement by design), but the underlying memory technology is
+genuinely different in ways that matter here. Confirmed against the
+official datasheet: writes complete at bus speed with no internal write
+cycle to wait for ("NoDelay" writes - by the time a new bus transaction
+could be shifted in, the previous write is already done, unlike an actual
+EEPROM's multi-millisecond write cycle), and endurance is rated in the
+trillions of cycles rather than an EEPROM's typical ~1 million.
 
 **Why I2C1, not a bus of its own:** confirmed against ST's own product
 page for this exact part, the STM32F303CC has **only two I2C peripherals
@@ -267,7 +277,7 @@ either: every other GPIO pin on this board is already committed to
 something (see section on `CONN_EXPANSION` in
 `PINOUT_CONNECTORS.TXT`). Sharing I2C1 (not I2C2) is deliberate: I2C2
 stays reserved purely for whatever an unknown future expansion board
-turns out to need, while this EEPROM is a core board component - it
+turns out to need, while this F-RAM is a core board component - it
 makes more sense paired with the OLED, another core component this
 firmware already knows how to share a bus with correctly, than diluting
 the connector's own dedicated bus. Address `0x50` (A0/A1/A2 tied to GND)
@@ -279,17 +289,19 @@ printer nozzle - only one is ever relevant for a board's fixed
 fan speeds, the status/ring LED colors, OLED night mode, and whether a
 critical error was active at the moment of the last save. A simple
 additive checksum (not the OTA update's HMAC-SHA256 - proportionate to
-what this actually needs to catch: a blank chip or an interrupted write,
-not a security boundary) guards against trusting a corrupted or
-never-written record.
+what this actually needs to catch: an uninitialized chip or an
+interrupted write, not a security boundary) guards against trusting a
+corrupted or never-written record.
 
 **Written periodically, not on every change** — checked every 500ms,
 actually written only when something differs from what's already on the
 chip, and even then rate-limited to at most once every 3 seconds. This
-EEPROM family is rated for roughly a million write cycles per address;
-comfortably enough for occasional real changes over the life of the
-board, but not something to spend carelessly if a setpoint were ever
-changed in a tight loop somewhere.
+isn't protecting a limited write-cycle budget the way it would need to
+for a real EEPROM - the F-RAM's endurance is effectively unlimited for
+anything this board would ever do. The interval is kept anyway for a more
+mundane reason: if a setpoint were ever adjusted rapidly (a UI slider
+being dragged, say), there's no reason to write every single
+intermediate value instead of just the one it settles on.
 
 **Deliberately does not auto-resume anything hazardous.** On boot, the
 saved record is loaded into RAM and made queryable over CAN (`0x190`/

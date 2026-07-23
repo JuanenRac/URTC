@@ -82,13 +82,13 @@ PA10  -> STM_SDA (Hardware I2C1_SDA, AF4) - OLED bus.
            the expansion connector's separate I2C2. Deliberately kept apart
            so nothing on an expansion board can stretch the clock or
            otherwise interfere with the OLED's own timing.
-         * ALSO carries the FL24LC64 parameter-persistence EEPROM (address
+         * ALSO carries the FM24CL64B parameter-persistence F-RAM (address
            0x50, A0/A1/A2 tied to GND) - this chip only has two I2C
            peripherals total (confirmed against ST's own product page:
            "up to two I2Cs" for this density variant), both already
            committed to the OLED and the expansion connector respectively,
-           so the EEPROM shares I2C1 rather than getting a bus of its own.
-           See firmware/README.md section 8 for the full reasoning and
+           so the F-RAM shares I2C1 rather than getting a bus of its own.
+           See firmware/README.md section 6 for the full reasoning and
            BOM.TXT for the part itself.
 
 -----------------------------------------------------------------------------

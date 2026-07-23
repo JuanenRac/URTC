@@ -56,7 +56,7 @@ PIN | SIGNAL    | FIRMWARE LOGIC FUNCTION
 4   | SDA       | PA10 (Hardware I2C1_SDA, AF4)
     |           | R33/R34, 4.7kOhm pull-ups to +3.3V.
     |           | NOTE: this same I2C1 bus (PA9/PA10) also reaches the on-board
-    |           | FL24LC64 parameter-persistence EEPROM - a directly-soldered
+    |           | FM24CL64B parameter-persistence F-RAM - a directly-soldered
     |           | chip with no connector of its own, not something plugged in
     |           | here. See PINOUT.TXT's I2C1 block and BOM.TXT for the part.
 
@@ -187,31 +187,38 @@ PIN | SIGNAL    | FIRMWARE LOGIC FUNCTION
 PIN | SIGNAL         | FUNCTION
 ------------------------------------------------------------------------------------------------
 1   | +24V           | Main rail passthrough
-2   | GND            | Ground
-3   | +5V            | Logic power
-4   | EXP_SPI_MOSI   | PB15 - bit-banged (software) SPI, not a hardware peripheral -
-    |                | see the SPI note below for the reasoning.
+2   | +24V           | Main rail passthrough (second pin)
+3   | GND            | Ground
+4   | +5V            | Logic power
 5   | EXP_TMC_STEP   | PB12 - STEP pulses. Universal to any STEP/DIR driver on the
     |                | expansion board (TMC2209 and TMC5160 both use this the same way)
 6   | EXP_TMC_EN     | PB14 - driver enable, universal same as EXP_TMC_STEP
 7   | EXP_I2C2_SCL   | PB10 - own bus, separate from the OLED's I2C1. R48 (4.7k to
     |                | +3.3V) populated as an external pull-up
-8   | EXP_SPI_CS     | PA2 - bit-banged, same bus as EXP_SPI_MOSI
-9   | EXP_SPI_MISO   | PB8 - bit-banged, same bus as EXP_SPI_MOSI
+8   | EXP_SPI_CS     | PA2 - bit-banged (software) SPI, not a hardware peripheral -
+    |                | see the SPI note below for the reasoning.
+9   | EXP_SPI_MISO   | PB8 - bit-banged, same bus as EXP_SPI_CS
 10  | EXP_GPIO1      | PC14 - general purpose, EXTI-capable if a future add-on needs
     |                | a fast interrupt-driven input, e.g. an endstop
 11  | EXP_TMC_DIAG0  | PC15 - a TMC5160's stall/fault diagnostic line, using the same
     |                | EXTI-capable headroom as EXP_GPIO1 - see the DIAG0 note below.
-12  | (no-connect)   | Reserved for future use.
-13  | EXP_SPI_SCK    | PB2 - bit-banged, same bus as EXP_SPI_MOSI
+12  | EXP_SPI_MOSI   | PB15 - bit-banged, same bus as EXP_SPI_CS
+13  | EXP_SPI_SCK    | PB2 - bit-banged, same bus as EXP_SPI_CS
 14  | EXP_I2C2_SDA   | PB11. R44 (4.7k to +3.3V) populated as an external pull-up
-15  | (no-connect)   | Reserved for future use.
-16  | EXP_TMC_DIR    | PB13 - direction, universal same as EXP_TMC_STEP
-17  | GND            | Ground
-18  | +3V3           | Logic power
-19  | GND            | Ground
-20  | +24V           | Main rail passthrough (second pin, for higher-current add-ons)
+15  | EXP_TMC_DIR    | PB13 - direction, universal same as EXP_TMC_STEP
+16  | GND            | Ground
+17  | +3V3           | Logic power
+18  | GND            | Ground
+19  | +24V           | Main rail passthrough (third pin, for higher-current add-ons)
+20  | +24V           | Main rail passthrough (fourth pin, for higher-current add-ons)
     |                |
+    | NOTE: 4 pins of +24V (was 2) and no no-connects remain, since a
+    |       schematic revision reorganized this connector for exactly
+    |       that: more current headroom on the main rail for a future
+    |       add-on driving a real motor, and every pin actually doing
+    |       something. Every MCU-side pin assignment is unchanged from
+    |       before this reorganization - only which physical connector
+    |       pin number each signal lands on moved.
     | NOTE - why bit-banged SPI, not a hardware peripheral: this chip's
     |       hardware SPI2 defaults to PB12/13/14/15, which this board already
     |       uses for EXP_TMC_STEP/DIR/EN/EXP_SPI_MOSI, so a hardware SPI2
@@ -253,14 +260,14 @@ PIN | SIGNAL         | FUNCTION
     |       only EXP_TMC_STEP/DIR/EN plus its own single-wire UART
     |       (TMCUART, half-duplex), never the 4 EXP_SPI_* pins, which have
     |       no meaning to that chip at all. Since the two populate options
-    |       are mutually exclusive on any given board, EXP_SPI_MOSI (pin 4)
+    |       are mutually exclusive on any given board, EXP_SPI_MOSI (pin 12)
     |       doubles as a natural home for a TMC2209's single UART line when
     |       that's the chip actually populated - no separate dedicated UART
     |       pin is needed, since one is never required at the same time as
     |       the SPI bus is. A board wanting both chips populated together
     |       can still wire EXP_TMC_STEP/DIR/EN to both drivers in parallel
     |       like any shared STEP/DIR bus, but the TMC2209 would then need
-    |       its own separate UART pin rather than sharing pin 4 with the
+    |       its own separate UART pin rather than sharing pin 12 with the
     |       TMC5160's MOSI.
 
 ========================================================================================

@@ -151,11 +151,11 @@ Data:
                MCU-side internal pull-up alone provides.
 
 ID: 0x190 [Master -> URTC Tool Head]
-Query recovered EEPROM state
+Query recovered persisted state
 DLC: any (payload ignored)
 Data: none needed
-Effect: answers with 0x191 - whatever was loaded from the FL24LC64
-        persistence EEPROM at boot (see STM32F303CC.C's SavedState_Load).
+Effect: answers with 0x191 - whatever was loaded from the FM24CL64B
+        persistence F-RAM at boot (see STM32F303CC.C's SavedState_Load).
         Read-only, no side effects, and deliberately does NOT itself
         re-apply anything to a live setpoint - see the note on 0x191
         below for why. Answered even during a declared critical error,
@@ -163,12 +163,12 @@ Effect: answers with 0x191 - whatever was loaded from the FL24LC64
         available exactly when something's already gone wrong.
 
 ID: 0x191 [URTC Tool Head -> Master, answers 0x190]
-Recovered EEPROM state response
+Recovered persisted state response
 DLC: 8 bytes
 Data:
   - txData[0]: 1 if a valid saved state was found and loaded, 0 if not
-               (blank/uninitialized EEPROM, checksum mismatch from a
-               corrupted/interrupted save, or the EEPROM didn't respond
+               (uninitialized F-RAM, checksum mismatch from a
+               corrupted/interrupted save, or the chip didn't respond
                at all - all three look the same from here: nothing
                trustworthy to report)
   - txData[1]: which tool profile this saved state was recorded under
@@ -197,7 +197,7 @@ Notes: this is a compact summary, not the full ~26-byte record kept in
        make, not something this board does on its own initiative.
 
 ID: 0x192 [Master -> URTC Tool Head]
-Erase recovered EEPROM state
+Erase recovered persisted state
 DLC: 4 bytes, magic payload E3 A5 E0 FF
 Data:
   - rxData[0..3]: must be exactly E3 A5 E0 FF - any other payload (or any
@@ -205,8 +205,12 @@ Data:
                own magic trigger: a corrupted or malformed frame landing
                on this ID by chance shouldn't be able to wipe a real
                saved record.
-Effect: overwrites the entire saved-state region of the EEPROM with
-        0xFF (matching erased-flash convention), clears recovered_state
+Effect: overwrites the entire saved-state region of the F-RAM with
+        0xFF (an arbitrary but definite pattern, guaranteed to fail the
+        magic/checksum check - unlike Flash/EEPROM, F-RAM has no
+        erase-before-write step, so 0xFF has no special hardware
+        significance here beyond being a value this firmware will
+        always recognize as invalid), clears recovered_state
         and had_valid_recovered_state in RAM immediately (not just on
         the next boot), and answers with 0x191 reporting
         had_valid_recovered_state=0 to confirm. Unlike 0x110/0x190,
@@ -531,7 +535,12 @@ Data:
                this project's key) | 0x04 HardwareID mismatch (image built
                for different hardware - checked before a single byte is
                written, reported here for one consistent "why did it fail"
-               path rather than the generic 0xFF error)
+               path rather than the generic 0xFF error) | 0x05 rollback
+               rejected (the image is validly signed, but declares a
+               version older than what's already installed - only
+               enforced when a currently-valid version exists to compare
+               against, never on a blank board or one recovering from
+               corrupted metadata)
 
 ID: 0x7F6 [URTC Tool Head -> Master, sent by the BOOTLOADER, every ~1s
 while listening or mid-update]
@@ -611,9 +620,9 @@ Notes: this is BOOTLOADER.C's own version (BOOTLOADER_VERSION_MAJOR/MINOR/
   0x181 -> Expansion SPI passthrough response (DLC:2-8)
   0x182 -> Query EXP_TMC_DIAG0 level (DLC:any)
   0x183 -> EXP_TMC_DIAG0 level response (DLC:1)
-  0x190 -> Query recovered EEPROM state (DLC:any)
-  0x191 -> Recovered EEPROM state response (DLC:8)
-  0x192 -> Erase recovered EEPROM state, magic payload (DLC:4)
+  0x190 -> Query recovered persisted state (DLC:any)
+  0x191 -> Recovered persisted state response (DLC:8)
+  0x192 -> Erase recovered persisted state, magic payload (DLC:4)
   --- Per-tool commands (see dedicated sections above) ---
   0x120 -> Stepper motor control (Dispensers, Screwdriver, Grippers - DLC:5)
   0x130 -> T12 setpoint temperature (Soldering iron - DLC:2)

@@ -520,12 +520,12 @@ status). This tool and the bootloader agree on this frame format, so
 flash both together if you're building a custom bootloader with a
 different version of the protocol.
 
-## 12. Optional EEPROM erase before flashing
+## 12. Optional F-RAM erase before flashing
 
-Section 3 has a checkbox, **"Also erase the persistence EEPROM before
+Section 3 has a checkbox, **"Also erase the persistence F-RAM before
 flashing"** - off by default. If checked, it sends the magic-payload
 erase command (`0x192` - see `CANBUS.TXT`) to the board's onboard
-FL24LC64 persistence EEPROM before the update sequence starts, wiping
+FM24CL64B persistence F-RAM before the update sequence starts, wiping
 whatever tool-parameter state it had saved.
 
 **Not required for a normal update.** A version mismatch in the saved
@@ -545,7 +545,7 @@ own confirmation frame doesn't come back within 2 seconds, this is logged
 as a warning and the actual firmware update proceeds anyway - erasing is
 a secondary, optional step alongside the real point of this tool, not
 something that should abort an otherwise-successful update over its own
-confirmation frame going missing. Check the EEPROM state separately
+confirmation frame going missing. Check the F-RAM state separately
 (`URTC Tester`'s own Query State button) if that matters to you.
 
 ## Changing the HMAC key / HardwareID
