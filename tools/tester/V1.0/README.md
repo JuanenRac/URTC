@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="/images/URTC_LOGO_TESTER.svg" alt="URTC Tester Logo" width="100%">
+</p>
+
 # URTC Tester (Windows / Linux)
 
 **Version:** 1.0 · **Author:** JuanenRac (Electro Hobby 3D) &lt;electrohobby3d@gmail.com&gt;
