@@ -47,8 +47,18 @@ import subprocess
 import shutil
 import zipfile
 import platform
-import tkinter as tk
-from tkinter import filedialog, messagebox, ttk
+
+# tkinter is only imported when NOT running in --cli mode. As an
+# unconditional module-level import, this previously crashed with
+# ModuleNotFoundError on a genuinely headless system (a CI runner, a
+# server, a Raspberry Pi with no python3-tk installed) even when --cli
+# was explicitly requested - defeating the entire point of having a
+# CLI mode, since that path never touches tkinter at all. Checking
+# sys.argv directly here (rather than waiting for argparse further down)
+# is deliberate: this has to happen before the import is ever attempted.
+if "--cli" not in sys.argv:
+    import tkinter as tk
+    from tkinter import filedialog, messagebox, ttk
 
 try:
     import serial
@@ -115,6 +125,7 @@ VERIFY_FAIL_REASONS = {
     0x02: "CRC32 mismatch (transfer corruption)",
     0x03: "HMAC signature mismatch (not signed with this project's key)",
     0x04: "HardwareID mismatch (image built for different hardware)",
+    0x05: "rollback rejected (older version than what's already installed)",
 }
 
 # THIS_HARDWARE_ID and HMAC_KEY must match BOOTLOADER.C exactly, or every
@@ -245,7 +256,16 @@ def _load_config_overrides(log=None):
             return current
         try:
             val = cfg[name]
+            if isinstance(val, bool):
+                # Python's bool is a subclass of int, so isinstance(val, str)
+                # being False for a bool falls through to int(val) below,
+                # which happily returns 1/0 for True/False with no error at
+                # all - checked explicitly, ahead of that, so a JSON "true"
+                # gets reported as skipped rather than silently becoming 1.
+                raise TypeError(f"{name} must be a number or numeric string, not a boolean")
             result = int(val, 0) if isinstance(val, str) else int(val)
+            if not (0 <= result <= 0xFFFFFFFF):
+                raise ValueError(f"{result} is out of range for a 32-bit value")
             overridden.append(name)
             return result
         except (ValueError, TypeError) as e:
@@ -255,12 +275,16 @@ def _load_config_overrides(log=None):
     if "hardware_id" in cfg:
         try:
             val = cfg["hardware_id"]
+            if isinstance(val, bool):
+                raise TypeError("hardware_id must be a number or numeric string, not a boolean")
             # Accepts either a JSON string ("0x0303CC01" or a plain decimal
             # string) or a plain JSON number (50580689) - both are natural
             # ways to write this in a hand-edited config file, and int()'s
             # own two-argument form only accepts a string for the first
             # argument, raising TypeError on a bare JSON number otherwise.
             hw_id = int(val, 0) if isinstance(val, str) else int(val)
+            if not (0 <= hw_id <= 0xFFFFFFFF):
+                raise ValueError(f"{hw_id} is out of range for a 32-bit HardwareID")
             overridden.append("hardware_id")
         except (ValueError, TypeError) as e:
             skipped.append(f"hardware_id ({e})")
@@ -385,8 +409,8 @@ class SLCAN:
     def send_frame(self, can_id, data):
         # SLCAN standard-frame transmit: "t" + 3 hex ID digits + 1 hex DLC
         # digit + DLC*2 hex data digits, e.g. t7F108 + 8 bytes = t7F1081122334455667788
-        if can_id > 0x7FF:
-            raise SLCANError(f"ID 0x{can_id:X} exceeds standard 11-bit range")
+        if not (0 <= can_id <= 0x7FF):
+            raise SLCANError(f"ID 0x{can_id:X} is outside the standard 11-bit range (0-0x7FF)")
         if len(data) > 8:
             raise SLCANError("CAN data payload cannot exceed 8 bytes")
         frame = f"t{can_id:03X}{len(data):01X}" + "".join(f"{b:02X}" for b in data)
@@ -421,6 +445,16 @@ class SLCAN:
                 if not chunk:
                     continue  # OS-level read timed out with nothing yet - keep going until our own deadline
                 self._rx_buf += chunk
+                if len(self._rx_buf) > 4096:
+                    # No real SLCAN line comes anywhere close to this length
+                    # (a full 8-byte-data standard frame is ~22 characters) -
+                    # this only grows this large if noise, a wrong baudrate,
+                    # or a disconnected adapter is feeding bytes with no \r
+                    # ever showing up. Discarding and starting fresh turns an
+                    # unbounded memory leak into a one-time logged desync,
+                    # and the next real \r (if the link recovers) resyncs
+                    # normally from there.
+                    self._rx_buf = b""
                 continue
             line_bytes, self._rx_buf = self._rx_buf.split(b"\r", 1)
             line = line_bytes.decode("ascii", errors="ignore").strip()
@@ -570,6 +604,7 @@ class SocketCAN:
                 f"interface up in the first place usually needs sudo)."
             )
         self.sock.settimeout(0.05)
+        self._last_timeout = 0.05
 
     def open_channel(self, bitrate_code=None):
         # Deliberately a no-op - see the SOCKETCAN NOTE above. The bitrate
@@ -588,8 +623,8 @@ class SocketCAN:
             pass
 
     def send_frame(self, can_id, data):
-        if can_id > 0x7FF:
-            raise SocketCANError(f"ID 0x{can_id:X} exceeds standard 11-bit range")
+        if not (0 <= can_id <= 0x7FF):
+            raise SocketCANError(f"ID 0x{can_id:X} is outside the standard 11-bit range (0-0x7FF)")
         if len(data) > 8:
             raise SocketCANError("CAN data payload cannot exceed 8 bytes")
         padded = data + bytes(8 - len(data))
@@ -600,7 +635,13 @@ class SocketCAN:
             raise SocketCANError(f"send failed on '{self.interface}': {e}")
 
     def read_frame(self, timeout=0.05):
-        self.sock.settimeout(timeout)
+        # settimeout() is itself a syscall - skipped when the caller asks
+        # for the same value already in effect (the common case: this is
+        # called in a tight polling loop, almost always with the same
+        # fixed timeout each time), rather than re-set on every single call.
+        if timeout != self._last_timeout:
+            self.sock.settimeout(timeout)
+            self._last_timeout = timeout
         try:
             frame = self.sock.recv(self._FRAME_SIZE)
         except socket.timeout:
@@ -627,6 +668,84 @@ class SocketCAN:
         # dlc shouldn't be trusted at face value even though Python's own
         # slicing already caps silently at the buffer's real 8-byte length.
         return (can_id, data[:min(dlc, 8)])
+
+
+class MockCAN:
+    """A simulated transport, implementing the same interface as SLCAN and
+    SocketCAN (open_channel/close_channel/close/send_frame/read_frame),
+    that plays back a plausible bootloader protocol sequence entirely in
+    memory - no real adapter or board needed. Meant for testing this
+    tool's own logic (retry behavior, timeout handling, UI state updates)
+    against a predictable, repeatable simulated peer, not for anything
+    that ships to run against real hardware.
+
+    simulate_failure, when given, makes the simulated update fail
+    verification with that specific VERIFY_FAIL_REASON_* value (see
+    CANBUS.TXT) instead of completing successfully - useful for testing
+    the failure-handling path without needing a board that's actually
+    misconfigured to trigger a real one.
+    """
+
+    def __init__(self, simulate_failure=None, log=None):
+        self.log = log or (lambda msg: None)
+        self.simulate_failure = simulate_failure
+        self._response_queue = []  # list of (can_id, data) tuples awaiting read_frame()
+        self._update_total_size = 0
+        self._update_bytes_received = 0
+        self._next_page_index = 0
+
+    def open_channel(self, bitrate_code=None):
+        pass  # nothing to actually open
+
+    def close_channel(self):
+        pass
+
+    def close(self):
+        pass
+
+    def send_frame(self, can_id, data):
+        if not (0 <= can_id <= 0x7FF):
+            raise SLCANError(f"ID 0x{can_id:X} is outside the standard 11-bit range (0-0x7FF)")
+        if can_id == CAN_ID_QUERY_VERSION:
+            # responder=0x01 (bootloader, matching this simulator's own
+            # role), a plausible fake HardwareID/version, then the
+            # bootloader-specific 0x7FA right alongside it.
+            self._response_queue.append((
+                CAN_ID_VERSION_RESPONSE,
+                bytes([0x01]) + struct.pack(">I", THIS_HARDWARE_ID) + struct.pack(">H", 1) + bytes([0]),
+            ))
+            self._response_queue.append((CAN_ID_BOOTLOADER_VERSION_RESPONSE, bytes([1, 0, 1])))
+        elif can_id == CAN_ID_START_UPDATE:
+            self._update_total_size = struct.unpack(">I", data[0:4])[0]
+            self._update_bytes_received = 0
+            self._next_page_index = 0
+            self._response_queue.append((CAN_ID_STATUS, bytes([0x02])))  # STATUS_ERASING
+            self._response_queue.append((CAN_ID_STATUS, bytes([0x03])))  # STATUS_RECEIVING
+        elif can_id == CAN_ID_HMAC_CHUNK:
+            pass  # no response, matching the real bootloader protocol
+        elif can_id == CAN_ID_DATA:
+            self._update_bytes_received += len(data)
+            page_size = 2048  # matches FLASH_PAGE_SIZE
+            while self._update_bytes_received >= (self._next_page_index + 1) * page_size or (
+                self._update_bytes_received >= self._update_total_size
+                and self._update_bytes_received > self._next_page_index * page_size
+            ):
+                self._response_queue.append((CAN_ID_PAGE_ACK, struct.pack(">I", self._next_page_index)))
+                self._next_page_index += 1
+                if self._next_page_index * page_size >= self._update_total_size:
+                    break
+        elif can_id == CAN_ID_END_UPDATE:
+            self._response_queue.append((CAN_ID_STATUS, bytes([0x06])))  # STATUS_VERIFYING
+            if self.simulate_failure is not None:
+                self._response_queue.append((CAN_ID_STATUS, bytes([0x05, self.simulate_failure])))
+            else:
+                self._response_queue.append((CAN_ID_STATUS, bytes([0x04])))  # verify OK
+
+    def read_frame(self, timeout=0.05):
+        if self._response_queue:
+            time.sleep(0.005)  # a small, fixed delay - realistic enough without slowing tests down
+            return self._response_queue.pop(0)
+        return None
 
 
 # =============================================================================
@@ -722,8 +841,17 @@ class _SubprocessProgrammerBase:
         self.log = log or (lambda msg: None)
         self.exe = None  # set by subclass __init__
 
-    def _looks_like_failure(self, text):
+    def _looks_like_failure(self, text, exclude_args=()):
+        # Strip anything that looks like a real path (contains a path
+        # separator) before scanning - a tool echoing back the exact file
+        # path it was given (a common, ordinary progress message, e.g.
+        # "Loading C:\test_error_logs\app.bin") shouldn't be able to
+        # trigger a false failure just because the user's own folder or
+        # file name happens to contain a word like "error" or "mismatch".
         lower = text.lower()
+        for arg in exclude_args:
+            if ("/" in arg or "\\" in arg) and arg.lower() in lower:
+                lower = lower.replace(arg.lower(), "")
         return any(indicator in lower for indicator in self._FAILURE_INDICATORS)
 
     def _run(self, args, dry_run, timeout=300, check_output=True):
@@ -761,7 +889,7 @@ class _SubprocessProgrammerBase:
             raise SWDFlashError(
                 f"{self.NAME} exited with code {proc.returncode} - see the log above for details"
             )
-        if check_output and self._looks_like_failure(combined):
+        if check_output and self._looks_like_failure(combined, exclude_args=args):
             raise SWDFlashError(
                 f"{self.NAME} exited with code 0, but its own output contains a "
                 f"failure indicator - treating this as a failure rather than "
@@ -904,6 +1032,50 @@ class PyOCDCLI(_SubprocessProgrammerBase):
         self.log("=== pyOCD full-chip program complete ===")
 
 
+def _search_windows_registry_for_stm32cubeprogrammer():
+    """Looks through the standard Windows uninstall-registry keys for an
+    STM32CubeProgrammer install and returns the CLI exe's full path, or
+    None if this isn't Windows, winreg isn't available for some reason,
+    nothing matching is found, or anything about the search goes wrong.
+    Deliberately broad in what it catches (any OSError, not just
+    FileNotFoundError) - a registry access failing in some unexpected way
+    should fall through to the hardcoded path list below, never be fatal
+    to finding the tool at all."""
+    if platform.system() != "Windows":
+        return None
+    try:
+        import winreg
+    except ImportError:
+        return None
+    # Both the 64-bit and WOW6432Node (32-bit apps on 64-bit Windows)
+    # uninstall keys are checked - the installer's own bitness decides
+    # which one it registers under, and that isn't something to assume
+    # either way.
+    uninstall_keys = [
+        r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
+        r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall",
+    ]
+    for key_path in uninstall_keys:
+        try:
+            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key_path) as root_key:
+                for i in range(winreg.QueryInfoKey(root_key)[0]):
+                    try:
+                        subkey_name = winreg.EnumKey(root_key, i)
+                        with winreg.OpenKey(root_key, subkey_name) as subkey:
+                            display_name = winreg.QueryValueEx(subkey, "DisplayName")[0]
+                            if "stm32cubeprogrammer" not in display_name.lower():
+                                continue
+                            install_loc = winreg.QueryValueEx(subkey, "InstallLocation")[0]
+                            candidate = os.path.join(install_loc, "bin", "STM32_Programmer_CLI.exe")
+                            if os.path.isfile(candidate):
+                                return candidate
+                    except OSError:
+                        continue  # this specific subkey didn't have what we needed - keep looking, not fatal
+        except OSError:
+            continue  # this uninstall key doesn't exist on this system - try the other one
+    return None
+
+
 class CubeProgrammerCLI(_SubprocessProgrammerBase):
     NAME = "STM32CubeProgrammer"
 
@@ -920,6 +1092,8 @@ class CubeProgrammerCLI(_SubprocessProgrammerBase):
     def __init__(self, log=None):
         super().__init__(log)
         self.exe = _find_executable(["STM32_Programmer_CLI", "STM32_Programmer_CLI.exe"])
+        if not self.exe:
+            self.exe = _search_windows_registry_for_stm32cubeprogrammer()
         if not self.exe:
             for path in self._FALLBACK_PATHS:
                 if os.path.isfile(path):
@@ -975,7 +1149,7 @@ class CubeProgrammerCLI(_SubprocessProgrammerBase):
             )
         output = self._run(connect_args, dry_run=False, check_output=False)
         lower = output.lower()
-        if self._looks_like_failure(output):
+        if self._looks_like_failure(output, exclude_args=connect_args):
             raise SWDFlashError(
                 "STM32CubeProgrammer's connection check reported a failure - "
                 "see the log above. Check the ST-Link is connected via USB "
@@ -1053,7 +1227,7 @@ class CubeProgrammerCLI(_SubprocessProgrammerBase):
             if m:
                 rdp_level = m.group(1)
 
-        if rdp_level is None and self._looks_like_failure(output):
+        if rdp_level is None and self._looks_like_failure(output, exclude_args=connect):
             raise SWDFlashError(
                 "Couldn't read option bytes - see the log above. Check the "
                 "ST-Link is connected via USB and wired to the chip's SWD pins."
@@ -1106,7 +1280,12 @@ def validate_firmware_file(path):
         return False, f"can't read file: {e}", size
 
     initial_sp, reset_handler = struct.unpack("<II", header[0:8])
-    if not (0x20000000 <= initial_sp <= 0x2000A000):
+    # Lower bound is 0x20000100, not the exact start of RAM: Cortex-M's
+    # stack grows downward, so a stack pointer sitting right at 0x20000000
+    # leaves zero bytes of real headroom before the first PUSH underflows
+    # into whatever precedes RAM in the address space. A small margin
+    # catches this without rejecting a genuinely small-stack build.
+    if not (0x20000100 <= initial_sp <= 0x2000A000):
         return False, (
             f"first word (0x{initial_sp:08X}) doesn't look like a valid "
             f"initial stack pointer for this chip's RAM - probably not a "
@@ -1216,7 +1395,7 @@ def _validate_intel_hex(path, size, max_size, label, expected_base_addr=None):
     for vector_addr in candidates:
         sp_bytes = bytes(data_bytes[vector_addr + i] for i in range(4))
         initial_sp = struct.unpack("<I", sp_bytes)[0]
-        if 0x20000000 <= initial_sp <= 0x2000A000:
+        if 0x20000100 <= initial_sp <= 0x2000A000:
             if expected_base_addr is not None and vector_addr != expected_base_addr:
                 # Found A valid-looking vector table, just not where this
                 # slot expects one - almost always means the wrong file for
@@ -1348,7 +1527,7 @@ def _validate_elf(path, size, max_size, label, expected_base_addr=None):
         if offset + 4 > len(data):
             continue
         initial_sp, = struct.unpack_from("<I", data, offset)
-        if 0x20000000 <= initial_sp <= 0x2000A000:
+        if 0x20000100 <= initial_sp <= 0x2000A000:
             if expected_base_addr is not None and paddr != expected_base_addr:
                 return False, (
                     f"loadable segment found at 0x{paddr:08X}, not the expected "
@@ -1413,7 +1592,7 @@ def validate_swd_image_file(path, max_size, label, expected_base_addr=None):
     except OSError as e:
         return False, f"can't read file: {e}", size
     initial_sp, reset_handler = struct.unpack("<II", header[0:8])
-    if not (0x20000000 <= initial_sp <= 0x2000A000):
+    if not (0x20000100 <= initial_sp <= 0x2000A000):
         return False, (
             f"first word (0x{initial_sp:08X}) doesn't look like a valid "
             f"initial stack pointer for this chip's RAM - probably not a "
@@ -1500,9 +1679,15 @@ class URTCFlasher:
                 return result
         return result
 
-    def _wait_for(self, expected_id, timeout=2.0):
+    def _wait_for(self, expected_id, timeout=2.0, expected_status_value=None):
         """Wait for a specific CAN ID, logging heartbeats/status seen along
-        the way but not treating them as the answer unless they match."""
+        the way but not treating them as the answer unless they match.
+        expected_status_value, when given (only meaningful alongside
+        expected_id=CAN_ID_STATUS), additionally requires data[0] to equal
+        that value before returning - otherwise a status frame carrying a
+        different, intermediate value (e.g. STATUS_ERASING arriving before
+        the STATUS_RECEIVING a caller actually needs) would be accepted as
+        the answer just because the CAN ID matched."""
         deadline = time.time() + timeout
         while time.time() < deadline:
             if self.stop_flag():
@@ -1525,8 +1710,9 @@ class URTCFlasher:
                     self.log(f"  status: {name} - {reason}")
                 else:
                     self.log(f"  status: {name}")
-                if can_id == expected_id:
+                if can_id == expected_id and (expected_status_value is None or data[0] == expected_status_value):
                     return data
+                continue  # a status frame that didn't match - keep waiting, don't fall through to the generic check below
             if can_id == expected_id:
                 return data
         raise FlashError(f"Timed out waiting for CAN ID 0x{expected_id:03X}")
@@ -1585,7 +1771,7 @@ class URTCFlasher:
         self.log("Sending start-update (0x7F1)...")
         payload = struct.pack(">II", size, THIS_HARDWARE_ID)
         self.can.send_frame(CAN_ID_START_UPDATE, payload)
-        self._wait_for(CAN_ID_STATUS, timeout=3.0)  # expect STATUS_ERASING then STATUS_RECEIVING
+        self._wait_for(CAN_ID_STATUS, timeout=5.0, expected_status_value=0x03)  # STATUS_RECEIVING specifically - not just STATUS_ERASING, which arrives first but before the (up to ~2s) erase has actually finished
 
         # --- 0x7F7 x4: HMAC signature chunks ---
         self.log("Sending HMAC signature (4x 0x7F7)...")
@@ -2798,11 +2984,14 @@ def run_cli(argv):
         prog="urtc_flasher.py --cli",
         description="Headless URTC CAN OTA firmware update (no GUI).",
     )
-    parser.add_argument("--transport", choices=["serial", "socketcan"], default="serial",
-                         help="Serial/SLCAN (default, all platforms) or SocketCAN (Linux only)")
-    parser.add_argument("--port", required=True,
+    parser.add_argument("--transport", choices=["serial", "socketcan", "mock"], default="serial",
+                         help="Serial/SLCAN (default, all platforms), SocketCAN (Linux only), "
+                              "or mock (simulated in-memory bootloader, for testing this tool's "
+                              "own logic - not for use against a real board)")
+    parser.add_argument("--port",
                          help="Serial port (e.g. COM3 or /dev/ttyACM0) for --transport serial, "
-                              "or interface name (e.g. can0) for --transport socketcan")
+                              "or interface name (e.g. can0) for --transport socketcan. "
+                              "Not needed for --transport mock.")
     parser.add_argument("--file", required=True, help="Firmware .bin file to flash")
     parser.add_argument("--no-trigger", action="store_true",
                          help="Skip the 0x7F0 bootloader-entry trigger - use this if the board "
@@ -2810,7 +2999,15 @@ def run_cli(argv):
                               "valid application currently present)")
     parser.add_argument("--force", action="store_true",
                          help="Flash even if the file fails the plausibility check")
+    parser.add_argument("--mock-fail", type=lambda s: int(s, 0), default=None, metavar="REASON",
+                         help="With --transport mock: simulate a verify failure with this "
+                              "VERIFY_FAIL_REASON_* value (e.g. 0x03 for HMAC mismatch) instead "
+                              "of a successful update. Ignored for real transports.")
     args = parser.parse_args(argv)
+
+    if args.transport != "mock" and not args.port:
+        _cli_log("ERROR: --port is required for --transport serial/socketcan.")
+        return 2
 
     if _CONFIG_LOADED:
         _load_config_overrides(_cli_log)  # re-run just to emit its own log line - values don't change
@@ -2833,10 +3030,13 @@ def run_cli(argv):
     try:
         if args.transport == "serial":
             transport = SLCAN(args.port, log=_cli_log)
-        else:
+        elif args.transport == "socketcan":
             transport = SocketCAN(args.port, log=_cli_log)
+        else:
+            transport = MockCAN(simulate_failure=args.mock_fail, log=_cli_log)
+            _cli_log("Using the mock transport - nothing here is touching real hardware.")
         transport.open_channel()
-        _cli_log(f"Connected via {args.transport} on {args.port}.")
+        _cli_log(f"Connected via {args.transport}" + (f" on {args.port}." if args.port else "."))
 
         flasher = URTCFlasher(transport, log=_cli_log, progress_cb=lambda pct: None)
         if not args.no_trigger:

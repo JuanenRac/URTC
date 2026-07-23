@@ -17,7 +17,14 @@ python -m pip install pyinstaller
 
 REM Clean slate before compiling - see build_exe.sh for the reasoning.
 if exist build rmdir /s /q build
-if exist dist rmdir /s /q dist
+if exist dist (
+    rmdir /s /q dist
+    if exist dist (
+        echo ERROR: couldn't remove dist\ - is URTC_Tester.exe currently running?
+        echo Close it first, then run this script again.
+        exit /b 1
+    )
+)
 
 REM --icon sets what Explorer/the taskbar shows for the .exe file itself -
 REM separate from root.iconphoto() in the code, which sets the title-bar/

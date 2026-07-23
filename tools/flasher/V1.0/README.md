@@ -358,6 +358,21 @@ anyway), `130` cancelled with Ctrl+C. Only covers the CAN OTA update path
 now, given how much more is at stake if a scripted run gets a wrong
 file/target combination wrong with nobody watching.
 
+**`--transport mock`** runs the whole update sequence against a
+simulated, in-memory bootloader instead of a real board - no adapter, no
+port, nothing physical involved:
+
+```
+python3 urtc_flasher.py --cli --transport mock --file firmware.bin --no-trigger
+```
+
+Useful for testing this tool's own logic (retry behavior, timeout
+handling, exit codes) in a CI pipeline or before touching real hardware -
+not something that talks to an actual board. `--mock-fail 0x03` (or any
+other `VERIFY_FAIL_REASON_*` value from `CANBUS.TXT`) makes the
+simulated update fail verification instead of succeeding, for testing
+the failure path the same way.
+
 ## 8. Reliability during a CAN update, and session logs
 
 If a page's ACK doesn't arrive within the normal 3s window during a CAN

@@ -26,7 +26,14 @@ REM previous output - removing both first means nothing stale from an
 REM earlier build can survive into this one, rather than relying on
 REM --noconfirm alone to just overwrite the final .exe.
 if exist build rmdir /s /q build
-if exist dist rmdir /s /q dist
+if exist dist (
+    rmdir /s /q dist
+    if exist dist (
+        echo ERROR: couldn't remove dist\ - is URTC_Flasher.exe currently running?
+        echo Close it first, then run this script again.
+        exit /b 1
+    )
+)
 
 REM --add-data uses ";" as the source/destination separator on Windows -
 REM Linux/Mac PyInstaller uses ":" instead (see build_exe.sh). Bundles the

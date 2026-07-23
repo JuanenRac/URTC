@@ -250,9 +250,9 @@ identification.
 
 ---
 
-## 6. Parameter persistence — FM24CL64B EEPROM (shared I2C1)
+## 6. Parameter persistence — FL24LC64 EEPROM (shared I2C1)
 
-A 64Kbit F-RAM I2C EEPROM, directly soldered to the board (no connector), holds
+A 64Kbit I2C EEPROM, directly soldered to the board (no connector), holds
 a periodically-updated snapshot of the active tool's setpoints and the
 global LED/OLED settings — so a sudden power loss doesn't leave "what was
 this board doing" as unknowable as the loss itself was unplanned.

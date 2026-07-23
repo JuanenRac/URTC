@@ -173,6 +173,13 @@ class SLCAN:
                 if not chunk:
                     continue  # OS-level read timed out with nothing yet - keep going until our own deadline
                 self._rx_buf += chunk
+                if len(self._rx_buf) > 4096:
+                    # No real SLCAN line comes anywhere close to this length -
+                    # this only grows this large from noise, a wrong
+                    # baudrate, or a disconnected adapter feeding bytes with
+                    # no \r ever showing up. Discarding turns an unbounded
+                    # memory grow into a one-time desync instead.
+                    self._rx_buf = b""
                 continue
             line_bytes, self._rx_buf = self._rx_buf.split(b"\r", 1)
             line = line_bytes.decode("ascii", errors="ignore").strip()
@@ -359,7 +366,17 @@ class SocketCAN:
             return None
         except OSError:
             return None
-        can_id_raw, dlc, data = struct.unpack(self._FRAME_FMT, frame)
+        try:
+            can_id_raw, dlc, data = struct.unpack(self._FRAME_FMT, frame)
+        except struct.error:
+            # A partial or corrupted read (syscall interruption, the
+            # interface being torn down mid-read) that doesn't match the
+            # expected frame size - treated the same as "nothing usable
+            # arrived this time" rather than letting this propagate and
+            # kill CANBusMonitor's background thread, which would leave
+            # the whole tool silently blind with no further indication
+            # anything went wrong.
+            return None
         # Error/extended/RTR frames must be discarded BEFORE masking to 11
         # bits, not after. SocketCAN packs these as flag bits in the same
         # 32-bit can_id field: bit 31 (0x80000000) = extended ID, bit 30
@@ -445,6 +462,7 @@ class CANBusMonitor:
         self.transport = transport
         self.log = log
         self._handlers = {}  # can_id -> list of callback(data) functions
+        self._sniffers = []  # callback(can_id, data) functions - called for EVERY frame, regardless of ID
         self._running = False
         self._thread = None
         self._lock = threading.Lock()
@@ -457,6 +475,21 @@ class CANBusMonitor:
         with self._lock:
             if can_id in self._handlers and callback in self._handlers[can_id]:
                 self._handlers[can_id].remove(callback)
+                if not self._handlers[can_id]:
+                    del self._handlers[can_id]
+
+    def register_sniffer(self, callback):
+        """Registers a callback(can_id, data) that fires for every single
+        frame this monitor sees, regardless of ID - for the raw bus
+        monitor panel. Separate from the per-ID handlers above; neither
+        mechanism affects the other."""
+        with self._lock:
+            self._sniffers.append(callback)
+
+    def unregister_sniffer(self, callback):
+        with self._lock:
+            if callback in self._sniffers:
+                self._sniffers.remove(callback)
 
     def clear_all(self):
         with self._lock:
@@ -485,11 +518,17 @@ class CANBusMonitor:
             can_id, data = frame
             with self._lock:
                 callbacks = list(self._handlers.get(can_id, []))
+                sniffers = list(self._sniffers)
             for callback in callbacks:
                 try:
                     callback(data)
                 except Exception as e:
                     self.log(f"handler error for 0x{can_id:03X}: {e}")
+            for sniffer in sniffers:
+                try:
+                    sniffer(can_id, data)
+                except Exception as e:
+                    self.log(f"sniffer callback error: {e}")
 
     def send(self, can_id, data):
         self.transport.send_frame(can_id, data)
@@ -547,6 +586,7 @@ class TesterGUI:
         self.bus = None  # CANBusMonitor, created on connect
         self.active_tool_id = None
         self._keepalive_jobs = {}  # name -> root.after() id, for watchdog-guarded commands currently repeating
+        self._current_tool_id = None  # which tool's panel is currently showing, if any - see _send_tool_off_command
 
         pad = {"padx": 8, "pady": 4}
         root.grid_columnconfigure(0, weight=1)
@@ -662,6 +702,14 @@ class TesterGUI:
         exp_frame = ttk.LabelFrame(left_col, text="3. Expansion Board (SPI + EEPROM)")
         exp_frame.pack(fill="x", **pad)
         self._build_expansion_panel(exp_frame)
+
+        # --- Custom/arbitrary CAN frame injector - also global. Useful for
+        # exercising a command that doesn't have its own dedicated panel
+        # control yet, testing something not (or not yet) documented in
+        # CANBUS.TXT, or just sending a raw frame to see what happens. ---
+        custom_frame = ttk.LabelFrame(left_col, text="5. Custom CAN Frame")
+        custom_frame.pack(fill="x", **pad)
+        self._build_custom_frame_panel(custom_frame)
 
         # --- Dynamic per-tool frame - populated by rebuild_tool_panel()
         # once the active tool is known. Its own inner frame is destroyed
@@ -802,6 +850,9 @@ class TesterGUI:
             messagebox.showerror("Nothing selected", "Select a COM port first.")
             return
         self.bitrate_status.config(text="Trying each bitrate...", foreground="gray")
+        self.connect_btn.config(state="disabled")
+        self.port_combo.config(state="disabled")
+        self.autobaud_btn.config(state="disabled")
         threading.Thread(target=self._auto_detect_worker, args=(port,), daemon=True).start()
 
     def _auto_detect_worker(self, port):
@@ -837,6 +888,9 @@ class TesterGUI:
             self.root.after(0, lambda: self._auto_detect_done(found_label))
 
     def _auto_detect_done(self, found_label):
+        self.connect_btn.config(state="normal")
+        self.port_combo.config(state="readonly")
+        self.autobaud_btn.config(state="normal")
         if found_label:
             self.bitrate_var.set(found_label)
             self.bitrate_status.config(text=f"Found: {found_label}", foreground="green")
@@ -856,17 +910,33 @@ class TesterGUI:
         threading.Thread(target=self._detect_active_tool_worker, daemon=True).start()
 
     def _detect_active_tool_worker(self):
+        bus = self.bus  # local reference - self.bus can be reassigned to
+        # None by toggle_connect() running on the main thread while this
+        # worker is still blocked inside wait_for_one below; using this
+        # local copy for the rest of the function means that reassignment
+        # can't turn a subsequent bus.send/wait_for_one call here into an
+        # AttributeError on a None.
+        if bus is None:
+            return
         self.log("Querying active tool (0x110)...")
-        self.bus.send(CAN_ID_QUERY_ACTIVE_TOOL, b"")
+        bus.send(CAN_ID_QUERY_ACTIVE_TOOL, b"")
         self.root.after(0, lambda: self.progress.configure(value=35))
-        tool_data = self.bus.wait_for_one(CAN_ID_ACTIVE_TOOL_RESP, timeout=1.5)
+        tool_data = bus.wait_for_one(CAN_ID_ACTIVE_TOOL_RESP, timeout=1.5)
 
         self.log("Querying version (0x7F8)...")
-        self.bus.send(CAN_ID_QUERY_VERSION, b"\x00")
+        bus.send(CAN_ID_QUERY_VERSION, b"\x00")
         self.root.after(0, lambda: self.progress.configure(value=70))
-        version_data = self.bus.wait_for_one(CAN_ID_VERSION_RESPONSE, timeout=1.5)
+        version_data = bus.wait_for_one(CAN_ID_VERSION_RESPONSE, timeout=1.5)
         self.root.after(0, lambda: self.progress.configure(value=100))
 
+        if self.bus is not bus:
+            # Disconnected (or disconnected and reconnected to something
+            # new) while this was waiting - this result is stale, and the
+            # widgets it would update may now belong to a different
+            # connection, or no connection at all. Silently dropped rather
+            # than risk showing a detection result for a board that isn't
+            # even the one currently connected.
+            return
         self.root.after(0, lambda: self._show_detect_result(tool_data, version_data))
 
     def _update_id_pin_display(self, tool_id):
@@ -930,7 +1000,37 @@ class TesterGUI:
             hw_note = "" if hw_id == THIS_HARDWARE_ID else f" (expected 0x{THIS_HARDWARE_ID:08X} - different board/rig?)"
             self.log(f"Version: {role}, HardwareID 0x{hw_id:08X}{hw_note}, firmware v{ver_major}.{ver_minor}")
 
+    def _send_tool_off_command(self):
+        """Sends an explicit, immediate safe/off command for whichever
+        tool's panel is currently showing, if any - called before tearing
+        down its keepalive timers. The firmware's own communication
+        watchdog (250ms for the soldering iron/laser/3D nozzle, 1000ms for
+        the layer fan) would shut the same actuator off on its own once
+        this tool stops resending anyway, so this isn't covering a real
+        safety gap - it just means the actuator stops within one CAN frame
+        of switching away, instead of coasting for however long that
+        watchdog takes to notice the silence."""
+        if self.bus is None or self._current_tool_id is None:
+            return
+        off_commands = {
+            0: lambda: self.bus.send(CAN_ID_SOLDER_SETPOINT, struct.pack(">H", 0)),
+            5: lambda: self.bus.send(CAN_ID_DRILL_CMD, bytes([0, 0])),
+            9: lambda: self.bus.send(CAN_ID_LASER_CMD, bytes([0, 0])),
+            10: lambda: (
+                self.bus.send(CAN_ID_3DP_THERMAL_MOTION, struct.pack(">H", 0) + bytes([0, 0, 0, 0])),
+                self.bus.send(CAN_ID_3DP_LAYER_FAN_CMD, bytes([0])),
+                self.bus.send(CAN_ID_3DP_HOTEND_FAN_CMD, bytes([0])),
+            ),
+        }.get(self._current_tool_id)
+        if off_commands is not None:
+            try:
+                off_commands()
+            except Exception as e:
+                self.log(f"Couldn't send off-command while switching away from tool "
+                         f"{self._current_tool_id}: {e}")
+
     def _clear_tool_panel(self):
+        self._send_tool_off_command()
         if self.bus is not None:
             self.bus.clear_all()  # drops every per-tool telemetry handler, not the connection itself
         for child in self.tool_panel_inner.winfo_children():
@@ -944,6 +1044,7 @@ class TesterGUI:
 
     def rebuild_tool_panel(self, tool_id):
         self._clear_tool_panel()
+        self._current_tool_id = tool_id
         name = TOOL_NAMES.get(tool_id, "No tool assigned")
         self.tool_frame.config(text=f"4. Tool Controls - {name}")
         builder = {
@@ -1079,6 +1180,89 @@ class TesterGUI:
         ttk.Label(parent, textvariable=self.eeprom_state_var, wraplength=380, justify="left").grid(
             row=10, column=0, columnspan=2, sticky="w", padx=4, pady=(4, 4))
 
+    def _open_bus_monitor(self):
+        if self.bus is None:
+            messagebox.showerror("Not connected", "Connect to the adapter first.")
+            return
+        if getattr(self, "_bus_monitor_win", None) is not None and self._bus_monitor_win.winfo_exists():
+            self._bus_monitor_win.lift()  # already open - just bring it to the front rather than opening a second one
+            return
+
+        win = tk.Toplevel(self.root)
+        win.title("Raw Bus Monitor")
+        win.geometry("640x420")
+        self._bus_monitor_win = win
+        self._bus_monitor_paused = False
+        self._bus_monitor_last_tick = None
+        self._bus_monitor_row_count = 0
+
+        top_row = ttk.Frame(win)
+        top_row.pack(fill="x", padx=6, pady=6)
+        pause_var = tk.BooleanVar(value=False)
+
+        def _toggle_pause():
+            self._bus_monitor_paused = pause_var.get()
+
+        ttk.Checkbutton(top_row, text="Pause", variable=pause_var, command=_toggle_pause).pack(side="left")
+
+        def _clear():
+            tree.delete(*tree.get_children())
+            self._bus_monitor_row_count = 0
+            self._bus_monitor_last_tick = None
+
+        ttk.Button(top_row, text="Clear", command=_clear).pack(side="left", padx=(8, 0))
+        ttk.Label(
+            top_row, text="Shows every frame seen, any ID - independent of the active tool panel.",
+            foreground="gray",
+        ).pack(side="left", padx=(12, 0))
+
+        columns = ("time", "id", "dlc", "data", "dt")
+        tree = ttk.Treeview(win, columns=columns, show="headings", height=18)
+        for col, label, width in (
+            ("time", "Time", 90), ("id", "ID", 60), ("dlc", "DLC", 40),
+            ("data", "Data (hex)", 220), ("dt", "Δt (ms)", 70),
+        ):
+            tree.heading(col, text=label)
+            tree.column(col, width=width, anchor="w")
+        scrollbar = ttk.Scrollbar(win, orient="vertical", command=tree.yview)
+        tree.configure(yscrollcommand=scrollbar.set)
+        tree.pack(side="left", fill="both", expand=True, padx=(6, 0), pady=(0, 6))
+        scrollbar.pack(side="right", fill="y", pady=(0, 6))
+
+        def _on_frame(can_id, data):
+            if self._bus_monitor_paused:
+                return
+            now = time.time()
+            dt_ms = "" if self._bus_monitor_last_tick is None else f"{(now - self._bus_monitor_last_tick) * 1000:.0f}"
+            self._bus_monitor_last_tick = now
+            ts = time.strftime("%H:%M:%S", time.localtime(now)) + f".{int(now * 1000) % 1000:03d}"
+
+            def _append():
+                if not tree.winfo_exists():
+                    return
+                tree.insert("", "end", values=(ts, f"0x{can_id:03X}", len(data), data.hex(" "), dt_ms))
+                self._bus_monitor_row_count += 1
+                if self._bus_monitor_row_count > 500:
+                    # Bounded, same reasoning as every other unbounded-growth
+                    # fix elsewhere in this project - a long session
+                    # shouldn't grow this window's memory/widget count
+                    # without limit. Oldest rows drop first.
+                    oldest = tree.get_children()[0]
+                    tree.delete(oldest)
+                    self._bus_monitor_row_count -= 1
+                tree.yview_moveto(1.0)  # auto-scroll to the newest row
+
+            self.root.after(0, _append)
+
+        self.bus.register_sniffer(_on_frame)
+
+        def _on_close():
+            self.bus.unregister_sniffer(_on_frame) if self.bus is not None else None
+            self._bus_monitor_win = None
+            win.destroy()
+
+        win.protocol("WM_DELETE_WINDOW", _on_close)
+
     def _query_diag0(self):
         if self.bus is None:
             messagebox.showerror("Not connected", "Connect to the adapter first.")
@@ -1092,6 +1276,99 @@ class TesterGUI:
         level = "HIGH (inactive/pulled up)" if response[0] else "LOW (asserted)"
         self.diag0_var.set(level)
         self.log(f"EXP_TMC_DIAG0 level: {level}")
+
+    def _build_custom_frame_panel(self, parent):
+        ttk.Label(parent, text="CAN ID (hex):").grid(row=0, column=0, sticky="w", padx=4, pady=(4, 0))
+        self.custom_id_var = tk.StringVar(value="100")
+        ttk.Entry(parent, textvariable=self.custom_id_var, width=8).grid(row=0, column=1, sticky="w", padx=4)
+        ttk.Label(parent, text="Data bytes (hex, space-separated):").grid(
+            row=1, column=0, columnspan=2, sticky="w", padx=4, pady=(4, 0))
+        self.custom_data_var = tk.StringVar(value="")
+        ttk.Entry(parent, textvariable=self.custom_data_var, width=30).grid(
+            row=2, column=0, columnspan=2, sticky="w", padx=4)
+
+        btn_row = ttk.Frame(parent)
+        btn_row.grid(row=3, column=0, columnspan=2, sticky="w", padx=4, pady=4)
+        ttk.Button(btn_row, text="Send Once", command=self._send_custom_frame_once).pack(side="left")
+
+        self.custom_periodic_var = tk.BooleanVar(value=False)
+        self.custom_interval_var = tk.IntVar(value=100)
+        ttk.Checkbutton(
+            btn_row, text="Repeat every", variable=self.custom_periodic_var,
+            command=self._toggle_custom_periodic,
+        ).pack(side="left", padx=(12, 4))
+        ttk.Spinbox(btn_row, from_=10, to=10000, textvariable=self.custom_interval_var, width=6).pack(side="left")
+        ttk.Label(btn_row, text="ms").pack(side="left", padx=(2, 0))
+
+        ttk.Label(
+            parent,
+            text="Sends a raw frame - useful for a command that doesn't have its own "
+                 "control here yet, or for testing something not (or not yet) "
+                 "documented in CANBUS.TXT. No validation beyond ID range and DLC≤8 - "
+                 "whatever this sends is exactly what goes on the bus.",
+            foreground="gray", wraplength=380, justify="left",
+        ).grid(row=4, column=0, columnspan=2, sticky="w", padx=4, pady=(0, 4))
+
+        ttk.Separator(parent, orient="horizontal").grid(row=5, column=0, columnspan=2, sticky="ew", pady=4)
+        ttk.Button(parent, text="Open Raw Bus Monitor...", command=self._open_bus_monitor).grid(
+            row=6, column=0, columnspan=2, sticky="w", padx=4, pady=(0, 4))
+
+    def _parse_custom_frame(self):
+        """Returns (can_id, data_bytes) or raises ValueError with a message
+        suitable for showing the user directly."""
+        try:
+            can_id = int(self.custom_id_var.get(), 16)
+        except (ValueError, tk.TclError):
+            raise ValueError(f"'{self.custom_id_var.get()}' isn't a valid hex CAN ID.")
+        if not (0 <= can_id <= 0x7FF):
+            raise ValueError(f"CAN ID 0x{can_id:X} is outside the standard 11-bit range (0-0x7FF).")
+        text = self.custom_data_var.get().strip()
+        try:
+            data = bytes(int(b, 16) for b in text.split()) if text else b""
+        except ValueError:
+            raise ValueError(f"'{text}' isn't valid space-separated hex bytes, e.g. 01 02 03.")
+        if len(data) > 8:
+            raise ValueError(f"{len(data)} bytes given - a CAN frame carries at most 8.")
+        return can_id, data
+
+    def _send_custom_frame_once(self):
+        if self.bus is None:
+            messagebox.showerror("Not connected", "Connect to the adapter first.")
+            return
+        try:
+            can_id, data = self._parse_custom_frame()
+        except ValueError as e:
+            messagebox.showerror("Bad input", str(e))
+            return
+        self.bus.send(can_id, data)
+        self.log(f"Sent custom frame: ID=0x{can_id:03X}, data={data.hex(' ') if data else '(empty)'}")
+
+    def _toggle_custom_periodic(self):
+        if not self.custom_periodic_var.get():
+            self._stop_keepalive("custom_frame")
+            return
+        if self.bus is None:
+            messagebox.showerror("Not connected", "Connect to the adapter first.")
+            self.custom_periodic_var.set(False)
+            return
+        try:
+            can_id, data = self._parse_custom_frame()
+        except ValueError as e:
+            messagebox.showerror("Bad input", str(e))
+            self.custom_periodic_var.set(False)
+            return
+        interval = max(10, self._safe_int(self.custom_interval_var, 100))
+        self.log(f"Repeating custom frame every {interval}ms: ID=0x{can_id:03X}, "
+                 f"data={data.hex(' ') if data else '(empty)'}")
+
+        def _send():
+            can_id, data = self._parse_custom_frame()  # re-parsed each tick - reflects a live-edited field without needing to stop/restart
+            self.bus.send(can_id, data)
+
+        self._start_keepalive(
+            "custom_frame", interval, _send,
+            on_failure=lambda: self.custom_periodic_var.set(False),
+        )
 
     def _send_expansion_spi(self):
         if self.bus is None:
@@ -1178,7 +1455,7 @@ class TesterGUI:
     # showing.
     # -------------------------------------------------------------------
 
-    def _start_keepalive(self, name, interval_ms, send_fn):
+    def _start_keepalive(self, name, interval_ms, send_fn, on_failure=None):
         """Registers a periodic resend under `name`, cancelling whatever
         was previously running under that same name first. Matches what a
         real master controller has to do to satisfy the firmware's
@@ -1186,10 +1463,25 @@ class TesterGUI:
         250ms, layer fan: 1000ms) - without this, a setpoint sent once
         would get cut by the firmware itself a fraction of a second later,
         which would look like a bug in THIS tool rather than the expected,
-        correct safety behavior it actually is."""
+        correct safety behavior it actually is.
+        on_failure, when given, runs once if send_fn ever raises (a
+        disconnected adapter, or an emptied Spinbox the caller's own
+        send_fn reads from) - typically used to uncheck whatever "Active"
+        checkbox started this, so the UI doesn't keep showing a keepalive
+        as running after it's actually stopped rescheduling itself."""
         self._stop_keepalive(name)
         def _tick():
-            send_fn()
+            try:
+                send_fn()
+            except Exception as e:
+                self.log(f"Keepalive '{name}' stopped: {e}")
+                self._keepalive_jobs.pop(name, None)
+                if on_failure is not None:
+                    try:
+                        on_failure()
+                    except Exception:
+                        pass
+                return  # deliberately doesn't reschedule - see on_failure above for reflecting this in the UI
             self._keepalive_jobs[name] = self.root.after(interval_ms, _tick)
         _tick()
 
@@ -1200,6 +1492,19 @@ class TesterGUI:
                 self.root.after_cancel(job_id)
             except Exception:
                 pass
+
+    def _safe_int(self, var, default=0):
+        """Reads a Tkinter IntVar (typically Spinbox-backed), falling back
+        to default if the field is currently empty or holds non-numeric
+        text - .get() on an IntVar raises tk.TclError in that case (e.g. a
+        user selecting the Spinbox's text and deleting it, or typing a
+        stray letter, then clicking Send/Move before re-entering a number),
+        which would otherwise propagate straight out of a one-shot button
+        callback with no useful feedback."""
+        try:
+            return var.get()
+        except tk.TclError:
+            return default
 
     def _build_soldering_iron_panel(self, parent):
         setpoint = tk.IntVar(value=0)
@@ -1218,7 +1523,7 @@ class TesterGUI:
             if active.get():
                 self.log(f"Soldering iron: setpoint {setpoint.get()}°C, sending every 150ms "
                           f"(firmware watchdog is 250ms).")
-                self._start_keepalive("solder", 150, _send_setpoint)
+                self._start_keepalive("solder", 150, _send_setpoint, on_failure=lambda: active.set(False))
             else:
                 self._stop_keepalive("solder")
                 self.bus.send(CAN_ID_SOLDER_SETPOINT, struct.pack(">H", 0))
@@ -1261,7 +1566,7 @@ class TesterGUI:
 
         def _send_move():
             dir_byte = 0x01 if direction.get() == "Forward" else 0x00
-            n = max(1, steps.get())
+            n = max(1, self._safe_int(steps, 1))
             data = bytes([dir_byte]) + struct.pack(">I", n)
             self.bus.send(CAN_ID_MOTION_CMD, data)
             self.log(f"{tool_name}: move {direction.get()}, {n} steps.")
@@ -1315,7 +1620,7 @@ class TesterGUI:
 
         def _send_drill():
             dir_byte = 0x01 if direction.get() == "Counter-clockwise" else 0x00
-            self.bus.send(CAN_ID_DRILL_CMD, bytes([max(0, min(255, speed.get())), dir_byte]))
+            self.bus.send(CAN_ID_DRILL_CMD, bytes([max(0, min(255, self._safe_int(speed, 0))), dir_byte]))
 
         ttk.Button(parent, text="Send", command=_send_drill).grid(row=1, column=2, padx=8)
         ttk.Label(
@@ -1407,7 +1712,7 @@ class TesterGUI:
             if active.get():
                 self.log(f"Laser: power {power.get()}, interlock {'armed' if interlock.get() else 'safe'}, "
                           f"sending every 150ms (firmware watchdog is 250ms).")
-                self._start_keepalive("laser", 150, _send_laser)
+                self._start_keepalive("laser", 150, _send_laser, on_failure=lambda: active.set(False))
             else:
                 self._stop_keepalive("laser")
                 self.bus.send(CAN_ID_LASER_CMD, bytes([0x00, 0x00]))
@@ -1475,9 +1780,9 @@ class TesterGUI:
         ttk.Spinbox(parent, from_=0, to=300, textvariable=nozzle_setpoint, width=6).grid(row=0, column=1, sticky="w", padx=4)
 
         def _send_thermal_motion():
-            temp = max(0, min(300, nozzle_setpoint.get()))
+            temp = max(0, min(300, self._safe_int(nozzle_setpoint, 0)))
             dir_byte = 0x01 if extruder_dir.get() == "Forward" else 0x00
-            steps = max(0, extruder_steps.get()) & 0xFFFFFF
+            steps = max(0, self._safe_int(extruder_steps, 0)) & 0xFFFFFF
             data = struct.pack(">H", temp) + bytes([dir_byte]) + steps.to_bytes(3, "big")
             self.bus.send(CAN_ID_3DP_THERMAL_MOTION, data)
 
@@ -1485,10 +1790,10 @@ class TesterGUI:
             if nozzle_active.get():
                 self.log(f"3D printer nozzle: setpoint {nozzle_setpoint.get()}°C, sending every "
                           f"150ms (firmware watchdog is 250ms, extruder motion not watchdog-guarded).")
-                self._start_keepalive("nozzle", 150, _send_thermal_motion)
+                self._start_keepalive("nozzle", 150, _send_thermal_motion, on_failure=lambda: nozzle_active.set(False))
             else:
                 self._stop_keepalive("nozzle")
-                extruder_steps_saved = extruder_steps.get()
+                extruder_steps_saved = self._safe_int(extruder_steps, 0)
                 extruder_steps.set(0)
                 _send_thermal_motion()
                 extruder_steps.set(extruder_steps_saved)
@@ -1524,7 +1829,7 @@ class TesterGUI:
             if layer_fan_active.get():
                 self.log(f"Layer fan: power {layer_fan_power.get()}, sending every 400ms "
                           f"(firmware watchdog is 1000ms).")
-                self._start_keepalive("layer_fan", 400, _send_layer_fan)
+                self._start_keepalive("layer_fan", 400, _send_layer_fan, on_failure=lambda: layer_fan_active.set(False))
             else:
                 self._stop_keepalive("layer_fan")
                 self.bus.send(CAN_ID_3DP_LAYER_FAN_CMD, bytes([0x00]))
@@ -1677,7 +1982,7 @@ def _show_splash_then(root, on_done):
 def main():
     root = tk.Tk()
     root.withdraw()
-    root.geometry(_center_geometry(root, 1116, 970))
+    root.geometry(_center_geometry(root, 1116, 1220))
     app = TesterGUI(root)
 
     def _reveal_main():
