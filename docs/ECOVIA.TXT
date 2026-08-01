@@ -1,5 +1,5 @@
 =============================================================================
-CONFIGURATION DOCUMENT: URTC - UNIVERSAL TOOL ECOSYSTEM (V1.0)
+CONFIGURATION DOCUMENT: URTC - UNIVERSAL TOOL ECOSYSTEM (V1.1)
 MATRIX ASSIGNMENT - URTC/HYDRA-UMC (JUANENBOT/PAROL6)
 MICROCONTROLLER: STM32F303CCT6 (LQFP48 Package - 48 Pins, 256KB Flash)
 AUTHOR: JuanenRac (Electro Hobby 3D) - electrohobby3d@gmail.com
@@ -35,7 +35,7 @@ All five: internal pull-up enabled, active-low (jumper to GND sets that bit).
     debug lines.
 
 -----------------------------------------------------------------------------
-[2] MASTER TOOL-HEAD ADDRESSING TABLE (URTC v1.0 BINARY MATRIX, 32 IDs)
+[2] MASTER TOOL-HEAD ADDRESSING TABLE (URTC v1.1 BINARY MATRIX, 32 IDs)
 -----------------------------------------------------------------------------
 ID4   ID3   ID2   ID1   ID0  |  ID (HEX)  |  ASSIGNED TOOL / MODULE FUNCTION
 -----------------------------------------------------------------------------

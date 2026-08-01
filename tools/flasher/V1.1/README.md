@@ -4,7 +4,7 @@
 
 # URTC Flasher (Windows / Linux)
 
-**Version:** 1.0 (this tool's own version - shown in the window banner and
+**Version:** 1.1 (this tool's own version - shown in the window banner and
 title bar, tracked separately from the URTC board firmware version it
 writes)
 
@@ -257,7 +257,7 @@ file right before flashing, with `version`/`build_date` logged alongside
 for reference.
 
 ```json
-{"version": "1.0", "build_date": "2026-07-23", "sha256": "e5a4918c..."}
+{"version": "1.1", "build_date": "2026-07-23", "sha256": "e5a4918c..."}
 ```
 
 A mismatch is logged as a clear warning, not a hard stop - this is a
@@ -293,10 +293,10 @@ fresh boot before it's jumped to the application).
 
 What you'll see:
 
-- **`v1.0 (application, HardwareID 0x0303CC01)`** - normal case, application
+- **`v1.1 (application, HardwareID 0x0303CC01)`** - normal case, application
   running, everything matches.
 - **`Bootloader running, no valid firmware currently installed, bootloader
-  v1.0.0`** - the board is stuck in the bootloader with nothing to jump
+  v1.1.1`** - the board is stuck in the bootloader with nothing to jump
   to (blank chip, or every check on the main slot failed). This is
   exactly the situation this tool exists to fix - flash it. The
   bootloader version shown here is the bootloader itself, unrelated to

@@ -4,7 +4,7 @@
 
 # URTC Flasher (Windows / Linux)
 
-**Version:** 1.0 (die Version dieses Tools selbst - angezeigt im
+**Version:** 1.1 (die Version dieses Tools selbst - angezeigt im
 Fenster-Banner und in der Titelleiste, getrennt verfolgt von der
 Firmware-Version der URTC-Platine, die es schreibt)
 
@@ -299,7 +299,7 @@ verglichen, wobei `version`/`build_date` zur Referenz daneben protokolliert
 werden.
 
 ```json
-{"version": "1.0", "build_date": "2026-07-23", "sha256": "e5a4918c..."}
+{"version": "1.1", "build_date": "2026-07-23", "sha256": "e5a4918c..."}
 ```
 
 Eine Abweichung wird als klare Warnung protokolliert, kein harter
@@ -340,10 +340,10 @@ oder bei einem frischen Start, bevor sie zur Anwendung springt).
 
 Was Sie sehen werden:
 
-- **`v1.0 (application, HardwareID 0x0303CC01)`** - normaler Fall,
+- **`v1.1 (application, HardwareID 0x0303CC01)`** - normaler Fall,
   Anwendung läuft, alles stimmt überein.
 - **`Bootloader running, no valid firmware currently installed,
-  bootloader v1.0.0`** - die Platine steckt im Bootloader fest, ohne
+  bootloader v1.1.1`** - die Platine steckt im Bootloader fest, ohne
   etwas, zu dem sie springen könnte (leerer Chip, oder jede Prüfung
   auf dem Hauptslot schlug fehl). Dies ist genau die Situation, für die
   dieses Tool existiert - flashen Sie sie. Die hier gezeigte

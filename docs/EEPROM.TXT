@@ -1,6 +1,6 @@
 =============================================================================
 EEPROM.TXT - FM24CL64B F-RAM register map
-PROJECT: URTC v1.0 (Universal Robot Tool Controller)
+PROJECT: URTC v1.1 (Universal Robot Tool Controller)
 AUTHOR: JuanenRac (Electro Hobby 3D) - electrohobby3d@gmail.com
 LICENSE: This document is licensed under CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/).
          Firmware source is GPL-3.0; hardware design files are CERN-OHL-S v2 - see the repo README.

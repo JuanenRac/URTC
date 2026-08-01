@@ -1,6 +1,6 @@
 # URTC Bootloader — Technical Reference
 
-**Project:** URTC v1.0 (Universal Robot Tool Controller)
+**Project:** URTC v1.1 (Universal Robot Tool Controller)
 **Author:** JuanenRac (Electro Hobby 3D) — electrohobby3d@gmail.com
 **License:** This document is CC BY-SA 4.0; the source it describes
 (`BOOTLOADER.C` and its partitioned form) is GPL-3.0. See the repo

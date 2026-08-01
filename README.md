@@ -2,7 +2,7 @@
   <img src="images/URTC_LOGO.svg" alt="URTC Logo" width="100%">
 </p>
 
-# 🚀 URTC — Universal Robot Tool Controller (v1.0)
+# 🚀 URTC — Universal Robot Tool Controller (v1.1)
 
 > **⚠️ Safety notice:** this board drives a **10W engraving laser diode** and multiple heater stages (T12 soldering iron cartridge, 3D printer hotend). Building and using it means working with equipment that can cause **burns, fire, or eye damage** if assembled or operated without proper safety measures (laser goggles rated for the diode's wavelength, thermal protection, an accessible power cutoff). This is a hobbyist/maker project shared as-is — build and use at your own risk, and don't skip basic safety practice just because the firmware has watchdogs.
 
@@ -272,7 +272,7 @@ its own.
 #### URTC Flasher v1.1 — `tools/flasher/V1.1/`
 
 <p align="center">
-  <img src="images/URTC_FLASHER_V1_0.png" alt="URTC Flasher window" width="700">
+  <img src="images/URTC_FLASHER_V1_1.png" alt="URTC Flasher window" width="700">
 </p>
 
 Two distinct jobs:
@@ -302,7 +302,7 @@ Or build a standalone binary that doesn't need Python installed: `build_exe.bat`
 #### URTC Tester v1.1 — `tools/tester/V1.1/`
 
 <p align="center">
-  <img src="images/URTC_TESTER_V1_0.png" alt="URTC Tester window" width="700">
+  <img src="images/URTC_TESTER_V1_1.png" alt="URTC Tester window" width="700">
 </p>
 
 A live CAN bus exerciser, not a flashing tool — it never touches flash,
@@ -458,8 +458,8 @@ they're kept consistent with each other.
 │   │                            places so the GitHub-rendered tools/flasher/V1.1/README.md
 │   │                            doesn't depend on a path outside tools/flasher/V1.1/)
 │   ├── URTC_LOGO_TESTER.svg      Same reasoning, for the Tester tool's banner
-│   ├── URTC_FLASHER_V1_0.png     Flasher tool window screenshot, referenced in this README
-│   ├── URTC_TESTER_V1_0.png      Tester tool window screenshot, referenced in this README
+│   ├── URTC_FLASHER_V1_1.png     Flasher tool window screenshot, referenced in this README
+│   ├── URTC_TESTER_V1_1.png      Tester tool window screenshot, referenced in this README
 │   ├── URTC_BOARD.png           Board photo (when added)
 │   ├── URTC_SCHEMATIC.png       Board schematic (when added)
 │   ├── URTC_PCB_TOP.png         Board TOP layer (when added)

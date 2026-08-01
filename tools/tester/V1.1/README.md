@@ -4,7 +4,7 @@
 
 # URTC Tester (Windows / Linux)
 
-**Version:** 1.0 · **Author:** JuanenRac (Electro Hobby 3D) &lt;electrohobby3d@gmail.com&gt;
+**Version:** 1.1 · **Author:** JuanenRac (Electro Hobby 3D) &lt;electrohobby3d@gmail.com&gt;
 
 License: **GPL-3.0**, same as the URTC firmware and the flasher tool - see
 `LICENSE` in the repository root.

@@ -1,5 +1,5 @@
 =============================================================================
-CAN BUS COMMAND MAP - URTC v1.0 (UNIVERSAL ROBOT TOOL CONTROLLER)
+CAN BUS COMMAND MAP - URTC v1.1 (UNIVERSAL ROBOT TOOL CONTROLLER)
 PROJECTS: URTC/HYDRA-UMC (JUANENBOT/PAROL6)
 AUTHOR: JuanenRac (Electro Hobby 3D) - electrohobby3d@gmail.com
 LICENSE: This document is licensed under CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/).

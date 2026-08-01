@@ -72,9 +72,9 @@
 
   </g>
 
-  <!-- Etiqueta "CAN TESTER v1.0" sobre el brazo - identifica esta ventana específica sin tapar el mecanismo -->
+  <!-- Etiqueta "CAN TESTER v1.1" sobre el brazo - identifica esta ventana específica sin tapar el mecanismo -->
   <text x="158" y="52" text-anchor="middle" font-family="'Segoe UI', Roboto, 'Arial Black', sans-serif" font-weight="800" font-size="40" fill="#00ADB5" letter-spacing="1">CAN TESTER</text>
-  <text x="158" y="82" text-anchor="middle" font-family="'Segoe UI', Roboto, 'Arial Black', sans-serif" font-weight="800" font-size="20" fill="#00ADB5" letter-spacing="1">v1.0</text>
+  <text x="158" y="82" text-anchor="middle" font-family="'Segoe UI', Roboto, 'Arial Black', sans-serif" font-weight="800" font-size="20" fill="#00ADB5" letter-spacing="1">v1.1</text>
 
   <!-- Autoría, debajo del brazo -->
   <text x="175" y="230" text-anchor="middle" font-family="'Segoe UI', Roboto, sans-serif" font-weight="700" font-size="13" fill="#627284" letter-spacing="1.5">JuanenRac &#169; 2026</text>

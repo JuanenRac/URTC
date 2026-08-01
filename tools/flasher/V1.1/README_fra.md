@@ -4,7 +4,7 @@
 
 # URTC Flasher (Windows / Linux)
 
-**Version :** 1.0 (la version de cet outil - affichée dans la bannière
+**Version :** 1.1 (la version de cet outil - affichée dans la bannière
 de la fenêtre et la barre de titre, suivie séparément de la version du
 firmware de la carte URTC qu'il écrit)
 
@@ -293,7 +293,7 @@ son champ `sha256` est comparé au fichier réel juste avant de flasher,
 avec `version`/`build_date` enregistrés à côté pour référence.
 
 ```json
-{"version": "1.0", "build_date": "2026-07-23", "sha256": "e5a4918c..."}
+{"version": "1.1", "build_date": "2026-07-23", "sha256": "e5a4918c..."}
 ```
 
 Une discordance est enregistrée comme un avertissement clair, pas un
@@ -336,10 +336,10 @@ frais avant de sauter vers l'application).
 
 Ce que vous verrez :
 
-- **`v1.0 (application, HardwareID 0x0303CC01)`** - cas normal,
+- **`v1.1 (application, HardwareID 0x0303CC01)`** - cas normal,
   application en cours d'exécution, tout correspond.
 - **`Bootloader running, no valid firmware currently installed,
-  bootloader v1.0.0`** - la carte est coincée dans le bootloader sans
+  bootloader v1.1.1`** - la carte est coincée dans le bootloader sans
   rien vers quoi sauter (puce vierge, ou chaque vérification sur
   l'emplacement principal a échoué). C'est exactement la situation pour
   laquelle cet outil existe - flashez-la. La version de bootloader

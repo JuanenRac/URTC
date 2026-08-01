@@ -4,7 +4,7 @@
 
 # URTC Flasher (Windows / Linux)
 
-**Versión:** 1.0 (la versión de esta herramienta - se muestra en el banner
+**Versión:** 1.1 (la versión de esta herramienta - se muestra en el banner
 de la ventana y en la barra de título, se controla por separado de la
 versión del firmware de la placa URTC que escribe)
 
@@ -286,7 +286,7 @@ flashear, con `version`/`build_date` registrados junto a ello como
 referencia.
 
 ```json
-{"version": "1.0", "build_date": "2026-07-23", "sha256": "e5a4918c..."}
+{"version": "1.1", "build_date": "2026-07-23", "sha256": "e5a4918c..."}
 ```
 
 Un desajuste se registra como una advertencia clara, no como una parada
@@ -327,10 +327,10 @@ arranque nuevo antes de saltar a la aplicación).
 
 Lo que verás:
 
-- **`v1.0 (application, HardwareID 0x0303CC01)`** - caso normal,
+- **`v1.1 (application, HardwareID 0x0303CC01)`** - caso normal,
   aplicación en ejecución, todo coincide.
 - **`Bootloader running, no valid firmware currently installed,
-  bootloader v1.0.0`** - la placa está atascada en el bootloader sin
+  bootloader v1.1.1`** - la placa está atascada en el bootloader sin
   nada a lo que saltar (chip en blanco, o cada comprobación en el slot
   principal falló). Esta es exactamente la situación para la que existe
   esta herramienta - flashéalo. La versión de bootloader mostrada aquí
