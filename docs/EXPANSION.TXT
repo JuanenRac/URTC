@@ -1,0 +1,141 @@
+=============================================================================
+EXPANSION.TXT - CONN_EXPANSION and expansion board variants
+PROJECT: URTC v1.0 (Universal Robot Tool Controller)
+AUTHOR: JuanenRac (Electro Hobby 3D) - electrohobby3d@gmail.com
+LICENSE: This document is licensed under CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/).
+         Firmware source is GPL-3.0; hardware design files are CERN-OHL-S v2 - see the repo README.
+=============================================================================
+This document covers the expansion connector itself, the planned family of
+add-on boards that plug into it, and the mechanism URTC uses to know which
+one (if any) is actually installed. For the connector's full pin-by-pin
+electrical detail, see PINOUT_CONNECTORS.TXT section 9 and PINOUT.TXT
+blocks 9-10 - this document doesn't repeat that, it covers the broader
+picture those two don't.
+
+-----------------------------------------------------------------------------
+1. CONN_EXPANSION - what it is
+-----------------------------------------------------------------------------
+A 20-pin header, separate from every tool-specific connector, carrying:
+  - 4 pins of +24V, 3 of GND, 1 of +3V3, 1 of +5V (main rail passthrough,
+    plus logic power)
+  - STEP/DIR/EN for an additional stepper driver (TMC2209 or TMC5160A)
+  - A bit-banged SPI bus (CS/SCK/MISO/MOSI) for that driver's own
+    configuration/diagnostics interface
+  - A combined diagnostic line (TMC_DIAG0) shared with the onboard
+    TMC2209's own DIAG output through a diode-OR (D4, a common-cathode
+    dual diode) - a stall/error on either driver pulls this line high.
+    The main board provides the pull-down (R50, 10K to GND) that keeps
+    this line at a clean, known low when neither driver is asserting;
+    the expansion board itself doesn't need one. A TMC5160 variant
+    populated here needs its own GCONF.diag0_int_pushpull bit set to 1
+    (push-pull/active-high, not its power-on default of open-drain/
+    active-low) for its side of this diode-OR to actually register a
+    stall here - see the main board's own CANBUS.TXT (0x182/0x183) for
+    the full reasoning.
+  - A second, independent I2C bus (I2C2, bit-banged - see the main
+    board's own PINOUT.TXT for why) - deliberately separate from the
+    OLED's own I2C2 (a second, hardware peripheral instance), so nothing
+    on an expansion board can interfere with display timing
+  - One general-purpose, EXTI-capable GPIO for whatever a future add-on
+    needs a fast interrupt-driven input for
+
+This connector's own pinout is fixed and finalized as of this document.
+What's NOT yet finalized is what actually gets built to plug into it -
+see section 2.
+
+-----------------------------------------------------------------------------
+2. The planned expansion board variants
+-----------------------------------------------------------------------------
+Four variants are planned, none of them finalized yet (no Eagle schematic
+exists for any of them at the time of writing - this section describes
+intent, not a built design):
+
+  1 - Basic, TMC2209 driver only. No onboard MCU - just the driver chip,
+      configured/monitored over the bit-banged SPI... actually, the
+      TMC2209 itself uses a single-wire UART for configuration, not SPI -
+      see PINOUT_CONNECTORS.TXT's own note on why EXP_SPI_MOSI doubles as
+      that UART line when this variant is what's populated. Lets URTC
+      drive a second stepper axis, or a more powerful motor than the
+      onboard TMC2209 handles, without needing a second brain to do it.
+
+  2 - Basic, TMC5160A driver only. Same idea as variant 1, but with the
+      TMC5160A instead - genuinely more current capability and a real SPI
+      configuration interface (matching what CONN_EXPANSION's SPI bus was
+      designed around), for a NEMA23/34 motor running at its full rated
+      torque rather than what the onboard TMC2209 alone can supply.
+
+  3 - Advanced, TMC2209 + an onboard STM32F051T8 slave MCU. The slave
+      talks to URTC's own STM32F303CCT6 over I2C2 (the same bus this
+      connector already carries) - both for URTC to push firmware updates
+      to the slave, and for ongoing runtime communication between the two.
+      The STM32F051T8 has up to 13 ADC channels and 6 PWM channels
+      available on top of general-purpose GPIO, which opens the door to
+      this expansion board also driving extra fans, extra temperature
+      sensors, motion/vibration sensors, additional endstops - whatever a
+      future tool profile built around this variant needs, without
+      URTC's own, already-fully-committed GPIO budget having to grow.
+
+  4 - Advanced, TMC5160A + an onboard STM32F051T8 slave. Same idea as
+      variant 3, with the more capable driver.
+
+None of the STM32F051T8 slave's own firmware, its I2C protocol with URTC,
+or any of the 4 variants' actual Eagle schematics exist yet. This section
+exists so the reasoning behind CONN_EXPANSION's pin choices (documented
+in PINOUT_CONNECTORS.TXT) makes sense in context, and so the
+expansion_board_type register below has real meaning even before the
+boards themselves are built.
+
+-----------------------------------------------------------------------------
+3. expansion_board_type - telling URTC what's installed
+-----------------------------------------------------------------------------
+There is no electrical way for URTC to sense which of these 4 variants
+(or none at all) is plugged into CONN_EXPANSION - none of them present a
+distinguishing signature on any pin URTC could read at boot. So instead
+of detection, URTC stores an explicit value the host sets once:
+
+  0 = No expansion board installed (the safe default - this is what a
+      freshly-flashed board starts at, and what a board with nothing on
+      CONN_EXPANSION should be told)
+  1 = Basic expansion board, TMC2209
+  2 = Basic expansion board, TMC5160A
+  3 = Advanced expansion board, TMC2209 + STM32F051T8
+  4 = Advanced expansion board, TMC5160A + STM32F051T8
+
+This value is set via CAN (0x1A0, see CANBUS.TXT), stored in the same
+FM24CL64B F-RAM that holds every other persisted setting (see
+STM32F303CC.C section 14 and EEPROM.TXT), and survives a power cycle the
+same way those do - the host sets it once when the hardware configuration
+actually changes, not on every boot.
+
+**Where this stands today:** the firmware stores and reports this value
+faithfully (0x1A0 to set, 0x1A1 to query), and it's restored from F-RAM
+at every boot. It does NOT yet change any runtime behavior based on the
+value - the generic SPI passthrough (0x180/0x181) and DIAG0 query
+(0x182/0x183) work identically regardless of what expansion_board_type is
+set to, since they're raw, board-agnostic transports. Gating specific
+behavior on this value (e.g., only responding to a future
+STM32F051T8-specific command when expansion_board_type is 3 or 4) is a
+natural next step once that slave's own firmware and protocol actually
+exist - not built speculatively ahead of that, the same reasoning applied
+throughout this project to other forward-looking hooks (see
+PINOUT_CONNECTORS.TXT's TMC_DIAG0 note for a similar case).
+
+-----------------------------------------------------------------------------
+4. Setting it from URTC Flasher
+-----------------------------------------------------------------------------
+`URTC Flasher`'s CAN OTA section includes a control for reading and
+setting this value directly against a connected board, independent of
+flashing new firmware - see tools/flasher/V1.1/README.md for the specific
+control. This exists there (not only in URTC Tester) because setting the
+installed expansion board is a one-time hardware-configuration step most
+naturally done at the same time as, or right before, a firmware update -
+not something that needs its own separate tool run.
+
+-----------------------------------------------------------------------------
+5. Reading it from URTC Tester
+-----------------------------------------------------------------------------
+`URTC Tester` shows the currently-set value in its expansion panel, and
+will grow tool-specific controls that only make sense for a given
+expansion_board_type as those tools get defined (e.g., a second-axis
+jog control that only applies with a NEMA motor actually present on the
+expansion connector) - see tools/tester/V1.1/README.md.
