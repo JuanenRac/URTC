@@ -92,7 +92,8 @@ void MX_GPIO_Post_Init(void) {
     // reconfiguration") to set once, correctly, as its actual final mode.
     if (active_tool == TOOL_PASTE_DISPENSER || active_tool == TOOL_LIQUID_DISPENSER ||
         active_tool == TOOL_SCREWDRIVER || active_tool == TOOL_GRIPPER_GIMBAL ||
-        active_tool == TOOL_GRIPPER_NEMA || active_tool == TOOL_3D_PRINTER) {
+        active_tool == TOOL_GRIPPER_NEMA || active_tool == TOOL_3D_PRINTER ||
+        active_tool == TOOL_SMT_PICKPLACE || active_tool == TOOL_VACUUM_GRIPPER_LG) {
         HAL_GPIO_WritePin(GPIOB, STEP_PIN, GPIO_PIN_RESET);
         GPIO_InitStruct.Pin = STEP_PIN;
         GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;

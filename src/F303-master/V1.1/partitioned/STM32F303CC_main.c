@@ -23,6 +23,7 @@
 #include "firmware_control_thermal.h"
 #include "firmware_control_sensors.h"
 #include "firmware_telemetry_watchdog.h"
+#include "firmware_can_weldpulse.h"
 #include "firmware_persistence.h"
 
 volatile ToolMode_t active_tool;
@@ -116,6 +117,9 @@ volatile uint8_t can_bus_error_flag = 0;
 
 volatile uint8_t laser_power_setpoint = 0;
 volatile uint32_t laser_last_kick_tick = 0;
+volatile uint8_t  weld_pulse_active = 0;
+volatile uint32_t weld_pulse_start_tick = 0;
+volatile uint16_t weld_pulse_duration_ms = 0;
 volatile uint32_t drill_last_kick_tick = 0;
 volatile uint32_t layer_fan_last_kick_tick = 0; // Layer fan communication watchdog (does not touch PB6)
 
@@ -263,7 +267,16 @@ int main(void) {
         HAL_GPIO_Init(HOTEND_FAN_FG_PORT, &GPIO_HotendFanFG);
         // NVIC enable for EXTI9_5_IRQn already happens unconditionally in
         // MX_GPIO_Post_Init, alongside EXTI3_IRQn - no need to repeat it here.
-    } else if (active_tool == TOOL_DRILL || active_tool == TOOL_LASER_ENGRAVER) {
+    } else if (active_tool == TOOL_DRILL || active_tool == TOOL_LASER_ENGRAVER ||
+               active_tool == TOOL_UV_CURING || active_tool == TOOL_HOTAIR_REWORK) {
+        // UV Curing (doc #8) and Hot Air Rework's own blower (doc #10)
+        // both share this same TIM1_CH1 channel at the drill/laser's
+        // 20kHz rate - added here after discovering TOOL_UV_CURING's own
+        // PWM handler (firmware_can_uvcuring.c) had already been written
+        // assuming this init happened, when it never actually did for
+        // that tool - this condition is what makes that handler's own
+        // __HAL_TIM_SET_COMPARE calls meaningful instead of writing to a
+        // timer nothing ever started.
         MX_TIM1_DrillLaserFan_Init(3199); // 64MHz/3200 = 20kHz - was 1kHz when
                                             // this shared TIM3's step tick
     }
@@ -287,7 +300,8 @@ int main(void) {
         HAL_GPIO_Init(GPIOB, &GPIO_Probe);
     } else if (active_tool != TOOL_PASTE_DISPENSER && active_tool != TOOL_LIQUID_DISPENSER &&
                active_tool != TOOL_SCREWDRIVER && active_tool != TOOL_GRIPPER_GIMBAL &&
-               active_tool != TOOL_GRIPPER_NEMA && active_tool != TOOL_3D_PRINTER) {
+               active_tool != TOOL_GRIPPER_NEMA && active_tool != TOOL_3D_PRINTER &&
+               active_tool != TOOL_SMT_PICKPLACE && active_tool != TOOL_VACUUM_GRIPPER_LG) {
         // Plain polled digital input: vacuum pickup's LM393 comparator, and the
         // new generic endstop/limit-switch input (Soldering iron, Drill, Laser,
         // AOI - NEW). Active low, so the internal pull-up gives a clean idle-high.
@@ -403,6 +417,7 @@ int main(void) {
             Watchdog_Safety_HotendFan();
             Watchdog_Safety_SolderIron();
             Watchdog_Safety_HotendHeater();
+            WeldPulse_Tick();
         }
 
         // Parameter-persistence check (every 500ms) - cheap when nothing's

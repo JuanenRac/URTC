@@ -4,9 +4,10 @@
 // GPL-3.0 - see LICENSE
 //
 // Covers Paste Dispenser, Liquid Dispenser, Screwdriver, Gripper (Gimbal),
-// and Gripper (NEMA) - 5 tool IDs sharing the exact same plain-stepper
-// STEP/DIR protocol, differing only in what's physically attached, not
-// in the protocol.
+// Gripper (NEMA), SMT Pick&Place (rotary A-axis), and Large-Format Vacuum
+// Gripper - 7 tool IDs sharing the exact same plain-stepper STEP/DIR
+// protocol, differing only in what's physically attached, not in the
+// protocol.
 // =============================================================================
 #include "firmware_common.h"
 #include "firmware_can_motion.h"

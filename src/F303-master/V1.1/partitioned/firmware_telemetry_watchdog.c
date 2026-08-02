@@ -77,7 +77,7 @@ void Watchdog_Safety_Drill(void) {
 // already-verified shutdown path each control function takes for a
 // declared error, rather than duplicating pin-level logic here.
 void Watchdog_Safety_SolderIron(void) {
-    if (active_tool != TOOL_SOLDERING_IRON) return;
+    if (active_tool != TOOL_SOLDERING_IRON && active_tool != TOOL_HOTAIR_REWORK) return;
 
     if (target_temperature > 0 && (HAL_GetTick() - solder_iron_last_kick_tick > 250)) {
         target_temperature = 0;

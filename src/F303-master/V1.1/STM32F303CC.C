@@ -109,7 +109,7 @@
 // not a hardware SPI peripheral. Reasoning (why not SPI2 or SPI3, both of
 // which exist on this chip but don't fit this board without moving other
 // already-committed pins): SPI2's default pins are PB12/13/14/15, which
-// this board already uses for EXP_TMC_STEP/DIR/EN/EXP_PWM. SPI3's default
+// this board already uses for EXP_TMC_STEP/DIR/EN/EXP_SPI_MOSI. SPI3's default
 // pins are PC10/PC11/PC12, which - confirmed against the official
 // STM32F303xB/xC datasheet's LQFP48-specific pin table - aren't present on
 // this 48-pin package at all, only on the larger LQFP64/LQFP100 variants
@@ -132,6 +132,22 @@
 #define EXP_SPI_MISO_PORT GPIOB
 #define EXP_SPI_MOSI_PIN  GPIO_PIN_15  // PB15
 #define EXP_SPI_MOSI_PORT GPIOB
+
+// Expansion driver interface (CONN_EXPANSION pins 5/6/15) - STEP/DIR/EN for
+// whatever stepper driver (TMC2209 or TMC5160A) is populated on the
+// expansion board, universal to either per PINOUT_CONNECTORS.TXT. Existed
+// as real hardware pins since the connector's own design, but had no
+// #define here until TOOL_CRIMPING_ACTUATOR (doc #12) became the first
+// tool actually driving a motor through the expansion board's own driver
+// instead of the onboard one - previously mentioned only in a comment
+// (and briefly, incorrectly, as "EXP_PWM" - there is no dedicated PWM
+// signal on this connector, confirmed against the same pinout doc).
+#define EXP_TMC_STEP_PIN  GPIO_PIN_12  // PB12
+#define EXP_TMC_STEP_PORT GPIOB
+#define EXP_TMC_DIR_PIN   GPIO_PIN_13  // PB13
+#define EXP_TMC_DIR_PORT  GPIOB
+#define EXP_TMC_EN_PIN    GPIO_PIN_14  // PB14
+#define EXP_TMC_EN_PORT   GPIOB
 
 // TMC_DIAG0 - combined stall/fault diagnostic line, shared between the
 // onboard TMC2209 (U6's own DIAG pin) and whatever driver populates the
@@ -235,17 +251,36 @@ typedef enum {
     TOOL_LASER_ENGRAVER     = 9,  
     TOOL_3D_PRINTER       = 10, 
     TOOL_SCAN_PROBE      = 11, 
-    // The 5-bit ID scheme can read 0-31, but only 0-11 map to a real tool
-    // head today. 12-31 (no jumpers matching any assigned tool - most
+    // 15-tool expansion (see 15_herramientas.txt) - IDs follow that
+    // document's own tool numbering for traceability. Document tools #2
+    // (Metrology Touch Probe) and #9 (Micro-Spindle) are explicitly
+    // identical to TOOL_SCAN_PROBE and TOOL_DRILL respectively - no new ID,
+    // they're just alternate physical end-effectors using the exact same
+    // firmware profile, so they don't appear here at all.
+    TOOL_SMT_PICKPLACE      = 12, // doc #1
+    TOOL_ELECTROMAGNET      = 13, // doc #3
+    TOOL_SPOT_WELDER        = 14, // doc #4
+    TOOL_CONFORMAL_COATING  = 15, // doc #5
+    TOOL_VACUUM_GRIPPER_LG  = 16, // doc #6
+    TOOL_FLYING_PROBE       = 17, // doc #7  - ADS1115 (0x48-0x4B)
+    TOOL_UV_CURING          = 18, // doc #8
+    TOOL_HOTAIR_REWORK      = 19, // doc #10
+    TOOL_PRESSFIT_INSERTER  = 20, // doc #11
+    TOOL_CRIMPING_ACTUATOR  = 21, // doc #12 - expansion driver (TMC2209/5160A)
+    TOOL_THERMAL_INSPECTION = 22, // doc #13 - MLX90640 (0x33)
+    TOOL_PASTE_JETTING      = 23, // doc #14
+    TOOL_ULTRASONIC_WELDER  = 24, // doc #15
+    // The 5-bit ID scheme can read 0-31, but only 0-24 map to a real tool
+    // head today. 25-31 (no jumpers matching any assigned tool - most
     // commonly unsoldered jumpers, a wiring fault, or simply an ID not yet
     // assigned to a tool) get their own explicit, deliberately inert state
     // here rather than silently mapping to any real tool - falling through
     // to an existing tool profile would make no sense: it isn't that tool,
     // and every other subsystem in the firmware would still treat it as if
     // it were one. This also leaves headroom for
-    // up to 20 more tool heads to be added later without another ID-scheme
-    // change.
-    TOOL_INVALID         = 12
+    // up to 6 more tool heads to be added later without another ID-scheme
+    // change (25-30 - 31 stays reserved for FREE CONFIGURATION).
+    TOOL_INVALID         = 25
 } ToolMode_t;
 
 // Snapshot of parameters worth surviving a power loss, written to the
@@ -452,6 +487,9 @@ volatile uint8_t can_bus_error_flag = 0;
 
 volatile uint8_t laser_power_setpoint = 0;
 volatile uint32_t laser_last_kick_tick = 0;
+volatile uint8_t  weld_pulse_active = 0;
+volatile uint32_t weld_pulse_start_tick = 0;
+volatile uint16_t weld_pulse_duration_ms = 0;
 volatile uint32_t drill_last_kick_tick = 0;
 volatile uint32_t layer_fan_last_kick_tick = 0; // Layer fan communication watchdog (does not touch PB6)
 
@@ -561,6 +599,7 @@ void Control_EndstopTelemetry(void);
 void Telemetry_Drill(void);
 void Telemetry_LayerFan(void);
 void Watchdog_Safety_Laser(void);
+void WeldPulse_Tick(void);
 void Watchdog_Safety_Drill(void);
 void Watchdog_Safety_LayerFan(void);
 void Watchdog_Safety_SolderIron(void);
@@ -1223,7 +1262,13 @@ static const uint8_t ws2812_lut[256][3] = {
 // (pages 5-6, column 108), without overwriting the telemetry text that
 // always lives starting at column 5.
 void OLED_DrawToolIcon(uint8_t tool) {
-    if (tool > TOOL_SCAN_PROBE) tool = TOOL_SOLDERING_IRON; // invalid ID safeguard
+    // ToolIcons[] below only has bitmap art for the original 12 tools
+    // (indices 0-11) - none of the 13 new tools (12-24) have their own
+    // dedicated animated icon yet, so anything above TOOL_SCAN_PROBE
+    // falls back to the soldering iron's icon rather than reading out of
+    // bounds. Update this once real icon art exists for the new tools -
+    // this is a placeholder, not a bug.
+    if (tool > TOOL_SCAN_PROBE) tool = TOOL_SOLDERING_IRON;
     uint8_t buf[16];
 
     memcpy(buf, ToolIcons[tool][animation_frame][0], 16);
@@ -1262,6 +1307,9 @@ void OLED_Render_YellowStrip(void) {
         case TOOL_SCREWDRIVER:
             status_text = (steps_remaining > 0) ? "DRIVING      " : "READY        ";
             break;
+        case TOOL_SMT_PICKPLACE:
+            status_text = (steps_remaining > 0) ? "ROTATING     " : "READY        ";
+            break;
         case TOOL_VACUUM_PICKUP:
             status_text = sensor_digital_reading ? "PART PICKED  " : "SEARCHING    ";
             break;
@@ -1270,6 +1318,7 @@ void OLED_Render_YellowStrip(void) {
             break;
         case TOOL_GRIPPER_GIMBAL:
         case TOOL_GRIPPER_NEMA:
+        case TOOL_VACUUM_GRIPPER_LG:
             status_text = (steps_remaining > 0) ? "GRIPPING     " : "READY        ";
             break;
         case TOOL_AOI_INSPECTION:
@@ -1491,6 +1540,8 @@ void Render_ToolScreen(void) {
         case TOOL_DRILL:            OLED_PrintStr(2, 16, "DRILL BL4260   "); break;
         case TOOL_GRIPPER_GIMBAL:     OLED_PrintStr(2, 16, "GRIPPER GIMBAL "); break;
         case TOOL_GRIPPER_NEMA:       OLED_PrintStr(2, 16, "GRIPPER NEMA 14"); break;
+        case TOOL_VACUUM_GRIPPER_LG:  OLED_PrintStr(2, 16, "VACUUM GRIP LG "); break;
+        case TOOL_SMT_PICKPLACE:      OLED_PrintStr(2, 16, "SMT PICK&PLACE "); break;
         case TOOL_AOI_INSPECTION:     OLED_PrintStr(2, 16, "AOI INSPECTION "); break;
         case TOOL_LASER_ENGRAVER:     OLED_PrintStr(2, 16, "LASER DIODE 10W"); break;
         case TOOL_3D_PRINTER:       OLED_PrintStr(2, 16, "3D PRINTER  V4 "); break;
@@ -1525,7 +1576,9 @@ void Render_ToolScreen(void) {
         case TOOL_LIQUID_DISPENSER:
         case TOOL_SCREWDRIVER:
         case TOOL_GRIPPER_GIMBAL:
-        case TOOL_GRIPPER_NEMA: {
+        case TOOL_GRIPPER_NEMA:
+        case TOOL_SMT_PICKPLACE:
+        case TOOL_VACUUM_GRIPPER_LG: {
             __disable_irq();
             uint32_t steps_rem_snapshot = steps_remaining;
             uint32_t steps_total_snapshot = total_steps_setpoint;
@@ -1872,7 +1925,7 @@ void MX_ExpansionSPI_Init(void) {
 // 6. SAFE PID THERMAL CONTROL LOOPS (PHYSICAL LIMIT INCLUDED)
 // =============================================================================
 void Control_SolderingIron_PID(void) {
-    if (active_tool != TOOL_SOLDERING_IRON) return;
+    if (active_tool != TOOL_SOLDERING_IRON && active_tool != TOOL_HOTAIR_REWORK) return;
 
     // The T12 cartridge routes its heater current and its internal
     // thermocouple through the same two conductors. Force the heater off
@@ -2188,6 +2241,19 @@ void Watchdog_Safety_Laser(void) {
     }
 }
 
+// Ends an active spot-welder/ultrasonic-welder pulse once its declared
+// duration has elapsed - see this function's own note in the partitioned
+// form (firmware_can_weldpulse.c) on the ~20ms real resolution limit
+// this polled approach has, since T12_PWM_PIN has no hardware timer
+// behind it.
+void WeldPulse_Tick(void) {
+    if (!weld_pulse_active) return;
+    if (HAL_GetTick() - weld_pulse_start_tick >= weld_pulse_duration_ms) {
+        HAL_GPIO_WritePin(T12_PWM_PORT, T12_PWM_PIN, GPIO_PIN_RESET);
+        weld_pulse_active = 0;
+    }
+}
+
 // Drill communication watchdog - the laser, layer fan, and hotend fan all
 // have one, but a lost-comms drill would have
 // spun at whatever speed was last commanded indefinitely). Same 250ms
@@ -2212,7 +2278,7 @@ void Watchdog_Safety_Drill(void) {
 // already-verified shutdown path each control function takes for a
 // declared error, rather than duplicating pin-level logic here.
 void Watchdog_Safety_SolderIron(void) {
-    if (active_tool != TOOL_SOLDERING_IRON) return;
+    if (active_tool != TOOL_SOLDERING_IRON && active_tool != TOOL_HOTAIR_REWORK) return;
 
     if (target_temperature > 0 && (HAL_GetTick() - solder_iron_last_kick_tick > 250)) {
         target_temperature = 0;
@@ -2337,7 +2403,7 @@ void Identify_PhysicalTool(void) {
                             // boot's reading was specifically 0x1F/11111b,
                             // not just whatever active_tool ends up as here.
 
-    if (id <= 11) {
+    if (id <= 24) {
         active_tool = (ToolMode_t)id;
     } else if (id == 31) {
         // 0x1F/11111b - every jumper installed - is the "free
@@ -2359,7 +2425,7 @@ void Identify_PhysicalTool(void) {
             && SavedState_Checksum(&fram_check) == fram_check.checksum) {
             selection = fram_check.free_tool_selection;
         }
-        if (selection >= 1 && selection <= 12) {
+        if (selection >= 1 && selection <= 25) {
             active_tool = (ToolMode_t)(selection - 1);
         } else {
             active_tool = TOOL_INVALID;
@@ -2790,6 +2856,8 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan_m) {
             case TOOL_SCREWDRIVER:
             case TOOL_GRIPPER_GIMBAL:
             case TOOL_GRIPPER_NEMA:
+            case TOOL_SMT_PICKPLACE:     // doc #1 - rotary A-axis, plain NEMA8 stepper
+            case TOOL_VACUUM_GRIPPER_LG: // doc #6 - open/close, plain stepper
                 if (rxHeader.StdId == 0x120 && rxHeader.DLC >= 5 && !boot_sequence_active) {
                     __disable_irq();
                     // Clears any steps left over from the previous command
@@ -2929,6 +2997,66 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan_m) {
                     // means the laser could fire when you expect it locked.
                     HAL_GPIO_WritePin(TMC_ENN_PORT, LASER_SAFETY_PIN,
                         (rxData[1] == 0x01) ? GPIO_PIN_SET : GPIO_PIN_RESET);
+                }
+                break;
+
+            case TOOL_ELECTROMAGNET: // doc #3 - CONN_T12 as plain on/off,
+                                      // not a hardware PWM channel (see
+                                      // firmware_can_electromagnet.c's own
+                                      // note in the partitioned form)
+                if (rxHeader.StdId == 0x1B0 && rxHeader.DLC >= 1 && !boot_sequence_active) {
+                    HAL_GPIO_WritePin(T12_PWM_PORT, T12_PWM_PIN,
+                        (rxData[0] != 0x00) ? GPIO_PIN_SET : GPIO_PIN_RESET);
+                }
+                break;
+
+            case TOOL_UV_CURING: // doc #8 - real hardware PWM, TIM1_CH1
+                                  // shared with drill/laser/layer fan
+                if (rxHeader.StdId == 0x1D0 && rxHeader.DLC >= 1 && !boot_sequence_active) {
+                    uint32_t uv_duty = (rxData[0] * 3199) / 255;
+                    __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, uv_duty);
+                }
+                break;
+
+            case TOOL_SPOT_WELDER:       // doc #4
+            case TOOL_ULTRASONIC_WELDER: // doc #15 - shares this case with
+                                          // doc #4 since both are a timed
+                                          // T12 pulse (see
+                                          // firmware_can_weldpulse.c's own
+                                          // note on the ~20ms real
+                                          // resolution limit and why only
+                                          // doc #4 gates on the contact
+                                          // sensor)
+                if (!weld_pulse_active) {
+                    if (rxHeader.StdId == 0x1C0 && rxHeader.DLC >= 3 && !boot_sequence_active
+                        && active_tool == TOOL_SPOT_WELDER && rxData[0] == 0x01
+                        && HAL_GPIO_ReadPin(GPIOB, TCRT_D0_DIG_PIN) == GPIO_PIN_SET) {
+                        weld_pulse_duration_ms = ((uint16_t)rxData[1] << 8) | rxData[2];
+                        weld_pulse_start_tick = HAL_GetTick();
+                        weld_pulse_active = 1;
+                        HAL_GPIO_WritePin(T12_PWM_PORT, T12_PWM_PIN, GPIO_PIN_SET);
+                    } else if (rxHeader.StdId == 0x200 && rxHeader.DLC >= 3 && !boot_sequence_active
+                               && active_tool == TOOL_ULTRASONIC_WELDER && rxData[0] == 0x01) {
+                        weld_pulse_duration_ms = ((uint16_t)rxData[1] << 8) | rxData[2];
+                        weld_pulse_start_tick = HAL_GetTick();
+                        weld_pulse_active = 1;
+                        HAL_GPIO_WritePin(T12_PWM_PORT, T12_PWM_PIN, GPIO_PIN_SET);
+                    }
+                }
+                break;
+
+            case TOOL_HOTAIR_REWORK: // doc #10 - target_temperature shared
+                                      // with the soldering iron's own
+                                      // thermal loop (see
+                                      // Control_SolderingIron_PID's own
+                                      // extended active_tool check above),
+                                      // blower on the same TIM1_CH1 as
+                                      // drill/laser/UV-curing
+                if (rxHeader.StdId == 0x1E0 && rxHeader.DLC >= 3 && !boot_sequence_active) {
+                    target_temperature = ((uint16_t)rxData[0] << 8) | rxData[1];
+                    solder_iron_last_kick_tick = HAL_GetTick();
+                    uint32_t blower_duty = (rxData[2] * 3199) / 255;
+                    __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, blower_duty);
                 }
                 break;
 
@@ -3372,7 +3500,8 @@ void MX_GPIO_Post_Init(void) {
     // reconfiguration") to set once, correctly, as its actual final mode.
     if (active_tool == TOOL_PASTE_DISPENSER || active_tool == TOOL_LIQUID_DISPENSER ||
         active_tool == TOOL_SCREWDRIVER || active_tool == TOOL_GRIPPER_GIMBAL ||
-        active_tool == TOOL_GRIPPER_NEMA || active_tool == TOOL_3D_PRINTER) {
+        active_tool == TOOL_GRIPPER_NEMA || active_tool == TOOL_3D_PRINTER ||
+        active_tool == TOOL_SMT_PICKPLACE || active_tool == TOOL_VACUUM_GRIPPER_LG) {
         HAL_GPIO_WritePin(GPIOB, STEP_PIN, GPIO_PIN_RESET);
         GPIO_InitStruct.Pin = STEP_PIN;
         GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
@@ -3738,7 +3867,12 @@ int main(void) {
         HAL_GPIO_Init(HOTEND_FAN_FG_PORT, &GPIO_HotendFanFG);
         // NVIC enable for EXTI9_5_IRQn already happens unconditionally in
         // MX_GPIO_Post_Init, alongside EXTI3_IRQn - no need to repeat it here.
-    } else if (active_tool == TOOL_DRILL || active_tool == TOOL_LASER_ENGRAVER) {
+    } else if (active_tool == TOOL_DRILL || active_tool == TOOL_LASER_ENGRAVER ||
+               active_tool == TOOL_UV_CURING || active_tool == TOOL_HOTAIR_REWORK) {
+        // UV Curing (doc #8) and Hot Air Rework's own blower (doc #10)
+        // both share this same TIM1_CH1 channel at the drill/laser's
+        // 20kHz rate - see the partitioned form's own note
+        // (STM32F303CC_main.c) on why this condition had to be extended.
         MX_TIM1_DrillLaserFan_Init(3199); // 64MHz/3200 = 20kHz - was 1kHz when
                                             // this shared TIM3's step tick
     }
@@ -3762,7 +3896,8 @@ int main(void) {
         HAL_GPIO_Init(GPIOB, &GPIO_Probe);
     } else if (active_tool != TOOL_PASTE_DISPENSER && active_tool != TOOL_LIQUID_DISPENSER &&
                active_tool != TOOL_SCREWDRIVER && active_tool != TOOL_GRIPPER_GIMBAL &&
-               active_tool != TOOL_GRIPPER_NEMA && active_tool != TOOL_3D_PRINTER) {
+               active_tool != TOOL_GRIPPER_NEMA && active_tool != TOOL_3D_PRINTER &&
+               active_tool != TOOL_SMT_PICKPLACE && active_tool != TOOL_VACUUM_GRIPPER_LG) {
         // Plain polled digital input: vacuum pickup's LM393 comparator, and the
         // new generic endstop/limit-switch input (Soldering iron, Drill, Laser,
         // AOI - NEW). Active low, so the internal pull-up gives a clean idle-high.
@@ -3877,6 +4012,7 @@ int main(void) {
             Watchdog_Safety_HotendFan();
             Watchdog_Safety_SolderIron();
             Watchdog_Safety_HotendHeater();
+            WeldPulse_Tick();
         }
 
         // Parameter-persistence check (every 500ms) - cheap when nothing's

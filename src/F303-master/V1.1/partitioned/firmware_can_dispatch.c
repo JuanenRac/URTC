@@ -23,6 +23,10 @@
 #include "firmware_can_aoi.h"
 #include "firmware_can_laser.h"
 #include "firmware_can_printer3d.h"
+#include "firmware_can_electromagnet.h"
+#include "firmware_can_uvcuring.h"
+#include "firmware_can_weldpulse.h"
+#include "firmware_can_hotair.h"
 
 void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan_m) {
     if (HAL_CAN_GetRxMessage(hcan_m, CAN_RX_FIFO0, &rxHeader, rxData) == HAL_OK) {
@@ -64,6 +68,8 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan_m) {
             case TOOL_SCREWDRIVER:
             case TOOL_GRIPPER_GIMBAL:
             case TOOL_GRIPPER_NEMA:
+            case TOOL_SMT_PICKPLACE:     // doc #1 - rotary A-axis, plain NEMA8 stepper
+            case TOOL_VACUUM_GRIPPER_LG: // doc #6 - open/close, plain stepper
                 Handle_CAN_MotionTools();
                 break;
             case TOOL_DRILL:
@@ -77,6 +83,19 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan_m) {
                 break;
             case TOOL_3D_PRINTER:
                 Handle_CAN_3DPrinter();
+                break;
+            case TOOL_ELECTROMAGNET:     // doc #3
+                Handle_CAN_Electromagnet();
+                break;
+            case TOOL_UV_CURING:         // doc #8
+                Handle_CAN_UVCuring();
+                break;
+            case TOOL_SPOT_WELDER:       // doc #4
+            case TOOL_ULTRASONIC_WELDER: // doc #15
+                Handle_CAN_WeldPulse();
+                break;
+            case TOOL_HOTAIR_REWORK:     // doc #10
+                Handle_CAN_HotAirRework();
                 break;
             default:
                 break;

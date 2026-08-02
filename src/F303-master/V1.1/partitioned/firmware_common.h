@@ -12,7 +12,7 @@
 
 // =============================================================================
 // TARGET MCU: STM32F303CCT6 (LQFP48 Package - 48 Pins)
-// ENVIRONMENT: ASSEMBLY LINE / UNIVERSAL TOOL-HEAD CONTROLLER (URTC v1.0)
+// ENVIRONMENT: ASSEMBLY LINE / UNIVERSAL TOOL-HEAD CONTROLLER (URTC v1.1)
 // PROJECTS: URTC/HYDRA-UMC (JUANENBOT/PAROL6)
 // AUTHOR: JuanenRac (Electro Hobby 3D) - electrohobby3d@gmail.com
 // SAFETY HARDWARE ALIGNMENT WITH PINOUT V1.0 AND ECOSYSTEM DOC
@@ -25,7 +25,7 @@
 // reset into the bootloader first just to find out.
 #define THIS_HARDWARE_ID     0x0303CC01UL // STM32F303CCT6, URTC board revision 1
 #define FIRMWARE_VERSION_MAJOR 1
-#define FIRMWARE_VERSION_MINOR 0
+#define FIRMWARE_VERSION_MINOR 1
 
 // ID configuration matrix (physical tool-head address readout)
 #define ID0_PIN         GPIO_PIN_0  // PF0 - Bit 0
@@ -94,7 +94,7 @@
 // not a hardware SPI peripheral. Reasoning (why not SPI2 or SPI3, both of
 // which exist on this chip but don't fit this board without moving other
 // already-committed pins): SPI2's default pins are PB12/13/14/15, which
-// this board already uses for EXP_TMC_STEP/DIR/EN/EXP_PWM. SPI3's default
+// this board already uses for EXP_TMC_STEP/DIR/EN/EXP_SPI_MOSI. SPI3's default
 // pins are PC10/PC11/PC12, which - confirmed against the official
 // STM32F303xB/xC datasheet's LQFP48-specific pin table - aren't present on
 // this 48-pin package at all, only on the larger LQFP64/LQFP100 variants
@@ -117,6 +117,22 @@
 #define EXP_SPI_MISO_PORT GPIOB
 #define EXP_SPI_MOSI_PIN  GPIO_PIN_15  // PB15
 #define EXP_SPI_MOSI_PORT GPIOB
+
+// Expansion driver interface (CONN_EXPANSION pins 5/6/15) - STEP/DIR/EN for
+// whatever stepper driver (TMC2209 or TMC5160A) is populated on the
+// expansion board, universal to either per PINOUT_CONNECTORS.TXT. Existed
+// as real hardware pins since the connector's own design, but had no
+// #define here until TOOL_CRIMPING_ACTUATOR (doc #12) became the first
+// tool actually driving a motor through the expansion board's own driver
+// instead of the onboard one - previously mentioned only in a comment
+// (and briefly, incorrectly, as "EXP_PWM" - there is no dedicated PWM
+// signal on this connector, confirmed against the same pinout doc).
+#define EXP_TMC_STEP_PIN  GPIO_PIN_12  // PB12
+#define EXP_TMC_STEP_PORT GPIOB
+#define EXP_TMC_DIR_PIN   GPIO_PIN_13  // PB13
+#define EXP_TMC_DIR_PORT  GPIOB
+#define EXP_TMC_EN_PIN    GPIO_PIN_14  // PB14
+#define EXP_TMC_EN_PORT   GPIOB
 
 // TMC_DIAG0 - combined stall/fault diagnostic line, shared between the
 // onboard TMC2209 (U6's own DIAG pin) and whatever driver populates the
@@ -220,17 +236,36 @@ typedef enum {
     TOOL_LASER_ENGRAVER     = 9,  
     TOOL_3D_PRINTER       = 10, 
     TOOL_SCAN_PROBE      = 11, 
-    // The 5-bit ID scheme can read 0-31, but only 0-11 map to a real tool
-    // head today. 12-31 (no jumpers matching any assigned tool - most
+    // 15-tool expansion (see 15_herramientas.txt) - IDs follow that
+    // document's own tool numbering for traceability. Document tools #2
+    // (Metrology Touch Probe) and #9 (Micro-Spindle) are explicitly
+    // identical to TOOL_SCAN_PROBE and TOOL_DRILL respectively - no new ID,
+    // they're just alternate physical end-effectors using the exact same
+    // firmware profile, so they don't appear here at all.
+    TOOL_SMT_PICKPLACE      = 12, // doc #1
+    TOOL_ELECTROMAGNET      = 13, // doc #3
+    TOOL_SPOT_WELDER        = 14, // doc #4
+    TOOL_CONFORMAL_COATING  = 15, // doc #5
+    TOOL_VACUUM_GRIPPER_LG  = 16, // doc #6
+    TOOL_FLYING_PROBE       = 17, // doc #7  - ADS1115 (0x48-0x4B)
+    TOOL_UV_CURING          = 18, // doc #8
+    TOOL_HOTAIR_REWORK      = 19, // doc #10
+    TOOL_PRESSFIT_INSERTER  = 20, // doc #11
+    TOOL_CRIMPING_ACTUATOR  = 21, // doc #12 - expansion driver (TMC2209/5160A)
+    TOOL_THERMAL_INSPECTION = 22, // doc #13 - MLX90640 (0x33)
+    TOOL_PASTE_JETTING      = 23, // doc #14
+    TOOL_ULTRASONIC_WELDER  = 24, // doc #15
+    // The 5-bit ID scheme can read 0-31, but only 0-24 map to a real tool
+    // head today. 25-31 (no jumpers matching any assigned tool - most
     // commonly unsoldered jumpers, a wiring fault, or simply an ID not yet
     // assigned to a tool) get their own explicit, deliberately inert state
     // here rather than silently mapping to any real tool - falling through
     // to an existing tool profile would make no sense: it isn't that tool,
     // and every other subsystem in the firmware would still treat it as if
     // it were one. This also leaves headroom for
-    // up to 20 more tool heads to be added later without another ID-scheme
-    // change.
-    TOOL_INVALID         = 12
+    // up to 6 more tool heads to be added later without another ID-scheme
+    // change (25-30 - 31 stays reserved for FREE CONFIGURATION).
+    TOOL_INVALID         = 25
 } ToolMode_t;
 
 // Snapshot of parameters worth surviving a power loss, written to the
@@ -357,6 +392,9 @@ extern volatile uint8_t boot_sequence_active;
 extern volatile uint8_t can_bus_error_flag;
 extern volatile uint8_t laser_power_setpoint;
 extern volatile uint32_t laser_last_kick_tick;
+extern volatile uint8_t  weld_pulse_active;
+extern volatile uint32_t weld_pulse_start_tick;
+extern volatile uint16_t weld_pulse_duration_ms;
 extern volatile uint32_t drill_last_kick_tick;
 extern volatile uint32_t layer_fan_last_kick_tick;
 extern volatile uint8_t hotend_fan_duty;

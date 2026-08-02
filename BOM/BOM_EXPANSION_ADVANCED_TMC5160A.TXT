@@ -1,0 +1,93 @@
+================================================================================
+BILL OF MATERIALS (BOM) - URTC EXPANSION BOARD, ADVANCED + TMC5160A VARIANT
+================================================================================
+AUTHOR: JuanenRac (Electro Hobby 3D) - electrohobby3d@gmail.com
+LICENSE: This document is licensed under CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/).
+         Firmware source is GPL-3.0; hardware design files (once drawn)
+         will be CERN-OHL-S v2, same as the main URTC board - see the
+         repo README.
+VARIANT: ADVANCED + TMC5160A - the most complete of the 4 variants:
+         everything in BOM_EXPANSION_ADVANCED_TMC2209.TXT (slave MCU,
+         both local sensor chips, local PWM support), but with the
+         higher-power TMC5160A driver and its required external MOSFET
+         power stage (see BOM_EXPANSION_BASIC_TMC5160A.TXT's own note on
+         why that driver needs 8 external MOSFETs where TMC2209 needs
+         none).
+SOURCE: Same provisional-BOM caveat as every other expansion-board BOM
+        in this set - no schematic exists yet.
+================================================================================
+
+--------------------------------------------------------------------------------
+1. STEPPER DRIVER (TMC5160A) - identical to BOM_EXPANSION_BASIC_TMC5160A.TXT
+   section 1
+--------------------------------------------------------------------------------
+RefDes      Qty        Value / Model       Package         Notes / Description
+--------------------------------------------------------------------------------
+U1          1          TMC5160A-BOB        QFN-32 (5x5)    Same part/reasoning as
+                                                            BOM_EXPANSION_BASIC_TMC5160A.TXT section 1
+Q1-Q8       8          IRLZ44N (or equiv.) TO-220 or        External power MOSFETs - same provisional
+                        10V-gate-drive,     D2PAK (SMD)     part/caveat as the basic-variant BOM
+                        low-RDSon part
+R1,R2       2          0.05R 1% (2W+)      R2512 or THT    Current-sense resistors
+C1-C4       4          100uF/50V low-ESR   Electrolytic/   VS bulk filtering
+                        (per amp of coil    Polymer
+                        current)
+C5,C6       2          100nF               C0603           VSA local decoupling
+C7          1          2.2uF               C0603           5VOUT decoupling
+
+--------------------------------------------------------------------------------
+2. SLAVE MICROCONTROLLER (STM32F303CBT6) - identical to
+   BOM_EXPANSION_ADVANCED_TMC2209.TXT section 2
+--------------------------------------------------------------------------------
+RefDes      Qty        Value / Model       Package         Notes / Description
+--------------------------------------------------------------------------------
+U2          1          STM32F303CBT6       LQFP48 (7x7)    Same part/reasoning as
+                                                            BOM_EXPANSION_ADVANCED_TMC2209.TXT section 2
+C8-C11      4          100nF               C0402           VDD decoupling
+C12         1          4.7uF                C0603           VDD bulk decoupling
+C13         1          100nF               C0402           VDDA decoupling
+R3          1          10K                 R0402           BOOT0 pull-down
+R4          1          10K                 R0402           BOOT0 pull-up path, through SW1
+SW1         1          Momentary pushbutton SMD/THT        Forces BOOT0 high during reset
+No crystal populated - same HSI-only reasoning as the TMC2209 advanced
+variant.
+
+--------------------------------------------------------------------------------
+3. LOCAL SENSOR BUS (I2C2) - identical to
+   BOM_EXPANSION_ADVANCED_TMC2209.TXT section 3
+--------------------------------------------------------------------------------
+RefDes      Qty        Value / Model       Package         Notes / Description
+--------------------------------------------------------------------------------
+U3          1          ADS1115IDGST        VSSOP-10        16-bit ADC, address 0x48
+U4          1          MLX90640ESF-BAA-     44-VLGA         32x24 thermal array, address 0x33
+                        000-TU
+R5,R6       2          4.7K                R0402           I2C2 pull-ups
+C14,C15     2          100nF               C0402           U3/U4 local decoupling
+
+--------------------------------------------------------------------------------
+4. LOCAL PWM CONNECTOR SUPPORT
+--------------------------------------------------------------------------------
+Same as BOM_EXPANSION_ADVANCED_TMC2209.TXT section 4 - no additional
+passives beyond the tool-facing connector.
+
+--------------------------------------------------------------------------------
+5. LINK BUS (I2C1) SUPPORT
+--------------------------------------------------------------------------------
+Same as BOM_EXPANSION_ADVANCED_TMC2209.TXT section 5 - no local
+pull-ups populated, shared bus already has them on the main board's side.
+
+--------------------------------------------------------------------------------
+6. CONNECTORS
+--------------------------------------------------------------------------------
+RefDes      Qty        Value / Model       Package         Notes / Description
+--------------------------------------------------------------------------------
+J1          1          TBD (link)          THT/SMD header  Same link connector as every other variant
+J2          1          TBD (motor)         THT terminal,   Same higher-current motor connector as
+                                            higher current  BOM_EXPANSION_BASIC_TMC5160A.TXT
+                                            rated
+J3          1          TBD (tool-specific) THT/SMD header  Same per-tool convention as the TMC2209
+                                                            advanced variant
+J4          1          TBD (SWD)           1.27mm 4-pin    Same SWD header as the TMC2209 advanced
+                                            header          variant
+
+================================================================================

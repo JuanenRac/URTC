@@ -49,7 +49,7 @@ void Identify_PhysicalTool(void) {
     raw_id_pin_value = id; // kept for the id==31 case below, and readable
                             // over CAN (0x1A3) afterward for diagnostics
 
-    if (id <= 11) {
+    if (id <= 24) {
         active_tool = (ToolMode_t)id;
     } else if (id == 31) {
         // 0x1F/11111b - every jumper installed - is the "free
@@ -72,7 +72,7 @@ void Identify_PhysicalTool(void) {
             && SavedState_Checksum(&fram_check) == fram_check.checksum) {
             selection = fram_check.free_tool_selection;
         }
-        if (selection >= 1 && selection <= 12) {
+        if (selection >= 1 && selection <= 25) {
             active_tool = (ToolMode_t)(selection - 1);
         } else {
             active_tool = TOOL_INVALID;

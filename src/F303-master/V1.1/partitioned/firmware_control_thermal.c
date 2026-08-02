@@ -7,7 +7,7 @@
 #include "firmware_control_thermal.h"
 
 void Control_SolderingIron_PID(void) {
-    if (active_tool != TOOL_SOLDERING_IRON) return;
+    if (active_tool != TOOL_SOLDERING_IRON && active_tool != TOOL_HOTAIR_REWORK) return;
 
     // The T12 cartridge routes its heater current and its internal
     // thermocouple through the same two conductors. Force the heater off
