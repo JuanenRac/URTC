@@ -291,8 +291,16 @@ typedef struct __attribute__((packed)) {
     uint8_t  oled_night_mode;
     uint8_t  had_critical_error; // was system_error_flag set at the moment of the last save, before whatever powered the board off?
     uint8_t  expansion_board_type; // 0=none, 1=basic TMC2209, 2=basic TMC5160A,
-                                    // 3=advanced TMC2209+STM32F051T8, 4=advanced
-                                    // TMC5160A+STM32F051T8 - see EXPANSION.TXT.
+                                    // 3=advanced TMC2209+STM32F303CBT6, 4=advanced
+                                    // TMC5160A+STM32F303CBT6, 5=basic ADS1115 (sensor
+                                    // only, no driver, no slave MCU - the ADS1115
+                                    // itself talks directly to this chip over the
+                                    // same bit-banged I2C bus that reaches the slave
+                                    // MCU on variants 3-4, just a different I2C
+                                    // address and protocol since there's no slave
+                                    // chip relaying it here), 6=basic MLX9064x (same
+                                    // direct-connection reasoning, for the thermal
+                                    // sensor instead) - see EXPANSION.TXT.
                                     // Set explicitly by the host (0x1A0/0x1A1 -
                                     // see CANBUS.TXT), not auto-detected - there's
                                     // no electrical way to sense which variant (or
@@ -303,9 +311,9 @@ typedef struct __attribute__((packed)) {
                                     // Identify_PhysicalTool()'s own id==31 branch.
                                     // 0 = no tool selected
                                     // (same safe/error state as an unrecognized ID
-                                    // reading), 1-12 = one of the 12 currently
+                                    // reading), 1-25 = one of the 25 currently
                                     // supported tool profiles (stored as id+1, not
-                                    // the raw 0-11 ToolMode_t value, so 0 can
+                                    // the raw 0-24 ToolMode_t value, so 0 can
                                     // unambiguously mean "nothing chosen yet"
                                     // rather than colliding with tool 0, the
                                     // soldering iron). Set via CAN (0x1A2/0x1A3 -

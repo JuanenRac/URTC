@@ -146,7 +146,7 @@ void Handle_CAN_GlobalCommands_PreErrorGate(void) {
             }
         }
 
-        // Set/query expansion board type (0x1A0/0x1A1) - which of the 5
+        // Set/query expansion board type (0x1A0/0x1A1) - which of the 7
         // possible configurations (see EXPANSION.TXT) is physically
         // installed on CONN_EXPANSION. There's no electrical way to
         // sense this - the board has to be told, once, and this value
@@ -157,7 +157,7 @@ void Handle_CAN_GlobalCommands_PreErrorGate(void) {
         // below, for the same reason as 0x190 just above - this is
         // configuration/diagnostic, not an actuation command, so there's
         // no reason to gate it behind a fault clearing.
-        if (rxHeader.StdId == 0x1A0 && rxHeader.DLC >= 1 && rxData[0] <= 4) {
+        if (rxHeader.StdId == 0x1A0 && rxHeader.DLC >= 1 && rxData[0] <= 6) {
             expansion_board_type = rxData[0];
         }
         if (rxHeader.StdId == 0x1A0 || rxHeader.StdId == 0x1A1) {
