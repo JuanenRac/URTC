@@ -471,12 +471,17 @@ subsystem rather than two.
 | `firmware_can_crimping.c` | Crimping Actuator handler (`0x1F0`) - drives the expansion board's own driver (`EXP_TMC_STEP/DIR/EN`) instead of the onboard one. |
 | `firmware_can_slavebridge.c` | CAN-to-I2C bridge to the expansion slave chip (`0x210`-`0x221`) - OTA relay and generic application-register access. Not gated by `active_tool`; see this file's own header comment for why. |
 | `firmware_can_pastejetting.c` | Solder Paste Jetting handler (`0x230`/`0x231`) - thin wrapper over the bridge above. |
-| `firmware_can_flyingprobe.c` | Functional Testing Head handler (`0x240`-`0x242`) - the ADS1115 (advanced-board) half of this tool's own 2 reading paths; the basic onboard-ADC half lives in `firmware_control_sensors.c`. |
-| `firmware_can_thermalinspection.c` | PCB Advanced Inspection handler (`0x250`-`0x255`) - MLX90640 chunk reads, split across multiple CAN frames per chunk since a chunk is larger than one frame's own payload. |
+| `firmware_ads1115.c` | Direct ADS1115 driver for the Basic+ADS1115 expansion board (`expansion_board_type==5`) - reaches the chip straight over the bit-banged expansion I2C bus, no slave chip involved. Built on the same primitives `firmware_expansion_i2c.c` already exposes. |
+| `firmware_can_flyingprobe.c` | Functional Testing Head handler (`0x240`-`0x242`) - dual-path: `expansion_board_type==5` talks to `firmware_ads1115.c` directly, `==3`/`4` relays through the expansion slave chip instead. Same CAN IDs either way. The basic onboard-ADC reading path (doc #7's own third option) lives in `firmware_control_sensors.c`. |
+| `firmware_can_thermalinspection.c` | PCB Advanced Inspection handler (`0x250`-`0x255`) - same dual-path shape as Flying Probe above: `expansion_board_type==6` talks to whichever of `melexis_mlx90640/`, `melexis_mlx90641/`, or `melexis_mlx90642/` matches `mlx_sensor_variant` directly, `==3`/`4` relays through the expansion slave chip. Pixel chunks are split across multiple CAN frames per chunk on either path, since a chunk is larger than one frame's own payload. |
 | `firmware_interrupts_can.c` | `HAL_CAN_RxFifo0MsgPendingCallback` - the CAN receive ISR every command above runs inside of. |
 | `firmware_interrupts_timer.c` | Step-pulse generation ISR (TIM3) and its own concurrency-safe `steps_remaining` handling - resolves onboard vs. expansion-board driver pins based on `active_tool` (see Crimping Actuator above). |
 | `firmware_interrupts_gpio.c` | EXTI (touch probe / FG pulse counting) ISR, including the probe-impact CAN message. |
 | `firmware_interrupts_fault.c` | `HardFault_Handler` and related fault-safe-state logic. |
+
+`melexis_mlx90640/`, `melexis_mlx90641/`, and `melexis_mlx90642/` are
+subfolders, not single files - see section 8a below for what lives in
+each and why they're split out from the flat list above.
 
 Plus `STM32F303CCTx_APP.ld` (the linker script defining this application's
 place in flash - see section 1's flash layout table) and this README,
@@ -490,6 +495,62 @@ changes, and no other module needs to know the new tool exists unless
 it specifically interacts with it. 25 tool IDs are assigned today (12
 from the original release, 13 more from a later expansion); the ID
 scheme has room for a handful more before needing another expansion.
+
+---
+
+## 8a. `melexis_mlx90640/`, `melexis_mlx90641/`, `melexis_mlx90642/` - this board's own direct MLX9064x support
+
+Only relevant when `expansion_board_type==6` (Basic+MLX9064x, no slave
+MCU) - the sensor is wired straight onto this board's own bit-banged
+expansion I2C bus, so this board's own STM32F303CC has to talk to it
+itself, the same job the expansion slave chip does on its side of the
+Advanced variants. `mlx_sensor_variant` (`MLX_VARIANT_90640`/`90641`/
+`90642`) decides which of these 3 folders `firmware_can_thermalinspection.c`
+actually calls into - all 3 have full direct-path support today, mirroring
+this project's own coverage on the expansion slave chip.
+
+**`melexis_mlx90640/`** (32×24, 768px):
+
+| File | Purpose |
+|---|---|
+| `MLX90640_API.h` / `.c` | Melexis's own official library (Apache-2.0, plain C), vendored unmodified - identical copy to the expansion slave chip's own `src/F303-slave/melexis/` (verified byte-for-byte before vendoring here, not a separate download). |
+| `MLX90640_I2C_Driver.h` | This library's own platform-transport interface. |
+| `firmware_mlx90640_transport.c` | This board's own implementation of that 5-function transport, built on `firmware_expansion_i2c.c`'s own bit-banged primitives. |
+| `firmware_mlx90640_app.c` / `.h` | Application-level capture and chunk-serving logic - 48 chunks (768 pixels at 16 per chunk). |
+| `LICENSE_MELEXIS_APACHE2.0` | The library's own unmodified Apache-2.0 license text. |
+
+**`melexis_mlx90641/`** (16×12, 192px):
+
+| File | Purpose |
+|---|---|
+| `MLX90641_API.h` / `.cpp` | Melexis's own official library (Apache-2.0), vendored with only one change: an `extern "C"` linkage wrapper added to the header (documented inline in the file itself) so this project's own C firmware can call it without C++ name-mangling. No logic changed. |
+| `MLX90641_I2C_Driver.h` | This library's own platform-transport interface - same `extern "C"` treatment as the API header above. |
+| `firmware_mlx90641_transport.c` | This board's own implementation of that 5-function transport interface, built on `firmware_expansion_i2c.c`'s own bit-banged primitives. |
+| `firmware_mlx90641_app.c` / `.h` | Application-level capture and chunk-serving logic - 12 chunks (192 pixels at 16 per chunk, this sensor's own lower resolution vs. the other two). |
+| `LICENSE_MELEXIS_APACHE2.0` | The library's own unmodified Apache-2.0 license text. |
+
+**Why `melexis_mlx90641/` is the one C++ code in an otherwise all-C
+project:** Melexis's own official MLX90641 library is written in C++
+(unlike its MLX90640 and MLX90642 siblings, both plain C) - confirmed
+against the real upstream repository before assuming otherwise. Rather
+than hand-porting non-trivial calibration math to C (real risk of a
+subtle error with no way to verify it against the original), this
+project's own build process compiles `MLX90641_API.cpp` with
+`arm-none-eabi-g++` (`-fno-exceptions -fno-rtti -fno-unwind-tables
+-fno-threadsafe-statics`, keeping the embedded footprint minimal) and
+links the result together with every other, plain-C object using `g++`
+as the final linker driver - verified with a symbol-table check that
+nothing ends up C++-name-mangled across that boundary before ever
+trusting the real firmware build.
+
+**`melexis_mlx90642/`** (32×24, 768px, onboard temperature calculation):
+
+| File | Purpose |
+|---|---|
+| `MLX90642.h` / `.c`, `MLX90642_depends.h` | Melexis's own official library (Apache-2.0, plain C), vendored unmodified - identical copy to the expansion slave chip's own `src/F303-slave/melexis_mlx90642/`. |
+| `firmware_mlx90642_transport.c` | This board's own implementation of a genuinely simpler 3-function transport (`I2CRead`/`I2CWrite`/`Wait_ms`) - this library's own `Config`/`I2CCmd`/`WakeUp` are already fully implemented inside the vendored `MLX90642.c` itself, each building its own exact byte buffer using this sensor's own documented opcodes and calling the generic `I2CWrite` below, so there's nothing left for a platform driver to guess at. |
+| `firmware_mlx90642_app.c` / `.h` | Application-level capture logic - genuinely simpler than the other 2 sensors' own equivalents, since this sensor calculates temperature onboard itself rather than expecting the host to run a calibration library against a raw EEPROM dump (no `DumpEE`/`ExtractParameters`/`CalculateTo` sequence here at all). Uses `MLX90642_GetFrameData()` rather than the simpler `MLX90642_GetImage()` specifically so both raw and calibrated chunks can be served from one capture, matching the other 2 sensors' own chunk-serving shape. This sensor's own temperature scale (degC×50, confirmed against Melexis's own example code) is rescaled to this project's own `MLX_TEMP_SCALE` (degC×100) convention, so a host reading `REG_MLX_CALIBRATED_CHUNK` never needs to know which sensor actually answered it. |
+| `LICENSE_MELEXIS_APACHE2.0` | The library's own unmodified Apache-2.0 license text. |
 
 ---
 

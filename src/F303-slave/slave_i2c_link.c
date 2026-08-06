@@ -58,16 +58,20 @@ void HAL_I2C_AddrCallback(I2C_HandleTypeDef *hi2c, uint8_t TransferDirection, ui
                 len = 10;
                 break;
             case REG_MLX_CAPTURE_STATUS:
-                tx_buffer[0] = MLX90640_GetCaptureStatus();
+                tx_buffer[0] = MLX_GetCaptureStatus();
                 len = 1;
                 break;
             case REG_MLX_RAW_CHUNK:
-                MLX90640_GetRawChunk(pending_mlx_chunk_index, tx_buffer);
+                MLX_GetRawChunk(pending_mlx_chunk_index, tx_buffer);
                 len = 32;
                 break;
             case REG_MLX_CALIBRATED_CHUNK:
-                MLX90640_GetCalibratedChunk(pending_mlx_chunk_index, tx_buffer);
+                MLX_GetCalibratedChunk(pending_mlx_chunk_index, tx_buffer);
                 len = 32;
+                break;
+            case REG_MLX_SENSOR_VARIANT:
+                tx_buffer[0] = mlx_sensor_variant;
+                len = 1;
                 break;
             case REG_ADS_READ: {
                 int16_t result = ADS1115_ReadResult();
@@ -104,10 +108,18 @@ void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef *hi2c) {
         return;
     }
 
+    // REG_MLX_SENSOR_VARIANT: also a 2-byte write (register + the new
+    // variant value), but a plain configuration write rather than a
+    // read-pointer selection - stored directly, no capture side effect.
+    if (bytes_received == 2 && reg == REG_MLX_SENSOR_VARIANT) {
+        mlx_sensor_variant = rx_buffer[1];
+        return;
+    }
+
     if (bytes_received == 1) {
         pending_read_register = reg;
         if (reg == REG_MLX_TRIGGER_CAPTURE) {
-            MLX90640_TriggerCapture();
+            MLX_TriggerCapture();
         } else if (reg == REG_ADS_TRIGGER) {
             ADS1115_TriggerConversion();
         }

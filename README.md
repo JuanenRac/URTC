@@ -63,7 +63,7 @@ Full pin-by-pin detail — which MCU pin backs which signal, and the reasoning b
 
 ### The 4 expansion board variants
 
-Every expansion board carries a stepper driver — either a TMC2209 (up to 2A/coil, integrated power MOSFETs) or a TMC5160A (up to 10A+/coil, needs 8 external power MOSFETs the driver itself doesn't include). Independent of that driver choice, a board is either **basic** (driver + connectors only, no MCU — STEP/DIR/EN routed straight from the main board) or **advanced** (adds a second microcontroller, STM32F303CBT6, plus 2 local sensor chips — an ADS1115 16-bit ADC and an MLX90640 thermal camera — and local PWM generation for tools whose timing needs generating right at the tool head rather than routed over a cable). 2×2 combinations, 4 boards total — see `BOM/BOM_EXPANSION_*.TXT` (4 files) and `docs/PINOUT_SLAVE.txt`.
+4 of the 6 expansion board variants carry a stepper driver — either a TMC2209 (up to 2A/coil, integrated power MOSFETs) or a TMC5160A (up to 10A+/coil, needs 8 external power MOSFETs the driver itself doesn't include). Independent of that driver choice, a driver-carrying board is either **basic** (driver + connectors only, no MCU — STEP/DIR/EN routed straight from the main board) or **advanced** (adds a second microcontroller, STM32F303CBT6, plus 2 local sensor chips — an ADS1115 16-bit ADC and an MLX9064x-family thermal camera — and local PWM generation for tools whose timing needs generating right at the tool head rather than routed over a cable). 2×2 combinations, plus 2 more sensor-only basic boards (ADS1115 or MLX9064x, wired directly to the main board's own STM32F303CC, no driver and no slave MCU) for a tool that only needs one of those 2 chips and nothing else an advanced board also carries — 6 boards total — see `BOM/BOM_EXPANSION_*.TXT` (6 files), `docs/EXPANSION.TXT`, and `docs/PINOUT_SLAVE.txt`.
 
 The advanced variant's own STM32F303CBT6 talks to the main board over the expansion connector's existing bit-banged I2C bus above — main board as master, slave chip answering as a real hardware I2C slave — and drives its own second, local-only I2C bus for the 2 sensor chips. It has its own bootloader and application firmware, updated the same way the main board is (CAN-OTA from `URTC Flasher`), just relayed across that I2C link rather than reaching the slave chip directly. See `src/F303-slave/README.md` and `src/F303-slave/boot/README.md` for the full technical detail.
 
@@ -99,7 +99,7 @@ Through its dynamic switching logic, the firmware natively manages the following
 20. **Hot Air Rework Nozzle:** heating element, turbine blower, and thermocouple feedback for reflowing misaligned SMD parts - shares the soldering iron's own thermal control loop.
 21. **Pneumatic Press-Fit Inserter:** linear actuator control for pressing connectors into PCBs - the actuator and its own sensor live on the robot's own mainboard, outside this board's own scope.
 22. **Wire Harnessing / Crimping Actuator:** high-torque jaw for stripping/crimping terminals, driven off an **expansion board's own driver** rather than the main board's.
-23. **PCB Advanced Inspection:** thermal imaging (MLX90640 32×24 array, **advanced** expansion board) to spot shorts by temperature signature, alongside ring-LED illumination. Also covers micro-spindle depaneling - the same drill hardware path above, a different bit for a different job.
+23. **PCB Advanced Inspection:** thermal imaging (MLX9064x-family array - MLX90640 and MLX90641 both supported today, either via an **advanced** expansion board's own slave chip or a **basic** MLX9064x expansion board wired directly to the main board) to spot shorts by temperature signature, alongside ring-LED illumination. Also covers micro-spindle depaneling - the same drill hardware path above, a different bit for a different job.
 24. **Solder Paste Jetting Valve:** piezoelectric micro-droplet dispensing, sub-millisecond pulse precision generated locally on an **advanced** expansion board.
 25. **Ultrasonic Welder / Packaging Sealer:** high-frequency transducer trigger for plastic enclosure welding.
 
@@ -391,7 +391,7 @@ version number that would imply they always move together.
 
 | Version | Notes |
 |---|---|
-| **1.1** | Project-wide version migration: both PC tools and this firmware/bootloader's own source folder move from `V1.0/` to `V1.1/` (`tools/flasher/`, `tools/tester/`, `src/F303-master/`). Compiled firmware binaries renamed to match (`URTC_V1.1_F303CC.bin/.hex/.elf`). No functional firmware changes beyond what's already listed under 1.0 below - this bump is the migration itself. The bootloader is unaffected by this migration and keeps its own independent version numbering (see its own changelog below) - only its folder moved alongside the firmware's. Later, still within this same version (no version bump, per this project's own rule that the firmware's version only changes on explicit request): IDs 12-24 assigned to the 13-tool expansion catalog (see the unified Tool Catalog section above), landing tool by tool - `TOOL_INVALID` moved to 25 to make room, and the `0x0C-0x1B`-style ID range check extended accordingly. The new companion expansion-slave chip (STM32F303CBT6, `src/F303-slave/`) got its own bootloader and application firmware, versioned entirely independently of this firmware (see the new section below). Later still, within this same version: the monolithic single-file build (this project's earlier dual-form maintenance approach) was retired in favor of maintaining a single source form - what had lived in `partitioned/` moved up to `src/F303-master/` directly (and `src/F303-master/boot/`, `src/F303-slave/`, `src/F303-slave/boot/` for the rest of this project's firmware), the `V1.1/` version-numbered subfolder dropped from every path in the process. No functional change - this is a source-tree reorganization, not a firmware behavior change. |
+| **1.1** | Project-wide version migration: both PC tools and this firmware/bootloader's own source folder move from `V1.0/` to `V1.1/` (`tools/flasher/`, `tools/tester/`, `src/F303-master/`). Compiled firmware binaries renamed to match (`URTC_V1.1_F303CC.bin/.hex/.elf`). No functional firmware changes beyond what's already listed under 1.0 below - this bump is the migration itself. The bootloader is unaffected by this migration and keeps its own independent version numbering (see its own changelog below) - only its folder moved alongside the firmware's. Later, still within this same version (no version bump, per this project's own rule that the firmware's version only changes on explicit request): IDs 12-24 assigned to the 13-tool expansion catalog (see the unified Tool Catalog section above), landing tool by tool - `TOOL_INVALID` moved to 25 to make room, and the `0x0C-0x1B`-style ID range check extended accordingly. The new companion expansion-slave chip (STM32F303CBT6, `src/F303-slave/`) got its own bootloader and application firmware, versioned entirely independently of this firmware (see the new section below). Later still, within this same version: the monolithic single-file build (this project's earlier dual-form maintenance approach) was retired in favor of maintaining a single source form - what had lived in `partitioned/` moved up to `src/F303-master/` directly (and `src/F303-master/boot/`, `src/F303-slave/`, `src/F303-slave/boot/` for the rest of this project's firmware), the `V1.1/` version-numbered subfolder dropped from every path in the process. No functional change - this is a source-tree reorganization, not a firmware behavior change. Later still, within this same version: 2 new expansion board variants (Basic+ADS1115, Basic+MLX9064x - `expansion_board_type` 5/6) get an ADS1115 and any of the 3 MLX9064x-family sensors wired directly to this board's own bit-banged expansion I2C bus, no slave MCU involved - `firmware_ads1115.c` and 3 new `melexis_mlx90640/mlx90641/mlx90642/` folders, with `Handle_CAN_FlyingProbe()`/`Handle_CAN_ThermalInspection()` both branching on `expansion_board_type` (and `mlx_sensor_variant` for the thermal sensor) to reach either this board's own direct driver or the expansion slave chip's own relayed one, transparently to whatever host is talking to them. A real bug from an earlier tool-count update was also found and fixed here: `0x1A2`'s own validation still capped `free_tool_selection` at 12 despite this project's own comment already saying 25 - silently rejecting any of the 13 newer tools in that specific configuration path. |
 | **1.0** | Initial versioned release. Full support for all 12 tool profiles, hardware I2C2 OLED, per-tool CAN telemetry, and the communication/stall watchdogs described throughout this README. Also includes the `0x110`/`0x111` active-tool query added for the Tester tool, the `11111`-jumper free tool configuration mechanism (`0x1A2`/`0x1A3` - see `docs/EEPROM.TXT` section 5), and peripheral type + device serial number reporting (`0x1A4`/`0x1A5` - see `docs/EEPROM.TXT` section 6), for telling multiple otherwise-identical boards apart on a shared CAN bus. Later fixes within this same version (no version bump, per this project's own rule that the firmware's version only changes on explicit request): the laser's PWM duty is now forced to 0 in software whenever the interlock isn't armed, instead of being generated purely from the power setpoint independent of interlock state; the bit-banged expansion I2C bus now actually runs at ~100kHz instead of the ~800kHz an incorrect delay loop had been producing; and a GPIO config struct wasn't being fully reset between pins, silently giving some digital outputs a faster edge rate than intended. |
 
 ### Bootloader (`src/F303-master/boot/`)
@@ -418,7 +418,7 @@ source tree (`src/F303-slave/`).
 
 | Component | Version | Notes |
 |---|---|---|
-| Application (`src/F303-slave/`) | **1.0** | Initial release. I2C1 link-bus protocol (this chip as slave) to the main board; I2C2 local sensor bus (this chip as master) driving an ADS1115 16-bit ADC and an MLX90640 thermal camera, the latter built on Melexis's own official library rather than a hand-rolled register map; 4-channel local PWM generation (TIM1) for tools needing sub-millisecond pulse timing generated at the tool head itself. |
+| Application (`src/F303-slave/`) | **1.0** | Initial release. I2C1 link-bus protocol (this chip as slave) to the main board; I2C2 local sensor bus (this chip as master) driving an ADS1115 16-bit ADC and an MLX9064x thermal camera, built on Melexis's own official library rather than a hand-rolled register map; 4-channel local PWM generation (TIM1) for tools needing sub-millisecond pulse timing generated at the tool head itself. Later, still within this same version (no version bump, per this project's own rule that the slave's own application version only changes on explicit request): MLX90641 and MLX90642 support added alongside the original MLX90640 support - 2 genuinely separate Melexis libraries (`melexis_mlx90641/`, `melexis_mlx90642/`), not variants of the first one; MLX90641's own upstream form is this project's own first C++ code, built into an otherwise all-C firmware, while MLX90642 turned out genuinely simpler than the other two (no host-side calibration math at all - it reports temperature already calculated). A new register (`REG_MLX_SENSOR_VARIANT`) and matching main-board CAN command (`0x1A6`/`0x1A7`) let the host say which of the 3 MLX9064x family members is actually populated, relayed to this chip at boot since it has no persistent storage of its own. |
 | Bootloader (`src/F303-slave/boot/`) | **1.0.0** | Initial release. Same A/B golden-image update model as the main board's own bootloader, scaled to this chip's 128KB flash, relayed over the I2C link rather than CAN directly - this chip has no CAN peripheral of its own. |
 
 ## 🔍 Current Status
@@ -470,8 +470,19 @@ If anyone in the community is working on custom end-effectors, smart tool-change
 │   ├── F303-master/
 │   │   ├── STM32F303CC_main.c    Entry point - global definitions and main()
 │   │   ├── firmware_*.c/.h       ~40 more files, one per subsystem (OLED, LEDs, per-tool
-│   │   │                         CAN handlers, init, persistence, etc.) - see this
-│   │   │                         folder's own README.md for the full file-by-file table
+│   │   │                         CAN handlers, init, persistence, etc.), including
+│   │   │                         firmware_ads1115.c (direct ADS1115 driver, Basic+ADS1115
+│   │   │                         board) - see this folder's own README.md for the full
+│   │   │                         file-by-file table
+│   │   ├── melexis_mlx90640/     Melexis's own official MLX90640 library (Apache-2.0,
+│   │   │                         plain C) plus this board's own direct-connection driver
+│   │   │                         on top of it, for the Basic+MLX9064x expansion board
+│   │   ├── melexis_mlx90641/     Same idea, MLX90641 library (Apache-2.0, C++ - see this
+│   │   │                         folder's own README.md section 8a for why this one
+│   │   │                         library is C++ in an otherwise all-C project)
+│   │   ├── melexis_mlx90642/     Same idea, MLX90642 library (Apache-2.0, plain C) - see
+│   │   │                         section 8a for why this sensor's own driver is genuinely
+│   │   │                         simpler than the other 2
 │   │   ├── STM32F303CCTx_APP.ld  Linker script for the application (112K main slot at 0x08008000)
 │   │   ├── README.md             Technical reference: hardware platform, the ID-jumper
 │   │   │                         tool-selection system, per-tool peripheral wiring - see
@@ -490,13 +501,20 @@ If anyone in the community is working on custom end-effectors, smart tool-change
 │       ├── slave_*.c/.h          4 more files (I2C link protocol, local sensor bus, local PWM)
 │       ├── STM32F303CBTx_SLAVEAPP.ld  Linker script (54K main slot at 0x08005000)
 │       ├── README.md             Technical reference: why this chip exists, the local
-│       │                         ADS1115/MLX90640 sensor bus, local PWM, the I2C link
+│       │                         ADS1115/MLX9064x sensor bus, local PWM, the I2C link
 │       │                         protocol to the main board
 │       ├── melexis/              Melexis's own official MLX90640 library (Apache-2.0,
-│       │                         unmodified, own license file) - kept as its own separate
-│       │                         compilation unit, deliberately never folded into this
-│       │                         project's own source, since Apache-2.0 requires that
+│       │                         plain C, unmodified, own license file) - kept as its own
+│       │                         separate compilation unit, deliberately never folded into
+│       │                         this project's own source, since Apache-2.0 requires that
 │       │                         code's own copyright notice stay intact
+│       ├── melexis_mlx90641/     Melexis's own official MLX90641 library (Apache-2.0, C++ -
+│       │                         a genuinely separate library from MLX90640's own, not a
+│       │                         variant of it - see this folder's own README.md section 3
+│       │                         for why it's C++ and how the build handles that)
+│       ├── melexis_mlx90642/     Melexis's own official MLX90642 library (Apache-2.0, plain
+│       │                         C) - genuinely simpler transport interface than the other
+│       │                         2 sensors' own, see README.md section 3 for why
 │       └── boot/
 │           ├── slaveboot_main.c   Entry point for the bootloader
 │           ├── slaveboot_*.c/.h   7 more files (crypto, flash/metadata, protocol)

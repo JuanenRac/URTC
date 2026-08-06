@@ -331,10 +331,27 @@ typedef struct __attribute__((packed)) {
                                     // and why this exists (multiple identically-
                                     // configured boards on one bus were otherwise
                                     // indistinguishable from each other).
+    uint8_t  mlx_sensor_variant; // MLX_VARIANT_90640/90641/90642 (0/1/2) - which
+                                    // MLX9064x family member is actually populated
+                                    // on a Basic+MLX9064x or Advanced expansion
+                                    // board, for both this board's own direct
+                                    // MLX90641 support (expansion_board_type==6)
+                                    // and the value relayed to the expansion slave
+                                    // chip's own REG_MLX_SENSOR_VARIANT at boot on
+                                    // the Advanced variants (3-4) - see this
+                                    // project's own audit trail for why this one
+                                    // value serves both paths rather than needing
+                                    // two separate settings. Set via CAN (0x1A6/
+                                    // 0x1A7 - see CANBUS.TXT), same reasoning as
+                                    // expansion_board_type above. Default 0
+                                    // (MLX90640) matches the slave chip's own
+                                    // default before this register existed, so an
+                                    // already-configured advanced board keeps
+                                    // working unchanged.
     uint8_t  checksum;           // CRC-8 (polynomial 0x07, CRC-8/SMBUS) over every byte above - proportionate for "was this corrupted", not a security boundary the way the OTA update's HMAC is
 } SavedState_t;
 #define SAVEDSTATE_MAGIC 0x55525443UL // 'URTC' as bytes, arbitrary but distinctive - astronomically unlikely to appear by chance in an uninitialized F-RAM
-#define SAVEDSTATE_VERSION 5
+#define SAVEDSTATE_VERSION 6
 // Fixed hardware/firmware identity constant, not a F-RAM field - the same
 // for every URTC firmware build, so there's nothing to persist or make
 // configurable. 0x03 per EEPROM.TXT section 6's peripheral type
@@ -376,6 +393,7 @@ extern uint8_t had_valid_recovered_state;
 extern volatile uint8_t expansion_board_type;
 extern volatile uint8_t free_tool_selection;
 extern volatile uint8_t device_serial_number;
+extern volatile uint8_t mlx_sensor_variant;
 extern uint8_t raw_id_pin_value;
 extern SavedState_t last_saved_state;
 
@@ -456,5 +474,25 @@ extern uint8_t rxData[8];
 uint8_t FRAM_WriteBytes(uint16_t addr, const uint8_t *data, uint16_t len);
 uint8_t FRAM_ReadBytes(uint16_t addr, uint8_t *data, uint16_t len);
 uint8_t SavedState_Checksum(const SavedState_t *s);
+
+// MLX9064x capture status - same values as the expansion slave chip's
+// own copy (slave_common.h) for consistency, though the two never
+// actually need to agree with each other at runtime (a given board has
+// either the slave chip's own sensor bus populated, or this board's
+// own direct connection, never both at once).
+#define MLX_CAPTURE_IDLE      0x00
+#define MLX_CAPTURE_BUSY      0x01
+#define MLX_CAPTURE_READY     0x02
+#define MLX_CAPTURE_ERROR     0xFF
+
+// Which MLX9064x family member is actually populated - same values as
+// the expansion slave chip's own copy (slave_common.h) for consistency.
+#define MLX_VARIANT_90640 0x00
+#define MLX_VARIANT_90641 0x01
+#define MLX_VARIANT_90642 0x02
+
+// Same scaling convention as the slave chip's own copy (slave_common.h)
+// - REG_MLX_CALIBRATED_CHUNK values are degrees C * 100 (centi-degrees).
+#define MLX_TEMP_SCALE 100
 
 #endif // FIRMWARE_COMMON_H

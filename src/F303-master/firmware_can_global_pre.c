@@ -189,7 +189,7 @@ void Handle_CAN_GlobalCommands_PreErrorGate(void) {
         // read something other than 0x1F" apart from "jumpers read
         // 0x1F but nothing's configured yet", which a bare selection
         // value on its own couldn't distinguish.
-        if (rxHeader.StdId == 0x1A2 && rxHeader.DLC >= 1 && rxData[0] <= 12) {
+        if (rxHeader.StdId == 0x1A2 && rxHeader.DLC >= 1 && rxData[0] <= 25) {
             free_tool_selection = rxData[0];
         }
         if (rxHeader.StdId == 0x1A2 || rxHeader.StdId == 0x1A3) {
@@ -227,6 +227,38 @@ void Handle_CAN_GlobalCommands_PreErrorGate(void) {
                 txH.IDE = CAN_ID_STD;
                 txH.RTR = CAN_RTR_DATA;
                 txH.DLC = 2;
+                txH.TransmitGlobalTime = DISABLE;
+                uint32_t mb;
+                HAL_CAN_AddTxMessage(&hcan, &txH, txD, &mb);
+            }
+        }
+
+        // Set/query MLX9064x sensor variant (0x1A6/0x1A7) - which of the
+        // 3 family members (MLX_VARIANT_90640/90641/90642) is actually
+        // populated, on either this board's own Basic+MLX9064x direct
+        // connection or an Advanced variant's own slave-chip sensor bus.
+        // Same "host has to tell us, no electrical way to sense it"
+        // reasoning as expansion_board_type above - positioned here for
+        // the same reason. On a write, and only if an expansion slave
+        // chip is actually the relevant path (expansion_board_type==3 or
+        // 4), the new value is also relayed live to the slave's own
+        // REG_MLX_SENSOR_VARIANT over the I2C bridge - this board's own
+        // direct MLX90641 support (expansion_board_type==6) just reads
+        // mlx_sensor_variant directly, no relay needed for that path.
+        if (rxHeader.StdId == 0x1A6 && rxHeader.DLC >= 1 && rxData[0] <= 2) {
+            mlx_sensor_variant = rxData[0];
+            if (expansion_board_type == 3 || expansion_board_type == 4) {
+                ExpansionI2C_SlaveWriteRegister(0x14, &mlx_sensor_variant, 1); // REG_MLX_SENSOR_VARIANT, see slave_common.h
+            }
+        }
+        if (rxHeader.StdId == 0x1A6 || rxHeader.StdId == 0x1A7) {
+            if (HAL_CAN_GetTxMailboxesFreeLevel(&hcan) > 0) {
+                CAN_TxHeaderTypeDef txH;
+                uint8_t txD[1] = {mlx_sensor_variant};
+                txH.StdId = 0x1A7;
+                txH.IDE = CAN_ID_STD;
+                txH.RTR = CAN_RTR_DATA;
+                txH.DLC = 1;
                 txH.TransmitGlobalTime = DISABLE;
                 uint32_t mb;
                 HAL_CAN_AddTxMessage(&hcan, &txH, txD, &mb);

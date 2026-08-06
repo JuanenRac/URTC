@@ -242,10 +242,10 @@ ID: 0x1A0 [Master -> URTC Tool Head]
 Set expansion board type
 DLC: 1+ bytes (only byte[0] used)
 Data:
-  - rxData[0]: 0-4, see EXPANSION.TXT for what each value means. Any
+  - rxData[0]: 0-6, see EXPANSION.TXT for what each value means. Any
                other value is silently ignored (not written, not
                acknowledged as an error - just no change).
-Effect: sets which of the 5 possible CONN_EXPANSION configurations is
+Effect: sets which of the 7 possible CONN_EXPANSION configurations is
         physically installed - there's no electrical way to sense this,
         so it has to be told rather than detected. Persists across power
         cycles the same way any other saved setting does (via the normal
@@ -258,15 +258,15 @@ ID: 0x1A1 [Master -> URTC Tool Head, or URTC Tool Head -> Master answering 0x1A0
 Query/response: current expansion board type
 DLC: any as a query (payload ignored) | 1 byte as a response
 Data:
-  - txData[0]: the currently-set value, 0-4 (see EXPANSION.TXT)
+  - txData[0]: the currently-set value, 0-6 (see EXPANSION.TXT)
 
 ID: 0x1A2 [Master -> URTC Tool Head]
 Set free tool configuration
 DLC: 1+ bytes (only byte[0] used)
 Data:
-  - rxData[0]: 0-12. 0 = no tool selected, 1-12 = one of the 12
+  - rxData[0]: 0-25. 0 = no tool selected, 1-25 = one of the 25
                currently supported tool profiles (stored/sent as id+1,
-               not the raw 0-11 tool ID - see EEPROM.TXT section 5).
+               not the raw 0-24 tool ID - see EEPROM.TXT section 5).
                Any other value is silently ignored (not written, not
                acknowledged as an error - just no change).
 Effect: sets which tool profile a board whose ID jumpers read 0x1F
@@ -294,7 +294,7 @@ Data:
                apart from "jumpers read 0x1F but nothing's configured
                yet" (txData[1]==0 below), which txData[1] alone
                couldn't distinguish.
-  - txData[1]: the currently-set free_tool_selection value, 0-12 (see
+  - txData[1]: the currently-set free_tool_selection value, 0-25 (see
                0x1A2 above)
 
 ID: 0x1A4 [Master -> URTC Tool Head]
@@ -328,6 +328,52 @@ Data:
                firmware entirely - see EEPROM.TXT section 6).
   - txData[1]: the currently-set device_serial_number value, 0-255 (see
                0x1A4 above)
+
+ID: 0x1A6 [Master -> URTC Tool Head]
+Set MLX9064x sensor variant
+DLC: 1+ bytes (only byte[0] used)
+Data:
+  - rxData[0]: 0=MLX90640, 1=MLX90641, 2=MLX90642 (MLX_VARIANT_* in the
+               source) - which of the 3 MLX9064x family members is
+               actually populated on either this board's own
+               Basic+MLX9064x expansion board (direct connection,
+               expansion_board_type==6, see EXPANSION.TXT) or an
+               Advanced expansion board's own local sensor bus. Values
+               above 2 are rejected (no change made, still answers with
+               the unchanged current value).
+Effect: sets this board's own mlx_sensor_variant, used two ways
+        depending on which expansion board is actually configured
+        (expansion_board_type, 0x1A0/0x1A1):
+          - expansion_board_type==6 (Basic+MLX9064x, direct): this
+            board's own thermal-inspection CAN handler (0x250-0x255,
+            see section further below) reads mlx_sensor_variant
+            directly to decide which sensor library to call.
+          - expansion_board_type==3 or 4 (either Advanced variant): the
+            new value is also relayed live, over the same I2C bridge
+            used for every other advanced-board register access, to the
+            expansion slave chip's own REG_MLX_SENSOR_VARIANT - see the
+            expansion slave's own README.md section 4 for that
+            register's own documentation. Not relayed on any other
+            expansion_board_type, since there's no slave chip to relay
+            to.
+        Persists across power cycles the same way expansion_board_type
+        does (F-RAM change-detection) - and is itself re-relayed to a
+        freshly-reset expansion slave chip at this board's own next
+        boot, since the slave chip has no persistent storage of its
+        own to remember this across its own resets. Answered even
+        during a declared critical error, same reasoning as
+        0x110/0x190/0x1A0/0x1A2/0x1A4: this is configuration, not an
+        actuation command. MLX90642 (variant 2) is not yet supported by
+        either this board's own direct path or the expansion slave's
+        own relay path - setting it is accepted and persisted, but no
+        capture will actually succeed against it yet.
+
+ID: 0x1A7 [Master -> URTC Tool Head, or URTC Tool Head -> Master answering 0x1A6]
+Query/response: MLX9064x sensor variant
+DLC: any as a query (payload ignored) | 1 byte as a response
+Data:
+  - txData[0]: the currently-set mlx_sensor_variant value (see 0x1A6
+               above)
 
 -----------------------------------------------------------------------------
 3. MOTION TOOLS (Standard Stepper - Extended Range)
@@ -965,6 +1011,8 @@ Notes: this is BOOTLOADER.C's own version (BOOTLOADER_VERSION_MAJOR/MINOR/
   0x1A3 -> Query/response: raw ID-jumper reading + free tool configuration (DLC:any/2)
   0x1A4 -> Set device serial number (DLC:1+)
   0x1A5 -> Query/response: peripheral type + device serial number (DLC:any/2)
+  0x1A6 -> Set MLX9064x sensor variant (DLC:1+)
+  0x1A7 -> Query/response: MLX9064x sensor variant (DLC:any/1)
   --- Per-tool commands (see dedicated sections above) ---
   0x120 -> Stepper motor control (Dispensers, Screwdriver, Grippers - DLC:5)
   0x130 -> T12 setpoint temperature (Soldering iron - DLC:2)

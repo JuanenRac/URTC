@@ -47,6 +47,7 @@ extern I2C_HandleTypeDef hi2c1; // LINK bus (slave mode)
 extern I2C_HandleTypeDef hi2c2; // LOCAL sensor bus (master mode)
 extern IWDG_HandleTypeDef hiwdg;
 extern TIM_HandleTypeDef htim1; // local PWM generation - see slave_pwm.c
+extern uint8_t mlx_sensor_variant; // MLX_VARIANT_* - which MLX9064x family member is actually populated, set by the main board over REG_MLX_SENSOR_VARIANT, defaults to MLX_VARIANT_90640 until told otherwise
 
 // -----------------------------------------------------------------------
 // Local sensor bus (I2C2) addresses
@@ -72,10 +73,11 @@ extern TIM_HandleTypeDef htim1; // local PWM generation - see slave_pwm.c
 #define REG_APP_VERSION           0x01 // read, 10 bytes: same field layout as the bootloader's own REG_QUERY_VERSION response, byte0=0 here (marks "application answering", mirroring the main board's own 0/1 convention for the same byte)
 #define REG_ENTER_BOOTLOADER      0x02 // write, 4 bytes: magic payload 0xB0,0x07,0x1D,0x5A (same constant the main board's own application checks for its own CAN 0x7F0) - resets into slaveboot on a match; any other 4 bytes, or any other length, is silently ignored rather than treated as a malformed command worth reporting, same reasoning as the main board's own version: requiring an exact magic rather than just the register address alone is what keeps a corrupted/malformed link-bus transaction from accidentally resetting this chip mid-tool-operation
 
-#define REG_MLX_TRIGGER_CAPTURE   0x10 // write, 0 bytes (register-address-only write, same as a read-pointer-select) - starts a new MLX90640 frame capture
+#define REG_MLX_TRIGGER_CAPTURE   0x10 // write, 0 bytes (register-address-only write, same as a read-pointer-select) - starts a new capture on whichever MLX9064x variant REG_MLX_SENSOR_VARIANT is currently set to
 #define REG_MLX_CAPTURE_STATUS    0x11 // read, 1 byte: see MLX_CAPTURE_* below
-#define REG_MLX_RAW_CHUNK         0x12 // write 1 byte (chunk index 0-47), then read 32 bytes: raw pixel data, uint16_t x16 per chunk, 48 chunks x 16 = 768 pixels total
-#define REG_MLX_CALIBRATED_CHUNK  0x13 // write 1 byte (chunk index 0-47), then read 32 bytes: calibrated temperature, int16_t x16 per chunk (centi-degrees C, see MLX_TEMP_SCALE below), same 48-chunk layout as the raw variant
+#define REG_MLX_RAW_CHUNK         0x12 // write 1 byte (chunk index), then read 32 bytes: raw pixel data, uint16_t x16 per chunk - chunk count and total pixel count depend on the configured variant (see MLX_VARIANT_* below): 48 chunks/768px for MLX90640, 12 chunks/192px for MLX90641
+#define REG_MLX_CALIBRATED_CHUNK  0x13 // write 1 byte (chunk index), then read 32 bytes: calibrated temperature, int16_t x16 per chunk (centi-degrees C, see MLX_TEMP_SCALE below), same variant-dependent chunk count as the raw variant above
+#define REG_MLX_SENSOR_VARIANT    0x14 // write 1 byte (MLX_VARIANT_*) to configure which of the 3 MLX9064x family members is actually populated on this board, or read 1 byte to query the current setting. Relayed here by the main board at boot (and on any later change) from its own persisted F-RAM setting - this chip has no persistent storage of its own, see EEPROM.TXT section 6 on the main board's own side of this. Writing this does NOT itself trigger re-initialization (no re-read of calibration EEPROM) - a board's own populated sensor doesn't change at runtime, so this is expected to be set once, early, and left alone; see slave_i2c_sensors.c's own note if that assumption ever needs revisiting
 
 #define REG_ADS_CONFIGURE         0x20 // write, 2 bytes: forwarded near-verbatim into the ADS1115's own 16-bit config register (see slave_i2c_sensors.c) - this chip doesn't interpret the bitfields, just relays them, same "generic passthrough" philosophy as the main board's own SPI passthrough to the expansion driver
 #define REG_ADS_TRIGGER           0x21 // write, 0 bytes - starts a single-shot conversion using whatever config REG_ADS_CONFIGURE last set (or the chip's own power-on default if never set)
@@ -92,6 +94,15 @@ extern TIM_HandleTypeDef htim1; // local PWM generation - see slave_pwm.c
 #define MLX_CAPTURE_BUSY      0x01 // I2C2 transfer from the sensor in progress
 #define MLX_CAPTURE_READY     0x02 // raw frame in RAM, calibration either already run or running - REG_MLX_RAW_CHUNK is servable as soon as this shows, REG_MLX_CALIBRATED_CHUNK once calibration finishes (see slave_i2c_sensors.c's own note on why these aren't the same moment)
 #define MLX_CAPTURE_ERROR     0xFF // I2C2 transfer or sensor communication failed - chunk reads return stale/zeroed data until the next successful REG_MLX_TRIGGER_CAPTURE
+
+// Which MLX9064x family member is actually populated - see
+// REG_MLX_SENSOR_VARIANT above. MLX90640 stays the default (0) so a
+// board already configured before this register existed keeps working
+// exactly as it did (this chip's own mlx_sensor_variant, see
+// slave_main.c, starts at 0 the same way).
+#define MLX_VARIANT_90640 0x00 // 32x24, 768px, 48 chunks - Melexis's own official mlx90640-library
+#define MLX_VARIANT_90641 0x01 // 16x12, 192px, 12 chunks - Melexis's own official mlx90641-library (melexis_mlx90641/)
+#define MLX_VARIANT_90642 0x02 // 32x24, 768px, 48 chunks, onboard temperature calculation - not yet implemented, see this project's own audit trail
 
 #define MLX_TEMP_SCALE 100 // REG_MLX_CALIBRATED_CHUNK values are degrees C * 100 (centi-degrees) as int16_t - e.g. 2350 means 23.50C; chosen over sending raw float32 to halve the byte count for the same pixel count (int16_t vs float32), which matters both for I2C2's own real transfer time and for whatever this eventually costs to relay across the link bus and onward over CAN
 

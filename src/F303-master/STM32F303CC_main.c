@@ -16,6 +16,8 @@
 #include "firmware_init_buses.h"
 #include "firmware_expansion_spi.h"
 #include "firmware_expansion_i2c.h"
+#include "melexis_mlx90641/firmware_mlx90641_app.h"
+#include "melexis_mlx90642/firmware_mlx90642_app.h"
 #include "firmware_identify.h"
 #include "firmware_oled_driver.h"
 #include "firmware_render.h"
@@ -46,6 +48,16 @@ volatile uint8_t device_serial_number = 0; // 0=unassigned (default) - restored 
                                             // updated by 0x1A4 at runtime. Purely a
                                             // host-assigned label - never consulted
                                             // by this firmware for any decision.
+volatile uint8_t mlx_sensor_variant = MLX_VARIANT_90640; // 0=MLX90640 (default) -
+                                            // restored from F-RAM at boot, updated
+                                            // by 0x1A6 at runtime. Used both for this
+                                            // board's own direct MLX90641 support
+                                            // (expansion_board_type==6, see
+                                            // firmware_can_thermalinspection.c) and
+                                            // relayed to the expansion slave chip's
+                                            // own REG_MLX_SENSOR_VARIANT at boot on
+                                            // the Advanced variants (see this file's
+                                            // own init sequence below).
 uint8_t raw_id_pin_value = 0xFF;           // The actual 5-bit ID-jumper reading
                                             // (0-31) from Identify_PhysicalTool(),
                                             // kept separately from active_tool so
@@ -342,6 +354,27 @@ int main(void) {
     // firmware_expansion_i2c.c's own comment for why this isn't a
     // hardware I2C peripheral either.
     MX_ExpansionI2C_Init();
+    // Basic+MLX9064x expansion board's own sensor, read directly over
+    // the bus just brought up above - only attempted when that specific
+    // board variant is actually configured (expansion_board_type, just
+    // loaded from F-RAM by SavedState_Load() above), same as every
+    // other expansion-board-specific init in this project. Which of the
+    // 2 supported sensors (MLX90641 or MLX90642) is actually populated
+    // is decided by mlx_sensor_variant.
+    if (expansion_board_type == 6 && mlx_sensor_variant == MLX_VARIANT_90642) {
+        MLX90642_Direct_Init();
+    } else if (expansion_board_type == 6) {
+        MLX90641_Direct_Init();
+    }
+    // Advanced boards: tell the expansion slave chip which MLX9064x
+    // variant it's actually got, since it has no persistent storage of
+    // its own to remember this across its own resets - see
+    // slave_common.h's own REG_MLX_SENSOR_VARIANT comment. Skipped
+    // entirely on any other board variant, since there's no slave chip
+    // to relay to.
+    if (expansion_board_type == 3 || expansion_board_type == 4) {
+        ExpansionI2C_SlaveWriteRegister(0x14, (uint8_t*)&mlx_sensor_variant, 1); // REG_MLX_SENSOR_VARIANT
+    }
     // Expansion connector's bit-banged SPI bus - see the function's own
     // comment and PINOUT_CONNECTORS.TXT for why this isn't a hardware
     // SPI peripheral.

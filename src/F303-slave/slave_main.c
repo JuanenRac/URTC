@@ -14,6 +14,7 @@ I2C_HandleTypeDef hi2c1;
 I2C_HandleTypeDef hi2c2;
 IWDG_HandleTypeDef hiwdg;
 TIM_HandleTypeDef htim1;
+uint8_t mlx_sensor_variant = MLX_VARIANT_90640; // safe default until the main board's own REG_MLX_SENSOR_VARIANT write tells this chip otherwise - matches this project's own established pattern for every other host-told-not-detected setting (expansion_board_type on the main board is the same idea)
 
 static void SystemClock_Config(void) {
     // Identical to slaveboot_main.c's own SystemClock_Config - same HSI-
