@@ -12,7 +12,7 @@ Hi everyone! I wanted to share a project I've been developing called URTC (Unive
 
 Here is the complete breakdown of what it is, what it does, and the hardware ecosystem it currently manages.
 
-**Status: 🚧 Work in progress.** Firmware and hardware are both under active iteration — expect rough edges, and treat anything here as a snapshot rather than a finished release.
+**Status: 🚧 Actively evolving project — no Release yet.** URTC is under continuous, active development on both fronts at once: firmware (new tool profiles, the expansion slave ecosystem, protocol changes) and hardware (schematic and BOM still being finalized, no populated board exists yet). Because both sides keep moving together, what's in this repository at any given moment is a snapshot of ongoing work, not a stable, versioned product — file names, folder structure, tool counts, and documentation can all still change as the design settles. Once both firmware and hardware reach a genuinely stable, verified-on-real-hardware state, a proper **Release** will be tagged bundling everything together (firmware, bootloader, PC tools, hardware design files, and documentation) as a coherent, frozen snapshot. Until then, treat `main` as the actively-moving target it is.
 
 ---
 
@@ -25,7 +25,7 @@ URTC is an all-in-one, compact control board powered by an STM32 microcontroller
 The core strength of URTC is its extreme versatility. Instead of swapping out electronics for every different job, the board features a scalable matrix architecture:
 
 * **32-Address Identification Scheme:** the hardware and communication protocol are designed to identify up to 32 different tools or end-effectors directly at the robot head, via a 5-bit solder-jumper ID matrix (ID0-ID4). Of those 32 readings, 31 map directly to a tool profile; the 32nd (all 5 jumpers installed, `11111`) is reserved as a "free configuration" address instead - see below.
-* **25 Plug-and-Play Automated Profiles (12 shipped, 13 in active development):** the firmware natively handles 12 fully-implemented, tested tool profiles today, with 13 more assigned their own IDs and under active development as part of the v1.1 expansion (see `15_herramientas.txt` and the catalog below) - some already fully wired into the CAN dispatch, others still landing. 6 more addresses remain free within the existing scheme after all 25. The board reads the physical identity of the tool head and configures the power stages, sensors, and logic switching seamlessly without needing a full re-flash.
+* **25 Plug-and-Play Automated Profiles:** the firmware natively handles 25 tool profiles - the board reads the physical identity of the tool head and configures the power stages, sensors, and logic switching seamlessly without needing a full re-flash. 6 more addresses remain free within the existing scheme for future tool profiles.
 * **Free tool configuration:** the reserved `11111` jumper reading doesn't pick a fixed tool - it tells the board to look up which tool to use from a register in its own persistent F-RAM instead, set ahead of time over CAN (via `URTC Flasher`). Useful for a board that needs reprogramming to a different tool without physically re-soldering jumpers. See `docs/EEPROM.TXT` section 5 for the full mechanism.
 
 ## 🔌 Hardware Flexibility & Motor Support
@@ -59,21 +59,21 @@ A 20-pin header, separate from the tool-specific connectors, for add-on boards t
 
 **A TMC2209 or a TMC5160, not necessarily both.** Both chips use the same STEP/DIR/EN interface for actual motion, so that part is universal. Where they differ is configuration/diagnostics: a TMC2209 uses its own single-wire UART for that, while a TMC5160 uses SPI — and since the two are mutually exclusive on any given expansion board, the 4 SPI pins double as a natural home for a TMC2209's single UART line too, rather than needing yet another dedicated pin nobody uses at the same time as the SPI bus. The bit-banged SPI bus talks the exact protocol a TMC5160 expects (SPI Mode 3, MSB first, CS held low for the whole transaction — see `docs/CANBUS.TXT`'s `0x180`/`0x181` for the generic byte-passthrough command that drives it) rather than this firmware needing to know that chip's specific register layout. A TMC5160's DIAG0 stall/fault line is wired too (`0x182`/`0x183`) — it reuses one of the two general-purpose GPIO pins, which were already earmarked for exactly this kind of fast interrupt-driven input.
 
-Full pin-by-pin detail — which MCU pin backs which signal, and the reasoning behind a couple of layout constraints this chip's 48-pin package has — lives in `docs/PINOUT_CONNECTORS.TXT` and `src/F303-master/V1.1/README.md`.
+Full pin-by-pin detail — which MCU pin backs which signal, and the reasoning behind a couple of layout constraints this chip's 48-pin package has — lives in `docs/PINOUT_CONNECTORS.TXT` and `src/F303-master/README.md`.
 
 ### The 4 expansion board variants
 
 Every expansion board carries a stepper driver — either a TMC2209 (up to 2A/coil, integrated power MOSFETs) or a TMC5160A (up to 10A+/coil, needs 8 external power MOSFETs the driver itself doesn't include). Independent of that driver choice, a board is either **basic** (driver + connectors only, no MCU — STEP/DIR/EN routed straight from the main board) or **advanced** (adds a second microcontroller, STM32F303CBT6, plus 2 local sensor chips — an ADS1115 16-bit ADC and an MLX90640 thermal camera — and local PWM generation for tools whose timing needs generating right at the tool head rather than routed over a cable). 2×2 combinations, 4 boards total — see `BOM/BOM_EXPANSION_*.TXT` (4 files) and `docs/PINOUT_SLAVE.txt`.
 
-The advanced variant's own STM32F303CBT6 talks to the main board over the expansion connector's existing bit-banged I2C bus above — main board as master, slave chip answering as a real hardware I2C slave — and drives its own second, local-only I2C bus for the 2 sensor chips. It has its own bootloader and application firmware, updated the same way the main board is (CAN-OTA from `URTC Flasher`), just relayed across that I2C link rather than reaching the slave chip directly. See `src/F303-slave/V1.1/README.md` and `src/F303-slave/V1.1/boot/README.md` for the full technical detail.
+The advanced variant's own STM32F303CBT6 talks to the main board over the expansion connector's existing bit-banged I2C bus above — main board as master, slave chip answering as a real hardware I2C slave — and drives its own second, local-only I2C bus for the 2 sensor chips. It has its own bootloader and application firmware, updated the same way the main board is (CAN-OTA from `URTC Flasher`), just relayed across that I2C link rather than reaching the slave chip directly. See `src/F303-slave/README.md` and `src/F303-slave/boot/README.md` for the full technical detail.
 
 ## 💾 Parameter Persistence
 
-An onboard FM24CL64B F-RAM (64Kbit, I2C) keeps a periodically-updated snapshot of the active tool's setpoints and the global LED/OLED settings, so a sudden power loss doesn't leave "what was this board doing" as unknowable as the loss itself was unplanned. It shares the OLED's hardware I2C2 bus rather than getting one of its own — this MCU only has one usable hardware I2C peripheral for this purpose, already spoken for by the OLED (see `src/F303-master/V1.1/README.md` section 6 for the full reasoning).
+An onboard FM24CL64B F-RAM (64Kbit, I2C) keeps a periodically-updated snapshot of the active tool's setpoints and the global LED/OLED settings, so a sudden power loss doesn't leave "what was this board doing" as unknowable as the loss itself was unplanned. It shares the OLED's hardware I2C2 bus rather than getting one of its own — this MCU only has one usable hardware I2C peripheral for this purpose, already spoken for by the OLED (see `src/F303-master/README.md` section 6 for the full reasoning).
 
 **Recovered state is queryable, never auto-applied to anything hazardous.** On boot, whatever was saved becomes readable over CAN (`0x190`/`0x191`) — but a heater setpoint, laser power, or motor command is never silently re-armed on its own. Only the safe, passive settings (LED colors, OLED mode) get restored directly. Deliberately re-sending a setpoint after actually reviewing what happened is left as the master controller's call, not something this board decides by itself the instant power comes back.
 
-## 💼 Natively Automated Tool Catalog (12 Shipped Firmware Profiles)
+## 💼 Natively Automated Tool Catalog (25 Firmware Profiles)
 
 Through its dynamic switching logic, the firmware natively manages the following tool heads:
 
@@ -88,41 +88,22 @@ Through its dynamic switching logic, the firmware natively manages the following
 9. **AOI (Automated Optical Inspection) System:** synchronous stroboscopic control of the LED lighting array for machine vision camera capture. Generic endstop input available. [Jumper/wiring config →](images/TOOL_AOI_INSPECTION.png)
 10. **Engraving Laser Diode (10W optical):** PWM beam power modulation with a safety hardware loop (CAN watchdog) that locks down if host communication is lost. Generic endstop input available. [Jumper/wiring config →](images/TOOL_LASER_ENGRAVER.png)
 11. **3D Printing Hotend:** PID control of the heater cartridge, NTC thermistor reading, extruder control, and a dedicated 25kHz PWM-controlled layer cooling fan (4-wire, tachometer feedback, own communication watchdog) — all integrated into a single block. [Jumper/wiring config →](images/TOOL_3D_PRINTER.png)
-12. **3D Scanner Probe:** ultra-fast hardware interrupt input (EXTI) with absolute priority for real-time surface digitization and impact sensing without lag. [Jumper/wiring config →](images/TOOL_SCAN_PROBE.png)
-
-## 🧪 13 More Tool Profiles (v1.1 expansion, in progress)
-
-IDs 12-24 are assigned and under active development, mapped out in
-`15_herramientas.txt`. 2 of the original 15-tool proposal turned out to
-be identical to existing profiles rather than needing a new one at all
-(a metrology touch probe is the same as **Scan Probe** above; a micro-
-spindle for PCB depaneling is the same as **Drill** above) - no new ID
-spent on either. The other 13:
-
+12. **3D Scanner Probe:** ultra-fast hardware interrupt input (EXTI) with absolute priority for real-time surface digitization and impact sensing without lag. Also covers metrology touch probing - the same hardware path, a different physical probe on the same tool head. [Jumper/wiring config →](images/TOOL_SCAN_PROBE.png)
 13. **SMT Pick & Place Head:** rotary A-axis for correct pad alignment, on the same stepper interface as the paste/liquid dispensers and both grippers above.
-14. **Heavy-Duty Electromagnet:** PWM-driven pickup for ferromagnetic parts, off the T12 heater output repurposed as a generic PWM/MOSFET driver.
+14. **Heavy-Duty Electromagnet:** on/off pickup control for ferromagnetic parts, off the T12 heater output repurposed as a generic GPIO driver.
 15. **Spot Welder Head:** millisecond-precise weld pulses for battery-pack nickel strips, with a surface-contact sensor gating the pulse.
-16. **Conformal Coating Airbrush:** protective coating spray control for finished PCBs.
+16. **Conformal Coating Airbrush:** protective coating spray control for finished PCBs - the spray valve and its own sensor live on the robot's own mainboard, outside this board's own scope.
 17. **Large-Format Vacuum Gripper:** multi-cup suction array for unpopulated FR4 boards, on the same stepper interface as tool #13 above.
-18. **Functional Testing Head:** flying-probe voltage/continuity testing — basic reading off the onboard ADC, advanced reading via an ADS1115 16-bit ADC on an **advanced** expansion board (see above).
+18. **Functional Testing Head:** flying-probe voltage/continuity testing — basic reading off the onboard ADC, advanced reading via an ADS1115 16-bit ADC on an **advanced** expansion board.
 19. **UV Curing Head:** high-power UV LED driver for instant glue/mask curing.
-20. **Hot Air Rework Nozzle:** heating element, turbine blower, and thermocouple feedback for reflowing misaligned SMD parts.
-21. **Pneumatic Press-Fit Inserter:** linear actuator control for pressing connectors into PCBs.
+20. **Hot Air Rework Nozzle:** heating element, turbine blower, and thermocouple feedback for reflowing misaligned SMD parts - shares the soldering iron's own thermal control loop.
+21. **Pneumatic Press-Fit Inserter:** linear actuator control for pressing connectors into PCBs - the actuator and its own sensor live on the robot's own mainboard, outside this board's own scope.
 22. **Wire Harnessing / Crimping Actuator:** high-torque jaw for stripping/crimping terminals, driven off an **expansion board's own driver** rather than the main board's.
-23. **PCB Advanced Inspection:** thermal imaging (MLX90640 32×24 array, **advanced** expansion board) to spot shorts by temperature signature, alongside ring-LED illumination.
+23. **PCB Advanced Inspection:** thermal imaging (MLX90640 32×24 array, **advanced** expansion board) to spot shorts by temperature signature, alongside ring-LED illumination. Also covers micro-spindle depaneling - the same drill hardware path above, a different bit for a different job.
 24. **Solder Paste Jetting Valve:** piezoelectric micro-droplet dispensing, sub-millisecond pulse precision generated locally on an **advanced** expansion board.
 25. **Ultrasonic Welder / Packaging Sealer:** high-frequency transducer trigger for plastic enclosure welding.
 
-**Where things stand right now:** every one of these 13 has its own
-tool ID and is accounted for in the addressing scheme; several are
-already wired into the CAN dispatch and share existing peripheral
-handlers (13 and 17 above reuse the same stepper-motion handler already
-serving 5 of the original 12 tools), the rest are landing tool by tool.
-This section will read as a completed catalog, matching the style
-above, once that work is done — right now it's the honest state of an
-active expansion, not a finished feature.
-
-*(Tool config images will populate as the hardware documentation catches up — filenames above match the naming convention already in use for `images/`.)*
+*(Tool config images exist for tools 1-12; images for tools 13-25 will populate as the hardware documentation catches up — filenames above match the naming convention already in use for `images/`.)*
 
 ## 🖥️ Local OLED Interface
 
@@ -130,7 +111,7 @@ Every tool head shows live, tool-specific telemetry on a 128×64 two-tone OLED: 
 
 ### The module
 
-Both physical variants below are the same panel electrically (SSD1306 or SSD1315-driven — the firmware's init sequence is verified compatible with both, see `OLED_Init()` in `STM32F303CC.C`; the SSD1315 is a newer, drop-in replacement controller that many modules ship with today under the same "SSD1306" listing/silkscreen), **128×64**, and the same two-tone "yellow/blue" split, where the physical LED material itself is divided into two fixed-color zones (this isn't software-selectable):
+Both physical variants below are the same panel electrically (SSD1306 or SSD1315-driven — the firmware's init sequence is verified compatible with both, see `OLED_Init()` in `firmware_oled_driver.c`; the SSD1315 is a newer, drop-in replacement controller that many modules ship with today under the same "SSD1306" listing/silkscreen), **128×64**, and the same two-tone "yellow/blue" split, where the physical LED material itself is divided into two fixed-color zones (this isn't software-selectable):
 
 * **Top 16 pixels (pages 0-1): yellow.** URTC uses this strip for whatever's most useful to see at a glance without reading closely — the CAN-activity indicator, live hero readings, or (on the boot splash / invalid-tool screens) short status text.
 * **Bottom 48 pixels (pages 2-7): blue.** Everything else — tool icons, detailed telemetry, the animated JuanenBOT face on the splash screen, the big blinking ERROR wordmark.
@@ -249,8 +230,8 @@ URTC's flash is split into two independent pieces, so the board can be reflashed
            │                                   │  bootloader checks all of it
            │                                   │  before ever jumping to the app.
 0x08008000 ├─────────────────────────────────┤
-           │  Main slot (112K)                 │  This is STM32F303CC.C /
-           │                                   │  URTC_v1_0_F303CC.* — the actual
+           │  Main slot (112K)                 │  This is the application firmware /
+           │                                   │  URTC_V1.1_F303CC.* — the actual
            │                                   │  firmware that runs day to day,
            │                                   │  described everywhere else in
            │                                   │  this README. Never touched by
@@ -273,17 +254,17 @@ The bootloader can only get onto the chip via physical programming — there's n
 1. Open the project in **STM32CubeIDE** (built and tested against the STM32F303CC target), or use **STM32CubeProgrammer** directly with the compiled outputs below.
 2. Flash **both** images over SWD (ST-Link) via the onboard `STM_JTAG` header — each `.hex` file has its target address baked in, so most tools (including STM32CubeProgrammer) can load both in the same session:
    * `URTC_BOOTLOADER.hex` → `0x08000000`
-   * `URTC_v1_0_F303CC.hex` → `0x08008000`
+   * `URTC_V1.1_F303CC.hex` → `0x08008000`
 3. Set the tool identity via the ID solder jumpers before powering up — the board reads them once at boot, same as always. Five jumpers (ID0-ID4), covering the full 32-address space (31 direct tool addresses, plus the reserved `11111` free-configuration address - see the Tool Matrix section above).
 4. Power up. The bootloader listens for ~600ms, sees nothing, and jumps straight into the application — from here on, everything behaves exactly as described in the rest of this README.
 
 **The JTAG header is never removed or disabled.** It's always there as a fallback — if a CAN update ever goes wrong, or you just prefer it, you can reflash either image over SWD at any time.
 
-**Two onboard pushbuttons, BOOT and RESET**, are also there for recovery — RESET is an ordinary hardware reset (`NRST`), and BOOT pulls `BOOT0` high, which is a chip-level decision made *before* anything in this repository runs at all: normally (not held) the chip boots from flash into this project's own bootloader as described above; held at reset, it boots into ST's own factory System Memory bootloader instead (USB DFU/UART recovery, entirely separate from anything here). See `src/F303-master/V1.1/README.md` section 4a for the full technical detail.
+**Two onboard pushbuttons, BOOT and RESET**, are also there for recovery — RESET is an ordinary hardware reset (`NRST`), and BOOT pulls `BOOT0` high, which is a chip-level decision made *before* anything in this repository runs at all: normally (not held) the chip boots from flash into this project's own bootloader as described above; held at reset, it boots into ST's own factory System Memory bootloader instead (USB DFU/UART recovery, entirely separate from anything here). See `src/F303-master/README.md` section 4a for the full technical detail.
 
 ### 2. Subsequent updates — over CAN bus
 
-Once the bootloader is in place, updating the application no longer needs physical access to the board at all — just send the new `STM32F303CC.C` build over the same umbilical CAN line already carrying commands to the tool head.
+Once the bootloader is in place, updating the application no longer needs physical access to the board at all — just send the new firmware build over the same umbilical CAN line already carrying commands to the tool head.
 
 **The update sequence:**
 
@@ -307,7 +288,7 @@ Two standalone, cross-platform (Windows/Linux) GUI tools live here, each
 in its own self-contained subfolder so either can be copied and shared on
 its own.
 
-#### URTC Flasher v1.1 — `tools/flasher/V1.1/`
+#### URTC Flasher v1.1 — `tools/flasher/`
 
 <p align="center">
   <img src="images/URTC_FLASHER_V1_1.png" alt="URTC Flasher window" width="700">
@@ -321,7 +302,7 @@ Two distinct jobs:
 A **File / Language / Help** menu bar sits at the top of the window - save the on-screen log, switch language, or open the README/GitHub repo/license/about from anywhere without hunting through the main controls for them.
 
 ```
-cd tools/flasher/V1.1
+cd tools/flasher
 pip install -r requirements.txt
 python urtc_flasher.py          # Windows
 python3 urtc_flasher.py         # Linux
@@ -329,15 +310,15 @@ python3 urtc_flasher.py         # Linux
 
 Or build a standalone binary that doesn't need Python installed: `build_exe.bat` on Windows, `./build_exe.sh` on Linux.
 
-**Firmware files go in `tools/flasher/V1.1/firmware/`** (inside the tool's own folder, not at the repo root — this keeps `tools/flasher/V1.1/` self-contained and shareable on its own). Multiple versions can sit there at once — every file gets checked against the same plausibility test the bootloader itself applies (valid stack pointer, sane size) and listed with a clear ✓/✗, auto-selecting only when there's exactly one that passes. Browse still works for a file anywhere else. See `tools/flasher/V1.1/README.md` for the full detail on both the CAN and SWD/JTAG paths, including Linux-specific setup (serial permissions, SocketCAN interface bring-up) and how the version-query display works.
+**Firmware files go in `tools/flasher/firmware/`** (inside the tool's own folder, not at the repo root — this keeps `tools/flasher/` self-contained and shareable on its own). Multiple versions can sit there at once — every file gets checked against the same plausibility test the bootloader itself applies (valid stack pointer, sane size) and listed with a clear ✓/✗, auto-selecting only when there's exactly one that passes. Browse still works for a file anywhere else. See `tools/flasher/README.md` for the full detail on both the CAN and SWD/JTAG paths, including Linux-specific setup (serial permissions, SocketCAN interface bring-up) and how the version-query display works.
 
-**5 languages**: English, Español, Italiano, Français, Deutsch — the **Language** menu (in the window's own menu bar) switches the whole interface, saved to `urtc_config.json` next to the tool. See `tools/flasher/V1.1/README.md`'s "Install and run" section for how to add another language.
+**5 languages**: English, Español, Italiano, Français, Deutsch — the **Language** menu (in the window's own menu bar) switches the whole interface, saved to `urtc_config.json` next to the tool. See `tools/flasher/README.md`'s "Install and run" section for how to add another language.
 
-**One-time adapter setup (Serial/SLCAN path):** a CANable Pro v2 ships by default running candleLight firmware, which talks to the host over the `gs_usb` protocol — not a serial port, and not what the Serial/SLCAN transport speaks. Getting it recognized as a serial port means flashing SLCAN-compatible firmware onto the adapter first, a one-time step separate from anything to do with URTC itself. **This step is skippable on Linux** if you use the SocketCAN transport instead — that one talks to the adapter's default `gs_usb` firmware natively through the kernel driver, no reflash needed. See `tools/flasher/V1.1/README.md` for the full walkthrough of both paths.
+**One-time adapter setup (Serial/SLCAN path):** a CANable Pro v2 ships by default running candleLight firmware, which talks to the host over the `gs_usb` protocol — not a serial port, and not what the Serial/SLCAN transport speaks. Getting it recognized as a serial port means flashing SLCAN-compatible firmware onto the adapter first, a one-time step separate from anything to do with URTC itself. **This step is skippable on Linux** if you use the SocketCAN transport instead — that one talks to the adapter's default `gs_usb` firmware natively through the kernel driver, no reflash needed. See `tools/flasher/README.md` for the full walkthrough of both paths.
 
 **Verified independently of hardware:** the tool's CRC32 and HMAC-SHA256 computation were checked byte-for-byte against the bootloader's own C implementation on the same test data — identical output on both sides. The SLCAN frame formatting/parsing and the SocketCAN frame packing (checked against Linux's `struct can_frame` layout with a round-trip test) each have their own tests. The SWD/JTAG section's command construction was verified via its dry-run mode for both `.bin` and `.hex` inputs. What hasn't been exercised on either flashing path is the full sequence against a real adapter/probe and a real board — treat a first attempt with the same caution as the bootloader itself above.
 
-#### URTC Tester v1.1 — `tools/tester/V1.1/`
+#### URTC Tester v1.1 — `tools/tester/`
 
 <p align="center">
   <img src="images/URTC_TESTER_V1_1.png" alt="URTC Tester window" width="700">
@@ -366,39 +347,38 @@ do, rather than sending a command once and having the tool head shut it
 off a fraction of a second later.
 
 ```
-cd tools/tester/V1.1
+cd tools/tester
 pip install -r requirements.txt
 python urtc_tester.py          # Windows
 python3 urtc_tester.py         # Linux
 ```
 
 Or build a standalone binary the same way as the flasher: `build_exe.bat`
-/ `./build_exe.sh`. See `tools/tester/V1.1/README.md` for the full per-tool
+/ `./build_exe.sh`. See `tools/tester/README.md` for the full per-tool
 control/telemetry table.
 
 **5 languages**: English, Español, Italiano, Français, Deutsch — same **Language** menu, same `config.json`-next-to-the-tool pattern as the flasher above.
 
 ## 📋 Changelog
 
-Firmware (`STM32F303CC.C`) and bootloader (`BOOTLOADER.C`) are versioned
-and released independently - flashing a new bootloader doesn't imply a
-new application version and vice versa, so each gets its own history
-here rather than one combined version number that would imply they
-always move together.
+Firmware and bootloader are versioned and released independently -
+flashing a new bootloader doesn't imply a new application version and
+vice versa, so each gets its own history here rather than one combined
+version number that would imply they always move together.
 
-### Firmware (`STM32F303CC.C`)
+### Firmware (`src/F303-master/`)
 
 | Version | Notes |
 |---|---|
-| **1.1** | Project-wide version migration: both PC tools and this firmware/bootloader's own source folder move from `V1.0/` to `V1.1/` (`tools/flasher/V1.1/`, `tools/tester/V1.1/`, `src/F303-master/V1.1/`). Compiled firmware binaries renamed to match (`URTC_v1_1_F303CC.bin/.hex/.elf`, monolithic and partitioned). No functional firmware changes beyond what's already listed under 1.0 below - this bump is the migration itself. The bootloader is unaffected by this migration and keeps its own independent version numbering (see its own changelog below) - only its folder moved alongside the firmware's. Later, still within this same version (no version bump, per this project's own rule that the firmware's version only changes on explicit request): IDs 12-24 assigned to the 13-tool expansion catalog (see the "13 More Tool Profiles" section above), landing tool by tool - `TOOL_INVALID` moved to 25 to make room, and the `0x0C-0x1B`-style ID range check extended accordingly. The new companion expansion-slave chip (STM32F303CBT6, `src/F303-slave/V1.1/`) got its own bootloader and application firmware, versioned entirely independently of this firmware (see the new section below). |
+| **1.1** | Project-wide version migration: both PC tools and this firmware/bootloader's own source folder move from `V1.0/` to `V1.1/` (`tools/flasher/`, `tools/tester/`, `src/F303-master/`). Compiled firmware binaries renamed to match (`URTC_V1.1_F303CC.bin/.hex/.elf`). No functional firmware changes beyond what's already listed under 1.0 below - this bump is the migration itself. The bootloader is unaffected by this migration and keeps its own independent version numbering (see its own changelog below) - only its folder moved alongside the firmware's. Later, still within this same version (no version bump, per this project's own rule that the firmware's version only changes on explicit request): IDs 12-24 assigned to the 13-tool expansion catalog (see the unified Tool Catalog section above), landing tool by tool - `TOOL_INVALID` moved to 25 to make room, and the `0x0C-0x1B`-style ID range check extended accordingly. The new companion expansion-slave chip (STM32F303CBT6, `src/F303-slave/`) got its own bootloader and application firmware, versioned entirely independently of this firmware (see the new section below). Later still, within this same version: the monolithic single-file build (this project's earlier dual-form maintenance approach) was retired in favor of maintaining a single source form - what had lived in `partitioned/` moved up to `src/F303-master/` directly (and `src/F303-master/boot/`, `src/F303-slave/`, `src/F303-slave/boot/` for the rest of this project's firmware), the `V1.1/` version-numbered subfolder dropped from every path in the process. No functional change - this is a source-tree reorganization, not a firmware behavior change. |
 | **1.0** | Initial versioned release. Full support for all 12 tool profiles, hardware I2C2 OLED, per-tool CAN telemetry, and the communication/stall watchdogs described throughout this README. Also includes the `0x110`/`0x111` active-tool query added for the Tester tool, the `11111`-jumper free tool configuration mechanism (`0x1A2`/`0x1A3` - see `docs/EEPROM.TXT` section 5), and peripheral type + device serial number reporting (`0x1A4`/`0x1A5` - see `docs/EEPROM.TXT` section 6), for telling multiple otherwise-identical boards apart on a shared CAN bus. Later fixes within this same version (no version bump, per this project's own rule that the firmware's version only changes on explicit request): the laser's PWM duty is now forced to 0 in software whenever the interlock isn't armed, instead of being generated purely from the power setpoint independent of interlock state; the bit-banged expansion I2C bus now actually runs at ~100kHz instead of the ~800kHz an incorrect delay loop had been producing; and a GPIO config struct wasn't being fully reset between pins, silently giving some digital outputs a faster edge rate than intended. |
 
-### Bootloader (`BOOTLOADER.C`)
+### Bootloader (`src/F303-master/boot/`)
 
 | Version | Notes |
 |---|---|
-| **1.1.1** | `HandleVersionQuery` now actually returns an all-zero HardwareID when no valid firmware is installed, matching what its own comment already promised - it had been returning this bootloader's own compiled-in HardwareID instead, which broke `URTC Flasher`'s own `hardware_id==0` check for showing "no valid firmware currently installed". |
-| **1.1.0** | The partitioned form's entry point file is now named `bootloader_main.c` instead of sharing the exact filename `BOOTLOADER.C` with the monolithic form - purely a naming clarity fix (matches the firmware's own `STM32F303CC_main.c` convention for its equivalent file), no functional change; both forms still build to the same `.rodata`. |
+| **1.1.1** | `HandleVersionQuery` now actually returns an all-zero HardwareID when no valid firmware is installed, matching what its own comment already promised - it had been returning this bootloader's own compiled-in HardwareID instead, which broke `URTC Flasher`'s own `hardware_id==0` check for showing "no valid firmware currently installed". Later, within this same version: the monolithic single-file build was retired, same reorganization as the firmware's own 1.1 entry above - `bootloader_main.c` and the rest of what lived in `boot/partitioned/` moved up to `src/F303-master/boot/` directly. No functional change. |
+| **1.1.0** | The entry point file is now named `bootloader_main.c` (matches the firmware's own `STM32F303CC_main.c` convention for its equivalent file). |
 | **1.0.9** | The jump-to-application stack pointer check no longer accepts a value sitting exactly at the base of either RAM region, which would have faulted on the very first `PUSH` after handoff - both bounds now require a small margin instead. The version-query response (`0x7F9`) now retries on a busy CAN mailbox the same way `0x7FA` already did, instead of silently dropping the whole reply. Added an explicit I2C2 peripheral teardown and a memory barrier before the post-write flash verification read, both matching safety patterns already used elsewhere in this same handoff path. The signing key constant is now defined once and referenced from every module that needs it, instead of a private copy compiled into each one. |
 | **1.0.8** | Fixed the OLED's I2C peripheral: PA9/PA10 with AF4 is I2C2, not I2C1 (confirmed against ST's own datasheet) - the same mistake already found and fixed in the application firmware, but never checked here until now, meaning this bootloader's OLED (the "UPDATING"/progress/error screens) would never have actually worked on real hardware. Also: hardware ID now reports the compiled-in value instead of 0 on a blank chip, an immediate first heartbeat instead of waiting a full second, and general cleanup (dual-CAN filter-bank setting that had no effect on this single-CAN chip, a lowercase-to-uppercase font fallback, a wider I2C timeout during the boot-time OLED wake-up window). |
 | **1.0.7** | Batches the CRC32 calculation once per received CAN frame instead of once per byte (an 8x reduction in call count across a full transfer). A defensive `__disable_irq()` before the vector-table/stack-pointer handoff to the application. Explicit state cleanup on an erase failure during a new update attempt. 1px of inter-character spacing added to the boot-screen font renderer, which previously ran letters together into a hard-to-read block. |
@@ -409,24 +389,22 @@ always move together.
 | **1.0.1** | Anti-rollback protection (a validly-signed image older than what's installed is rejected - `0x05` verify-fail reason `0x05`), stricter jump-to-application checks (stack alignment, Thumb-state and address-range validation on the reset vector), a corrected RAM bound matching this chip's actual 40KB of contiguous SRAM, and general hardening around the OLED/CAN/flash timing paths. |
 | **1.0.0** | Initial versioned release. HMAC-SHA256 signed OTA updates, golden-image A/B backup slot, and `0x7FA` - the bootloader's own version, reported alongside `0x7F9` (the installed application's version) whenever the bootloader itself answers a version query. |
 
-### Expansion Slave (`SLAVEAPP.C` / `SLAVEBOOT.C`, STM32F303CBT6)
+### Expansion Slave (`src/F303-slave/`, STM32F303CBT6)
 
 Versioned entirely independently of the main board's own firmware/
 bootloader above - a separate chip, on a separate board, in a separate
-source tree (`src/F303-slave/V1.1/`).
+source tree (`src/F303-slave/`).
 
 | Component | Version | Notes |
 |---|---|---|
-| Application (`SLAVEAPP.C`) | **1.0** | Initial release. I2C1 link-bus protocol (this chip as slave) to the main board; I2C2 local sensor bus (this chip as master) driving an ADS1115 16-bit ADC and an MLX90640 thermal camera, the latter built on Melexis's own official library rather than a hand-rolled register map; 4-channel local PWM generation (TIM1) for tools needing sub-millisecond pulse timing generated at the tool head itself. |
-| Bootloader (`SLAVEBOOT.C`) | **1.0.0** | Initial release. Same A/B golden-image update model as the main board's own bootloader, scaled to this chip's 128KB flash, relayed over the I2C link rather than CAN directly - this chip has no CAN peripheral of its own. |
+| Application (`src/F303-slave/`) | **1.0** | Initial release. I2C1 link-bus protocol (this chip as slave) to the main board; I2C2 local sensor bus (this chip as master) driving an ADS1115 16-bit ADC and an MLX90640 thermal camera, the latter built on Melexis's own official library rather than a hand-rolled register map; 4-channel local PWM generation (TIM1) for tools needing sub-millisecond pulse timing generated at the tool head itself. |
+| Bootloader (`src/F303-slave/boot/`) | **1.0.0** | Initial release. Same A/B golden-image update model as the main board's own bootloader, scaled to this chip's 128KB flash, relayed over the I2C link rather than CAN directly - this chip has no CAN peripheral of its own. |
 
 ## 🔍 Current Status
 
-The core firmware and bootloader are each maintained in two parallel forms - a single monolithic file (`STM32F303CC.C` / `BOOTLOADER.C`) and a partitioned, multi-file split of the same logic (`partitioned/` subfolders) - kept in sync on every change. Either builds and links to an equivalent binary; the monolithic form is the reference for deterministic timing (hardware ISRs drive everything from OLED rendering to the diagnostic LED heartbeat), while the partitioned form trades a small `.text` overhead for easier navigation across a large codebase.
+**Firmware (`src/F303-master/`):** feature-complete for all 25 tool profiles — thermal PID control, per-tool telemetry, communication watchdogs, stall/fault detection, and the OLED's own live diagnostics, alongside an active-tool query pair (`0x110`/`0x111`), a generic SPI passthrough (`0x180`/`0x181`) for the expansion connector, an onboard F-RAM that persists setpoints across a power loss (`0x190`/`0x191`), the `11111`-jumper free tool configuration mechanism (`0x1A2`/`0x1A3`), peripheral type + device serial number reporting (`0x1A4`/`0x1A5`) for telling multiple otherwise-identical boards apart on a shared bus, and a CAN-to-I2C bridge (`0x210`-`0x221`) reaching the expansion slave chip on advanced expansion boards. Versioned independently of the bootloader (see the Changelog below).
 
-**Firmware (`STM32F303CC.C`):** feature-complete for all 12 tool profiles — thermal PID control, per-tool telemetry, communication watchdogs, stall/fault detection, and the OLED's own live diagnostics, alongside an active-tool query pair (`0x110`/`0x111`), a generic SPI passthrough (`0x180`/`0x181`) for the expansion connector, an onboard F-RAM that persists setpoints across a power loss (`0x190`/`0x191`), the `11111`-jumper free tool configuration mechanism (`0x1A2`/`0x1A3`), and peripheral type + device serial number reporting (`0x1A4`/`0x1A5`) for telling multiple otherwise-identical boards apart on a shared bus. Versioned independently of the bootloader (see the Changelog below).
-
-**Bootloader (`BOOTLOADER.C`):** feature-complete golden-image A/B update system — HMAC-SHA256 signed OTA updates over CAN, a backup slot that guarantees a failed update never bricks the board, and its own version reporting (`0x7FA`) independent of the application. Compiles and links clean; see the bench-test caveat above before trusting it unattended with real actuators connected.
+**Bootloader (`src/F303-master/boot/`):** feature-complete golden-image A/B update system — HMAC-SHA256 signed OTA updates over CAN, a backup slot that guarantees a failed update never bricks the board, and its own version reporting (`0x7FA`) independent of the application. Compiles and links clean; see the bench-test caveat above before trusting it unattended with real actuators connected.
 
 **PC tools (`tools/`):** both `URTC Flasher` (CAN OTA updates + full-chip SWD/JTAG programming) and `URTC Tester` (live per-tool control/telemetry exerciser) are feature-complete for what they set out to do, each with their own README covering setup and every control in detail.
 
@@ -435,14 +413,6 @@ The core firmware and bootloader are each maintained in two parallel forms - a s
 If anyone in the community is working on custom end-effectors, smart tool-changers, or advanced tool integration for PAROL6, Faze4, or any other robot arm platform, I'd love to chat, swap ideas, or dive deeper into the CAN commands!
 
 ## 📂 Repository Structure
-
-Both the firmware and the bootloader are maintained in two equivalent
-forms: a single monolithic source file, and the same thing split across
-several dozen `.c`/`.h` files by subsystem. Both are kept in sync and
-both build to byte-identical `.rodata` - use whichever fits how you like
-to read code; neither is more "official" than the other. See
-`src/F303-master/V1.1/README.md` for more on why both exist and how
-they're kept consistent with each other.
 
 ```
 /
@@ -466,80 +436,64 @@ they're kept consistent with each other.
 │   ├── ECOVIA.TXT               Tool identification matrix and pin-mutation logic
 │   ├── PINOUT.TXT               Full MCU pinout, block by block
 │   ├── PINOUT_CONNECTORS.TXT    Physical connector pinouts (CONN_DRILL, CONN_SEN, etc.)
-│   ├── EXPANSION.TXT            CONN_EXPANSION connector and the planned add-on board variants
+│   ├── EXPANSION.TXT            CONN_EXPANSION connector and the add-on board variants
 │   ├── PINOUT_SLAVE.txt         Full pinout for the expansion slave chip (advanced variants only)
 │   └── EEPROM.TXT               Full F-RAM register map (every persisted setting, byte offsets)
 ├── src/
 │   ├── F303-master/
-│   │   └── V1.1/
-│   │       ├── STM32F303CC.C     Main application firmware source, single-file monolithic build
-│   │       ├── STM32F303CCTx_APP.ld  Linker script for the application (112K main slot at 0x08008000)
-│   │       ├── README.md         Technical reference: hardware platform, the ID-jumper
-│   │       │                     tool-selection system, per-tool peripheral wiring - see
-│   │       │                     CANBUS.TXT for the wire-level protocol this explains the why of
-│   │       ├── partitioned/      Same application firmware, same behavior, split across 60
-│   │       │                     .c/.h files by subsystem (OLED, LEDs, per-tool CAN handlers,
-│   │       │                     init, persistence, etc.) instead of one monolithic file -
-│   │       │                     see this folder's own note in the firmware README for why
-│   │       │                     both forms are maintained side by side
-│   │       └── boot/
-│   │           ├── BOOTLOADER.C  CAN bootloader source (listens for updates, verifies, jumps to app)
-│   │           ├── STM32F303CCTx_BOOTLOADER.ld  Linker script for the bootloader (30K region at 0x08000000)
-│   │           ├── README.md     Same technical-reference role as the application's, for the bootloader
-│   │           └── partitioned/  Same bootloader, split across 10 .c/.h files (main entry
-│   │                             point - named bootloader_main.c, distinctly from the
-│   │                             monolithic BOOTLOADER.C above, to avoid confusing the two -
-│   │                             plus shared types/constants, crypto, flash/metadata, OLED,
-│   │                             and CAN protocol) - same reasoning as above
-│   └── F303-slave/
-│       └── V1.1/                Companion chip (STM32F303CBT6) on the 2 ADVANCED expansion
-│           │                    board variants only - see the Expansion Connector section
-│           │                    above. Own bootloader/application pair, own I2C-based
-│           │                    (not CAN) update protocol, own independent versioning.
-│           ├── SLAVEAPP.C        Application firmware source, single-file monolithic build
-│           ├── STM32F303CBTx_SLAVEAPP.ld  Linker script (54K main slot at 0x08005000)
-│           ├── README.md         Technical reference: why this chip exists, the local
-│           │                     ADS1115/MLX90640 sensor bus, local PWM, the I2C link
-│           │                     protocol to the main board
-│           ├── melexis/          Melexis's own official MLX90640 library (Apache-2.0,
-│           │                     unmodified, own license file) - shared by both the
-│           │                     monolithic and partitioned application builds rather than
-│           │                     duplicated, and deliberately never folded into either
-│           ├── partitioned/      Same application firmware, split across 5 .c/.h files
-│           │                     (I2C link protocol, local sensor bus, local PWM, entry point)
-│           └── boot/
-│               ├── SLAVEBOOT.C   I2C-link bootloader source (same A/B model as the main
-│               │                 board's own bootloader, relayed over I2C instead of CAN)
-│               ├── README.md     Same technical-reference role as the application's
-│               └── partitioned/  Same bootloader, split across 8 .c/.h files (crypto,
-│                                 flash/metadata, protocol, entry point)
+│   │   ├── STM32F303CC_main.c    Entry point - global definitions and main()
+│   │   ├── firmware_*.c/.h       ~40 more files, one per subsystem (OLED, LEDs, per-tool
+│   │   │                         CAN handlers, init, persistence, etc.) - see this
+│   │   │                         folder's own README.md for the full file-by-file table
+│   │   ├── STM32F303CCTx_APP.ld  Linker script for the application (112K main slot at 0x08008000)
+│   │   ├── README.md             Technical reference: hardware platform, the ID-jumper
+│   │   │                         tool-selection system, per-tool peripheral wiring - see
+│   │   │                         CANBUS.TXT for the wire-level protocol this explains the why of
+│   │   └── boot/
+│   │       ├── bootloader_main.c  Entry point for the bootloader
+│   │       ├── bootloader_*.c/.h  9 more files (shared types/constants, crypto,
+│   │       │                      flash/metadata, OLED, CAN protocol)
+│   │       ├── STM32F303CCTx_BOOTLOADER.ld  Linker script for the bootloader (30K region at 0x08000000)
+│   │       └── README.md          Same technical-reference role as the application's, for the bootloader
+│   └── F303-slave/               Companion chip (STM32F303CBT6) on the 2 ADVANCED expansion
+│       │                         board variants only - see the Expansion Connector section
+│       │                         above. Own bootloader/application pair, own I2C-based
+│       │                         (not CAN) update protocol, own independent versioning.
+│       ├── slave_main.c          Entry point
+│       ├── slave_*.c/.h          4 more files (I2C link protocol, local sensor bus, local PWM)
+│       ├── STM32F303CBTx_SLAVEAPP.ld  Linker script (54K main slot at 0x08005000)
+│       ├── README.md             Technical reference: why this chip exists, the local
+│       │                         ADS1115/MLX90640 sensor bus, local PWM, the I2C link
+│       │                         protocol to the main board
+│       ├── melexis/              Melexis's own official MLX90640 library (Apache-2.0,
+│       │                         unmodified, own license file) - kept as its own separate
+│       │                         compilation unit, deliberately never folded into this
+│       │                         project's own source, since Apache-2.0 requires that
+│       │                         code's own copyright notice stay intact
+│       └── boot/
+│           ├── slaveboot_main.c   Entry point for the bootloader
+│           ├── slaveboot_*.c/.h   7 more files (crypto, flash/metadata, protocol)
+│           ├── STM32F303CBTx_SLAVEBOOT.ld  Linker script (18K region at 0x08000000)
+│           └── README.md          Same technical-reference role as the application's
 ├── firmware/
 │   ├── URTC_BOOTLOADER.bin       Bootloader compiled, flash to 0x08000000
 │   ├── URTC_BOOTLOADER.elf       Bootloader compiled, flash to 0x08000000
 │   ├── URTC_BOOTLOADER.hex       Bootloader compiled, flash to 0x08000000 (address baked in)
-│   ├── URTC_BOOTLOADER_partitioned.{bin,elf,hex}  Same bootloader, built from the
-│   │                             partitioned source above - identical .rodata, byte for byte
-│   ├── URTC_v1_0_F303CC.bin      Application bin compiled, flash to 0x08008000
-│   ├── URTC_v1_0_F303CC.elf      Application elf compiled, flash to 0x08008000
-│   ├── URTC_v1_0_F303CC.hex      Application HEX compiled, flash to 0x08008000 (address baked in)
-│   ├── URTC_v1_0_F303CC_partitioned.{bin,elf,hex}  Same application, built from the
-│   │                             partitioned source above - identical .rodata, byte for byte
+│   ├── URTC_V1.1_F303CC.bin      Application bin compiled, flash to 0x08008000
+│   ├── URTC_V1.1_F303CC.elf      Application elf compiled, flash to 0x08008000
+│   ├── URTC_V1.1_F303CC.hex      Application HEX compiled, flash to 0x08008000 (address baked in)
 │   ├── URTC_SLAVE_BOOTLOADER.{bin,elf,hex}  Expansion slave's own bootloader, flash to 0x08000000
 │   │                             on the STM32F303CBT6 (advanced expansion boards only)
-│   ├── URTC_SLAVE_BOOTLOADER_monolithic.{bin,elf,hex}  Same, built from the monolithic
-│   │                             SLAVEBOOT.C source - identical .bss, .text within ~0.2%
-│   ├── URTC_SLAVE_APP.{bin,elf,hex}  Expansion slave's own application, flash to 0x08005000
-│   └── URTC_SLAVE_APP_monolithic.{bin,elf,hex}  Same, built from the monolithic SLAVEAPP.C
-│                                 source - identical .bss, .text within ~0.6%
+│   └── URTC_SLAVE_APP.{bin,elf,hex}  Expansion slave's own application, flash to 0x08005000
 ├── images/
 │   ├── OLED_DIRECT_MOUNT.jpg     LCD1/CONN_OLED2 - bare 30-pin FPC panel, direct-mount option
 │   ├── OLED_BREAKOUT_MODULE.jpg  CONN_OLED - external I2C breakout module, alternate option
 │   ├── URTC_LOGO.svg             General project logo, embedded at the top of this README -
 │   │                            same artwork as the tool banners below, minus the tool-specific label
 │   ├── URTC_LOGO_FLASHER.svg     Flasher tool's banner logo (also embedded at
-│   │                            tools/flasher/V1.1/assets/ for the tool itself - kept in both
-│   │                            places so the GitHub-rendered tools/flasher/V1.1/README.md
-│   │                            doesn't depend on a path outside tools/flasher/V1.1/)
+│   │                            tools/flasher/assets/ for the tool itself - kept in both
+│   │                            places so the GitHub-rendered tools/flasher/README.md
+│   │                            doesn't depend on a path outside tools/flasher/)
 │   ├── URTC_LOGO_TESTER.svg      Same reasoning, for the Tester tool's banner
 │   ├── URTC_FLASHER_V1_1.png     Flasher tool window screenshot, referenced in this README
 │   ├── URTC_TESTER_V1_1.png      Tester tool window screenshot, referenced in this README
@@ -556,77 +510,75 @@ they're kept consistent with each other.
 │   ├── datasheet/               Datasheets of all parts used in board
 │   └── *_PARLIST/PINLIST/NETLIST.TXT   Eagle-exported netlists (ground truth for pin mapping)
 ├── tools/
-│   ├── flasher/
-│   │   └── V1.1/                CAN OTA update + full-chip SWD/JTAG programming
-│   │       ├── assets/
-│   │       │   ├── URTC_LOGO_FLASHER.svg  Banner logo source (vector)
-│   │       │   ├── urtc_banner.png        Shown centered on screen for 5s at startup (a splash,
-│   │       │   │                          not part of the main window), rendered from the .svg above
-│   │       │   ├── URTC_APP_ICON.svg      App icon source (vector) - a simplified standalone design,
-│   │       │   │                          not the banner shrunk down (which doesn't hold up at 16-32px)
-│   │       │   ├── urtc_icon.png          Window/taskbar icon (Windows + Linux, via root.iconphoto)
-│   │       │   └── urtc_icon.ico          Same icon, multi-resolution, for the compiled .exe itself
-│   │       ├── firmware/            Compiled .bin(s) to flash - kept inside this folder
-│   │       │                        (not at the repo root) so this whole version's folder can be
-│   │       │                        copied and shared on its own, fully self-contained
-│   │       ├── language/            5 translation files (english/spanish/italian/french/german.lng) -
-│   │       │                        plain KEY=Value text, editable directly or as a template for another language
-│   │       ├── logs/                 Auto-created at runtime, one session log file each run - safe to delete
-│   │       ├── urtc_config.json.example  Template for overriding HMAC_KEY/HardwareID/memory-map
-│   │       │                        constants without touching source - copy to urtc_config.json
-│   │       │                        and edit if you actually need one of these overrides
-│   │       ├── urtc_flasher.py      Entry point only (CLI args, splash screen, main window setup) -
-│   │       │                        the actual logic lives in the 6 flasher_*.py modules below,
-│   │       │                        split by responsibility purely for readability
-│   │       ├── flasher_config.py    Config file I/O, language loading, protocol constants
-│   │       ├── flasher_transports.py  SLCAN, SocketCAN, MockCAN (for --cli --transport mock)
-│   │       ├── flasher_swd_tools.py  STM32CubeProgrammer / pyOCD subprocess wrappers
-│   │       ├── flasher_validation.py  Firmware file validation (.bin/.hex/.elf plausibility +
-│   │       │                        slot-correctness checks)
-│   │       ├── flasher_protocol.py  The CAN OTA update state machine itself
-│   │       ├── flasher_gui.py       The main window - connection, flashing, SWD/JTAG, free tool
-│   │       │                        config, peripheral info, and the File/Language/Help menu bar
-│   │       ├── requirements.txt     Python dependencies (just pyserial)
-│   │       ├── build_exe.bat        Packages the tool as a standalone .exe (Windows, no Python needed to run it)
-│   │       ├── build_exe.sh         Same, for Linux (produces a native binary, not a cross-compiled .exe)
-│   │       ├── README.md            Tool-specific setup and usage instructions (English)
-│   │       └── README_spa.md, README_ita.md, README_fra.md, README_deu.md
+│   ├── flasher/                 CAN OTA update + full-chip SWD/JTAG programming
+│   │   ├── assets/
+│   │   │   ├── URTC_LOGO_FLASHER.svg  Banner logo source (vector)
+│   │   │   ├── urtc_banner.png        Shown centered on screen for 5s at startup (a splash,
+│   │   │   │                          not part of the main window), rendered from the .svg above
+│   │   │   ├── URTC_APP_ICON.svg      App icon source (vector) - a simplified standalone design,
+│   │   │   │                          not the banner shrunk down (which doesn't hold up at 16-32px)
+│   │   │   ├── urtc_icon.png          Window/taskbar icon (Windows + Linux, via root.iconphoto)
+│   │   │   └── urtc_icon.ico          Same icon, multi-resolution, for the compiled .exe itself
+│   │   ├── firmware/            Compiled .bin(s) to flash - kept inside this folder
+│   │   │                        (not at the repo root) so this whole tool's folder can be
+│   │   │                        copied and shared on its own, fully self-contained
+│   │   ├── language/            5 translation files (english/spanish/italian/french/german.lng) -
+│   │   │                        plain KEY=Value text, editable directly or as a template for another language
+│   │   ├── logs/                 Auto-created at runtime, one session log file each run - safe to delete
+│   │   ├── urtc_config.json.example  Template for overriding HMAC_KEY/HardwareID/memory-map
+│   │   │                        constants without touching source - copy to urtc_config.json
+│   │   │                        and edit if you actually need one of these overrides
+│   │   ├── urtc_flasher.py      Entry point only (CLI args, splash screen, main window setup) -
+│   │   │                        the actual logic lives in the 6 flasher_*.py modules below,
+│   │   │                        split by responsibility purely for readability
+│   │   ├── flasher_config.py    Config file I/O, language loading, protocol constants
+│   │   ├── flasher_transports.py  SLCAN, SocketCAN, MockCAN (for --cli --transport mock)
+│   │   ├── flasher_swd_tools.py  STM32CubeProgrammer / pyOCD subprocess wrappers
+│   │   ├── flasher_validation.py  Firmware file validation (.bin/.hex/.elf plausibility +
+│   │   │                        slot-correctness checks)
+│   │   ├── flasher_protocol.py  The CAN OTA update state machine itself
+│   │   ├── flasher_gui.py       The main window - connection, flashing, SWD/JTAG, free tool
+│   │   │                        config, peripheral info, and the File/Language/Help menu bar
+│   │   ├── requirements.txt     Python dependencies (just pyserial)
+│   │   ├── build_exe.bat        Packages the tool as a standalone .exe (Windows, no Python needed to run it)
+│   │   ├── build_exe.sh         Same, for Linux (produces a native binary, not a cross-compiled .exe)
+│   │   ├── README.md            Tool-specific setup and usage instructions (English)
+│   │   └── README_spa.md, README_ita.md, README_fra.md, README_deu.md
 │   │                                Same, translated - the Help menu's Readme entry picks the
 │   │                                matching one automatically based on the active language
-│   └── tester/
-│       └── V1.1/                Live CAN bus exerciser - reads whichever tool profile a
-│           │                    board is jumpered for and shows only that tool's own
-│           │                    controls/telemetry, per CANBUS.TXT
-│           ├── assets/
-│           │   ├── URTC_LOGO_TESTER.svg   Banner logo source (vector)
-│           │   ├── urtc_tester_banner.png Same 5s startup splash as the flasher, rendered from the .svg above
-│           │   ├── URTC_APP_ICON.svg      Same icon source as the flasher (shared design)
-│           │   ├── urtc_icon.png          Window/taskbar icon
-│           │   └── urtc_icon.ico          Same icon, multi-resolution, for the compiled .exe itself
-│           ├── language/            5 translation files (english/spanish/italian/french/german.lng) -
-│           │                        same format and reasoning as the flasher's own language/ folder
-│           ├── logs/                 Auto-created at runtime, same as the flasher's
-│           ├── config.json          Auto-created on first language change - just the language
-│           │                        preference, next to the tool
-│           ├── urtc_tester.py       Entry point only (splash screen, main window setup - no CLI
-│           │                        mode) - the actual logic lives in the 7 tester_*.py modules
-│           │                        below, split by responsibility purely for readability
-│           ├── tester_config.py     Config/language loading, protocol constants
-│           ├── tester_transports.py  SLCAN, SocketCAN
-│           ├── tester_bus_monitor.py  Background CAN read thread and callback dispatch
-│           ├── tester_gui_core.py   The main window's own base - connection, detection, window
-│           │                        lifecycle, and the File/Language/Help menu bar
-│           ├── tester_common_panels.py  Global controls, F-RAM, expansion board, free tool
-│           │                        config, peripheral info, self-test, raw bus monitor,
-│           │                        custom CAN frame sender
-│           ├── tester_panel_helpers.py  Shared utilities every tool panel builder uses
-│           ├── tester_tool_panels.py  The 8 tool-specific panel builders (12 profiles, several
-│           │                        sharing one handler - e.g. all 5 motion-based tools)
-│           ├── requirements.txt     Python dependencies (just pyserial)
-│           ├── build_exe.bat        Standalone .exe build (Windows)
-│           ├── build_exe.sh         Standalone binary build (Linux)
-│           ├── README.md            Tool-specific setup and usage instructions (English)
-│           └── README_spa.md, README_ita.md, README_fra.md, README_deu.md
+│   └── tester/                  Live CAN bus exerciser - reads whichever tool profile a
+│       │                        board is jumpered for and shows only that tool's own
+│       │                        controls/telemetry, per CANBUS.TXT
+│       ├── assets/
+│       │   ├── URTC_LOGO_TESTER.svg   Banner logo source (vector)
+│       │   ├── urtc_tester_banner.png Same 5s startup splash as the flasher, rendered from the .svg above
+│       │   ├── URTC_APP_ICON.svg      Same icon source as the flasher (shared design)
+│       │   ├── urtc_icon.png          Window/taskbar icon
+│       │   └── urtc_icon.ico          Same icon, multi-resolution, for the compiled .exe itself
+│       ├── language/            5 translation files (english/spanish/italian/french/german.lng) -
+│       │                        same format and reasoning as the flasher's own language/ folder
+│       ├── logs/                 Auto-created at runtime, same as the flasher's
+│       ├── config.json          Auto-created on first language change - just the language
+│       │                        preference, next to the tool
+│       ├── urtc_tester.py       Entry point only (splash screen, main window setup - no CLI
+│       │                        mode) - the actual logic lives in the 7 tester_*.py modules
+│       │                        below, split by responsibility purely for readability
+│       ├── tester_config.py     Config/language loading, protocol constants
+│       ├── tester_transports.py  SLCAN, SocketCAN
+│       ├── tester_bus_monitor.py  Background CAN read thread and callback dispatch
+│       ├── tester_gui_core.py   The main window's own base - connection, detection, window
+│       │                        lifecycle, and the File/Language/Help menu bar
+│       ├── tester_common_panels.py  Global controls, F-RAM, expansion board, free tool
+│       │                        config, peripheral info, self-test, raw bus monitor,
+│       │                        custom CAN frame sender
+│       ├── tester_panel_helpers.py  Shared utilities every tool panel builder uses
+│       ├── tester_tool_panels.py  The 8 tool-specific panel builders (12 profiles, several
+│       │                        sharing one handler - e.g. all 5 motion-based tools)
+│       ├── requirements.txt     Python dependencies (just pyserial)
+│       ├── build_exe.bat        Standalone .exe build (Windows)
+│       ├── build_exe.sh         Standalone binary build (Linux)
+│       ├── README.md            Tool-specific setup and usage instructions (English)
+│       └── README_spa.md, README_ita.md, README_fra.md, README_deu.md
 │                                    Same, translated - same Help-menu behavior as the flasher's own
 ├── LICENSE
 └── README.md                    This file
@@ -652,6 +604,6 @@ Because this project consists of several different types of content, individual 
 
 3. The **hardware designs** (Eagle schematic/board files, gerbers, and the 3D-printable parts under `./PCB` and `./3D`) are available under the **CERN Open Hardware Licence v2 - Strongly Reciprocal (CERN-OHL-S v2)**. Full text at https://cern-ohl.web.cern.ch/.
 
-4. The **documentation** (this README, the service manual, and the reference files under `./docs`, including `./tools/flasher/V1.1/README.md` and `./tools/tester/V1.1/README.md`) is available under **Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)**. Full text at https://creativecommons.org/licenses/by-sa/4.0/.
+4. The **documentation** (this README, the service manual, and the reference files under `./docs`, including `./tools/flasher/README.md` and `./tools/tester/README.md`) is available under **Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)**. Full text at https://creativecommons.org/licenses/by-sa/4.0/.
 
 If you build on this project, keep the licensing split in mind: code changes to the firmware or the flashing tool should stay GPL-3.0, hardware modifications should stay CERN-OHL-S, and documentation derivatives should stay CC BY-SA - each with attribution back to this project.

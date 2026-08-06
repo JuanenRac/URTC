@@ -527,10 +527,240 @@ Data:
   - txData[0]: Calculated actual RPM (uint16_t) - High byte (MSB via EXTI6 on PA6) [BIG-ENDIAN]
   - txData[1]: Calculated actual RPM (uint16_t) - Low byte (LSB)
 
+ID: 0x1B0 [Master -> URTC Tool Head]
+Heavy-Duty Electromagnet power control
+DLC: 1 byte
+Data:
+  - rxData[0]: Coil state - any nonzero value energizes the coil (holding
+               a ferromagnetic part), 0x00 releases it. Plain GPIO
+               on/off on T12_PWM_PORT/T12_PWM_PIN, not a hardware PWM
+               channel - an electromagnet has no use for a variable duty
+               cycle the way this same physical pin's other use (the
+               soldering iron's own bang-bang heater control) does.
+
+ID: 0x1C0 [Master -> URTC Tool Head]
+Spot Welder Head timed pulse
+DLC: 3 bytes
+Data:
+  - rxData[0]: 0x01 fires a pulse, any other value is ignored
+  - rxData[1..2]: Pulse duration in milliseconds (uint16_t) [BIG-ENDIAN]
+  Note: Refuses to fire unless the contact sensor (TCRT_D0_DIG_PIN, the
+        same CONN_SEN digital input shared with the vacuum pickup's own
+        comparator) reads HIGH first - "ensure pressure before firing"
+        per the tool's own design brief. Ignored entirely while a pulse
+        from this command OR 0x200 below is already in progress (shared
+        pulse state, only one of these 2 tools is ever active at once).
+        Real timing resolution is ~20ms (this project's existing 20ms
+        cyclic safety loop), not a true 1ms - see the firmware's own
+        firmware_can_weldpulse.c for the full reasoning; achieving
+        genuine 1ms precision would need a dedicated hardware timer
+        interrupt, not implemented.
+
+ID: 0x1D0 [Master -> URTC Tool Head]
+UV Curing Head power control
+DLC: 1 byte
+Data:
+  - rxData[0]: LED driver duty cycle, 0-255, scaled onto TIM1_CH1's own
+               3199-count period (same physical PWM channel already
+               shared with the drill, laser, and 3D printer's layer
+               fan - only one of those tools is ever active at once).
+
+ID: 0x1E0 [Master -> URTC Tool Head]
+Hot Air Rework Nozzle setpoint
+DLC: 3 bytes
+Data:
+  - rxData[0..1]: Heating element target temperature in degrees C
+                  (uint16_t) [BIG-ENDIAN] - same target_temperature
+                  field and the same safety-verified thermal loop the
+                  soldering iron's own 0x130 already uses (445C ceiling,
+                  stuck-heater detection, ADC-fault handling, comms-loss
+                  shutdown all apply unchanged), since this tool shares
+                  the exact same physical T12 heater+thermocouple
+                  mechanism.
+  - rxData[2]: Air turbine blower duty cycle, 0-255, same TIM1_CH1
+               channel as UV Curing above.
+  Note: Same 250ms communication watchdog as the soldering iron's own
+        0x130 (shared solder_iron_last_kick_tick field) - a lost link
+        with the heater active shuts it down the same way.
+
+ID: 0x1F0 [Master -> URTC Tool Head]
+Wire Harnessing/Crimping Actuator motor control
+DLC: 5 bytes
+Data:
+  - rxData[0]: Direction, 0x01 = one way, 0x00 = the other (same
+               convention as 0x120 below)
+  - rxData[1..4]: Step count (uint32_t) [BIG-ENDIAN], 0 = stop
+  Note: Identical byte layout to 0x120, but drives the ADVANCED
+        expansion board's own stepper driver (EXP_TMC_STEP/DIR/EN,
+        PB12/13/14) instead of the onboard one - this tool needs a
+        BASIC or ADVANCED expansion board populated with its own driver
+        (TMC2209 or TMC5160A) to function at all. See EXPANSION.TXT for
+        the board variants.
+
+ID: 0x200 [Master -> URTC Tool Head]
+Ultrasonic Welder/Packaging Sealer timed pulse
+DLC: 3 bytes
+Data:
+  - rxData[0]: 0x01 fires a pulse, any other value is ignored
+  - rxData[1..2]: Pulse duration in milliseconds (uint16_t) [BIG-ENDIAN]
+  Note: Same shared pulse mechanism as 0x1C0 above, minus the contact-
+        sensor gate - this tool's own design brief doesn't call for one
+        the way the Spot Welder's does.
+
+-----------------------------------------------------------------------------
+EXPANSION SLAVE BRIDGE (0x210-0x221) - see EXPANSION.TXT and
+docs/PINOUT_SLAVE.txt for the physical hardware (STM32F303CBT6, ADVANCED
+expansion board variants only). This board has no CAN peripheral of its
+own - every command below is relayed across the I2C link bus this board
+already bit-bangs as master to reach it (firmware_expansion_i2c.c's own
+ExpansionI2C_SlaveWriteRegister/ReadRegister). Not gated by active_tool:
+this is a real hardware bus that either has a responding slave chip on
+it or doesn't (a BASIC expansion board, or no expansion board at all,
+just gets no response and the request quietly does nothing) - the same
+board-presence check every other passthrough in this project already
+relies on rather than duplicating in software.
+-----------------------------------------------------------------------------
+
+ID: 0x210 [Master -> URTC Tool Head]
+Enter the expansion slave's own bootloader
+DLC: 4 bytes
+Data:
+  - rxData[0..3]: Magic payload 0xB0, 0x07, 0x1D, 0x5A - same constant
+                  this board's own application checks for its own CAN
+                  0x7F0. Relayed to the slave's own application-mode
+                  REG_ENTER_BOOTLOADER; this board doesn't check the
+                  payload itself, the slave's own firmware does.
+
+ID: 0x211 [Master -> URTC Tool Head]
+Start slave firmware update
+DLC: 8 bytes
+Data: Same layout as this board's own CAN_ID_START_UPDATE (0x7F1) -
+      big-endian total size (4 bytes) + big-endian HardwareID (4 bytes).
+      Relayed to the slave's own bootloader-mode REG_START_UPDATE.
+
+ID: 0x212 [Master -> URTC Tool Head]
+Slave HMAC-SHA256 signature chunk, x4
+DLC: 8 bytes
+Data: Same 4-frames-of-8-bytes accumulation as this board's own
+      CAN_ID_HMAC_CHUNK (0x7F7) - sent sequentially right after 0x211
+      and before the first 0x213 frame. Only relayed to the slave's own
+      REG_HMAC_EXPECTED once all 4 frames (32 bytes total) have arrived.
+
+ID: 0x213 [Master -> URTC Tool Head]
+Slave firmware data, to its own backup slot
+DLC: 1-8 bytes
+Data: Firmware image bytes, relayed as-is to the slave's own bootloader-
+      mode REG_DATA - unlike 0x212 above, no accumulation needed here,
+      each frame is its own I2C transaction (the slave's own REG_DATA
+      handler accumulates across calls on its own end).
+
+ID: 0x214 [Master -> URTC Tool Head]
+End slave update / verify
+DLC: 8 bytes
+Data: Same layout as this board's own CAN_ID_END_UPDATE (0x7F4) -
+      big-endian CRC32 (4 bytes) + big-endian version major (2) + minor
+      (2). Relayed to the slave's own bootloader-mode REG_END_UPDATE,
+      which triggers its own size/CRC32/HMAC/anti-rollback verification
+      and, if all pass, the copy into its own main slot.
+
+ID: 0x215 [Master -> URTC Tool Head, or URTC Tool Head -> Master answering 0x215]
+Slave bootloader status query
+DLC: any (request) / 1 byte (response)
+Data:
+  - txData[0]: The slave's own REG_STATUS byte (slaveboot_common.h's own
+               STATUS_* constants) - not translated or reinterpreted by
+               this board, forwarded exactly as the slave itself reports
+               it.
+  Note: No response is sent at all if the I2C transaction itself fails
+        (no slave chip present to answer) - same "silence means nothing
+        there" convention as this project's other passthrough commands.
+
+ID: 0x216 [Master -> URTC Tool Head, or URTC Tool Head -> Master answering 0x216]
+Slave bootloader update progress query
+DLC: any (request) / 1 byte (response)
+Data:
+  - txData[0]: The slave's own REG_PROGRESS byte, 0-100, or 0xFF if no
+               update is currently in progress.
+
+ID: 0x217 [Master -> URTC Tool Head, or URTC Tool Head -> Master answering 0x217]
+Slave bootloader version query, part 1 of 2
+DLC: any (request) / 8 bytes (response)
+Data:
+  - txData[0]: 0x01 (answering as the bootloader - same 0/1 convention
+               this board's own 0x7F9 byte0 uses)
+  - txData[1..4]: Slave's own HardwareID (big-endian)
+  - txData[5..6]: Installed slave firmware's own version major (big-endian)
+  - txData[7]: Installed slave firmware's own version minor, high byte
+
+ID: 0x218 [URTC Tool Head -> Master, sent alongside 0x217's own response]
+Slave bootloader version query, part 2 of 2
+DLC: 2 bytes
+Data:
+  - txData[0]: Installed slave firmware's own version minor, low byte
+  - txData[1]: The slave BOOTLOADER's own version (not the application's)
+  Note: Same 2-response-ID split as this board's own 0x7F9/0x7FA, for
+        the same reason - the slave's 10-byte answer doesn't fit one
+        CAN frame.
+
+ID: 0x220 [Master -> URTC Tool Head]
+Write slave application register (generic)
+DLC: 2-8 bytes
+Data:
+  - rxData[0]: The slave's own application-mode register number
+               (REG_PWM_*, REG_ADS_*, REG_MLX_* - see slave_common.h)
+  - rxData[1..]: That register's own payload, relayed as-is
+  Note: Only meaningful once the slave's own bootloader has already
+        copied a verified application image into its main slot and
+        jumped to it (see 0x210-0x218 above) - writing to an
+        application-mode register while the slave is still in its own
+        bootloader gets no response, same silent-failure convention as
+        everywhere else in this bridge.
+
+ID: 0x221 [Master -> URTC Tool Head, or URTC Tool Head -> Master answering 0x221]
+Read slave application register (generic)
+DLC: 2 bytes (request) / up to 8 bytes (response)
+Data (request):
+  - rxData[0]: The register to read
+  - rxData[1]: How many bytes to read back (caller's own responsibility
+               to ask for the right length for whichever register it
+               named - see slave_common.h for each register's own
+               documented response length)
+Data (response): Whatever the named register returned, exactly as many
+                  bytes as requested.
+
+ID: 0x230 [Master -> URTC Tool Head]
+Solder Paste Jetting Valve local PWM configuration
+DLC: 3 bytes
+Data:
+  - rxData[0]: PWM channel (0-3, see docs/PINOUT_SLAVE.txt Block 4 for
+               which physical connector pin each channel reaches)
+  - rxData[1..2]: Frequency in Hz (uint16_t) [BIG-ENDIAN]
+  Note: Thin, tool-specific wrapper over 0x220 above (writes the
+        slave's own REG_PWM_CONFIGURE) - exists so a host controlling
+        this specific tool doesn't need to also know the raw slave
+        register map, same convenience every other tool's own dedicated
+        ID already provides.
+
+ID: 0x231 [Master -> URTC Tool Head]
+Solder Paste Jetting Valve pulse
+DLC: 3 bytes
+Data:
+  - rxData[0]: PWM channel (0-3)
+  - rxData[1]: Duty percent, 0-100
+  - rxData[2]: Pulse duration in milliseconds, 0-255 (0 = continuous,
+               until explicitly stopped - not currently exposed by this
+               tool's own command set, since a continuous jetting valve
+               output isn't a documented use case for it)
+  Note: Thin wrapper over 0x220 (writes the slave's own REG_PWM_PULSE).
+        Genuine sub-millisecond pulse precision, since this PWM is
+        generated locally on the expansion board's own TIM1, not routed
+        from this board over a cable - see slave_pwm.c's own note on
+        its 1us counter resolution.
+
 =============================================================================
 CAN BOOTLOADER PROTOCOL - see the README's "Building & Flashing" section
 for the full walkthrough. These IDs are deliberately far from every
-application-runtime ID above (0x095-0x179) so there's no risk of confusing
+application-runtime ID above (0x095-0x231) so there's no risk of confusing
 a bootloader-protocol frame with a normal command, or vice versa. 0x7F0 is
 handled by the RUNNING APPLICATION; 0x7F1-0x7F4/0x7F7 are handled by the
 BOOTLOADER (which only runs before the application, or after 0x7F0 resets
@@ -752,6 +982,26 @@ Notes: this is BOOTLOADER.C's own version (BOOTLOADER_VERSION_MAJOR/MINOR/
   0x177 -> Layer fan actual RPM telemetry, uint16_t (3D printer - DLC:2)
   0x178 -> Hotend fan PWM power control, (3D printer - DLC:1)
   0x179 -> Hotend fan actual RPM telemetry, uint16_t, (3D printer - DLC:2)
+  0x1B0 -> Coil on/off (Electromagnet - DLC:1)
+  0x1C0 -> Timed pulse + contact-sensor gate (Spot Welder - DLC:3)
+  0x1D0 -> LED driver duty cycle (UV Curing - DLC:1)
+  0x1E0 -> Heater setpoint + blower duty (Hot Air Rework - DLC:3)
+  0x1F0 -> Expansion driver STEP/DIR/EN (Crimping Actuator - DLC:5)
+  0x200 -> Timed pulse, no sensor gate (Ultrasonic Welder - DLC:3)
+  --- Expansion slave bridge (advanced boards only, see dedicated section above) ---
+  0x210 -> Enter slave bootloader, magic payload (DLC:4)
+  0x211 -> Start slave update, size + HardwareID (DLC:8)
+  0x212 -> Slave HMAC-SHA256 chunk, x4 (DLC:8)
+  0x213 -> Slave firmware data (DLC:1-8)
+  0x214 -> End slave update / verify (DLC:8)
+  0x215 -> Slave bootloader status (DLC:any, or 1 response)
+  0x216 -> Slave update progress (DLC:any, or 1 response)
+  0x217 -> Slave bootloader version, part 1 (DLC:any, or 8 response)
+  0x218 -> Slave bootloader version, part 2 (response only, DLC:2)
+  0x220 -> Write slave application register, generic (DLC:2-8)
+  0x221 -> Read slave application register, generic (DLC:2, or up to 8 response)
+  0x230 -> Local PWM config (Solder Paste Jetting - DLC:3)
+  0x231 -> Local PWM pulse (Solder Paste Jetting - DLC:3)
   --- CAN bootloader protocol (see dedicated section above) ---
   0x7F0 -> Enter bootloader mode (Application, magic payload - DLC:4)
   0x7F1 -> Start update, size + HardwareID (Bootloader - DLC:8)
