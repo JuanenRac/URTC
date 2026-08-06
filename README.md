@@ -178,12 +178,33 @@ The same panel pre-mounted on a small carrier board with a 4-pin header — usef
 <td align="center"><img src="ani/10_3d_printer.gif" width="80"><br>3D Printer Hotend</td>
 <td align="center"><img src="ani/11_scan_probe.gif" width="80"><br>3D Scanner Probe</td>
 </tr>
+<tr>
+<td align="center"><img src="ani/12_smt_pickplace.gif" width="80"><br>SMT Pick & Place</td>
+<td align="center"><img src="ani/13_electromagnet.gif" width="80"><br>Electromagnet</td>
+<td align="center"><img src="ani/14_spot_welder.gif" width="80"><br>Spot Welder</td>
+<td align="center"><img src="ani/15_conformal_coating.gif" width="80"><br>Conformal Coating</td>
+</tr>
+<tr>
+<td align="center"><img src="ani/16_vacuum_gripper_lg.gif" width="80"><br>Vacuum Gripper (LG)</td>
+<td align="center"><img src="ani/17_flying_probe.gif" width="80"><br>Flying Probe</td>
+<td align="center"><img src="ani/18_uv_curing.gif" width="80"><br>UV Curing</td>
+<td align="center"><img src="ani/19_hotair_rework.gif" width="80"><br>Hot Air Rework</td>
+</tr>
+<tr>
+<td align="center"><img src="ani/20_pressfit_inserter.gif" width="80"><br>Press-Fit Inserter</td>
+<td align="center"><img src="ani/21_crimping_actuator.gif" width="80"><br>Crimping Actuator</td>
+<td align="center"><img src="ani/22_thermal_inspection.gif" width="80"><br>Thermal Inspection</td>
+<td align="center"><img src="ani/23_paste_jetting.gif" width="80"><br>Paste Jetting</td>
+</tr>
+<tr>
+<td align="center"><img src="ani/24_ultrasonic_welder.gif" width="80"><br>Ultrasonic Welder</td>
+</tr>
 </table>
 
 
 ### Invalid tool ID warning
 
-If the ID jumpers don't match any of the 12 assigned profiles, the board blocks every actuator and blinks this instead:
+If the ID jumpers don't match any of the 25 assigned profiles, the board blocks every actuator and blinks this instead:
 
 <img src="ani/error_warning.gif" width="480">
 
@@ -419,8 +440,14 @@ If anyone in the community is working on custom end-effectors, smart tool-change
 ├── 3D/
 │   ├── STL/                     Directory of 3D Tools parts for print in STL format
 │   └── OpenSCAD/                Directory of 3D Tools parts
-├── ani/
-│   └── *.gif                    Gif files of logos for OLED.
+├── ani/                          27 GIFs: one 4-frame animation per tool profile (00-24,
+│                                 matching each tool's own numeric ID), the boot splash
+│                                 (splash_boot.gif), and the invalid-ID warning
+│                                 (error_warning.gif) - all decoded straight from this
+│                                 project's own firmware source (firmware_render.c's own
+│                                 ToolIcons[]/SplashFace[]/ErrorText[] tables), not
+│                                 hand-drawn separately, so they always match what the
+│                                 real OLED actually shows
 ├── BOM/
 │   ├── BOM.TXT                  Full bill of materials of PCB board
 │   ├── BOM_EXPANSION_BASIC_TMC2209.TXT     Expansion board, basic + TMC2209
