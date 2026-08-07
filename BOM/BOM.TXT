@@ -80,7 +80,7 @@ U8          1          FM24CL64B           SOIC-8          64Kbit I2C F-RAM, par
                                                             EEPROM: no write-cycle delay (writes complete at bus
                                                             speed - "NoDelay" per the datasheet), and endurance in
                                                             the trillions of cycles rather than an EEPROM's typical
-                                                            ~1 million - see src/F303-master/V1.1/README.md section 6.
+                                                            ~1 million - see src/F303-master/README.md section 6.
 BOOT        1          KMR2                6mm SMT         Bootloader-select pushbutton (BOOT0 -> +3V3 via R31)
 RESET       1          KMR2                6mm SMT         MCU reset pushbutton (STM_RST -> GND)
 STM_JTAG    1          SWD-1X5-SMD         2.54mm, 5-pin   ST-Link programming header (VCC/GND/RST/SWDIO/SWCLK)

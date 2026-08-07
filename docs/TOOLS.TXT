@@ -1,0 +1,245 @@
+=============================================================================
+TOOLS.TXT - URTC Tool Catalog: what each tool does, what it uses
+PROJECT: URTC (Universal Robot Tool Controller)
+AUTHOR: JuanenRac (Electro Hobby 3D) - electrohobby3d@gmail.com
+LICENSE: This document is licensed under CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/).
+         Firmware source is GPL-3.0; hardware design files are CERN-OHL-S v2 - see the repo README.
+=============================================================================
+25 tool profiles, one row per tool: what it does, and which peripherals
+it actually uses - the main board's own onboard ones, and an expansion
+board's own, when a tool needs one. Deliberately high-level - no pin
+numbers, no register addresses, no timer channels. For that level of
+detail, see ECOVIA.TXT (the ID-jumper matrix and pin-mutation logic)
+and PINOUT.TXT/PINOUT_CONNECTORS.TXT (every physical pin, connector by
+connector). For the wire-level CAN protocol each tool answers to, see
+CANBUS.TXT. For which of the 6 expansion board variants exists and what
+each one carries, see EXPANSION.TXT.
+
+"Main board peripherals" below means whatever's already built into the
+URTC board itself - the stepper driver, the thermal control loop, the
+LED ring, the connectors every tool head plugs into. "Expansion board"
+means an add-on board on CONN_EXPANSION is actually required - not just
+usable, required - for that tool to work at all.
+
+=============================================================================
+1. Soldering Station (T12) - ID 0x00
+=============================================================================
+Precise PID temperature control for a standard T12 soldering tip.
+Main board peripherals: T12 heater PID loop, T12 ADC thermocouple
+reading, generic endstop input (optional).
+Expansion board: none needed.
+
+=============================================================================
+2. SMT Solder Paste Dispenser - ID 0x01
+=============================================================================
+Millimetric feed control for solder paste deposition on PCBs.
+Main board peripherals: onboard stepper driver (STEP/DIR/EN).
+Expansion board: none needed.
+
+=============================================================================
+3. Thermal Paste / Liquid Dispenser - ID 0x02
+=============================================================================
+Fluidity management for high-viscosity pastes or liquid adhesives.
+Main board peripherals: onboard stepper driver (STEP/DIR/EN).
+Expansion board: none needed.
+
+=============================================================================
+4. Smart Electric Screwdriver - ID 0x03
+=============================================================================
+Rotation and stop control based on torque limits or end-stops.
+Main board peripherals: onboard stepper driver (STEP/DIR/EN).
+Expansion board: none needed.
+
+=============================================================================
+5. Vacuum / Pneumatic Gripper - ID 0x04
+=============================================================================
+Vacuum pump control and pressure level reading for Pick-and-Place.
+Main board peripherals: onboard ADC (pressure sensor), digital sensor
+input, onboard stepper driver (positioning).
+Expansion board: none needed.
+
+=============================================================================
+6. Drill (BL4260) - ID 0x05
+=============================================================================
+PWM speed control, direction switching, and electric braking with
+real-time RPM readings. Also covers micro-spindle depaneling - same
+hardware path, different bit for a different job.
+Main board peripherals: dedicated drill PWM/brake/direction lines,
+tachometer input, generic endstop input (optional).
+Expansion board: none needed.
+
+=============================================================================
+7. Gimbal Gripper - ID 0x06
+=============================================================================
+High-sensitivity manipulation using a 3-phase brushless gimbal motor.
+Main board peripherals: onboard stepper driver (STEP/DIR/EN).
+Expansion board: none needed.
+
+=============================================================================
+8. NEMA Gripper - ID 0x07
+=============================================================================
+Robust clamping force via a heavy-duty stepper motor.
+Main board peripherals: onboard stepper driver (STEP/DIR/EN).
+Expansion board: none needed.
+
+=============================================================================
+9. AOI (Automated Optical Inspection) System - ID 0x08
+=============================================================================
+Synchronous stroboscopic LED lighting control for machine vision camera
+capture.
+Main board peripherals: LED ring driver, generic endstop input
+(optional).
+Expansion board: none needed.
+
+=============================================================================
+10. Engraving Laser Diode (10W optical) - ID 0x09
+=============================================================================
+PWM beam power modulation with a hardware safety interlock that locks
+down if host communication is lost.
+Main board peripherals: dedicated laser PWM line, safety interlock
+input, generic endstop input (optional).
+Expansion board: none needed.
+
+=============================================================================
+11. 3D Printing Hotend - ID 0x0A
+=============================================================================
+PID heater control, extruder control, and a dedicated layer cooling
+fan (own tachometer, own communication watchdog).
+Main board peripherals: hotend heater PID loop, hotend ADC (NTC
+thermistor), onboard stepper driver (extruder), dedicated layer-fan PWM
++ tachometer.
+Expansion board: none needed.
+
+=============================================================================
+12. 3D Scanner Probe - ID 0x0B
+=============================================================================
+Ultra-fast hardware-interrupt input for real-time surface digitization
+and impact sensing. Also covers metrology touch probing - same hardware
+path, a different physical probe on the same tool head.
+Main board peripherals: dedicated high-priority interrupt input (EXTI).
+Expansion board: none needed.
+
+=============================================================================
+13. SMT Pick & Place Head - ID 0x0C
+=============================================================================
+Rotary A-axis for correct pad alignment during placement.
+Main board peripherals: onboard stepper driver (STEP/DIR/EN, shared
+motion-tool handler).
+Expansion board: none needed.
+
+=============================================================================
+14. Heavy-Duty Electromagnet - ID 0x0D
+=============================================================================
+On/off pickup control for ferromagnetic parts and scrap.
+Main board peripherals: T12 heater output, repurposed as a generic
+GPIO driver (not a thermal loop for this tool).
+Expansion board: none needed.
+
+=============================================================================
+15. Spot Welder Head - ID 0x0E
+=============================================================================
+Millisecond-precise weld pulses for battery-pack nickel strips, gated
+on a surface-contact sensor.
+Main board peripherals: T12 heater output (pulse driver), digital
+contact sensor input.
+Expansion board: recommended if the tool head sits too far from the
+main board's own T12 connector for pulse timing to stay precise -
+otherwise not required. See EXPANSION.TXT.
+
+=============================================================================
+16. Conformal Coating Airbrush - ID 0x0F
+=============================================================================
+Protective coating spray control for finished PCBs.
+Main board peripherals: none - the spray valve and its own sensor live
+on the robot's own mainboard, outside this board's own scope. This
+tool's own ID exists purely for identification; no CAN handler runs
+for it.
+Expansion board: none needed.
+
+=============================================================================
+17. Large-Format Vacuum Gripper - ID 0x10
+=============================================================================
+Multi-cup suction array for unpopulated FR4 boards.
+Main board peripherals: onboard stepper driver (STEP/DIR/EN, shared
+motion-tool handler).
+Expansion board: none needed.
+
+=============================================================================
+18. Functional Testing Head - ID 0x11
+=============================================================================
+Flying-probe voltage/continuity testing. 2 independent reading paths:
+Main board peripherals (basic reading): onboard ADC, same channel the
+Vacuum Pickup tool also uses.
+Expansion board (advanced reading): an ADS1115 16-bit ADC - either a
+Basic+ADS1115 board (direct connection) or either Advanced board
+variant (relayed through the expansion slave chip). See EXPANSION.TXT.
+
+=============================================================================
+19. UV Curing Head - ID 0x12
+=============================================================================
+High-power UV LED driver for instant glue/mask curing.
+Main board peripherals: shared hardware PWM channel (drill/laser/UV).
+Expansion board: none needed.
+
+=============================================================================
+20. Hot Air Rework Nozzle - ID 0x13
+=============================================================================
+Heating element, turbine blower, and thermocouple feedback for
+reflowing misaligned SMD parts.
+Main board peripherals: soldering iron's own thermal PID loop (shared),
+shared hardware PWM channel (blower).
+Expansion board: none needed.
+
+=============================================================================
+21. Pneumatic Press-Fit Inserter - ID 0x14
+=============================================================================
+Linear actuator control for pressing connectors into PCBs.
+Main board peripherals: none - the actuator and its own sensor live on
+the robot's own mainboard, outside this board's own scope. This tool's
+own ID exists purely for identification; no CAN handler runs for it.
+Expansion board: none needed.
+
+=============================================================================
+22. Wire Harnessing / Crimping Actuator - ID 0x15
+=============================================================================
+High-torque jaw for stripping and crimping terminals.
+Main board peripherals: none for the actuator itself - driven entirely
+off an expansion board's own driver.
+Expansion board: required - either Basic variant (TMC2209 or TMC5160A).
+See EXPANSION.TXT.
+
+=============================================================================
+23. PCB Advanced Inspection - ID 0x16
+=============================================================================
+Thermal imaging to spot shorts by temperature signature, alongside ring
+LED illumination. Also covers micro-spindle depaneling via the shared
+drill hardware path.
+Main board peripherals: LED ring driver (illumination only).
+Expansion board: required for the thermal sensor itself - either a
+Basic+MLX9064x board (direct connection) or either Advanced board
+variant (relayed through the expansion slave chip). Which of the 3
+MLX9064x-family sensors (MLX90640/90641/90642) is actually populated is
+configured separately - see EEPROM.TXT section 6 and CANBUS.TXT's own
+0x1A6/0x1A7. See EXPANSION.TXT for the board variants.
+
+=============================================================================
+24. Solder Paste Jetting Valve - ID 0x17
+=============================================================================
+Piezoelectric micro-droplet dispensing, sub-millisecond pulse
+precision.
+Main board peripherals: none - needs local PWM generated at the tool
+head itself, not routed over a cable.
+Expansion board: required - either Advanced board variant (local PWM
+generated by the expansion slave chip). See EXPANSION.TXT.
+
+=============================================================================
+25. Ultrasonic Welder / Packaging Sealer - ID 0x18
+=============================================================================
+High-frequency transducer trigger for plastic enclosure welding.
+Main board peripherals: T12 heater output (pulse driver, same shared
+mechanism as the Spot Welder above).
+Expansion board: recommended if the tool head sits too far from the
+main board's own T12 connector for pulse timing to stay precise -
+otherwise not required. See EXPANSION.TXT.
+
+=============================================================================

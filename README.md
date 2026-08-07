@@ -461,6 +461,8 @@ If anyone in the community is working on custom end-effectors, smart tool-change
 │   ├── MANUAL.ODT               Service manual of URTC board and 3D Files
 │   ├── CANBUS.TXT               CAN bus protocol reference (all command/telemetry IDs)
 │   ├── ECOVIA.TXT               Tool identification matrix and pin-mutation logic
+│   ├── TOOLS.TXT                High-level catalog of all 25 tools - what each does and
+│   │                            which peripherals it uses, no pin-level detail
 │   ├── PINOUT.TXT               Full MCU pinout, block by block
 │   ├── PINOUT_CONNECTORS.TXT    Physical connector pinouts (CONN_DRILL, CONN_SEN, etc.)
 │   ├── EXPANSION.TXT            CONN_EXPANSION connector and the add-on board variants

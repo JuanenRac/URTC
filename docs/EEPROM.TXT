@@ -1,6 +1,6 @@
 =============================================================================
 EEPROM.TXT - FM24CL64B F-RAM register map
-PROJECT: URTC v1.1 (Universal Robot Tool Controller)
+PROJECT: URTC (Universal Robot Tool Controller)
 AUTHOR: JuanenRac (Electro Hobby 3D) - electrohobby3d@gmail.com
 LICENSE: This document is licensed under CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/).
          Firmware source is GPL-3.0; hardware design files are CERN-OHL-S v2 - see the repo README.
@@ -275,7 +275,7 @@ for a host that wants both.
 constant, not a F-RAM field at all - URTC_PERIPHERAL_TYPE in the
 firmware source, the same value for every URTC build, nothing to
 persist or configure. 0x04-0x05 are reserved for the expansion board's
-own firmware (the STM32F051T8 on an "advanced" expansion board - see
+own firmware (the STM32F303CBT6 on an "advanced" expansion board - see
 EXPANSION.TXT) to report about itself; this codebase doesn't answer on
 an expansion board's behalf, since that's different silicon running
 different firmware entirely, not something URTC's own firmware has any

@@ -90,7 +90,7 @@ PA10  -> STM_SDA (Hardware I2C2_SDA, AF4, same confirmation as above) - OLED bus
          * ALSO carries the FM24CL64B parameter-persistence F-RAM (address
            0x50, A0/A1/A2 tied to GND) - so the F-RAM shares this I2C2 bus
            rather than getting one of its own.
-           See src/F303-master/V1.1/README.md section 6 for the full reasoning and
+           See src/F303-master/README.md section 6 for the full reasoning and
            BOM.TXT for the part itself.
 
 -----------------------------------------------------------------------------

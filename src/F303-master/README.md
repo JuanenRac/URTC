@@ -561,6 +561,7 @@ trusting the real firmware build.
 | `docs/CANBUS.TXT` | Every CAN ID, byte layout, and DLC - the authoritative wire protocol reference |
 | `docs/EEPROM.TXT` | Complete F-RAM byte layout, including free tool configuration and peripheral info (sections 5-6) |
 | `docs/ECOVIA.TXT` | Full ID↔tool table and pin-mutation logic |
+| `docs/TOOLS.TXT` | High-level catalog of all 25 tools - what each does and which peripherals (main board and/or expansion board) it uses, without pin-level detail |
 | `docs/PINOUT.TXT` | Complete MCU pinout, block by block |
 | `docs/PINOUT_CONNECTORS.TXT` | Physical connector pinouts (CONN_DRILL, CONN_SEN, CONN_EXPANSION, etc.) |
 | `BOM/BOM.TXT` | Bill of materials, cross-checked against the Eagle netlist |

@@ -16,6 +16,7 @@
 #include "firmware_init_buses.h"
 #include "firmware_expansion_spi.h"
 #include "firmware_expansion_i2c.h"
+#include "melexis_mlx90640/firmware_mlx90640_app.h"
 #include "melexis_mlx90641/firmware_mlx90641_app.h"
 #include "melexis_mlx90642/firmware_mlx90642_app.h"
 #include "firmware_identify.h"
@@ -359,12 +360,14 @@ int main(void) {
     // board variant is actually configured (expansion_board_type, just
     // loaded from F-RAM by SavedState_Load() above), same as every
     // other expansion-board-specific init in this project. Which of the
-    // 2 supported sensors (MLX90641 or MLX90642) is actually populated
-    // is decided by mlx_sensor_variant.
+    // 3 supported sensors is actually populated is decided by
+    // mlx_sensor_variant.
     if (expansion_board_type == 6 && mlx_sensor_variant == MLX_VARIANT_90642) {
         MLX90642_Direct_Init();
-    } else if (expansion_board_type == 6) {
+    } else if (expansion_board_type == 6 && mlx_sensor_variant == MLX_VARIANT_90641) {
         MLX90641_Direct_Init();
+    } else if (expansion_board_type == 6) {
+        MLX90640_Direct_Init();
     }
     // Advanced boards: tell the expansion slave chip which MLX9064x
     // variant it's actually got, since it has no persistent storage of

@@ -1,5 +1,5 @@
 =============================================================================
-CAN BUS COMMAND MAP - URTC v1.1 (UNIVERSAL ROBOT TOOL CONTROLLER)
+CAN BUS COMMAND MAP - URTC (UNIVERSAL ROBOT TOOL CONTROLLER)
 PROJECTS: URTC/HYDRA-UMC (JUANENBOT/PAROL6)
 AUTHOR: JuanenRac (Electro Hobby 3D) - electrohobby3d@gmail.com
 LICENSE: This document is licensed under CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/).
@@ -413,14 +413,21 @@ Data:
 ID: 0x135 [URTC Tool Head -> Master] (Automatic telemetry every 150ms)
 DLC: 3 bytes
 Data:
-  - txData[0]: Current T12 temperature (°C) - High byte (MSB) [BIG-ENDIAN]
-  - txData[1]: Current T12 temperature (°C) - Low byte (LSB)
+  - txData[0]: Current temperature (°C) - High byte (MSB) [BIG-ENDIAN]
+  - txData[1]: Current temperature (°C) - Low byte (LSB)
   - txData[2]: Generic endstop / limit switch state (PB3)
                0x01 = Triggered (line pulled low)
                0x00 = Open
-  Note: Temperature read exclusively via ADC Channel 0 (PA0) through the AD8605
-        op-amp. Endstop polled every 150ms as a plain digital input (not
-        interrupt-driven) - see CANBUS section [5] logic in ECOVIA.TXT for why.
+  Note: Sent for whichever tool actually owns the T12 thermal loop right
+        now - the Soldering Iron (its own original tool), or Hot Air
+        Rework (0x1E0 above), which shares this exact same physical
+        heater/thermocouple mechanism rather than having its own
+        separate one. Temperature read exclusively via ADC Channel 0
+        (PA0) through the AD8605 op-amp. Endstop polled every 150ms as
+        a plain digital input (not interrupt-driven) - see CANBUS
+        section [5] logic in ECOVIA.TXT for why; not physically wired
+        for Hot Air Rework's own tool head, so this byte's own value is
+        meaningless when that tool is the one answering.
 
 -----------------------------------------------------------------------------
 5. DRILL TOOL (BL4260 Brushless Motor with Integrated Driver)
@@ -803,10 +810,119 @@ Data:
         from this board over a cable - see slave_pwm.c's own note on
         its 1us counter resolution.
 
+-----------------------------------------------------------------------------
+FUNCTIONAL TESTING HEAD (doc tool #7, 0x240-0x243) - see this project's
+own EXPANSION.TXT for the 2 reading paths this tool has: the CAN IDs
+below reach either an ADS1115 wired directly to this board's own
+expansion connector (Basic+ADS1115, expansion_board_type==5) or the
+same chip on an expansion slave's own local sensor bus (either Advanced
+variant, expansion_board_type==3 or 4, relayed through the slave
+bridge) - a host never needs to know or care which. This tool's own
+basic reading (no expansion board at all, this board's own onboard
+ADC) is a separate telemetry ID, 0x243, documented alongside vacuum
+pickup's own 0x145 further above rather than here, since it shares that
+same onboard ADC channel.
+-----------------------------------------------------------------------------
+
+ID: 0x240 [Master -> URTC Tool Head]
+ADS1115 configuration
+DLC: 2 bytes
+Data:
+  - rxData[0..1]: The ADS1115's own 16-bit config register value
+                  [BIG-ENDIAN], forwarded near-verbatim - this board
+                  doesn't interpret the bitfields (gain, mux, data
+                  rate), same generic-passthrough philosophy as the SPI
+                  passthrough to the expansion driver (0x180/0x181).
+
+ID: 0x241 [Master -> URTC Tool Head]
+ADS1115 trigger conversion
+DLC: any (payload ignored)
+Data: none - starts a single-shot conversion using whatever config was
+      last set via 0x240.
+
+ID: 0x242 [Master -> URTC Tool Head, or URTC Tool Head -> Master answering 0x242]
+ADS1115 read result
+DLC: any as a query (payload ignored) | 2 bytes as a response
+Data:
+  - txData[0..1]: The ADS1115's own 16-bit conversion result
+                  [BIG-ENDIAN], raw ADC counts - scaling to volts
+                  depends on whatever PGA gain was last configured via
+                  0x240, which is why this stays raw rather than this
+                  board guessing at a conversion.
+
+-----------------------------------------------------------------------------
+PCB ADVANCED INSPECTION (doc tool #13, 0x250-0x255) - same dual-path
+reasoning as Functional Testing Head above, for an MLX9064x-family
+thermal sensor instead of an ADS1115. Reaches either a sensor wired
+directly to this board's own expansion connector (Basic+MLX9064x,
+expansion_board_type==6) or the same family of chips on an expansion
+slave's own local sensor bus (either Advanced variant, relayed through
+the slave bridge) - a host never needs to know or care which, or which
+of the 3 MLX9064x family members (MLX90640/90641/90642) is actually
+configured (see 0x1A6/0x1A7 above) - chunk count and pixel count are
+the only visible difference (48 chunks/768px for MLX90640 and MLX90642,
+12 chunks/192px for MLX90641), and a host already has to know which
+variant it's reading to interpret that correctly regardless of which
+connection path served it.
+-----------------------------------------------------------------------------
+
+ID: 0x250 [Master -> URTC Tool Head]
+Trigger thermal capture
+DLC: any (payload ignored)
+Data: none - starts a new frame capture on whichever MLX9064x variant
+      is currently configured (0x1A6/0x1A7).
+
+ID: 0x251 [Master -> URTC Tool Head, or URTC Tool Head -> Master answering 0x251]
+Query thermal capture status
+DLC: any as a query (payload ignored) | 1 byte as a response
+Data:
+  - txData[0]: 0x00=idle, 0x01=busy (capture in progress), 0x02=ready
+               (frame available, both chunk types below now servable),
+               0xFF=error (I2C transfer or sensor communication
+               failed - chunk reads return stale/zeroed data until the
+               next successful 0x250)
+
+ID: 0x252 [Master -> URTC Tool Head]
+Request raw pixel chunk
+DLC: 1 byte
+Data:
+  - rxData[0]: Chunk index (0-47 for MLX90640/90642, 0-11 for
+               MLX90641 - see this section's own intro above)
+Effect: triggers a 4-frame response on 0x253 (below) - no response sent
+        at all if capture status isn't 0x02 (ready) when this arrives.
+
+ID: 0x253 [URTC Tool Head -> Master, sent as 4 consecutive frames answering 0x252]
+Raw pixel chunk data
+DLC: 8 bytes x4
+Data: 32 bytes total (16 pixels, uint16_t each) split across exactly 4
+      frames of 8 bytes, concatenated in the order received - same
+      convention this project's own bootloader HMAC chunk transfer
+      already established. A host seeing fewer than 4 frames for a
+      given request already knows to treat it as incomplete, same as
+      it would a dropped CAN frame from any other cause.
+
+ID: 0x254 [Master -> URTC Tool Head]
+Request calibrated temperature chunk
+DLC: 1 byte
+Data:
+  - rxData[0]: Chunk index (same range as 0x252 above)
+Effect: triggers a 4-frame response on 0x255 (below), same reasoning as
+        0x252/0x253.
+
+ID: 0x255 [URTC Tool Head -> Master, sent as 4 consecutive frames answering 0x254]
+Calibrated temperature chunk data
+DLC: 8 bytes x4
+Data: 32 bytes total (16 pixels, int16_t each, centi-degrees C - value
+      x100, so 2550 means 25.50°C), same 4-frame concatenation as 0x253
+      above. Every sensor variant's own native scale is rescaled to
+      this same centi-degrees-C convention before being sent, so a host
+      never needs to know which of the 3 MLX9064x family members
+      actually answered.
+
 =============================================================================
 CAN BOOTLOADER PROTOCOL - see the README's "Building & Flashing" section
 for the full walkthrough. These IDs are deliberately far from every
-application-runtime ID above (0x095-0x231) so there's no risk of confusing
+application-runtime ID above (0x095-0x255) so there's no risk of confusing
 a bootloader-protocol frame with a normal command, or vice versa. 0x7F0 is
 handled by the RUNNING APPLICATION; 0x7F1-0x7F4/0x7F7 are handled by the
 BOOTLOADER (which only runs before the application, or after 0x7F0 resets
@@ -1050,6 +1166,16 @@ Notes: this is BOOTLOADER.C's own version (BOOTLOADER_VERSION_MAJOR/MINOR/
   0x221 -> Read slave application register, generic (DLC:2, or up to 8 response)
   0x230 -> Local PWM config (Solder Paste Jetting - DLC:3)
   0x231 -> Local PWM pulse (Solder Paste Jetting - DLC:3)
+  0x240 -> ADS1115 configuration (Functional Testing Head - DLC:2)
+  0x241 -> ADS1115 trigger conversion (Functional Testing Head - DLC:any)
+  0x242 -> ADS1115 read result (Functional Testing Head - DLC:any, or 2 response)
+  0x243 -> Basic-mode reading, onboard ADC (Functional Testing Head - response only, DLC:2)
+  0x250 -> Trigger thermal capture (PCB Advanced Inspection - DLC:any)
+  0x251 -> Query capture status (PCB Advanced Inspection - DLC:any, or 1 response)
+  0x252 -> Request raw pixel chunk (PCB Advanced Inspection - DLC:1)
+  0x253 -> Raw pixel chunk data, x4 frames (PCB Advanced Inspection - response only, DLC:8x4)
+  0x254 -> Request calibrated temperature chunk (PCB Advanced Inspection - DLC:1)
+  0x255 -> Calibrated temperature chunk data, x4 frames (PCB Advanced Inspection - response only, DLC:8x4)
   --- CAN bootloader protocol (see dedicated section above) ---
   0x7F0 -> Enter bootloader mode (Application, magic payload - DLC:4)
   0x7F1 -> Start update, size + HardwareID (Bootloader - DLC:8)

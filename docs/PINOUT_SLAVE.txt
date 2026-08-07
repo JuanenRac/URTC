@@ -1,14 +1,16 @@
 =============================================================================
 URTC EXPANSION SLAVE - PINOUT ASSIGNMENT (ADVANCED VARIANTS ONLY)
 MICROCONTROLLER: STM32F303CBT6 (LQFP48 Package - 48 Pins, 128KB Flash, 40KB SRAM)
-PROJECT: URTC v1.1 (Universal Robot Tool Controller) - Expansion Ecosystem
+PROJECT: URTC (Universal Robot Tool Controller) - Expansion Ecosystem
 AUTHOR: JuanenRac (Electro Hobby 3D) - electrohobby3d@gmail.com
 LICENSE: This document is licensed under CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/).
          Firmware source (this chip's bootloader and application) is
-         GPL-3.0; the Melexis MLX90640 library it links against is
-         Apache-2.0 (see src/F303-slave/V1.1/melexis/LICENSE_MELEXIS_APACHE2.0) -
-         see the repo README's "License and Copyright Notices" section
-         for the full breakdown.
+         GPL-3.0; the 3 Melexis MLX9064x-family libraries it links
+         against are all Apache-2.0 (see each one's own
+         LICENSE_MELEXIS_APACHE2.0 in src/F303-slave/melexis/,
+         melexis_mlx90641/, and melexis_mlx90642/) - see the repo
+         README's "License and Copyright Notices" section for the full
+         breakdown.
 
 SCOPE: this chip is only populated on the 2 ADVANCED expansion board
 variants (Advanced+TMC2209, Advanced+TMC5160A). The 2 BASIC variants

@@ -356,7 +356,7 @@ typedef struct __attribute__((packed)) {
 // for every URTC firmware build, so there's nothing to persist or make
 // configurable. 0x03 per EEPROM.TXT section 6's peripheral type
 // numbering (0x04-0x05 reserved for expansion-board firmwares, which are
-// a different chip - STM32F051T8 - running different firmware entirely,
+// a different chip - STM32F303CBT6 - running different firmware entirely,
 // not something this codebase reports on their behalf).
 #define URTC_PERIPHERAL_TYPE 0x03
 #define SAVEDSTATE_FRAM_ADDR 0 // lives at the very start of the F-RAM - nothing else uses this chip yet

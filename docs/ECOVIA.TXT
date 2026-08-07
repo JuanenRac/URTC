@@ -1,5 +1,5 @@
 =============================================================================
-CONFIGURATION DOCUMENT: URTC - UNIVERSAL TOOL ECOSYSTEM (V1.1)
+CONFIGURATION DOCUMENT: URTC - UNIVERSAL TOOL ECOSYSTEM
 MATRIX ASSIGNMENT - URTC/HYDRA-UMC (JUANENBOT/PAROL6)
 MICROCONTROLLER: STM32F303CCT6 (LQFP48 Package - 48 Pins, 256KB Flash)
 AUTHOR: JuanenRac (Electro Hobby 3D) - electrohobby3d@gmail.com
@@ -35,7 +35,7 @@ All five: internal pull-up enabled, active-low (jumper to GND sets that bit).
     debug lines.
 
 -----------------------------------------------------------------------------
-[2] MASTER TOOL-HEAD ADDRESSING TABLE (URTC v1.1 BINARY MATRIX, 32 IDs)
+[2] MASTER TOOL-HEAD ADDRESSING TABLE (URTC BINARY MATRIX, 32 IDs)
 -----------------------------------------------------------------------------
 ID4   ID3   ID2   ID1   ID0  |  ID (HEX)  |  ASSIGNED TOOL / MODULE FUNCTION
 -----------------------------------------------------------------------------
@@ -50,20 +50,20 @@ ID4   ID3   ID2   ID1   ID0  |  ID (HEX)  |  ASSIGNED TOOL / MODULE FUNCTION
   0     1     0     0     0   |    0x08    |  TOOL_AOI_INSPECTION (Camera + Coaxial LED ring)
   0     1     0     0     1   |    0x09    |  TOOL_LASER_ENGRAVER (10W optical diode head)
   0     1     0     1     0   |    0x0A    |  TOOL_3D_PRINTER (FDM Hotend + Direct extruder)
-  0     1     0     1     1   |    0x0B    |  TOOL_SCAN_PROBE (Touch impact probe - EXTI3 max priority)
-  0     1     1     0     0   |    0x0C    |  RESERVED (Unassigned / Preventive high impedance -> TOOL_INVALID)
-  0     1     1     0     1   |    0x0D    |  RESERVED (Unassigned / Preventive high impedance -> TOOL_INVALID)
-  0     1     1     1     0   |    0x0E    |  RESERVED (Unassigned / Preventive high impedance -> TOOL_INVALID)
-  0     1     1     1     1   |    0x0F    |  RESERVED (Unassigned / Preventive high impedance -> TOOL_INVALID)
-  1     0     0     0     0   |    0x10    |  RESERVED (Unassigned / Preventive high impedance -> TOOL_INVALID)
-  1     0     0     0     1   |    0x11    |  RESERVED (Unassigned / Preventive high impedance -> TOOL_INVALID)
-  1     0     0     1     0   |    0x12    |  RESERVED (Unassigned / Preventive high impedance -> TOOL_INVALID)
-  1     0     0     1     1   |    0x13    |  RESERVED (Unassigned / Preventive high impedance -> TOOL_INVALID)
-  1     0     1     0     0   |    0x14    |  RESERVED (Unassigned / Preventive high impedance -> TOOL_INVALID)
-  1     0     1     0     1   |    0x15    |  RESERVED (Unassigned / Preventive high impedance -> TOOL_INVALID)
-  1     0     1     1     0   |    0x16    |  RESERVED (Unassigned / Preventive high impedance -> TOOL_INVALID)
-  1     0     1     1     1   |    0x17    |  RESERVED (Unassigned / Preventive high impedance -> TOOL_INVALID)
-  1     1     0     0     0   |    0x18    |  RESERVED (Unassigned / Preventive high impedance -> TOOL_INVALID)
+  0     1     0     1     1   |    0x0B    |  TOOL_SCAN_PROBE (Touch impact probe - EXTI3 max priority; also covers metrology touch probing)
+  0     1     1     0     0   |    0x0C    |  TOOL_SMT_PICKPLACE (Pick & Place head, rotary A-axis)
+  0     1     1     0     1   |    0x0D    |  TOOL_ELECTROMAGNET (Ferromagnetic parts pickup, off T12's own GPIO)
+  0     1     1     1     0   |    0x0E    |  TOOL_SPOT_WELDER (Battery-tab nickel strip welder, timed pulse)
+  0     1     1     1     1   |    0x0F    |  TOOL_CONFORMAL_COATING (Spray valve control - actuator lives on the robot's own mainboard)
+  1     0     0     0     0   |    0x10    |  TOOL_VACUUM_GRIPPER_LG (Multi-cup suction array, unpopulated boards)
+  1     0     0     0     1   |    0x11    |  TOOL_FLYING_PROBE (Voltage/continuity testing - onboard ADC or an ADS1115 on an expansion board)
+  1     0     0     1     0   |    0x12    |  TOOL_UV_CURING (High-power UV LED driver)
+  1     0     0     1     1   |    0x13    |  TOOL_HOTAIR_REWORK (Heating element + turbine blower, shares the soldering iron's own thermal loop)
+  1     0     1     0     0   |    0x14    |  TOOL_PRESSFIT_INSERTER (Linear actuator - lives on the robot's own mainboard)
+  1     0     1     0     1   |    0x15    |  TOOL_CRIMPING_ACTUATOR (High-torque jaw, driven off an expansion board's own driver)
+  1     0     1     1     0   |    0x16    |  TOOL_THERMAL_INSPECTION (MLX9064x-family thermal imaging - onboard the main board or an expansion board, depending on variant; also covers micro-spindle depaneling)
+  1     0     1     1     1   |    0x17    |  TOOL_PASTE_JETTING (Piezoelectric micro-droplet dispensing, local PWM on an advanced/sensor expansion board)
+  1     1     0     0     0   |    0x18    |  TOOL_ULTRASONIC_WELDER (High-frequency transducer, plastic enclosure welding)
   1     1     0     0     1   |    0x19    |  RESERVED (Unassigned / Preventive high impedance -> TOOL_INVALID)
   1     1     0     1     0   |    0x1A    |  RESERVED (Unassigned / Preventive high impedance -> TOOL_INVALID)
   1     1     0     1     1   |    0x1B    |  RESERVED (Unassigned / Preventive high impedance -> TOOL_INVALID)
@@ -72,21 +72,31 @@ ID4   ID3   ID2   ID1   ID0  |  ID (HEX)  |  ASSIGNED TOOL / MODULE FUNCTION
   1     1     1     1     0   |    0x1E    |  RESERVED (Unassigned / Preventive high impedance -> TOOL_INVALID)
   1     1     1     1     1   |    0x1F    |  FREE CONFIGURATION - see note below, not a direct tool mapping
 
-* 0x00-0x0B (12 IDs) are assigned to real tool profiles today. 0x0C-0x1E
-  (19 IDs) are headroom for future tools within this same addressing
-  scheme - each reads as TOOL_INVALID until firmware explicitly assigns
-  it, at which point every actuator output is forced to its safe/inert
-  state and system_error_flag is set. 0x1F (all 5 jumpers installed) is
-  set aside separately, as "free configuration": rather than mapping to
-  a fixed tool, this reading tells the firmware to look up which tool to
-  use from a register in its own persistent F-RAM instead, set ahead of
-  time over CAN via `URTC Flasher` - useful for reprogramming a board to
-  a different tool without re-soldering jumpers. If that F-RAM register
-  is unset or invalid, a board reading 0x1F falls back to exactly the
-  same safe/inert TOOL_INVALID state as any of the plain unassigned IDs
+* 0x00-0x18 (25 IDs) are assigned to real tool profiles today - the
+  original 12 (0x00-0x0B) plus a later 13-tool expansion (0x0C-0x18,
+  see docs/TOOLS.TXT for what each one actually does, peripheral by
+  peripheral). 0x19-0x1E (6 IDs) are headroom for future tools within
+  this same addressing scheme - each reads as TOOL_INVALID until
+  firmware explicitly assigns it, at which point every actuator output
+  is forced to its safe/inert state and system_error_flag is set. 0x1F
+  (all 5 jumpers installed) is set aside separately, as "free
+  configuration": rather than mapping to a fixed tool, this reading
+  tells the firmware to look up which tool to use from a register in
+  its own persistent F-RAM instead, set ahead of time over CAN via
+  `URTC Flasher` - useful for reprogramming a board to a different tool
+  without re-soldering jumpers. If that F-RAM register is unset or
+  invalid, a board reading 0x1F falls back to exactly the same
+  safe/inert TOOL_INVALID state as any of the plain unassigned IDs
   above. See `docs/EEPROM.TXT` section 5 for the complete mechanism, and
   `docs/CANBUS.TXT`'s `0x1A2`/`0x1A3` for the CAN commands that read and
   write this register.
+
+* Several of the 13 newer tools (0x0C-0x18) need more than this board's
+  own onboard peripherals to work - an expansion board of some kind,
+  see `docs/EXPANSION.TXT` for the 6 variants and which tools need
+  which. This table only covers ID-jumper assignment; it doesn't
+  distinguish "works standalone" from "needs an expansion board" - that
+  distinction lives in `docs/TOOLS.TXT` instead.
 
 -----------------------------------------------------------------------------
 [3] EXTERIOR AND INTERIOR LIGHTING INTERFACES

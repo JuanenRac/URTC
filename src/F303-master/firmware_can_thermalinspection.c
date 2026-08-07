@@ -1,6 +1,6 @@
 // =============================================================================
 // URTC Firmware - CAN command handler: PCB Advanced Inspection
-// (0x250-0x255, MLX9064x access - direct (either MLX90641 or MLX90642)
+// (0x250-0x255, MLX9064x access - direct (any of the 3 family members)
 // or via the expansion slave bridge, depending on which board variant
 // and sensor variant is configured)
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
@@ -17,11 +17,8 @@
 //
 //   expansion_board_type==6 (Basic+MLX9064x): the sensor is wired
 //   directly onto this board's own bit-banged I2C bus, no slave MCU
-//   involved. Which of the 2 supported sensors is actually behind it
-//   (MLX90641 or MLX90642 - MLX90640 has no direct-path support, only
-//   the slave-relayed path below) is decided by mlx_sensor_variant, the
-//   same setting that also gets relayed to the slave chip on Advanced
-//   boards.
+//   involved. mlx_sensor_variant decides which of the 3 family members
+//   is actually behind it - all 3 have direct-path support here.
 //
 //   expansion_board_type==3 or 4 (either Advanced variant): the sensor
 //   lives on the expansion slave chip's own LOCAL sensor bus, relayed
@@ -41,6 +38,7 @@
 // =============================================================================
 #include "firmware_common.h"
 #include "firmware_can_thermalinspection.h"
+#include "melexis_mlx90640/firmware_mlx90640_app.h"
 #include "melexis_mlx90641/firmware_mlx90641_app.h"
 #include "melexis_mlx90642/firmware_mlx90642_app.h"
 
@@ -67,8 +65,10 @@ void Handle_CAN_ThermalInspection(void) {
     if (rxHeader.StdId == 0x250 && !boot_sequence_active) {
         if (expansion_board_type == 6 && mlx_sensor_variant == MLX_VARIANT_90642) {
             MLX90642_Direct_TriggerCapture();
+        } else if (expansion_board_type == 6 && mlx_sensor_variant == MLX_VARIANT_90641) {
+            MLX90641_Direct_TriggerCapture();
         } else if (expansion_board_type == 6) {
-            MLX90641_Direct_TriggerCapture(); // MLX_VARIANT_90641, and the safe default (0) - MLX90640 has no direct-path support, see this file's own header comment
+            MLX90640_Direct_TriggerCapture(); // MLX_VARIANT_90640 and the safe default (0) both take this path
         } else {
             ExpansionI2C_SlaveWriteRegister(REG_APP_MLX_TRIGGER_CAPTURE, rxData, 0);
         }
@@ -79,8 +79,11 @@ void Handle_CAN_ThermalInspection(void) {
         if (expansion_board_type == 6 && mlx_sensor_variant == MLX_VARIANT_90642) {
             status = MLX90642_Direct_GetCaptureStatus();
             got_status = 1;
-        } else if (expansion_board_type == 6) {
+        } else if (expansion_board_type == 6 && mlx_sensor_variant == MLX_VARIANT_90641) {
             status = MLX90641_Direct_GetCaptureStatus();
+            got_status = 1;
+        } else if (expansion_board_type == 6) {
+            status = MLX90640_Direct_GetCaptureStatus();
             got_status = 1;
         } else {
             got_status = ExpansionI2C_SlaveReadRegister(REG_APP_MLX_CAPTURE_STATUS, &status, 1);
@@ -101,8 +104,11 @@ void Handle_CAN_ThermalInspection(void) {
         if (expansion_board_type == 6 && mlx_sensor_variant == MLX_VARIANT_90642) {
             MLX90642_Direct_GetRawChunk(rxData[0], chunk);
             SendChunkFrames(0x253, chunk);
-        } else if (expansion_board_type == 6) {
+        } else if (expansion_board_type == 6 && mlx_sensor_variant == MLX_VARIANT_90641) {
             MLX90641_Direct_GetRawChunk(rxData[0], chunk);
+            SendChunkFrames(0x253, chunk);
+        } else if (expansion_board_type == 6) {
+            MLX90640_Direct_GetRawChunk(rxData[0], chunk);
             SendChunkFrames(0x253, chunk);
         } else if (ExpansionI2C_SlaveReadRegisterWithParam(REG_APP_MLX_RAW_CHUNK, rxData[0], chunk, 32)) {
             SendChunkFrames(0x253, chunk);
@@ -113,8 +119,11 @@ void Handle_CAN_ThermalInspection(void) {
         if (expansion_board_type == 6 && mlx_sensor_variant == MLX_VARIANT_90642) {
             MLX90642_Direct_GetCalibratedChunk(rxData[0], chunk);
             SendChunkFrames(0x255, chunk);
-        } else if (expansion_board_type == 6) {
+        } else if (expansion_board_type == 6 && mlx_sensor_variant == MLX_VARIANT_90641) {
             MLX90641_Direct_GetCalibratedChunk(rxData[0], chunk);
+            SendChunkFrames(0x255, chunk);
+        } else if (expansion_board_type == 6) {
+            MLX90640_Direct_GetCalibratedChunk(rxData[0], chunk);
             SendChunkFrames(0x255, chunk);
         } else if (ExpansionI2C_SlaveReadRegisterWithParam(REG_APP_MLX_CALIBRATED_CHUNK, rxData[0], chunk, 32)) {
             SendChunkFrames(0x255, chunk);
