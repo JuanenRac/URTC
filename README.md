@@ -315,10 +315,19 @@ its own.
   <img src="images/URTC_FLASHER_V1_1.png" alt="URTC Flasher window" width="700">
 </p>
 
-Two distinct jobs:
+Two distinct jobs, each supporting both the main board and (on an
+Advanced expansion board variant) its own expansion slave chip:
 
-- **CAN OTA update** — drives the update sequence above over a USB-CAN adapter, either through an SLCAN-compatible serial port (Windows/Linux) or directly over Linux's native SocketCAN (no adapter reflash needed on most CANable-family boards that way). Implements the full protocol: HardwareID check, HMAC-SHA256 signing, page-by-page transfer with ACKs, live progress via the bootloader's heartbeat, and a version query so you can see what's currently installed (application or bootloader, either one answers) before deciding what to flash.
-- **Full-chip SWD/JTAG programming** — a separate, clearly-marked section for mass-erasing the whole chip and writing both the bootloader and application images fresh, via either pyOCD (no separate install beyond the pip package) or STM32CubeProgrammer. This is the same kind of operation as a first JTAG bring-up, not an OTA update — it isn't self-healing the way the CAN path is, though recovering from an interrupted attempt just means reconnecting and flashing again, the same as any first-time bring-up.
+- **CAN OTA update** — drives the update sequence above over a USB-CAN adapter, either through an SLCAN-compatible serial port (Windows/Linux) or directly over Linux's native SocketCAN (no adapter reflash needed on most CANable-family boards that way). Implements the full protocol: HardwareID check, HMAC-SHA256 signing, page-by-page transfer with ACKs, live progress via the bootloader's heartbeat, and a version query so you can see what's currently installed (application or bootloader, either one answers) before deciding what to flash. A **Flash target** selector picks between the main board and the expansion slave chip - the slave's own update is relayed through the main board's own I2C bridge (`CANBUS.TXT`'s own `0x210`-`0x218`) rather than a separate physical connection, tracked via periodic progress polling instead of the main board's own per-page ACK (no equivalent exists on that bridge - each write there completes synchronously within its own I2C transaction). The firmware file list only shows application images - bootloader binaries are filtered out, since CAN-OTA never flashes those.
+- **Full-chip SWD/JTAG programming** — a separate, clearly-marked section for mass-erasing the whole chip and writing both the bootloader and application images fresh, via either pyOCD (no separate install beyond the pip package) or STM32CubeProgrammer. This is the same kind of operation as a first JTAG bring-up, not an OTA update — it isn't self-healing the way the CAN path is, though recovering from an interrupted attempt just means reconnecting and flashing again, the same as any first-time bring-up. Same **Target chip** selector as the CAN-OTA tab - switching it changes the flash addresses and pyOCD target string used automatically, since the expansion slave chip (STM32F303CBT6) genuinely differs from the main board (STM32F303CC) in both.
+
+Also available from the CAN-OTA tab: **Expansion board** and **MLX9064x
+sensor variant** dropdowns (Query/Save), for telling the board which of
+the 7 possible `CONN_EXPANSION` configurations (none, or one of 6 real
+variants) and which of the 3 MLX9064x-family thermal sensors (or none)
+is actually populated - a one-time hardware-configuration step, done
+here since it's most naturally paired with a firmware update. See
+`docs/EXPANSION.TXT` and `docs/CANBUS.TXT` for the full mechanism.
 
 A **File / Language / Help** menu bar sits at the top of the window - save the on-screen log, switch language, or open the README/GitHub repo/license/about from anywhere without hunting through the main controls for them.
 
@@ -331,7 +340,7 @@ python3 urtc_flasher.py         # Linux
 
 Or build a standalone binary that doesn't need Python installed: `build_exe.bat` on Windows, `./build_exe.sh` on Linux.
 
-**Firmware files go in `tools/flasher/firmware/`** (inside the tool's own folder, not at the repo root — this keeps `tools/flasher/` self-contained and shareable on its own). Multiple versions can sit there at once — every file gets checked against the same plausibility test the bootloader itself applies (valid stack pointer, sane size) and listed with a clear ✓/✗, auto-selecting only when there's exactly one that passes. Browse still works for a file anywhere else. See `tools/flasher/README.md` for the full detail on both the CAN and SWD/JTAG paths, including Linux-specific setup (serial permissions, SocketCAN interface bring-up) and how the version-query display works.
+**Firmware files go in `tools/flasher/firmware/`** (inside the tool's own folder, not at the repo root — this keeps `tools/flasher/` self-contained and shareable on its own). Multiple versions can sit there at once — every application-firmware file gets checked against the same plausibility test the bootloader itself applies (valid stack pointer, sane size) and listed with a clear ✓/✗, auto-selecting only when there's exactly one that passes. Browse still works for a file anywhere else, and **Download from GitHub...** fetches the current file listing straight from this project's own `firmware/` folder (`github.com/JuanenRac/URTC`) and downloads whichever one you pick directly into the local folder - no browser, no manual save-as. See `tools/flasher/README.md` for the full detail on both the CAN and SWD/JTAG paths, including Linux-specific setup (serial permissions, SocketCAN interface bring-up) and how the version-query display works.
 
 **5 languages**: English, Español, Italiano, Français, Deutsch — the **Language** menu (in the window's own menu bar) switches the whole interface, saved to `urtc_config.json` next to the tool. See `tools/flasher/README.md`'s "Install and run" section for how to add another language.
 
@@ -576,14 +585,17 @@ If anyone in the community is working on custom end-effectors, smart tool-change
 │   │   │                        constants without touching source - copy to urtc_config.json
 │   │   │                        and edit if you actually need one of these overrides
 │   │   ├── urtc_flasher.py      Entry point only (CLI args, splash screen, main window setup) -
-│   │   │                        the actual logic lives in the 6 flasher_*.py modules below,
+│   │   │                        the actual logic lives in the 7 flasher_*.py modules below,
 │   │   │                        split by responsibility purely for readability
 │   │   ├── flasher_config.py    Config file I/O, language loading, protocol constants
 │   │   ├── flasher_transports.py  SLCAN, SocketCAN, MockCAN (for --cli --transport mock)
 │   │   ├── flasher_swd_tools.py  STM32CubeProgrammer / pyOCD subprocess wrappers
 │   │   ├── flasher_validation.py  Firmware file validation (.bin/.hex/.elf plausibility +
 │   │   │                        slot-correctness checks)
-│   │   ├── flasher_protocol.py  The CAN OTA update state machine itself
+│   │   ├── flasher_protocol.py  The CAN OTA update state machine itself, for both the main
+│   │   │                        board and (relayed through its own I2C bridge) the expansion
+│   │   │                        slave chip
+│   │   ├── flasher_github.py    Downloads firmware from this project's own GitHub repository
 │   │   ├── flasher_gui.py       The main window - connection, flashing, SWD/JTAG, free tool
 │   │   │                        config, peripheral info, and the File/Language/Help menu bar
 │   │   ├── requirements.txt     Python dependencies (just pyserial)
