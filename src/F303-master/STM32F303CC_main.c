@@ -488,9 +488,11 @@ int main(void) {
 
             // Gated by active_tool - sends the temperature telemetry frame
             // only for the tool that actually owns current_temperature at
-            // the moment (soldering iron or 3D printer hotend), rather than
-            // on a flat timer regardless of which tool is active.
-            if (active_tool == TOOL_SOLDERING_IRON) {
+            // the moment (soldering iron, Hot Air Rework - which shares
+            // this exact same thermal loop, see CANBUS.TXT's own 0x1E0 -
+            // or 3D printer hotend), rather than on a flat timer
+            // regardless of which tool is active.
+            if (active_tool == TOOL_SOLDERING_IRON || active_tool == TOOL_HOTAIR_REWORK) {
                 txH.StdId = 0x135;
                 txH.DLC = 3; // extended: byte 2 = endstop
                 txD[0] = (uint8_t)((current_temperature >> 8) & 0xFF);
