@@ -234,7 +234,8 @@ void Handle_CAN_GlobalCommands_PreErrorGate(void) {
         }
 
         // Set/query MLX9064x sensor variant (0x1A6/0x1A7) - which of the
-        // 3 family members (MLX_VARIANT_90640/90641/90642) is actually
+        // 3 family members (MLX_VARIANT_90640/90641/90642), or none at
+        // all (MLX_VARIANT_NONE, the safe default), is actually
         // populated, on either this board's own Basic+MLX9064x direct
         // connection or an Advanced variant's own slave-chip sensor bus.
         // Same "host has to tell us, no electrical way to sense it"
@@ -243,9 +244,9 @@ void Handle_CAN_GlobalCommands_PreErrorGate(void) {
         // chip is actually the relevant path (expansion_board_type==3 or
         // 4), the new value is also relayed live to the slave's own
         // REG_MLX_SENSOR_VARIANT over the I2C bridge - this board's own
-        // direct MLX90641 support (expansion_board_type==6) just reads
+        // direct sensor support (expansion_board_type==6) just reads
         // mlx_sensor_variant directly, no relay needed for that path.
-        if (rxHeader.StdId == 0x1A6 && rxHeader.DLC >= 1 && rxData[0] <= 2) {
+        if (rxHeader.StdId == 0x1A6 && rxHeader.DLC >= 1 && rxData[0] <= 3) {
             mlx_sensor_variant = rxData[0];
             if (expansion_board_type == 3 || expansion_board_type == 4) {
                 ExpansionI2C_SlaveWriteRegister(0x14, &mlx_sensor_variant, 1); // REG_MLX_SENSOR_VARIANT, see slave_common.h

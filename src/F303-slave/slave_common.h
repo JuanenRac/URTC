@@ -47,7 +47,7 @@ extern I2C_HandleTypeDef hi2c1; // LINK bus (slave mode)
 extern I2C_HandleTypeDef hi2c2; // LOCAL sensor bus (master mode)
 extern IWDG_HandleTypeDef hiwdg;
 extern TIM_HandleTypeDef htim1; // local PWM generation - see slave_pwm.c
-extern uint8_t mlx_sensor_variant; // MLX_VARIANT_* - which MLX9064x family member is actually populated, set by the main board over REG_MLX_SENSOR_VARIANT, defaults to MLX_VARIANT_90640 until told otherwise
+extern uint8_t mlx_sensor_variant; // MLX_VARIANT_* - which MLX9064x family member is actually populated, set by the main board over REG_MLX_SENSOR_VARIANT, defaults to MLX_VARIANT_NONE (no sensor configured) until told otherwise
 
 // -----------------------------------------------------------------------
 // Local sensor bus (I2C2) addresses
@@ -96,13 +96,15 @@ extern uint8_t mlx_sensor_variant; // MLX_VARIANT_* - which MLX9064x family memb
 #define MLX_CAPTURE_ERROR     0xFF // I2C2 transfer or sensor communication failed - chunk reads return stale/zeroed data until the next successful REG_MLX_TRIGGER_CAPTURE
 
 // Which MLX9064x family member is actually populated - see
-// REG_MLX_SENSOR_VARIANT above. MLX90640 stays the default (0) so a
-// board already configured before this register existed keeps working
-// exactly as it did (this chip's own mlx_sensor_variant, see
-// slave_main.c, starts at 0 the same way).
-#define MLX_VARIANT_90640 0x00 // 32x24, 768px, 48 chunks - Melexis's own official mlx90640-library
-#define MLX_VARIANT_90641 0x01 // 16x12, 192px, 12 chunks - Melexis's own official mlx90641-library (melexis_mlx90641/)
-#define MLX_VARIANT_90642 0x02 // 32x24, 768px, 48 chunks, onboard temperature calculation - not yet implemented, see this project's own audit trail
+// REG_MLX_SENSOR_VARIANT above. 0 means no sensor configured at all
+// (the safe default) - deliberately NOT "assume MLX90640", since a
+// real MLX90640 needs the main board to explicitly say so via its own
+// 0x1A6 CAN command once, the same one-time hardware-configuration
+// step expansion_board_type itself already requires.
+#define MLX_VARIANT_NONE   0x00 // no sensor populated - see MLX_TriggerCapture/friends in slave_i2c_sensors.c for how each one handles this explicitly rather than falling through to a real sensor's own code path
+#define MLX_VARIANT_90640 0x01 // 32x24, 768px, 48 chunks - Melexis's own official mlx90640-library
+#define MLX_VARIANT_90641 0x02 // 16x12, 192px, 12 chunks - Melexis's own official mlx90641-library (melexis_mlx90641/)
+#define MLX_VARIANT_90642 0x03 // 32x24, 768px, 48 chunks, onboard temperature calculation - melexis_mlx90642/
 
 #define MLX_TEMP_SCALE 100 // REG_MLX_CALIBRATED_CHUNK values are degrees C * 100 (centi-degrees) as int16_t - e.g. 2350 means 23.50C; chosen over sending raw float32 to halve the byte count for the same pixel count (int16_t vs float32), which matters both for I2C2's own real transfer time and for whatever this eventually costs to relay across the link bus and onward over CAN
 

@@ -331,23 +331,26 @@ typedef struct __attribute__((packed)) {
                                     // and why this exists (multiple identically-
                                     // configured boards on one bus were otherwise
                                     // indistinguishable from each other).
-    uint8_t  mlx_sensor_variant; // MLX_VARIANT_90640/90641/90642 (0/1/2) - which
-                                    // MLX9064x family member is actually populated
-                                    // on a Basic+MLX9064x or Advanced expansion
-                                    // board, for both this board's own direct
-                                    // MLX90641 support (expansion_board_type==6)
-                                    // and the value relayed to the expansion slave
-                                    // chip's own REG_MLX_SENSOR_VARIANT at boot on
-                                    // the Advanced variants (3-4) - see this
-                                    // project's own audit trail for why this one
-                                    // value serves both paths rather than needing
-                                    // two separate settings. Set via CAN (0x1A6/
-                                    // 0x1A7 - see CANBUS.TXT), same reasoning as
-                                    // expansion_board_type above. Default 0
-                                    // (MLX90640) matches the slave chip's own
-                                    // default before this register existed, so an
-                                    // already-configured advanced board keeps
-                                    // working unchanged.
+    uint8_t  mlx_sensor_variant; // MLX_VARIANT_NONE/90640/90641/90642
+                                    // (0/1/2/3) - which MLX9064x family member is
+                                    // actually populated on a Basic+MLX9064x or
+                                    // Advanced expansion board, for both this
+                                    // board's own direct sensor support
+                                    // (expansion_board_type==6) and the value
+                                    // relayed to the expansion slave chip's own
+                                    // REG_MLX_SENSOR_VARIANT at boot on the
+                                    // Advanced variants (3-4) - see this project's
+                                    // own audit trail for why this one value
+                                    // serves both paths rather than needing two
+                                    // separate settings. Set via CAN (0x1A6/0x1A7
+                                    // - see CANBUS.TXT), same reasoning as
+                                    // expansion_board_type above. Default 0 means
+                                    // no sensor configured at all - deliberately
+                                    // NOT "assume MLX90640", since a real MLX90640
+                                    // needs the host to explicitly say so via
+                                    // 0x1A6 once, the same one-time hardware-
+                                    // configuration step expansion_board_type
+                                    // itself already requires.
     uint8_t  checksum;           // CRC-8 (polynomial 0x07, CRC-8/SMBUS) over every byte above - proportionate for "was this corrupted", not a security boundary the way the OTA update's HMAC is
 } SavedState_t;
 #define SAVEDSTATE_MAGIC 0x55525443UL // 'URTC' as bytes, arbitrary but distinctive - astronomically unlikely to appear by chance in an uninitialized F-RAM
@@ -487,9 +490,10 @@ uint8_t SavedState_Checksum(const SavedState_t *s);
 
 // Which MLX9064x family member is actually populated - same values as
 // the expansion slave chip's own copy (slave_common.h) for consistency.
-#define MLX_VARIANT_90640 0x00
-#define MLX_VARIANT_90641 0x01
-#define MLX_VARIANT_90642 0x02
+#define MLX_VARIANT_NONE   0x00 // no sensor populated - the safe default; MLX_TriggerCapture and friends deliberately do nothing against this rather than guessing which real sensor might be there
+#define MLX_VARIANT_90640 0x01
+#define MLX_VARIANT_90641 0x02
+#define MLX_VARIANT_90642 0x03
 
 // Same scaling convention as the slave chip's own copy (slave_common.h)
 // - REG_MLX_CALIBRATED_CHUNK values are degrees C * 100 (centi-degrees).

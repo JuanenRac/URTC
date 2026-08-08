@@ -96,7 +96,7 @@ Offset | Size | Field                    | Type     | Notes
        |      |                          |          | board off? Diagnostic
        |      |                          |          | only - doesn't re-raise
        |      |                          |          | the fault at boot.
-25     | 1    | expansion_board_type     | uint8_t  | 0-4, see EXPANSION.TXT.
+25     | 1    | expansion_board_type     | uint8_t  | 0-6, see EXPANSION.TXT.
        |      |                          |          | Set via CAN (0x1A0),
        |      |                          |          | not derived from
        |      |                          |          | anything else this
@@ -109,7 +109,7 @@ Offset | Size | Field                    | Type     | Notes
        |      |                          |          | jumpers installed) -
        |      |                          |          | see section 4 below.
        |      |                          |          | 0 = no tool selected,
-       |      |                          |          | 1-12 = one of the 12
+       |      |                          |          | 1-25 = one of the 25
        |      |                          |          | currently supported
        |      |                          |          | tool profiles (stored
        |      |                          |          | as id+1, so 0 can
@@ -140,11 +140,38 @@ Offset | Size | Field                    | Type     | Notes
        |      |                          |          | above. See section 6
        |      |                          |          | below for why this
        |      |                          |          | exists.
-28     | 1    | checksum                 | uint8_t  | CRC-8 (polynomial
+28     | 1    | mlx_sensor_variant       | uint8_t  | 0=no sensor configured
+       |      |                          |          | (safe default), 1=
+       |      |                          |          | MLX90640, 2=MLX90641,
+       |      |                          |          | 3=MLX90642 - which
+       |      |                          |          | MLX9064x-family sensor
+       |      |                          |          | is actually populated,
+       |      |                          |          | on either this board's
+       |      |                          |          | own Basic+MLX9064x
+       |      |                          |          | direct connection or
+       |      |                          |          | an Advanced board's
+       |      |                          |          | own slave-chip sensor
+       |      |                          |          | bus - see
+       |      |                          |          | EXPANSION.TXT. 0
+       |      |                          |          | deliberately does NOT
+       |      |                          |          | mean "assume
+       |      |                          |          | MLX90640" - a real
+       |      |                          |          | MLX90640 needs this
+       |      |                          |          | set explicitly, same
+       |      |                          |          | one-time hardware-
+       |      |                          |          | configuration step
+       |      |                          |          | expansion_board_type
+       |      |                          |          | itself already
+       |      |                          |          | requires. Set via CAN
+       |      |                          |          | (0x1A6), same
+       |      |                          |          | reasoning as
+       |      |                          |          | expansion_board_type
+       |      |                          |          | above.
+29     | 1    | checksum                 | uint8_t  | CRC-8 (polynomial
        |      |                          |          | 0x07, the standard
        |      |                          |          | CRC-8/SMBUS variant)
        |      |                          |          | over every byte above
-       |      |                          |          | (offsets 0-27) -
+       |      |                          |          | (offsets 0-28) -
        |      |                          |          | proportionate for
        |      |                          |          | "was this corrupted
        |      |                          |          | by a partial write",
@@ -159,7 +186,7 @@ Offset | Size | Field                    | Type     | Notes
        |      |                          |          | way that happened to
        |      |                          |          | cancel out.
 -------|------|--------------------------|----------|---------------------
-Total: 29 bytes (offsets 0-28). Verified against the actual compiled
+Total: 30 bytes (offsets 0-29). Verified against the actual compiled
 struct via offsetof(), not hand-counted - packed structs have no
 compiler-inserted padding, so this is also simply the sum of each field's
 own size, but the exact figures above were checked, not assumed.

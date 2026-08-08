@@ -333,21 +333,27 @@ ID: 0x1A6 [Master -> URTC Tool Head]
 Set MLX9064x sensor variant
 DLC: 1+ bytes (only byte[0] used)
 Data:
-  - rxData[0]: 0=MLX90640, 1=MLX90641, 2=MLX90642 (MLX_VARIANT_* in the
-               source) - which of the 3 MLX9064x family members is
-               actually populated on either this board's own
-               Basic+MLX9064x expansion board (direct connection,
-               expansion_board_type==6, see EXPANSION.TXT) or an
-               Advanced expansion board's own local sensor bus. Values
-               above 2 are rejected (no change made, still answers with
-               the unchanged current value).
+  - rxData[0]: 0=none installed, 1=MLX90640, 2=MLX90641, 3=MLX90642
+               (MLX_VARIANT_* in the source) - which of the 3 MLX9064x
+               family members is actually populated on either this
+               board's own Basic+MLX9064x expansion board (direct
+               connection, expansion_board_type==6, see EXPANSION.TXT)
+               or an Advanced expansion board's own local sensor bus,
+               or that none is populated at all (0, the safe default -
+               deliberately NOT "assume MLX90640", a real MLX90640
+               needs this set explicitly). Values above 3 are rejected
+               (no change made, still answers with the unchanged
+               current value).
 Effect: sets this board's own mlx_sensor_variant, used two ways
         depending on which expansion board is actually configured
         (expansion_board_type, 0x1A0/0x1A1):
           - expansion_board_type==6 (Basic+MLX9064x, direct): this
             board's own thermal-inspection CAN handler (0x250-0x255,
             see section further below) reads mlx_sensor_variant
-            directly to decide which sensor library to call.
+            directly to decide which sensor library to call - or
+            answers nothing at all (0x250/0x252/0x254) or
+            MLX_CAPTURE_ERROR (0x251) if this is still 0 (none
+            configured).
           - expansion_board_type==3 or 4 (either Advanced variant): the
             new value is also relayed live, over the same I2C bridge
             used for every other advanced-board register access, to the
@@ -363,10 +369,9 @@ Effect: sets this board's own mlx_sensor_variant, used two ways
         own to remember this across its own resets. Answered even
         during a declared critical error, same reasoning as
         0x110/0x190/0x1A0/0x1A2/0x1A4: this is configuration, not an
-        actuation command. MLX90642 (variant 2) is not yet supported by
-        either this board's own direct path or the expansion slave's
-        own relay path - setting it is accepted and persisted, but no
-        capture will actually succeed against it yet.
+        actuation command. All 3 family members (MLX90640, MLX90641,
+        MLX90642) are fully implemented on both the direct-connection
+        path and the expansion slave's own relay path.
 
 ID: 0x1A7 [Master -> URTC Tool Head, or URTC Tool Head -> Master answering 0x1A6]
 Query/response: MLX9064x sensor variant

@@ -402,51 +402,67 @@ static void MLX90642_DoGetCalibratedChunk(uint8_t chunk_index, uint8_t out[32]) 
 // register handling calls. Branches on mlx_sensor_variant
 // (slave_common.h, MLX_VARIANT_*) so the link-bus protocol and the main
 // board's own CAN handlers never need to know which sensor is actually
-// behind them.
+// behind them. MLX_VARIANT_NONE (the safe default, no sensor
+// configured) is handled explicitly in every function below rather than
+// falling through to MLX90640's own code path - guessing which real
+// sensor might be there and reading garbage from it would be worse than
+// simply reporting nothing configured.
 // -----------------------------------------------------------------------
 void Sensors_Init(void) {
-    if (mlx_sensor_variant == MLX_VARIANT_90641) {
+    if (mlx_sensor_variant == MLX_VARIANT_90640) {
+        MLX90640_DoInit();
+    } else if (mlx_sensor_variant == MLX_VARIANT_90641) {
         MLX90641_DoInit();
     } else if (mlx_sensor_variant == MLX_VARIANT_90642) {
         MLX90642_DoInit();
-    } else {
-        MLX90640_DoInit(); // MLX_VARIANT_90640 and the safe default (0) both take this path
     }
+    // MLX_VARIANT_NONE: nothing to initialize.
 }
 
 void MLX_TriggerCapture(void) {
-    if (mlx_sensor_variant == MLX_VARIANT_90641) {
+    if (mlx_sensor_variant == MLX_VARIANT_90640) {
+        MLX90640_DoTriggerCapture();
+    } else if (mlx_sensor_variant == MLX_VARIANT_90641) {
         MLX90641_DoTriggerCapture();
     } else if (mlx_sensor_variant == MLX_VARIANT_90642) {
         MLX90642_DoTriggerCapture();
-    } else if (mlx_sensor_variant == MLX_VARIANT_90640) {
-        MLX90640_DoTriggerCapture();
     }
+    // MLX_VARIANT_NONE: no sensor configured - deliberately does
+    // nothing, status stays MLX_CAPTURE_IDLE rather than silently
+    // succeeding against nothing.
 }
 
 uint8_t MLX_GetCaptureStatus(void) {
+    if (mlx_sensor_variant == MLX_VARIANT_90640) return mlx90640_capture_status;
     if (mlx_sensor_variant == MLX_VARIANT_90641) return mlx90641_capture_status;
     if (mlx_sensor_variant == MLX_VARIANT_90642) return MLX90642_DoGetCaptureStatus();
-    return mlx90640_capture_status;
+    return MLX_CAPTURE_ERROR; // MLX_VARIANT_NONE - answered explicitly
+                              // rather than silently, so a host polling
+                              // this can tell "no sensor configured"
+                              // apart from "chip not responding at all".
 }
 
 void MLX_GetRawChunk(uint8_t chunk_index, uint8_t out[32]) {
-    if (mlx_sensor_variant == MLX_VARIANT_90641) {
+    if (mlx_sensor_variant == MLX_VARIANT_90640) {
+        MLX90640_DoGetRawChunk(chunk_index, out);
+    } else if (mlx_sensor_variant == MLX_VARIANT_90641) {
         MLX90641_DoGetRawChunk(chunk_index, out);
     } else if (mlx_sensor_variant == MLX_VARIANT_90642) {
         MLX90642_DoGetRawChunk(chunk_index, out);
     } else {
-        MLX90640_DoGetRawChunk(chunk_index, out);
+        for (int i = 0; i < 32; i++) out[i] = 0; // MLX_VARIANT_NONE
     }
 }
 
 void MLX_GetCalibratedChunk(uint8_t chunk_index, uint8_t out[32]) {
-    if (mlx_sensor_variant == MLX_VARIANT_90641) {
+    if (mlx_sensor_variant == MLX_VARIANT_90640) {
+        MLX90640_DoGetCalibratedChunk(chunk_index, out);
+    } else if (mlx_sensor_variant == MLX_VARIANT_90641) {
         MLX90641_DoGetCalibratedChunk(chunk_index, out);
     } else if (mlx_sensor_variant == MLX_VARIANT_90642) {
         MLX90642_DoGetCalibratedChunk(chunk_index, out);
     } else {
-        MLX90640_DoGetCalibratedChunk(chunk_index, out);
+        for (int i = 0; i < 32; i++) out[i] = 0; // MLX_VARIANT_NONE
     }
 }
 

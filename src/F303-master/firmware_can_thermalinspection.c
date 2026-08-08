@@ -19,6 +19,10 @@
 //   directly onto this board's own bit-banged I2C bus, no slave MCU
 //   involved. mlx_sensor_variant decides which of the 3 family members
 //   is actually behind it - all 3 have direct-path support here.
+//   MLX_VARIANT_NONE (the safe default, no sensor configured yet)
+//   deliberately answers nothing at all on this path - guessing which
+//   real sensor might be there and reading garbage from it would be
+//   worse than a host simply seeing no response.
 //
 //   expansion_board_type==3 or 4 (either Advanced variant): the sensor
 //   lives on the expansion slave chip's own LOCAL sensor bus, relayed
@@ -63,27 +67,38 @@ static void SendChunkFrames(uint32_t id, const uint8_t *data32) {
 
 void Handle_CAN_ThermalInspection(void) {
     if (rxHeader.StdId == 0x250 && !boot_sequence_active) {
-        if (expansion_board_type == 6 && mlx_sensor_variant == MLX_VARIANT_90642) {
-            MLX90642_Direct_TriggerCapture();
+        if (expansion_board_type == 6 && mlx_sensor_variant == MLX_VARIANT_90640) {
+            MLX90640_Direct_TriggerCapture();
         } else if (expansion_board_type == 6 && mlx_sensor_variant == MLX_VARIANT_90641) {
             MLX90641_Direct_TriggerCapture();
-        } else if (expansion_board_type == 6) {
-            MLX90640_Direct_TriggerCapture(); // MLX_VARIANT_90640 and the safe default (0) both take this path
-        } else {
+        } else if (expansion_board_type == 6 && mlx_sensor_variant == MLX_VARIANT_90642) {
+            MLX90642_Direct_TriggerCapture();
+        } else if (expansion_board_type != 6) {
             ExpansionI2C_SlaveWriteRegister(REG_APP_MLX_TRIGGER_CAPTURE, rxData, 0);
         }
+        // expansion_board_type==6 && mlx_sensor_variant==MLX_VARIANT_NONE:
+        // no sensor configured, deliberately does nothing - see this
+        // file's own header comment.
 
     } else if (rxHeader.StdId == 0x251) {
         uint8_t status = 0;
         uint8_t got_status = 0;
-        if (expansion_board_type == 6 && mlx_sensor_variant == MLX_VARIANT_90642) {
-            status = MLX90642_Direct_GetCaptureStatus();
+        if (expansion_board_type == 6 && mlx_sensor_variant == MLX_VARIANT_90640) {
+            status = MLX90640_Direct_GetCaptureStatus();
             got_status = 1;
         } else if (expansion_board_type == 6 && mlx_sensor_variant == MLX_VARIANT_90641) {
             status = MLX90641_Direct_GetCaptureStatus();
             got_status = 1;
+        } else if (expansion_board_type == 6 && mlx_sensor_variant == MLX_VARIANT_90642) {
+            status = MLX90642_Direct_GetCaptureStatus();
+            got_status = 1;
         } else if (expansion_board_type == 6) {
-            status = MLX90640_Direct_GetCaptureStatus();
+            // MLX_VARIANT_NONE: answer explicitly with MLX_CAPTURE_ERROR
+            // rather than staying silent here - unlike the trigger/chunk
+            // requests above, a status query is expected to always get
+            // an answer, so a host polling this can tell "no sensor
+            // configured" apart from "board not responding at all".
+            status = MLX_CAPTURE_ERROR;
             got_status = 1;
         } else {
             got_status = ExpansionI2C_SlaveReadRegister(REG_APP_MLX_CAPTURE_STATUS, &status, 1);
@@ -101,32 +116,36 @@ void Handle_CAN_ThermalInspection(void) {
 
     } else if (rxHeader.StdId == 0x252 && rxHeader.DLC >= 1) {
         uint8_t chunk[32];
-        if (expansion_board_type == 6 && mlx_sensor_variant == MLX_VARIANT_90642) {
-            MLX90642_Direct_GetRawChunk(rxData[0], chunk);
+        if (expansion_board_type == 6 && mlx_sensor_variant == MLX_VARIANT_90640) {
+            MLX90640_Direct_GetRawChunk(rxData[0], chunk);
             SendChunkFrames(0x253, chunk);
         } else if (expansion_board_type == 6 && mlx_sensor_variant == MLX_VARIANT_90641) {
             MLX90641_Direct_GetRawChunk(rxData[0], chunk);
             SendChunkFrames(0x253, chunk);
-        } else if (expansion_board_type == 6) {
-            MLX90640_Direct_GetRawChunk(rxData[0], chunk);
+        } else if (expansion_board_type == 6 && mlx_sensor_variant == MLX_VARIANT_90642) {
+            MLX90642_Direct_GetRawChunk(rxData[0], chunk);
             SendChunkFrames(0x253, chunk);
-        } else if (ExpansionI2C_SlaveReadRegisterWithParam(REG_APP_MLX_RAW_CHUNK, rxData[0], chunk, 32)) {
+        } else if (expansion_board_type != 6 && ExpansionI2C_SlaveReadRegisterWithParam(REG_APP_MLX_RAW_CHUNK, rxData[0], chunk, 32)) {
             SendChunkFrames(0x253, chunk);
         }
+        // expansion_board_type==6 && MLX_VARIANT_NONE: no response, same
+        // reasoning as the trigger command above.
 
     } else if (rxHeader.StdId == 0x254 && rxHeader.DLC >= 1) {
         uint8_t chunk[32];
-        if (expansion_board_type == 6 && mlx_sensor_variant == MLX_VARIANT_90642) {
-            MLX90642_Direct_GetCalibratedChunk(rxData[0], chunk);
+        if (expansion_board_type == 6 && mlx_sensor_variant == MLX_VARIANT_90640) {
+            MLX90640_Direct_GetCalibratedChunk(rxData[0], chunk);
             SendChunkFrames(0x255, chunk);
         } else if (expansion_board_type == 6 && mlx_sensor_variant == MLX_VARIANT_90641) {
             MLX90641_Direct_GetCalibratedChunk(rxData[0], chunk);
             SendChunkFrames(0x255, chunk);
-        } else if (expansion_board_type == 6) {
-            MLX90640_Direct_GetCalibratedChunk(rxData[0], chunk);
+        } else if (expansion_board_type == 6 && mlx_sensor_variant == MLX_VARIANT_90642) {
+            MLX90642_Direct_GetCalibratedChunk(rxData[0], chunk);
             SendChunkFrames(0x255, chunk);
-        } else if (ExpansionI2C_SlaveReadRegisterWithParam(REG_APP_MLX_CALIBRATED_CHUNK, rxData[0], chunk, 32)) {
+        } else if (expansion_board_type != 6 && ExpansionI2C_SlaveReadRegisterWithParam(REG_APP_MLX_CALIBRATED_CHUNK, rxData[0], chunk, 32)) {
             SendChunkFrames(0x255, chunk);
         }
+        // expansion_board_type==6 && MLX_VARIANT_NONE: no response, same
+        // reasoning as the trigger command above.
     }
 }
