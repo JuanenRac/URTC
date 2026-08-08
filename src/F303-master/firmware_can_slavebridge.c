@@ -77,7 +77,7 @@ void Handle_CAN_SlaveBridge(void) {
 
     } else if (rxHeader.StdId == 0x212 && rxHeader.DLC == 8) {
         // Same 4-frames-of-8-bytes accumulation as the main board's own
-        // bootloader HMAC chunk handling (CAN_ID_HMAC_CHUNK, BOOTLOADER.C) -
+        // bootloader HMAC chunk handling (CAN_ID_HMAC_CHUNK, bootloader_protocol.c) -
         // REG_HMAC_EXPECTED expects the complete 32-byte signature in one
         // I2C transaction (slaveboot_protocol.c's own HandleHmacExpected
         // doesn't accumulate partial writes the way HandleData does), so

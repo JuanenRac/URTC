@@ -18,7 +18,7 @@
 // SAFETY HARDWARE ALIGNMENT WITH PINOUT V1.0 AND ECOSYSTEM DOC
 // =============================================================================
 
-// Firmware identity - must match BOOTLOADER.C's THIS_HARDWARE_ID exactly
+// Firmware identity - must match bootloader_common.h's THIS_HARDWARE_ID exactly
 // (same board, same check). Reported over CAN via 0x7F8/0x7F9 - see
 // HAL_CAN_RxFifo0MsgPendingCallback - so a host can ask "what's currently
 // running" before deciding what to flash, without needing to trigger a
@@ -376,9 +376,9 @@ typedef struct __attribute__((packed)) {
 // Full standard 5x7 alphanumeric character font (no clipping)
 
 // =============================================================================
-// Shared peripheral handles and global state - defined once in the main
-// partitioned file (STM32F303CC.C), declared extern here since almost
-// every module below reads or writes several of these.
+// Shared peripheral handles and global state - defined once in
+// STM32F303CC_main.c, declared extern here since almost every module
+// below reads or writes several of these.
 // =============================================================================
 extern CAN_HandleTypeDef hcan;
 extern TIM_HandleTypeDef htim3;

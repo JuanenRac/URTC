@@ -13,7 +13,7 @@ bytes, leaving 8163 bytes of headroom for whatever gets added later.
 
 For the load/save logic itself (when it reads, when it writes, what gets
 restored automatically vs. left for the host to decide) see
-STM32F303CC.C section 14 - this document is the register map, not the
+firmware_persistence.c - this document is the register map, not the
 behavior around it. For the CAN commands that read/write parts of this
 from off-board, see CANBUS.TXT (0x190/0x191 query, 0x192 erase,
 0x1A0/0x1A1 for the expansion board type field specifically).
@@ -200,7 +200,7 @@ Passive settings - restored directly, no hazard either way:
 ring_on itself isn't separately restored, but doesn't need to be: it's a
 derived value, not independent state - at save time it's computed as
 "is any of ring_r/g/b non-zero" (see SavedState_MaybeSave() in
-STM32F303CC.C), not read from a dedicated variable. Restoring ring_r/g/b
+firmware_persistence.c), not read from a dedicated variable. Restoring ring_r/g/b
 already gives the same answer to that same question on the next boot,
 so there's nothing separate left to restore.
 

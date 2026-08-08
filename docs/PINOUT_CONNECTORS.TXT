@@ -243,7 +243,7 @@ PIN | SIGNAL         | FUNCTION
     |       correctly. Confirmed against the TMC5160's own datasheet: it
     |       specifies SPI Mode 3 (CPOL=1, CPHA=1) explicitly by name, which
     |       the firmware's bit-banged implementation matches exactly - see
-    |       ExpansionSPI_TransferByte() in STM32F303CC.C.
+    |       ExpansionSPI_TransferByte() in firmware_expansion_spi.c.
     | NOTE - TMC_DIAG0: EXP_GPIO1 and TMC_DIAG0 (pins 10/11) share the
     |       same design intent - general-purpose, EXTI-capable headroom
     |       for whatever fast interrupt-driven input a future add-on needs.

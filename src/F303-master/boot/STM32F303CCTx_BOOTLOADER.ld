@@ -1,5 +1,5 @@
 /* Linker script for URTC bootloader - STM32F303CCT6
- * Flash region: 0x08000000, 32KB (bootloader slot - see BOOTLOADER.C's
+ * Flash region: 0x08000000, 32KB (bootloader slot - see bootloader_common.h's
  * own MAIN_APP_ADDR=0x08008000 / BACKUP_APP_ADDR=0x08024000 constants,
  * which assume exactly this 32KB bootloader region ahead of them).
  * RAM: 40KB main SRAM at 0x20000000 (the STM32F303CC's other 8KB, CCM

@@ -58,7 +58,7 @@ void Handle_CAN_GlobalCommands_PreErrorGate(void) {
         // nothing here can cause harm. Responds via 0x7F9: byte0=0 marks
         // this as the application answering directly (as opposed to the
         // bootloader answering from stored metadata, byte0=1 - see
-        // BOOTLOADER.C), then HardwareID (4 bytes) + version major
+        // bootloader_protocol.c), then HardwareID (4 bytes) + version major
         // (2 bytes) + version minor (1 byte), all big-endian.
         if (rxHeader.StdId == 0x7F8) {
             if (HAL_CAN_GetTxMailboxesFreeLevel(&hcan) > 0) {

@@ -1,8 +1,9 @@
 /* Linker script for URTC main application - STM32F303CCT6
  * Flash region: 0x08008000, 112KB (main application slot, right after
- * the 32KB bootloader - see BOOTLOADER.C's MAIN_APP_ADDR=0x08008000 and
- * BACKUP_APP_ADDR=0x08024000, and APP_MAX_SIZE in urtc_flasher.py, all
- * of which assume exactly this layout).
+ * the 32KB bootloader - see bootloader_common.h's own MAIN_APP_ADDR=
+ * 0x08008000 and BACKUP_APP_ADDR=0x08024000, and APP_MAX_SIZE in
+ * URTC Flasher's own flasher_config.py (github.com/JuanenRac/URTC-FLASHER),
+ * all of which assume exactly this layout).
  * RAM: 40KB main SRAM at 0x20000000 (the STM32F303CC's other 8KB, CCM
  * RAM, lives at the unrelated 0x10000000 alias and isn't used here).
  */

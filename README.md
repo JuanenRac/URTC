@@ -61,7 +61,7 @@ A 20-pin header, separate from the tool-specific connectors, for add-on boards t
 
 Full pin-by-pin detail — which MCU pin backs which signal, and the reasoning behind a couple of layout constraints this chip's 48-pin package has — lives in `docs/PINOUT_CONNECTORS.TXT` and `src/F303-master/README.md`.
 
-### The 4 expansion board variants
+### The 6 expansion board variants
 
 4 of the 6 expansion board variants carry a stepper driver — either a TMC2209 (up to 2A/coil, integrated power MOSFETs) or a TMC5160A (up to 10A+/coil, needs 8 external power MOSFETs the driver itself doesn't include). Independent of that driver choice, a driver-carrying board is either **basic** (driver + connectors only, no MCU — STEP/DIR/EN routed straight from the main board) or **advanced** (adds a second microcontroller, STM32F303CBT6, plus 2 local sensor chips — an ADS1115 16-bit ADC and an MLX9064x-family thermal camera — and local PWM generation for tools whose timing needs generating right at the tool head rather than routed over a cable). 2×2 combinations, plus 2 more sensor-only basic boards (ADS1115 or MLX9064x, wired directly to the main board's own STM32F303CC, no driver and no slave MCU) for a tool that only needs one of those 2 chips and nothing else an advanced board also carries — 6 boards total — see `BOM/BOM_EXPANSION_*.TXT` (6 files), `docs/EXPANSION.TXT`, and `docs/PINOUT_SLAVE.txt`.
 
@@ -303,91 +303,22 @@ Once the bootloader is in place, updating the application no longer needs physic
 
 **⚠️ Bench-test this before trusting it in the field.** The protocol above compiles and links clean and the logic has been reasoned through carefully, but a bootloader is exactly the kind of firmware where "builds correctly" is a long way from "trustworthy on hardware" — the real flash-programming timing, CAN behavior across a multi-thousand-frame transfer, and the bootloader-to-application handoff all need to be verified on an actual board (ideally with JTAG on hand as a fallback) before relying on this for an unattended update with real actuators connected.
 
-### PC Tools — `tools/`
+### PC Tools
 
-Two standalone, cross-platform (Windows/Linux) GUI tools live here, each
-in its own self-contained subfolder so either can be copied and shared on
-its own.
+Two standalone, cross-platform (Windows/Linux) GUI tools support this
+board - **URTC Flasher** (CAN-OTA and full-chip SWD/JTAG updates, for
+both this board and, on an Advanced expansion variant, its own
+expansion slave chip) and **URTC Tester** (a live CAN-bus exerciser
+showing whichever tool profile is currently jumpered). Both used to
+live inside this repository under `tools/`; each is now its own
+independent project, with its own README, license, and translations:
 
-#### URTC Flasher v1.1 — `tools/flasher/`
+- [URTC Flasher](https://github.com/JuanenRac/URTC-FLASHER)
+- [URTC Tester](https://github.com/JuanenRac/URTC-TESTER)
 
-<p align="center">
-  <img src="images/URTC_FLASHER_V1_1.png" alt="URTC Flasher window" width="700">
-</p>
-
-Two distinct jobs, each supporting both the main board and (on an
-Advanced expansion board variant) its own expansion slave chip:
-
-- **CAN OTA update** — drives the update sequence above over a USB-CAN adapter, either through an SLCAN-compatible serial port (Windows/Linux) or directly over Linux's native SocketCAN (no adapter reflash needed on most CANable-family boards that way). Implements the full protocol: HardwareID check, HMAC-SHA256 signing, page-by-page transfer with ACKs, live progress via the bootloader's heartbeat, and a version query so you can see what's currently installed (application or bootloader, either one answers) before deciding what to flash. A **Flash target** selector picks between the main board and the expansion slave chip - the slave's own update is relayed through the main board's own I2C bridge (`CANBUS.TXT`'s own `0x210`-`0x218`) rather than a separate physical connection, tracked via periodic progress polling instead of the main board's own per-page ACK (no equivalent exists on that bridge - each write there completes synchronously within its own I2C transaction). The firmware file list only shows application images - bootloader binaries are filtered out, since CAN-OTA never flashes those.
-- **Full-chip SWD/JTAG programming** — a separate, clearly-marked section for mass-erasing the whole chip and writing both the bootloader and application images fresh, via either pyOCD (no separate install beyond the pip package) or STM32CubeProgrammer. This is the same kind of operation as a first JTAG bring-up, not an OTA update — it isn't self-healing the way the CAN path is, though recovering from an interrupted attempt just means reconnecting and flashing again, the same as any first-time bring-up. Same **Target chip** selector as the CAN-OTA tab - switching it changes the flash addresses and pyOCD target string used automatically, since the expansion slave chip (STM32F303CBT6) genuinely differs from the main board (STM32F303CC) in both.
-
-Also available from the CAN-OTA tab: **Expansion board** and **MLX9064x
-sensor variant** dropdowns (Query/Save), for telling the board which of
-the 7 possible `CONN_EXPANSION` configurations (none, or one of 6 real
-variants) and which of the 3 MLX9064x-family thermal sensors (or none)
-is actually populated - a one-time hardware-configuration step, done
-here since it's most naturally paired with a firmware update. See
-`docs/EXPANSION.TXT` and `docs/CANBUS.TXT` for the full mechanism.
-
-A **File / Language / Help** menu bar sits at the top of the window - save the on-screen log, switch language, or open the README/GitHub repo/license/about from anywhere without hunting through the main controls for them.
-
-```
-cd tools/flasher
-pip install -r requirements.txt
-python urtc_flasher.py          # Windows
-python3 urtc_flasher.py         # Linux
-```
-
-Or build a standalone binary that doesn't need Python installed: `build_exe.bat` on Windows, `./build_exe.sh` on Linux.
-
-**Firmware files go in `tools/flasher/firmware/`** (inside the tool's own folder, not at the repo root — this keeps `tools/flasher/` self-contained and shareable on its own). Multiple versions can sit there at once — every application-firmware file gets checked against the same plausibility test the bootloader itself applies (valid stack pointer, sane size) and listed with a clear ✓/✗, auto-selecting only when there's exactly one that passes. Browse still works for a file anywhere else, and **Download from GitHub...** fetches the current file listing straight from this project's own `firmware/` folder (`github.com/JuanenRac/URTC`) and downloads whichever one you pick directly into the local folder - no browser, no manual save-as. See `tools/flasher/README.md` for the full detail on both the CAN and SWD/JTAG paths, including Linux-specific setup (serial permissions, SocketCAN interface bring-up) and how the version-query display works.
-
-**5 languages**: English, Español, Italiano, Français, Deutsch — the **Language** menu (in the window's own menu bar) switches the whole interface, saved to `urtc_config.json` next to the tool. See `tools/flasher/README.md`'s "Install and run" section for how to add another language.
-
-**One-time adapter setup (Serial/SLCAN path):** a CANable Pro v2 ships by default running candleLight firmware, which talks to the host over the `gs_usb` protocol — not a serial port, and not what the Serial/SLCAN transport speaks. Getting it recognized as a serial port means flashing SLCAN-compatible firmware onto the adapter first, a one-time step separate from anything to do with URTC itself. **This step is skippable on Linux** if you use the SocketCAN transport instead — that one talks to the adapter's default `gs_usb` firmware natively through the kernel driver, no reflash needed. See `tools/flasher/README.md` for the full walkthrough of both paths.
-
-**Verified independently of hardware:** the tool's CRC32 and HMAC-SHA256 computation were checked byte-for-byte against the bootloader's own C implementation on the same test data — identical output on both sides. The SLCAN frame formatting/parsing and the SocketCAN frame packing (checked against Linux's `struct can_frame` layout with a round-trip test) each have their own tests. The SWD/JTAG section's command construction was verified via its dry-run mode for both `.bin` and `.hex` inputs. What hasn't been exercised on either flashing path is the full sequence against a real adapter/probe and a real board — treat a first attempt with the same caution as the bootloader itself above.
-
-#### URTC Tester v1.1 — `tools/tester/`
-
-<p align="center">
-  <img src="images/URTC_TESTER_V1_1.png" alt="URTC Tester window" width="700">
-</p>
-
-A live CAN bus exerciser, not a flashing tool — it never touches flash,
-only runtime commands and telemetry against whatever firmware is already
-running. Connects the same way the flasher does, then asks the board
-(over the `0x110`/`0x111` query pair — see `docs/CANBUS.TXT`) which of the
-12 tool profiles it's currently jumpered for, and builds a single panel
-showing only that tool's own controls and live telemetry — a soldering
-iron's setpoint-and-readback, a drill's speed/direction/RPM, the AOI
-ring's strobe mode, the 3D printer's full thermal+motion+fan set, and so
-on — rather than one window trying to represent all 12 at once. A
-separate Global Controls panel (status LED, ring LED color, OLED mode)
-stays visible regardless of which tool is active, since `0x100` applies
-to all of them. The same **File / Language / Help** menu bar as the
-flasher sits at the top of the window.
-
-Handles the firmware's own communication watchdogs automatically: the
-soldering iron, laser, and 3D-printer nozzle each auto-resend their
-setpoint every 150ms for as long as they're switched on (the firmware
-cuts them after 250ms of silence), and the layer fan does the same every
-400ms (1000ms watchdog) - matching what a real master controller has to
-do, rather than sending a command once and having the tool head shut it
-off a fraction of a second later.
-
-```
-cd tools/tester
-pip install -r requirements.txt
-python urtc_tester.py          # Windows
-python3 urtc_tester.py         # Linux
-```
-
-Or build a standalone binary the same way as the flasher: `build_exe.bat`
-/ `./build_exe.sh`. See `tools/tester/README.md` for the full per-tool
-control/telemetry table.
-
-**5 languages**: English, Español, Italiano, Français, Deutsch — same **Language** menu, same `config.json`-next-to-the-tool pattern as the flasher above.
+A web-based alternative covering similar ground (live monitoring, CAN
+analysis, OTA flashing, thermal inspection) without installing anything
+locally also exists: [URTC Web Studio](https://github.com/JuanenRac/URTC-WEB-STUDIO).
 
 ## 📋 Changelog
 
@@ -436,7 +367,7 @@ source tree (`src/F303-slave/`).
 
 **Bootloader (`src/F303-master/boot/`):** feature-complete golden-image A/B update system — HMAC-SHA256 signed OTA updates over CAN, a backup slot that guarantees a failed update never bricks the board, and its own version reporting (`0x7FA`) independent of the application. Compiles and links clean; see the bench-test caveat above before trusting it unattended with real actuators connected.
 
-**PC tools (`tools/`):** both `URTC Flasher` (CAN OTA updates + full-chip SWD/JTAG programming) and `URTC Tester` (live per-tool control/telemetry exerciser) are feature-complete for what they set out to do, each with their own README covering setup and every control in detail.
+**PC tools:** both [URTC Flasher](https://github.com/JuanenRac/URTC-FLASHER) (CAN OTA updates + full-chip SWD/JTAG programming) and [URTC Tester](https://github.com/JuanenRac/URTC-TESTER) (live per-tool control/telemetry exerciser) are feature-complete for what they set out to do, each its own independent project now with its own README covering setup and every control in detail.
 
 **Hardware:** schematic and BOM are still being finalized; no populated board exists yet to validate any of the above against real silicon. Everything above compiles, links, and has been reasoned through carefully, but "builds correctly" and "verified on hardware" are two different claims — see the safety notice at the top of this README, and treat a first bring-up with the caution any new board deserves.
 
@@ -544,15 +475,7 @@ If anyone in the community is working on custom end-effectors, smart tool-change
 ├── images/
 │   ├── OLED_DIRECT_MOUNT.jpg     LCD1/CONN_OLED2 - bare 30-pin FPC panel, direct-mount option
 │   ├── OLED_BREAKOUT_MODULE.jpg  CONN_OLED - external I2C breakout module, alternate option
-│   ├── URTC_LOGO.svg             General project logo, embedded at the top of this README -
-│   │                            same artwork as the tool banners below, minus the tool-specific label
-│   ├── URTC_LOGO_FLASHER.svg     Flasher tool's banner logo (also embedded at
-│   │                            tools/flasher/assets/ for the tool itself - kept in both
-│   │                            places so the GitHub-rendered tools/flasher/README.md
-│   │                            doesn't depend on a path outside tools/flasher/)
-│   ├── URTC_LOGO_TESTER.svg      Same reasoning, for the Tester tool's banner
-│   ├── URTC_FLASHER_V1_1.png     Flasher tool window screenshot, referenced in this README
-│   ├── URTC_TESTER_V1_1.png      Tester tool window screenshot, referenced in this README
+│   ├── URTC_LOGO.svg             General project logo, embedded at the top of this README
 │   ├── URTC_BOARD.png           Board photo (when added)
 │   ├── URTC_SCHEMATIC.png       Board schematic (when added)
 │   ├── URTC_PCB_TOP.png         Board TOP layer (when added)
@@ -565,80 +488,6 @@ If anyone in the community is working on custom end-effectors, smart tool-change
 │   ├── URTC_V1.0_JLCPCB.ZIP     Gerbers, bom and cpl files 
 │   ├── datasheet/               Datasheets of all parts used in board
 │   └── *_PARLIST/PINLIST/NETLIST.TXT   Eagle-exported netlists (ground truth for pin mapping)
-├── tools/
-│   ├── flasher/                 CAN OTA update + full-chip SWD/JTAG programming
-│   │   ├── assets/
-│   │   │   ├── URTC_LOGO_FLASHER.svg  Banner logo source (vector)
-│   │   │   ├── urtc_banner.png        Shown centered on screen for 5s at startup (a splash,
-│   │   │   │                          not part of the main window), rendered from the .svg above
-│   │   │   ├── URTC_APP_ICON.svg      App icon source (vector) - a simplified standalone design,
-│   │   │   │                          not the banner shrunk down (which doesn't hold up at 16-32px)
-│   │   │   ├── urtc_icon.png          Window/taskbar icon (Windows + Linux, via root.iconphoto)
-│   │   │   └── urtc_icon.ico          Same icon, multi-resolution, for the compiled .exe itself
-│   │   ├── firmware/            Compiled .bin(s) to flash - kept inside this folder
-│   │   │                        (not at the repo root) so this whole tool's folder can be
-│   │   │                        copied and shared on its own, fully self-contained
-│   │   ├── language/            5 translation files (english/spanish/italian/french/german.lng) -
-│   │   │                        plain KEY=Value text, editable directly or as a template for another language
-│   │   ├── logs/                 Auto-created at runtime, one session log file each run - safe to delete
-│   │   ├── urtc_config.json.example  Template for overriding HMAC_KEY/HardwareID/memory-map
-│   │   │                        constants without touching source - copy to urtc_config.json
-│   │   │                        and edit if you actually need one of these overrides
-│   │   ├── urtc_flasher.py      Entry point only (CLI args, splash screen, main window setup) -
-│   │   │                        the actual logic lives in the 7 flasher_*.py modules below,
-│   │   │                        split by responsibility purely for readability
-│   │   ├── flasher_config.py    Config file I/O, language loading, protocol constants
-│   │   ├── flasher_transports.py  SLCAN, SocketCAN, MockCAN (for --cli --transport mock)
-│   │   ├── flasher_swd_tools.py  STM32CubeProgrammer / pyOCD subprocess wrappers
-│   │   ├── flasher_validation.py  Firmware file validation (.bin/.hex/.elf plausibility +
-│   │   │                        slot-correctness checks)
-│   │   ├── flasher_protocol.py  The CAN OTA update state machine itself, for both the main
-│   │   │                        board and (relayed through its own I2C bridge) the expansion
-│   │   │                        slave chip
-│   │   ├── flasher_github.py    Downloads firmware from this project's own GitHub repository
-│   │   ├── flasher_gui.py       The main window - connection, flashing, SWD/JTAG, free tool
-│   │   │                        config, peripheral info, and the File/Language/Help menu bar
-│   │   ├── requirements.txt     Python dependencies (just pyserial)
-│   │   ├── build_exe.bat        Packages the tool as a standalone .exe (Windows, no Python needed to run it)
-│   │   ├── build_exe.sh         Same, for Linux (produces a native binary, not a cross-compiled .exe)
-│   │   ├── README.md            Tool-specific setup and usage instructions (English)
-│   │   └── README_spa.md, README_ita.md, README_fra.md, README_deu.md
-│   │                                Same, translated - the Help menu's Readme entry picks the
-│   │                                matching one automatically based on the active language
-│   └── tester/                  Live CAN bus exerciser - reads whichever tool profile a
-│       │                        board is jumpered for and shows only that tool's own
-│       │                        controls/telemetry, per CANBUS.TXT
-│       ├── assets/
-│       │   ├── URTC_LOGO_TESTER.svg   Banner logo source (vector)
-│       │   ├── urtc_tester_banner.png Same 5s startup splash as the flasher, rendered from the .svg above
-│       │   ├── URTC_APP_ICON.svg      Same icon source as the flasher (shared design)
-│       │   ├── urtc_icon.png          Window/taskbar icon
-│       │   └── urtc_icon.ico          Same icon, multi-resolution, for the compiled .exe itself
-│       ├── language/            5 translation files (english/spanish/italian/french/german.lng) -
-│       │                        same format and reasoning as the flasher's own language/ folder
-│       ├── logs/                 Auto-created at runtime, same as the flasher's
-│       ├── config.json          Auto-created on first language change - just the language
-│       │                        preference, next to the tool
-│       ├── urtc_tester.py       Entry point only (splash screen, main window setup - no CLI
-│       │                        mode) - the actual logic lives in the 7 tester_*.py modules
-│       │                        below, split by responsibility purely for readability
-│       ├── tester_config.py     Config/language loading, protocol constants
-│       ├── tester_transports.py  SLCAN, SocketCAN
-│       ├── tester_bus_monitor.py  Background CAN read thread and callback dispatch
-│       ├── tester_gui_core.py   The main window's own base - connection, detection, window
-│       │                        lifecycle, and the File/Language/Help menu bar
-│       ├── tester_common_panels.py  Global controls, F-RAM, expansion board, free tool
-│       │                        config, peripheral info, self-test, raw bus monitor,
-│       │                        custom CAN frame sender
-│       ├── tester_panel_helpers.py  Shared utilities every tool panel builder uses
-│       ├── tester_tool_panels.py  The 8 tool-specific panel builders (12 profiles, several
-│       │                        sharing one handler - e.g. all 5 motion-based tools)
-│       ├── requirements.txt     Python dependencies (just pyserial)
-│       ├── build_exe.bat        Standalone .exe build (Windows)
-│       ├── build_exe.sh         Standalone binary build (Linux)
-│       ├── README.md            Tool-specific setup and usage instructions (English)
-│       └── README_spa.md, README_ita.md, README_fra.md, README_deu.md
-│                                    Same, translated - same Help-menu behavior as the flasher's own
 ├── LICENSE
 └── README.md                    This file
 ```
@@ -659,10 +508,10 @@ Because this project consists of several different types of content, individual 
 
 1. The **firmware** located at `./firmware` (application and CAN bootloader alike) is available under the **GNU General Public License v3.0 (GPL-3.0)**. Full text at https://www.gnu.org/licenses/gpl-3.0.html.
 
-2. The **PC tools** at `./tools` are source code, licensed the same way and for the same reason as the firmware: **GNU General Public License v3.0 (GPL-3.0)**. This covers `urtc_flasher.py` and `urtc_tester.py` themselves and any `.exe`/binary built from either via their respective `build_exe.bat`/`build_exe.sh` — distributing a compiled tool means distributing something GPL-3.0 covers, same as distributing a compiled firmware `.bin` does.
+2. The **hardware designs** (Eagle schematic/board files, gerbers, and the 3D-printable parts under `./PCB` and `./3D`) are available under the **CERN Open Hardware Licence v2 - Strongly Reciprocal (CERN-OHL-S v2)**. Full text at https://cern-ohl.web.cern.ch/.
 
-3. The **hardware designs** (Eagle schematic/board files, gerbers, and the 3D-printable parts under `./PCB` and `./3D`) are available under the **CERN Open Hardware Licence v2 - Strongly Reciprocal (CERN-OHL-S v2)**. Full text at https://cern-ohl.web.cern.ch/.
+3. The **documentation** (this README, the service manual, and the reference files under `./docs`) is available under **Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)**. Full text at https://creativecommons.org/licenses/by-sa/4.0/.
 
-4. The **documentation** (this README, the service manual, and the reference files under `./docs`, including `./tools/flasher/README.md` and `./tools/tester/README.md`) is available under **Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)**. Full text at https://creativecommons.org/licenses/by-sa/4.0/.
+If you build on this project, keep the licensing split in mind: code changes to the firmware should stay GPL-3.0, hardware modifications should stay CERN-OHL-S, and documentation derivatives should stay CC BY-SA - each with attribution back to this project.
 
-If you build on this project, keep the licensing split in mind: code changes to the firmware or the flashing tool should stay GPL-3.0, hardware modifications should stay CERN-OHL-S, and documentation derivatives should stay CC BY-SA - each with attribution back to this project.
+This repository covers the URTC board's own firmware and hardware only - the PC tools (URTC Flasher, URTC Tester) that used to live here are now independent projects with their own licensing, see "PC Tools" above.

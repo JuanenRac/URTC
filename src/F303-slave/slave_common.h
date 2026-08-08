@@ -29,7 +29,7 @@
 // duplicated here rather than shared via a common include: the
 // application and the bootloader never run at the same time and don't
 // share a build (same relationship the main board's own application
-// firmware already has with ITS bootloader - STM32F303CC.C doesn't
+// firmware already has with ITS bootloader - STM32F303CC_main.c doesn't
 // include bootloader_common.h either), so keeping them independently-
 // defined-but-value-matching is the existing project convention, not a
 // gap specific to this chip.

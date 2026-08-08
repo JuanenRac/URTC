@@ -80,17 +80,28 @@ ID: 0x111 [URTC Tool Head -> Master, answers 0x110]
 Active tool + quick state response
 DLC: 4 bytes
 Data:
-  - txData[0]: Active tool (matches the ToolMode_t enum in STM32F303CC.C):
-               0=Soldering Iron, 1=Paste Dispenser, 2=Liquid Dispenser,
-               3=Screwdriver, 4=Vacuum Pickup, 5=Drill, 6=Gripper Gimbal,
-               7=Gripper NEMA, 8=AOI Inspection, 9=Laser Engraver,
-               10=3D Printer, 11=Scan Probe, 12+ = no tool assigned to
-               this jumper setting (see STM32F303CC.C's TOOL_INVALID note).
+  - txData[0]: Active tool (matches the ToolMode_t enum in
+               firmware_common.h): 0=Soldering Iron, 1=Paste Dispenser,
+               2=Liquid Dispenser, 3=Screwdriver, 4=Vacuum Pickup,
+               5=Drill, 6=Gripper Gimbal, 7=Gripper NEMA, 8=AOI
+               Inspection, 9=Laser Engraver, 10=3D Printer, 11=Scan
+               Probe, 12=SMT Pick & Place, 13=Electromagnet, 14=Spot
+               Welder, 15=Conformal Coating, 16=Vacuum Gripper (LG),
+               17=Flying Probe, 18=UV Curing, 19=Hot Air Rework,
+               20=Press-Fit Inserter, 21=Crimping Actuator,
+               22=Thermal Inspection, 23=Paste Jetting, 24=Ultrasonic
+               Welder - see docs/TOOLS.TXT for what each one actually
+               does. 25 (TOOL_INVALID) = no tool assigned to this
+               jumper setting (see firmware_common.h's own
+               TOOL_INVALID note); 0x19-0x1E on the ID-jumper matrix
+               itself resolve here too, since those 6 raw jumper
+               readings are also currently unassigned - see
+               ECOVIA.TXT's own addressing table for the full picture.
                This is the already-resolved value, not the raw ID-jumper
                reading - a board whose jumpers read 0x1F (free
                configuration, see EEPROM.TXT section 5) reports whichever
                real tool number the F-RAM resolved it to here, or still
-               12+ if that register was never set. 0x1A3 reports the raw
+               25 if that register was never set. 0x1A3 reports the raw
                jumper reading separately, for telling "jumpers read
                something other than 0x1F" apart from "jumpers read 0x1F
                but unconfigured."
@@ -119,7 +130,7 @@ Effect: asserts EXP_SPI_CS_PIN low, clocks all N bytes (SPI Mode 3 -
         all - that's left to whatever's on the master side of this
         connection, since the actual expansion board isn't finalized yet.
         Firmware-side implementation: ExpansionSPI_TransferByte() in
-        STM32F303CC.C.
+        firmware_expansion_spi.c.
 
 ID: 0x181 [URTC Tool Head -> Master, answers 0x180]
 Expansion SPI passthrough response
@@ -173,7 +184,7 @@ Query recovered persisted state
 DLC: any (payload ignored)
 Data: none needed
 Effect: answers with 0x191 - whatever was loaded from the FM24CL64B
-        persistence F-RAM at boot (see STM32F303CC.C's SavedState_Load).
+        persistence F-RAM at boot (see firmware_persistence.c's own SavedState_Load).
         Read-only, no side effects, and deliberately does NOT itself
         re-apply anything to a live setpoint - see the note on 0x191
         below for why. Answered even during a declared critical error,
@@ -204,7 +215,7 @@ Data:
                was armed, whichever was relevant (0 otherwise)
   - txData[7]: 3D-printer layer fan power at the last save
 Notes: this is a compact summary, not the full ~26-byte record kept in
-       RAM (recovered_state in STM32F303CC.C) - a single CAN frame can't
+       RAM (recovered_state, owned by firmware_persistence.c) - a single CAN frame can't
        carry that much. Nothing here gets applied to a live setpoint
        automatically on boot, by design: a heater, the laser, or a motor
        quietly re-arming itself the instant the board powers back up
@@ -1103,7 +1114,7 @@ Data:
   - txData[0]: Bootloader version major (uint8_t)
   - txData[1]: Bootloader version minor (uint8_t)
   - txData[2]: Bootloader version patch (uint8_t)
-Notes: this is BOOTLOADER.C's own version (BOOTLOADER_VERSION_MAJOR/MINOR/
+Notes: this is bootloader_common.h's own version (BOOTLOADER_VERSION_MAJOR/MINOR/
        PATCH in the source) - a separate thing from 0x7F9's Firmware
        version major/minor, which describes the installed APPLICATION,
        not the bootloader itself. The application never sends this frame -

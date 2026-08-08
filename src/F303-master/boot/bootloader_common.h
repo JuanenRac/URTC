@@ -9,9 +9,9 @@
 #include "stm32f3xx_hal.h"
 
 // -----------------------------------------------------------------------
-// Shared peripheral handles - defined once in BOOTLOADER.C (this
-// partitioned build's main file), declared extern here so every module
-// that needs one can see it without each module guessing at ownership.
+// Shared peripheral handles - defined once in bootloader_main.c, declared
+// extern here so every module that needs one can see it without each
+// module guessing at ownership.
 // -----------------------------------------------------------------------
 extern CAN_HandleTypeDef hcan;
 extern IWDG_HandleTypeDef hiwdg;
