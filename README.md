@@ -89,19 +89,19 @@ Through its dynamic switching logic, the firmware natively manages the following
 10. **Engraving Laser Diode (10W optical):** PWM beam power modulation with a safety hardware loop (CAN watchdog) that locks down if host communication is lost. Generic endstop input available. [Jumper/wiring config →](images/TOOL_LASER_ENGRAVER.png)
 11. **3D Printing Hotend:** PID control of the heater cartridge, NTC thermistor reading, extruder control, and a dedicated 25kHz PWM-controlled layer cooling fan (4-wire, tachometer feedback, own communication watchdog) — all integrated into a single block. [Jumper/wiring config →](images/TOOL_3D_PRINTER.png)
 12. **3D Scanner Probe:** ultra-fast hardware interrupt input (EXTI) with absolute priority for real-time surface digitization and impact sensing without lag. Also covers metrology touch probing - the same hardware path, a different physical probe on the same tool head. [Jumper/wiring config →](images/TOOL_SCAN_PROBE.png)
-13. **SMT Pick & Place Head:** rotary A-axis for correct pad alignment, on the same stepper interface as the paste/liquid dispensers and both grippers above.
-14. **Heavy-Duty Electromagnet:** on/off pickup control for ferromagnetic parts, off the T12 heater output repurposed as a generic GPIO driver.
-15. **Spot Welder Head:** millisecond-precise weld pulses for battery-pack nickel strips, with a surface-contact sensor gating the pulse.
-16. **Conformal Coating Airbrush:** protective coating spray control for finished PCBs - the spray valve and its own sensor live on the robot's own mainboard, outside this board's own scope.
-17. **Large-Format Vacuum Gripper:** multi-cup suction array for unpopulated FR4 boards, on the same stepper interface as tool #13 above.
-18. **Functional Testing Head:** flying-probe voltage/continuity testing — basic reading off the onboard ADC, advanced reading via an ADS1115 16-bit ADC on an **advanced** expansion board.
-19. **UV Curing Head:** high-power UV LED driver for instant glue/mask curing.
-20. **Hot Air Rework Nozzle:** heating element, turbine blower, and thermocouple feedback for reflowing misaligned SMD parts - shares the soldering iron's own thermal control loop.
-21. **Pneumatic Press-Fit Inserter:** linear actuator control for pressing connectors into PCBs - the actuator and its own sensor live on the robot's own mainboard, outside this board's own scope.
-22. **Wire Harnessing / Crimping Actuator:** high-torque jaw for stripping/crimping terminals, driven off an **expansion board's own driver** rather than the main board's.
-23. **PCB Advanced Inspection:** thermal imaging (MLX9064x-family array - MLX90640 and MLX90641 both supported today, either via an **advanced** expansion board's own slave chip or a **basic** MLX9064x expansion board wired directly to the main board) to spot shorts by temperature signature, alongside ring-LED illumination. Also covers micro-spindle depaneling - the same drill hardware path above, a different bit for a different job.
-24. **Solder Paste Jetting Valve:** piezoelectric micro-droplet dispensing, sub-millisecond pulse precision generated locally on an **advanced** expansion board.
-25. **Ultrasonic Welder / Packaging Sealer:** high-frequency transducer trigger for plastic enclosure welding.
+13. **SMT Pick & Place Head:** rotary A-axis for correct pad alignment, on the same stepper interface as the paste/liquid dispensers and both grippers above. [Jumper/wiring config →](images/TOOL_SMT_PICKPLACE.png)
+14. **Heavy-Duty Electromagnet:** on/off pickup control for ferromagnetic parts, off the T12 heater output repurposed as a generic GPIO driver. [Jumper/wiring config →](images/TOOL_ELECTROMAGNET.png)
+15. **Spot Welder Head:** millisecond-precise weld pulses for battery-pack nickel strips, with a surface-contact sensor gating the pulse. [Jumper/wiring config →](images/TOOL_SPOT_WELDER.png)
+16. **Conformal Coating Airbrush:** protective coating spray control for finished PCBs - the spray valve and its own sensor live on the robot's own mainboard, outside this board's own scope. [Jumper/wiring config →](images/TOOL_CONFORMAL_COATING.png)
+17. **Large-Format Vacuum Gripper:** multi-cup suction array for unpopulated FR4 boards, on the same stepper interface as tool #13 above. [Jumper/wiring config →](images/TOOL_VACUUM_GRIPPER_LG.png)
+18. **Functional Testing Head:** flying-probe voltage/continuity testing — basic reading off the onboard ADC, advanced reading via an ADS1115 16-bit ADC on an **advanced** expansion board. [Jumper/wiring config →](images/TOOL_FLYING_PROBE.png)
+19. **UV Curing Head:** high-power UV LED driver for instant glue/mask curing. [Jumper/wiring config →](images/TOOL_UV_CURING.png)
+20. **Hot Air Rework Nozzle:** heating element, turbine blower, and thermocouple feedback for reflowing misaligned SMD parts - shares the soldering iron's own thermal control loop. [Jumper/wiring config →](images/TOOL_HOTAIR_REWORK.png)
+21. **Pneumatic Press-Fit Inserter:** linear actuator control for pressing connectors into PCBs - the actuator and its own sensor live on the robot's own mainboard, outside this board's own scope. [Jumper/wiring config →](images/TOOL_PRESSFIT_INSERTER.png)
+22. **Wire Harnessing / Crimping Actuator:** high-torque jaw for stripping/crimping terminals, driven off an **expansion board's own driver** rather than the main board's. [Jumper/wiring config →](images/TOOL_CRIMPING_ACTUATOR.png)
+23. **PCB Advanced Inspection:** thermal imaging (MLX9064x-family array - all 3 family members, MLX90640/MLX90641/MLX90642, supported today, either via an **advanced** expansion board's own slave chip or a **basic** MLX9064x expansion board wired directly to the main board) to spot shorts by temperature signature, alongside ring-LED illumination. Also covers micro-spindle depaneling - the same drill hardware path above, a different bit for a different job. [Jumper/wiring config →](images/TOOL_THERMAL_INSPECTION.png)
+24. **Solder Paste Jetting Valve:** piezoelectric micro-droplet dispensing, sub-millisecond pulse precision generated locally on an **advanced** expansion board. [Jumper/wiring config →](images/TOOL_PASTE_JETTING.png)
+25. **Ultrasonic Welder / Packaging Sealer:** high-frequency transducer trigger for plastic enclosure welding. [Jumper/wiring config →](images/TOOL_ULTRASONIC_WELDER.png)
 
 *(Tool config images exist for tools 1-12; images for tools 13-25 will populate as the hardware documentation catches up — filenames above match the naming convention already in use for `images/`.)*
 
@@ -407,7 +407,11 @@ If anyone in the community is working on custom end-effectors, smart tool-change
 │   ├── PINOUT_CONNECTORS.TXT    Physical connector pinouts (CONN_DRILL, CONN_SEN, etc.)
 │   ├── EXPANSION.TXT            CONN_EXPANSION connector and the add-on board variants
 │   ├── PINOUT_SLAVE.txt         Full pinout for the expansion slave chip (advanced variants only)
-│   └── EEPROM.TXT               Full F-RAM register map (every persisted setting, byte offsets)
+│   ├── EEPROM.TXT               Full F-RAM register map (every persisted setting, byte offsets)
+│   └── tool_image_generator/    Toolkit that generates images/TOOL_*.png (see below) - PCB.png
+│                                blank reference, render_engine.py + tool_data.py +
+│                                generate_all.py, and PROCEDURE.TXT explaining how to add
+│                                a new tool's own image or regenerate an existing one
 ├── src/
 │   ├── F303-master/
 │   │   ├── STM32F303CC_main.c    Entry point - global definitions and main()
@@ -480,8 +484,8 @@ If anyone in the community is working on custom end-effectors, smart tool-change
 │   ├── URTC_SCHEMATIC.png       Board schematic (when added)
 │   ├── URTC_PCB_TOP.png         Board TOP layer (when added)
 │   ├── URTC_PCB_BOTTOM.png      Board BOTTOM layer (when added)
-│   └── TOOL_*.png               Per-tool jumper/wiring reference photos, one per profile
-│                                (when added - see each tool's own link in the Tool Profiles section)
+│   └── TOOL_*.png               Per-tool jumper/wiring reference diagram, one per profile
+│                                (all 25 present - see each tool's own link in the Tool Catalog above)
 ├── PCB/
 │   ├── URTC_V1.0.sch            Eagle schematic (when added)
 │   ├── URTC_V1.0.brd            Eagle board layout (when added)
