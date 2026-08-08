@@ -169,8 +169,8 @@ own to remember it across its own resets.
 -----------------------------------------------------------------------------
 `URTC Flasher`'s CAN OTA section includes a control for reading and
 setting this value directly against a connected board, independent of
-flashing new firmware - see tools/flasher/README.md for the specific
-control. This exists there (not only in URTC Tester) because setting the
+flashing new firmware - see its own README
+(github.com/JuanenRac/URTC-FLASHER) for the specific control. This exists there (not only in URTC Tester) because setting the
 installed expansion board is a one-time hardware-configuration step most
 naturally done at the same time as, or right before, a firmware update -
 not something that needs its own separate tool run.
@@ -182,4 +182,4 @@ not something that needs its own separate tool run.
 will grow tool-specific controls that only make sense for a given
 expansion_board_type as those tools get exercised through it (e.g., a
 live thermal image for a board with variant 3, 4, or 6 actually set) -
-see tools/tester/README.md.
+see its own README (github.com/JuanenRac/URTC-TESTER).

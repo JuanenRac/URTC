@@ -44,10 +44,11 @@ For pin-by-pin detail, see `docs/PINOUT.TXT` and
 Every one of these addresses is a compile-time constant duplicated in
 four independent places that all have to agree: `bootloader_common.h`,
 the linker scripts (`STM32F303CCTx_BOOTLOADER.ld` / `_APP.ld`), and
-`tools/flasher/urtc_flasher.py`'s own `BOOTLOADER_FLASH_ADDR` /
-`APP_FLASH_ADDR` / `*_MAX_SIZE` constants (overridable via
+`URTC Flasher`'s own `flasher_config.py` (its own `BOOTLOADER_FLASH_ADDR` /
+`APP_FLASH_ADDR` / `*_MAX_SIZE` constants, overridable via
 `urtc_config.json` if this is ever adapted to a different partition
-scheme or chip variant).
+scheme or chip variant - see that project's own repository,
+github.com/JuanenRac/URTC-FLASHER, now independent of this one).
 
 ---
 
