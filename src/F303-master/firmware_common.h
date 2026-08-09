@@ -351,10 +351,24 @@ typedef struct __attribute__((packed)) {
                                     // 0x1A6 once, the same one-time hardware-
                                     // configuration step expansion_board_type
                                     // itself already requires.
+    int32_t  solder_spool_position; // Real physical state, not a per-tool
+                                    // setpoint - saved with its own current
+                                    // value unconditionally (no active_tool
+                                    // gate the way solder_setpoint/drill_speed/
+                                    // etc. above have), since the spool stays
+                                    // wherever it physically is regardless of
+                                    // which tool happens to be mounted right
+                                    // now. Restored directly on load (like
+                                    // expansion_board_type/free_tool_selection
+                                    // above) rather than only exposed via
+                                    // recovered_state - this is passive
+                                    // position tracking, not an actuator
+                                    // setpoint that could re-arm something
+                                    // hazardous on boot. See CANBUS.TXT 0x132.
     uint8_t  checksum;           // CRC-8 (polynomial 0x07, CRC-8/SMBUS) over every byte above - proportionate for "was this corrupted", not a security boundary the way the OTA update's HMAC is
 } SavedState_t;
 #define SAVEDSTATE_MAGIC 0x55525443UL // 'URTC' as bytes, arbitrary but distinctive - astronomically unlikely to appear by chance in an uninitialized F-RAM
-#define SAVEDSTATE_VERSION 6
+#define SAVEDSTATE_VERSION 7
 // Fixed hardware/firmware identity constant, not a F-RAM field - the same
 // for every URTC firmware build, so there's nothing to persist or make
 // configurable. 0x03 per EEPROM.TXT section 6's peripheral type
@@ -406,6 +420,17 @@ extern volatile LED_RGB_t ring_pixels[8];
 extern volatile uint32_t steps_remaining;
 extern volatile uint8_t step_pulse_high;
 extern volatile uint32_t total_steps_setpoint;
+extern volatile int32_t solder_spool_position; // Signed, open-loop accumulation of
+                                    // commanded 0x120 steps while TOOL_SOLDERING_IRON
+                                    // is active - positive = fed forward (toward the
+                                    // iron), negative = net retracted past the last
+                                    // reset point. Not a real physical measurement
+                                    // (no encoder on this motor) - an estimate that
+                                    // assumes every commanded step actually happened,
+                                    // the same open-loop assumption every other
+                                    // stepper on this board already makes. Reset to
+                                    // 0 via 0x131 (see CANBUS.TXT), typically done
+                                    // by the operator after loading a fresh spool.
 extern volatile uint16_t current_temperature;
 extern volatile uint16_t target_temperature;
 extern volatile uint16_t sensor_analog_reading;

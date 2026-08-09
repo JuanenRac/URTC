@@ -30,7 +30,7 @@ Offset | Size | Field                    | Type     | Notes
        |      |                          |          | blank/uninitialized
        |      |                          |          | F-RAM won't match by
        |      |                          |          | astronomical chance.
-4      | 1    | struct_version           | uint8_t  | Currently 3. Bumped
+4      | 1    | struct_version           | uint8_t  | Currently 7. Bumped
        |      |                          |          | whenever this layout
        |      |                          |          | OR the checksum
        |      |                          |          | algorithm changes, so
@@ -42,7 +42,8 @@ Offset | Size | Field                    | Type     | Notes
        |      |                          |          | as if new fields were
        |      |                          |          | already there.
 5      | 1    | active_tool_at_save      | uint8_t  | Which tool profile
-       |      |                          |          | (0-11, or 12+ for
+       |      |                          |          | (0-24, or 25/
+       |      |                          |          | TOOL_INVALID for
        |      |                          |          | none) was active when
        |      |                          |          | this was saved -
        |      |                          |          | cross-checked against
@@ -167,11 +168,49 @@ Offset | Size | Field                    | Type     | Notes
        |      |                          |          | reasoning as
        |      |                          |          | expansion_board_type
        |      |                          |          | above.
-29     | 1    | checksum                 | uint8_t  | CRC-8 (polynomial
+29     | 4    | solder_spool_position    | int32_t  | Signed, open-loop
+       |      |                          |          | estimate of the
+       |      |                          |          | soldering iron's own
+       |      |                          |          | wire feeder position
+       |      |                          |          | (doc #16) - positive
+       |      |                          |          | = net fed forward
+       |      |                          |          | since the last
+       |      |                          |          | reset, negative =
+       |      |                          |          | net retracted past
+       |      |                          |          | it. NOT gated by
+       |      |                          |          | which tool is
+       |      |                          |          | currently active
+       |      |                          |          | (unlike
+       |      |                          |          | solder_setpoint/
+       |      |                          |          | drill_speed/etc.
+       |      |                          |          | above) - this is
+       |      |                          |          | real physical state,
+       |      |                          |          | not a per-session
+       |      |                          |          | setpoint, so it
+       |      |                          |          | keeps its own real
+       |      |                          |          | value saved even
+       |      |                          |          | while some other
+       |      |                          |          | tool is mounted.
+       |      |                          |          | Restored directly on
+       |      |                          |          | boot, same reasoning
+       |      |                          |          | as
+       |      |                          |          | expansion_board_type
+       |      |                          |          | above - passive
+       |      |                          |          | position tracking,
+       |      |                          |          | not an actuator
+       |      |                          |          | setpoint that could
+       |      |                          |          | re-arm something
+       |      |                          |          | hazardous by
+       |      |                          |          | restoring it
+       |      |                          |          | automatically. Set/
+       |      |                          |          | reset/queried via
+       |      |                          |          | CAN (0x131/0x132) -
+       |      |                          |          | see CANBUS.TXT.
+33     | 1    | checksum                 | uint8_t  | CRC-8 (polynomial
        |      |                          |          | 0x07, the standard
        |      |                          |          | CRC-8/SMBUS variant)
        |      |                          |          | over every byte above
-       |      |                          |          | (offsets 0-28) -
+       |      |                          |          | (offsets 0-32) -
        |      |                          |          | proportionate for
        |      |                          |          | "was this corrupted
        |      |                          |          | by a partial write",
@@ -186,7 +225,7 @@ Offset | Size | Field                    | Type     | Notes
        |      |                          |          | way that happened to
        |      |                          |          | cancel out.
 -------|------|--------------------------|----------|---------------------
-Total: 30 bytes (offsets 0-29). Verified against the actual compiled
+Total: 34 bytes (offsets 0-33). Verified against the actual compiled
 struct via offsetof(), not hand-counted - packed structs have no
 compiler-inserted padding, so this is also simply the sum of each field's
 own size, but the exact figures above were checked, not assumed.

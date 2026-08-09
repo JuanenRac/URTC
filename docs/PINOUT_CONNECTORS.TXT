@@ -121,8 +121,8 @@ PIN | SIGNAL | FUNCTION
 5. CONN_SEN (External Sensors, Endstops, and Telemetry)
    Type: JST4-B4B-PH-K (2.00mm pitch)
 ------------------------------------------------------------------------------------------------
-PIN | SIGNAL    | VACUUM MODE (TCRT5000)| 3D MODE (NTC THERMISTOR)     | ENDSTOP MODE (NEW)
-    |           |                       |                              | Soldering/Drill/Laser/AOI/Probe
+PIN | SIGNAL    | VACUUM MODE (TCRT5000)| 3D MODE (NTC THERMISTOR)     | ENDSTOP MODE
+    |           |                       |                              | Drill/Laser/AOI/Probe
 ------------------------------------------------------------------------------------------------
 1   | GND       | Ground                | To ground (NTC Pin 1)        | Ground
 2   | TCRT_A0   | PB0 (ADC_CH11)        | PB0 (ADC_CH11, NTC Pin 2 -   | NC
@@ -133,18 +133,26 @@ PIN | SIGNAL    | VACUUM MODE (TCRT5000)| 3D MODE (NTC THERMISTOR)     | ENDSTOP
     |           |                       |                              |  active low, 330R R39 protected)
 4   | +5V       | Sensor VCC supply     | NC                           | Probe VCC / NC
     |           |                       |                              |
-    | NOTE: For Soldering/Drill/Laser/AOI, PB3 is polled every 150ms as a plain
+    | NOTE: For Drill/Laser/AOI, PB3 is polled every 150ms as a plain
     |       digital input (not interrupt-driven), since EXTI line 3 is reserved
     |       for the Scan Probe (PB3) and Drill/3D-Printer tachometer (PA3) uses.
-    |       Reported on the OLED and over CAN (0x135/0x147 extended DLC, plus new
+    |       Reported on the OLED and over CAN (0x147 extended DLC, plus
     |       0x155/0x165 for AOI/Laser - see CANBUS.TXT).
+    | NOTE - Soldering Iron NOT in this list: PB3 is this board's own only
+    |       STEP-capable line, and the soldering iron's own wire feeder motor
+    |       (see CONN_MOT below) needs it as an output the moment that tool is
+    |       active - the same pin can't simultaneously be an endstop input.
+    |       Sacrificed deliberately, at the person's own explicit choice, in
+    |       favor of the feeder motor - the endstop was already optional for
+    |       this tool, the feeder isn't. See CANBUS.TXT's own 0x135 note.
 
 ------------------------------------------------------------------------------------------------
-6. CONN_MOT (NEMA Motor for Hotend Extruder, NEMA Gripper, NEMA Dispensers, and Gimbal Gripper)
+6. CONN_MOT (NEMA Motor for Hotend Extruder, NEMA Gripper, NEMA Dispensers,
+   Gimbal Gripper, and the Soldering Iron's Own Wire Feeder)
    Type: B4B-XH-2 (2.54mm pitch)
    Controlled by: TMC2209 (PB3=STEP, PB5=DIR, PB6=ENN)
 ------------------------------------------------------------------------------------------------
-PIN | SIGNAL    | NEMA MODE (GRIPPER/EXTRUDER/DISPENSERS)    | GIMBAL MODE (3-Phase BLDC)
+PIN | SIGNAL    | NEMA MODE (GRIPPER/EXTRUDER/DISPENSERS/FEEDER)  | GIMBAL MODE (3-Phase BLDC)
 ------------------------------------------------------------------------------------------------
 1   | OA1       | Coil A - Wire 1                            | Phase 1
 2   | OA2       | Coil A - Wire 2                            | Phase 2

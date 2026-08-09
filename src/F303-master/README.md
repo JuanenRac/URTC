@@ -117,8 +117,9 @@ something the CAN bus can override). Three things key off it, all inside
    interlocks). Everything else affecting the *same physical pins* for
    *other* tools is deliberately left untouched at this stage, since
    several pins are shared across mutually-exclusive tool roles (PB3 in
-   particular — stepper STEP output for six tools, LM393 comparator
-   input for vacuum pickup, generic probe/endstop input otherwise; see
+   particular — stepper STEP output for eight tools (including the
+   soldering iron's own wire feeder), LM393 comparator input for vacuum
+   pickup, generic probe/endstop input otherwise; see
    `docs/PINOUT_CONNECTORS.TXT`).
 2. **Peripheral init** (`MX_ADC_Init`, `MX_TIM1_DrillLaserFan_Init`,
    `MX_TIM2_HotendFan_Init`, `MX_TIM3_Full_Init`) — only what the active
@@ -133,15 +134,22 @@ something the CAN bus can override). Three things key off it, all inside
 
 | ID | Tool | Actuation | Timer/PWM | Sensing | Comm watchdog |
 |---|---|---|---|---|---|
-| 0 | Soldering Iron | T12 heater (PA1) | bang-bang, no PWM timer | ADC1_IN1 (PA0) thermocouple | 250 ms |
-| 1–3, 6–7 | Dispensers/Screwdriver/Grippers | Generic stepper (STEP/DIR/ENN) | TIM3 step-tick (~500 steps/s ceiling) | none | none (one-shot moves) |
+| 0 | Soldering Iron | T12 heater (PA1) + wire feeder (STEP/DIR/ENN, shares row below's own mechanism) | bang-bang, no PWM timer (heater); TIM3 step-tick (feeder) | ADC1_IN1 (PA0) thermocouple | 250 ms (heater); none (feeder, one-shot moves) |
+| 1–3, 6–7, 12, 16 | Dispensers/Screwdriver/Grippers/SMT Pick&Place/Large-Format Vacuum Gripper | Generic stepper (STEP/DIR/ENN) | TIM3 step-tick (~500 steps/s ceiling) | none | none (one-shot moves) |
 | 4 | Vacuum Pickup | — | — | ADC1_IN11 (PB0) + PB3 (LM393 digital) | — |
 | 5 | Drill (BL4260) | Brake (PB9), direction (PA4) | TIM1_CH1/PA8 @ 20 kHz | Tachometer via EXTI3/PA3 | none (brake on 0 speed) |
 | 8 | AOI Inspection | Ring LED strobe | — | PB3 endstop | none |
 | 9 | Laser Engraver | Interlock (PB6) | TIM1_CH1/PA8 @ 20 kHz | PB3 endstop | 250 ms |
 | 10 | 3D Printer | Hotend heater (PA1) + stepper + 2 fans | TIM1 @ 25 kHz (layer fan), TIM2/PA5 @ 25 kHz (hotend fan) | ADC1_IN11 (PB0) NTC | 250 ms (hotend), 1000 ms (layer fan), stall-detect (hotend fan) |
 | 11 | Scan Probe | — | — | PB3 via EXTI3, max CAN priority | — |
-| 12+ | *(unassigned)* | all actuators forced safe | — | — | — |
+
+This table predates the 13-tool expansion (IDs 12-24) and was never
+fully extended to cover them - it's been kept updated only where a
+change happening elsewhere directly touched a row already in it (like
+the soldering iron's own row above), not swept end to end for the
+newer tools. For complete, current per-tool detail covering all 25,
+see `docs/TOOLS.TXT` (peripheral summary) and `docs/CANBUS.TXT`
+(wire-level protocol) instead of treating this table as exhaustive.
 
 Two of these deserve a specific safety note, both already covered in
 depth by `docs/PINOUT_CONNECTORS.TXT` and `docs/CANBUS.TXT`: the soldering iron and

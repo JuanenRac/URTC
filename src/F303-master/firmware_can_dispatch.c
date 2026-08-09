@@ -68,6 +68,15 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan_m) {
         switch (active_tool) {
             case TOOL_SOLDERING_IRON:
                 Handle_CAN_SolderingIron();
+                Handle_CAN_MotionTools(); // doc #16's own solder-wire-feeder motor,
+                                          // sharing CONN_MOT and the 0x120 protocol
+                                          // with the 7 tools in the case below -
+                                          // called unconditionally here (like they
+                                          // are for their own tool IDs) since each
+                                          // handler internally filters by its own
+                                          // rxHeader.StdId before acting, so calling
+                                          // both is safe regardless of which ID this
+                                          // particular frame actually is
                 break;
             case TOOL_PASTE_DISPENSER:
             case TOOL_LIQUID_DISPENSER:

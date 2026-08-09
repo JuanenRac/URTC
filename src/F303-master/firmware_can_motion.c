@@ -4,8 +4,9 @@
 // GPL-3.0 - see LICENSE
 //
 // Covers Paste Dispenser, Liquid Dispenser, Screwdriver, Gripper (Gimbal),
-// Gripper (NEMA), SMT Pick&Place (rotary A-axis), and Large-Format Vacuum
-// Gripper - 7 tool IDs sharing the exact same plain-stepper STEP/DIR
+// Gripper (NEMA), SMT Pick&Place (rotary A-axis), Large-Format Vacuum
+// Gripper, and the Soldering Iron's own solder-wire-feeder motor (doc
+// #16) - 8 tool IDs sharing the exact same plain-stepper STEP/DIR
 // protocol, differing only in what's physically attached, not in the
 // protocol.
 // =============================================================================
@@ -41,6 +42,23 @@ void Handle_CAN_MotionTools(void) {
                     if (steps > 0) {
                         total_steps_setpoint = steps;
                         steps_remaining = steps;
+                        // Open-loop position tracking for the solder-wire
+                        // feeder only (doc #16) - this motor has no
+                        // encoder, so this is an estimate that assumes
+                        // every commanded step actually happens, same as
+                        // every other stepper on this board. Updated at
+                        // command-receipt time (not when steps_remaining
+                        // reaches 0) since that's consistent with how
+                        // total_steps_setpoint itself is already tracked
+                        // here, and keeps this in the same critical
+                        // section as the direction that determines its
+                        // own sign. Saved to F-RAM by
+                        // SavedState_MaybeSave() (see firmware_persistence.c),
+                        // read back over CAN via 0x132, reset via 0x131 -
+                        // see CANBUS.TXT.
+                        if (active_tool == TOOL_SOLDERING_IRON) {
+                            solder_spool_position += (new_dir == GPIO_PIN_SET) ? (int32_t)steps : -(int32_t)steps;
+                        }
                         // Fresh move: force the step ISR to start with a
                         // rising edge. Left at 1 from the tail end of a
                         // previous move, the first tick of this new move

@@ -395,6 +395,9 @@ Data:
 3. MOTION TOOLS (Standard Stepper - Extended Range)
    Associated with: TOOL_PASTE_DISPENSER (1), TOOL_LIQUID_DISPENSER (2),
                 TOOL_SCREWDRIVER (3), TOOL_GRIPPER_GIMBAL (6), TOOL_GRIPPER_NEMA (7)
+                Also reused by TOOL_SOLDERING_IRON (0) for its own solder-wire-
+                feeder motor - see section 4 below. Same connector (CONN_MOT),
+                same protocol, different physical attachment.
 -----------------------------------------------------------------------------
 ID: 0x120 [Master -> URTC Tool Head]
 DLC: 5 bytes
@@ -409,6 +412,10 @@ Data:
   Note: Uses lines PB3 (STEP), PB5 (DIR), and PB6 (TMC_ENN). The firmware
         enables power on receiving the frame (PB6=0) and cuts it once
         finished (PB6=1) to avoid static overheating.
+  Note: When TOOL_SOLDERING_IRON is the active tool, this same command
+        also feeds/retracts the solder wire spool (forward = fed toward
+        the iron, reverse = retracted) and updates that tool's own
+        open-loop spool_position tracker accordingly - see 0x132 below.
 
 -----------------------------------------------------------------------------
 4. SOLDERING TOOL
@@ -426,24 +433,65 @@ Data:
         and the system enters Critical Error - the same protection the
         laser (0x160) has.
 
+ID: 0x131 [Master -> URTC Tool Head]
+Reset solder wire feeder position to 0
+DLC: 4 bytes, magic payload 52 53 50 30 ("RSP0" in ASCII - Reset Spool
+     Position 0)
+Data:
+  - rxData[0..3]: must be exactly 52 53 50 30 - any other payload (or any
+               other DLC) leaves spool_position untouched, though this ID
+               still answers with 0x132 regardless (reporting whatever
+               the position actually is, unchanged) - same reasoning as
+               0x192's own magic trigger: a corrupted or malformed frame
+               landing on this ID by chance shouldn't be able to silently
+               discard a real tracked position.
+Effect: zeroes this tool's own open-loop spool_position tracker (see 0x132
+        below) immediately in RAM, persisted to F-RAM the normal way (via
+        SavedState_MaybeSave(), not forced immediately). Typically sent by
+        the operator right after loading a fresh spool, since without a
+        reset the tracked position keeps accumulating relative to
+        whatever spool was loaded before, no longer meaning anything
+        useful about the new one.
+
+ID: 0x132 [Master -> URTC Tool Head, or URTC Tool Head -> Master answering
+           0x131 or 0x132]
+Query/response: solder wire feeder's own current position
+DLC: any as a query (payload ignored) | 4 bytes as a response
+Data:
+  - txData[0..3]: spool_position, signed 32-bit, big-endian (MSB to LSB).
+               Positive = net fed forward since the last reset; negative
+               = net retracted past it.
+  Note: Open-loop estimate, not a physical measurement - this motor has
+        no encoder, so this is this board's own running total of
+        commanded 0x120 steps (assuming each one actually happened),
+        the same open-loop assumption every other stepper on this board
+        already makes. Persisted across power cycles in F-RAM
+        (SavedState_t's own solder_spool_position field, see EEPROM.TXT) -
+        restored directly on boot (not just held in recovered_state)
+        since this is passive position tracking, not an actuator
+        setpoint that could re-arm something hazardous by restoring it
+        automatically.
+
 ID: 0x135 [URTC Tool Head -> Master] (Automatic telemetry every 150ms)
-DLC: 3 bytes
+DLC: 2 bytes
 Data:
   - txData[0]: Current temperature (°C) - High byte (MSB) [BIG-ENDIAN]
   - txData[1]: Current temperature (°C) - Low byte (LSB)
-  - txData[2]: Generic endstop / limit switch state (PB3)
-               0x01 = Triggered (line pulled low)
-               0x00 = Open
   Note: Sent for whichever tool actually owns the T12 thermal loop right
         now - the Soldering Iron (its own original tool), or Hot Air
         Rework (0x1E0 above), which shares this exact same physical
         heater/thermocouple mechanism rather than having its own
         separate one. Temperature read exclusively via ADC Channel 0
-        (PA0) through the AD8605 op-amp. Endstop polled every 150ms as
-        a plain digital input (not interrupt-driven) - see CANBUS
-        section [5] logic in ECOVIA.TXT for why; not physically wired
-        for Hot Air Rework's own tool head, so this byte's own value is
-        meaningless when that tool is the one answering.
+        (PA0) through the AD8605 op-amp.
+  Note: DLC 2, not 3 - this frame used to carry a 3rd byte reporting a
+        generic endstop's own state on PB3. Removed for both tools that
+        share this frame: soldering iron's own PB3 now drives its wire
+        feeder's STEP output instead (CONN_MOT, see section 3 above),
+        and Hot Air Rework's tool head was never actually wired to that
+        endstop signal in the first place - its own 3rd byte here always
+        reported a meaningless, stale value, not a real reading. See
+        PINOUT_CONNECTORS.TXT's own CONN_SEN section for the full
+        reasoning on the soldering iron's own trade-off.
 
 -----------------------------------------------------------------------------
 5. DRILL TOOL (BL4260 Brushless Motor with Integrated Driver)

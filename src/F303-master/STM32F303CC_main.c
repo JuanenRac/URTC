@@ -101,6 +101,7 @@ volatile uint32_t steps_remaining = 0;
 // of the intended rising edge, misaligning that first step.
 volatile uint8_t step_pulse_high = 0;
 volatile uint32_t total_steps_setpoint = 1; 
+volatile int32_t solder_spool_position = 0;
 volatile uint16_t current_temperature = 0;
 volatile uint16_t target_temperature = 0;
 volatile uint16_t sensor_analog_reading = 0;
@@ -296,7 +297,8 @@ int main(void) {
     }
 
     // PB3 reconfiguration: only just configured as a push-pull STEP
-    // output above, and only for the 6 stepper-based tools. Every other
+    // output above, and only for the 8 stepper-based tools (7 plain-motor
+    // tools plus the soldering iron's own wire feeder). Every other
     // tool - including TOOL_SCAN_PROBE and the vacuum/endstop group below -
     // reaches this point with PB3 exactly as it was left by
     // MX_GPIO_Init_Early(), i.e. untouched, so this is the only place
@@ -315,10 +317,17 @@ int main(void) {
     } else if (active_tool != TOOL_PASTE_DISPENSER && active_tool != TOOL_LIQUID_DISPENSER &&
                active_tool != TOOL_SCREWDRIVER && active_tool != TOOL_GRIPPER_GIMBAL &&
                active_tool != TOOL_GRIPPER_NEMA && active_tool != TOOL_3D_PRINTER &&
-               active_tool != TOOL_SMT_PICKPLACE && active_tool != TOOL_VACUUM_GRIPPER_LG) {
+               active_tool != TOOL_SMT_PICKPLACE && active_tool != TOOL_VACUUM_GRIPPER_LG &&
+               active_tool != TOOL_SOLDERING_IRON) {
         // Plain polled digital input: vacuum pickup's LM393 comparator, and the
-        // new generic endstop/limit-switch input (Soldering iron, Drill, Laser,
-        // AOI - NEW). Active low, so the internal pull-up gives a clean idle-high.
+        // generic endstop/limit-switch input (Drill, Laser, AOI). Active low,
+        // so the internal pull-up gives a clean idle-high. TOOL_SOLDERING_IRON
+        // moved into the motor-tool exclusion above it - PB3 now drives its
+        // own solder-wire-feeder STEP output instead (CONN_MOT, doc #16 -
+        // reusing the shared 0x120 stepper protocol), so this board no longer
+        // has a spare pin to also read a soldering-iron endstop on. Sacrificed
+        // deliberately, at the person's own explicit choice - see CANBUS.TXT's
+        // own note on 0x135 for the full reasoning.
         GPIO_InitTypeDef GPIO_Endstop = {0};
         GPIO_Endstop.Pin = TOUCH_IN_PIN;
         GPIO_Endstop.Mode = GPIO_MODE_INPUT;
@@ -494,13 +503,21 @@ int main(void) {
             // the moment (soldering iron, Hot Air Rework - which shares
             // this exact same thermal loop, see CANBUS.TXT's own 0x1E0 -
             // or 3D printer hotend), rather than on a flat timer
-            // regardless of which tool is active.
+            // regardless of which tool is active. DLC 2 now, not 3 - the
+            // 3rd byte used to report endstop_triggered here, but neither
+            // tool actually has a real value for it any more: soldering
+            // iron's own PB3 now drives the wire feeder's STEP output
+            // (see CONN_MOT, doc #16), and Hot Air Rework never populated
+            // this byte with a real reading in the first place (found
+            // while making this change - TOOL_HOTAIR_REWORK was never in
+            // Control_EndstopTelemetry()'s own tool list to begin with,
+            // so this byte was always whatever stale value some earlier
+            // tool happened to leave behind, not a real endstop).
             if (active_tool == TOOL_SOLDERING_IRON || active_tool == TOOL_HOTAIR_REWORK) {
                 txH.StdId = 0x135;
-                txH.DLC = 3; // extended: byte 2 = endstop
+                txH.DLC = 2;
                 txD[0] = (uint8_t)((current_temperature >> 8) & 0xFF);
                 txD[1] = (uint8_t)(current_temperature & 0xFF);
-                txD[2] = endstop_triggered;
                 if (HAL_CAN_GetTxMailboxesFreeLevel(&hcan) > 0) {
                     HAL_CAN_AddTxMessage(&hcan, &txH, txD, &mb);
                 }

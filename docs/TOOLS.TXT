@@ -24,10 +24,18 @@ usable, required - for that tool to work at all.
 =============================================================================
 1. Soldering Station (T12) - ID 0x00
 =============================================================================
-Precise PID temperature control for a standard T12 soldering tip.
+Precise PID temperature control for a standard T12 soldering tip, with
+its own motorized wire feeder spooling solder wire into the joint.
 Main board peripherals: T12 heater PID loop, T12 ADC thermocouple
-reading, generic endstop input (optional).
+reading, solder wire feeder motor (NEMA stepper, forward/reverse).
 Expansion board: none needed.
+Note: this tool's own feeder motor shares CONN_MOT and its STEP/DIR
+protocol with the plain-motion tools (doc #2, #3, #4, #7, #8, #13,
+#17) - same connector, same command, different physical attachment.
+The trade-off: CONN_SEN's own generic endstop input is no longer
+available for this tool specifically, since the feeder's STEP signal
+and the endstop reading would otherwise need the same MCU pin at the
+same time - see PINOUT_CONNECTORS.TXT for the full reasoning.
 
 =============================================================================
 2. SMT Solder Paste Dispenser - ID 0x01

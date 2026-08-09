@@ -93,7 +93,14 @@ void MX_GPIO_Post_Init(void) {
     if (active_tool == TOOL_PASTE_DISPENSER || active_tool == TOOL_LIQUID_DISPENSER ||
         active_tool == TOOL_SCREWDRIVER || active_tool == TOOL_GRIPPER_GIMBAL ||
         active_tool == TOOL_GRIPPER_NEMA || active_tool == TOOL_3D_PRINTER ||
-        active_tool == TOOL_SMT_PICKPLACE || active_tool == TOOL_VACUUM_GRIPPER_LG) {
+        active_tool == TOOL_SMT_PICKPLACE || active_tool == TOOL_VACUUM_GRIPPER_LG ||
+        active_tool == TOOL_SOLDERING_IRON) {
+        // TOOL_SOLDERING_IRON added for its own solder-wire-feeder motor
+        // (doc #16) - shares this exact same STEP/DIR/ENN mechanism and
+        // CONN_MOT connector as the other 7 tools here, at the cost of
+        // this board no longer having a spare pin free to also read a
+        // soldering-iron endstop on CONN_SEN (see the "PB3
+        // reconfiguration" block below, and CANBUS.TXT's own 0x135 note).
         HAL_GPIO_WritePin(GPIOB, STEP_PIN, GPIO_PIN_RESET);
         GPIO_InitStruct.Pin = STEP_PIN;
         GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;

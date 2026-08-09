@@ -25,10 +25,13 @@ void Control_SensorTelemetry(void) {
 }
 
 // Generic endstop/limit switch, active low. Shares PB3 with the tools
-// above, but only makes sense for the 4 that don't already use that pin for
-// something else - reconfigured as a plain input for exactly these 4 in main().
+// above, but only makes sense for the 3 that don't already use that pin for
+// something else - reconfigured as a plain input for exactly these 3 in main().
+// TOOL_SOLDERING_IRON used to be a 4th tool here - removed once its own
+// PB3 became the solder-wire-feeder's STEP output instead (doc #16); see
+// CANBUS.TXT's own 0x135 note for the full reasoning.
 void Control_EndstopTelemetry(void) {
-    if (active_tool != TOOL_SOLDERING_IRON && active_tool != TOOL_DRILL &&
+    if (active_tool != TOOL_DRILL &&
         active_tool != TOOL_LASER_ENGRAVER && active_tool != TOOL_AOI_INSPECTION) return;
 
     // Debounced the same way the scan probe's own EXTI handler already is

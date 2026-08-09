@@ -1,5 +1,6 @@
 // =============================================================================
-// URTC Firmware - CAN dispatch declarations - soldering iron tool (0x130)
+// URTC Firmware - CAN dispatch declarations - soldering iron tool
+// (0x130 heater, 0x131 feeder position reset, 0x132 feeder position query/response)
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
 // GPL-3.0 - see LICENSE
 // =============================================================================

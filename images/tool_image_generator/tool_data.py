@@ -50,8 +50,9 @@ add(0x00, "T12 SOLDERING IRON", [
      ["Pin 1: +24V  -  wire: red (convention)",
       "Pin 2: T12- (MOSFET control)",
       "Pin 3: NC  -  wire: no connection"]),
-    ("CONN_SEN", "Limit switch / endstop (optional)", SEN_ENDSTOP_PINS),
-])
+    ("CONN_MOT", "Solder wire feeder motor (NEMA stepper, forward/reverse)", mot_pins(None)),
+], notes=["This tool's own generic endstop input on CONN_SEN is NOT available - PB3 (the endstop line) is the same physical pin this tool's own wire feeder needs as its STEP output, and the two can't share it at once. A deliberate trade-off, not an oversight - the endstop was already optional for this tool.",
+          "Wire feeder position is open-loop (no encoder) - tracked as an estimate and persisted across power cycles. Reset it after loading a fresh spool (CAN 0x131) so it starts meaning something again - see CANBUS.TXT."])
 
 # 0x01 Paste Dispenser
 add(0x01, "SMT SOLDER PASTE DISPENSER", [
