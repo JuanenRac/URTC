@@ -494,6 +494,14 @@ If anyone in the community is working on custom end-effectors, smart tool-change
 │   ├── URTC_V1.0_JLCPCB.ZIP     Gerbers, bom and cpl files 
 │   ├── datasheet/               Datasheets of all parts used in board
 │   └── *_PARLIST/PINLIST/NETLIST.TXT   Eagle-exported netlists (ground truth for pin mapping)
+├── VERSION_CHECKLIST.txt        Mechanical checklist for bumping any of this project's own
+│                                4 independent version numbers correctly
+├── check_version_consistency.sh  Automated version/file-consistency checks - run before
+│                                trusting VERSION_CHECKLIST.txt's own claims
+├── build_firmware.sh            Installs the toolchain, fetches ST's own HAL/CMSIS, and
+│                                compiles all 4 firmware binaries end to end (Linux)
+├── build_firmware.bat           Same, for Windows - see docs/COMPILE_STM32F303.TXT for
+│                                the full manual process either script automates
 ├── LICENSE
 └── README.md                    This file
 ```

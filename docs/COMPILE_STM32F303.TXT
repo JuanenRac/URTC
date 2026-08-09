@@ -234,11 +234,20 @@ board application build AND the expansion slave application build -
 both link with g++, both bootloaders (which never touch this library
 at all) link with plain gcc.
 
-Verify no C++ symbol leaked out into the linked binary's own public
-symbol table unexpectedly (should be empty or near-empty on this
-project - the extern "C" wrapper should keep everything unmangled):
+Verify the specific MLX90641 functions this project's own C code actually
+calls are correctly unmangled - the ones extern "C" needs to cover:
 
-    arm-none-eabi-nm your_output.elf | grep " T _Z"
+    arm-none-eabi-nm your_output.elf | grep -E " T MLX90641_(DumpEE|ExtractParameters|GetFrameData|GetTa|CalculateTo)\b"
+
+All 5 should show up with plain, unmangled names (no leading _Z). Don't
+just grep for ANY "_Z"-prefixed symbol and expect zero results - Melexis's
+own MLX90641_API.cpp has ~17 internal-only helper functions (HammingDecode,
+ExtractCPParameters, ValidateAuxData, and similar) that are never declared
+in the public header, never called from this project's own C code, and
+stay mangled - correctly and harmlessly, since they're only ever called
+from other C++ code within that same .cpp file. Seeing those in a bare
+"_Z" grep is normal, not a sign the extern "C" wrapper failed - checking
+the specific public functions above is the check that actually matters.
 
 -----------------------------------------------------------------------------
 7. The 4 link steps

@@ -1,0 +1,428 @@
+=============================================================================
+URTC - VERSION BUMP CHECKLIST
+=============================================================================
+Built after the 1.0 -> 1.1 migration (1 August 2026), which took 4
+separate correction rounds with the user to find everything - each round
+using a grep pattern that missed a different real case. Rewritten
+completely after a later reorganization (also 1 August 2026, same day)
+retired the dual monolithic/partitioned form and the VX.X/ version-
+numbered subfolder scheme project-wide - the original version of this
+document described a folder/file layout that no longer exists at all.
+This document exists so the NEXT bump doesn't repeat either round's
+mistakes. Read this top-to-bottom before touching anything; don't just
+grep for the old number and replace it blindly - several of these
+entries explain why a match should NOT change.
+
+There are FIVE independent version tracks in this project now (a new
+Track E was added once the expansion slave chip's own firmware existed -
+the original 4-track version of this document predates that chip). Confusing
+which track a given "1.0" belongs to is exactly what caused every miss
+in the last migration.
+
+-----------------------------------------------------------------------------
+TRACK A - PROJECT SOFTWARE VERSION (currently 1.1)
+-----------------------------------------------------------------------------
+Covers the main board's own firmware + Flasher + Tester together, as one
+number, bumped only on explicit request (never automatically). This is
+the track most likely to be "the next bump" the user means by default.
+
+--- A1. Code constants (single source of truth - everything below that
+        reads these does NOT need separate editing) ---
+  src/F303-master/firmware_common.h
+    #define FIRMWARE_VERSION_MINOR N   (MAJOR has never changed - still 1)
+  tools/flasher/flasher_config.py
+    FLASHER_VERSION = "X.X"
+  tools/tester/tester_config.py
+    TESTER_VERSION = "X.X"
+  --> Window titles, About dialogs, and session log headers in both PC
+      tools all read these constants dynamically (f-strings) - confirmed
+      with a real GUI run under Xvfb, not just grep. Nothing to edit
+      there by hand once the constant is correct.
+  --> No monolithic form exists anymore (retired 1 August 2026) - there
+      is exactly ONE copy of firmware_common.h to edit, not a
+      monolithic-and-partitioned pair. If a future session summary or
+      search result ever references a "STM32F303CC.C" or a
+      "partitioned/" subfolder, that's stale information predating the
+      retirement - see Track D.
+
+--- A2. Folder names ---
+  There is nothing to do here anymore. The VX.X/ version-numbered
+  subfolder scheme (src/F303-master/VX.X/, tools/flasher/VX.X/,
+  tools/tester/VX.X/) was retired project-wide on 1 August 2026 - every
+  path is flat now (src/F303-master/, tools/flasher/, tools/tester/)
+  and does NOT move or get renamed on a version bump. Don't recreate a
+  version-numbered folder for a future bump; that pattern was
+  deliberately abandoned, not paused.
+
+--- A3. Compiled binary naming ---
+  firmware/URTC_VX.X_F303CC.bin/.hex/.elf
+  --> Rename pattern: URTC_V<MAJOR>.<MINOR>_F303CC - note the period
+      between major and minor (confirmed with the user directly at the
+      1.1 binary: "URTC_V1.1_F303CC.bin", not underscores). Delete the
+      old-numbered binaries after confirming the new ones build and
+      byte-compare correctly against a fresh compile.
+  --> Only ONE set of these 3 files exists now, not a monolithic-plus-
+      partitioned pair (the "_partitioned" suffix was dropped project-
+      wide when the monolithic form was retired) - don't recreate that
+      suffix on a future bump.
+  --> Bootloader binaries NEVER include a version number in the
+      filename, on any bump, ever - see Track C.
+  --> The expansion slave chip's own binaries (URTC_SLAVE_APP.*,
+      URTC_SLAVE_BOOTLOADER.*) never include a version number either,
+      and don't move with Track A at all - see Track E.
+
+--- A4. OLED boot splash (firmware, NOT a text string) ---
+  firmware_render.c: SplashYellowText[2][128]
+  --> The "URTC vX.X" text on the OLED at boot is a pre-rendered SSD1306
+      bitmap baked into this const array, not something OLED_PrintStr()
+      draws at runtime - editing it means decoding/re-encoding pixel
+      columns, not a text replace. Technique that worked: render the
+      current array to an actual PNG (a short Python/PIL script, 8x
+      scale) to visually confirm the current digit, find the exact empty
+      "separator" columns bounding just that one digit (a column is
+      fully 0x00 in both page bytes = boundary), replace only those
+      columns with an existing glyph shape already present elsewhere in
+      the same bitmap (e.g. reuse the "1" from "v1" to build the new
+      minor-version digit) centered in the same column span so nothing
+      else in the strip shifts, then render the candidate again before
+      touching the actual source. Verify with a byte-diff against a
+      fresh compile afterward - a correct edit here changes zero bytes
+      of binary size (only values inside an already-existing array).
+  --> The GIF preview of this splash (ani/splash_boot.gif) is decoded
+      straight from this same array by a one-off script, not maintained
+      by hand - regenerate it the same way after any edit here rather
+      than trying to hand-edit the GIF, so it can never drift from what
+      the real firmware actually shows.
+
+--- A5. Image assets with version text BAKED IN (not dynamic - must
+        manually edit the source and regenerate the render) ---
+  tools/flasher/assets/URTC_LOGO_FLASHER.svg
+    2 places: an explanatory comment, and a <text>vX.X</text> element
+  tools/tester/assets/URTC_LOGO_TESTER.svg
+    same, 2 places
+  images/URTC_LOGO_FLASHER.svg, images/URTC_LOGO_TESTER.svg
+    DUPLICATE copies living in the project-root images/ gallery,
+    independent of the ones inside tools/*/assets/ above - these
+    are what the root README.md actually displays. Missing this exact
+    duplication is what caused one full correction round. After fixing
+    the assets/ copies, diff them against these to confirm they're
+    otherwise identical, then just copy the corrected file over - don't
+    re-derive it by hand a second time.
+  tools/flasher/assets/urtc_banner.png
+  tools/tester/assets/urtc_tester_banner.png
+    Rendered FROM the SVGs above - regenerate after editing the SVG
+    (cairosvg via pip; check exact pre-existing PNG dimensions first
+    with PIL and render at that exact size - re-confirm current
+    dimensions rather than assuming they're unchanged from the last
+    bump).
+  images/URTC_FLASHER_V1_X.png, images/URTC_TESTER_V1_X.png
+    These are REAL screenshots of the running app windows, not SVG
+    renders - regenerate by actually launching the app under Xvfb and
+    capturing with ImageMagick `import -window root`, then crop to the
+    known window geometry (re-confirm current geometry rather than
+    assuming it matches an old value in this document, since UI
+    controls get added between checklist revisions even within the
+    same software version - the MLX9064x sensor variant control, for
+    instance, was added well after this document's own last previous
+    revision, still within the same 1.1, and changed both tools' own
+    window height). Rename the file itself to match the new version
+    number, then fix the 4 references in the root README.md (2 in the
+    embedded <img> tags in the body, 2 in the ASCII file-tree listing),
+    and delete the old-numbered PNGs.
+
+--- A6. Documentation identity-tag mentions (manual text edits - these
+        are NOT hardware-tied, they just borrow the project's name+
+        version as a header/title even in documents whose actual
+        content is protocol/firmware, which is why they're easy to
+        wrongly leave alone) ---
+  README.md
+    - main title line: "# URTC - Universal Robot Tool Controller"
+      (this project's own README title does NOT carry a version number
+      at all as of the "constant evolution" note added at the top on
+      1 August 2026 - don't add one back on a future bump; see Track D)
+    - changelog table: add a new row for the software version (firmware
+      row - see the existing 1.1 entry for the phrasing pattern: state
+      this bump IS the migration, point back at the previous version's
+      entry for any functional changes that didn't get their own bump)
+  LICENSE
+    - paths to tools/flasher/README.md and tools/tester/README.md
+      inside the CC BY-SA clause (flat paths now, no VX.X/ segment -
+      see A2)
+  PROJECT_INDEX.txt
+    - "Current versions" summary block (Firmware/Flasher/Tester lines,
+      plus the expansion slave's own separate lines - see Track E)
+    - the "Generated: <date>" line - don't rewrite the original date/
+      pass description (it's a real historical fact), but do add a
+      note that it's been kept current through later passes, so a
+      reader doesn't mistake it for stale
+  chat.TXT
+    - "Current versions" section
+    - the deliberate historical section documenting the retirement of
+      the monolithic form and the VX.X/ folder scheme (1 August 2026) -
+      that's intentionally preserved lesson text, not a live reference;
+      don't remove it on a future bump, and don't mistake its own path
+      examples for current guidance
+  docs/CANBUS.TXT - title line (currently untitled with a version - if
+      one gets added on a future bump, keep it project-version-free,
+      matching this project's own current convention of not baking a
+      software version into protocol documentation that describes
+      wire-level behavior, not a specific release)
+  docs/ECOVIA.TXT - title line (currently version-free as of the
+      "constant evolution" pass - keep it that way)
+  docs/EEPROM.TXT - "PROJECT: URTC..." line (currently version-free)
+  docs/EXPANSION.TXT - "PROJECT: URTC..." line (currently version-free)
+  docs/TOOLS.TXT - "PROJECT: URTC..." line (currently version-free -
+      this file didn't exist at the 1.0->1.1 bump, added later; new
+      docs files created after this point should follow the same no-
+      baked-in-version convention already established for the others)
+  src/F303-master/README.md
+    - "**Project:** URTC..." line (currently version-free)
+  src/F303-master/boot/README.md
+    - same "**Project:**" line (currently version-free)
+  src/F303-master/firmware_common.h
+    - check for any "// ENVIRONMENT: ..." or similar identity-tag
+      comment near the top before assuming there is or isn't one - this
+      is source code, not docs, but it's the same identity-tag pattern
+      if present, and needs a recompile + byte-diff-verified binary
+      regen afterward like any other firmware source edit, even though
+      it would be comment-only
+  tools/flasher/README*.md - ALL 5 languages (English + 4
+      translations), each one has, separately:
+    - the "**Version:**" header line (format differs slightly per
+      language and even per tool - the Flasher's own line explains the
+      version's purpose inline, the Tester's combines it with the
+      author on one line - read the actual current text before writing
+      a sed pattern, don't assume the English structure)
+    - the manifest.json example's "version" field (the fake build_date
+      and truncated sha256 in that same example are deliberately
+      illustrative placeholder values - leave those alone, only the
+      version number itself should track reality)
+  tools/tester/README*.md - ALL 5 languages, same categories (version
+      header line) - no manifest.json example in this one, so one fewer
+      thing to check than the Flasher's
+  mejoras_futuras.txt - scan for any entry whose own reasoning references
+      "the project is still at vX.X" as a CURRENT-STATE justification
+      for deferring something - if the version referenced no longer
+      matches, that reasoning is now stale and needs updating (this is
+      a judgment call per-entry, not a blind find/replace - most entries
+      won't mention a version at all)
+
+-----------------------------------------------------------------------------
+TRACK B - HARDWARE / PCB VERSION (currently v1.0 - does NOT move with
+Track A; only changes if the actual schematic/board layout changes)
+-----------------------------------------------------------------------------
+  docs/PINOUT.TXT - title (real physical MCU pin assignments)
+  docs/PINOUT_CONNECTORS.TXT - title AND "PLATFORM:" line (real physical
+      connector pinouts)
+  BOM/BOM.TXT - title (component footprints tied to the actual PCB
+      layout) AND its own reference to "URTC_V1.0.sch's exported
+      BOM/netlist" (names a specific unchanged file, see below)
+  README.md - the board photo's alt text (`![URTC v1.0](images/
+      URTC_BOARD.png)` - describes what's IN that specific photo, not
+      the project in general) and the Eagle file-tree entries
+  The actual Eagle files: URTC_V1.0.sch, URTC_V1.0.brd,
+      URTC_V1.0_JLCPCB.ZIP - literal filenames. Only rename+regenerate
+      these (and then fix every reference to the old filename) if the
+      PCB design itself actually changes; a software-only version bump
+      never touches these.
+  The 4 expansion board variants' own BOMs (BOM/BOM_EXPANSION_*.TXT) -
+      also Track B, not Track A: these describe physical component
+      selections for boards that haven't been laid out in Eagle yet at
+      all (as of this document's own last update), independent of any
+      software version. A new expansion board BOM added between bumps
+      (there were 2 more added after the original 4 - see this
+      project's own audit trail) follows this same track, not Track A.
+
+If a future hardware revision DOES happen, this whole track becomes its
+own version bump with its own checklist - don't assume it moves in sync
+with Track A just because they happened to both start at "1.0".
+
+  docs/PINOUT_SLAVE.txt is ALSO Track B (physical pins on a real chip),
+  even though it was found - and fixed - carrying a Track A version
+  number ("URTC v1.1") in its own title at one point, borrowed by
+  mistake from the software track rather than deliberately following
+  Track B's own "v1.0" the way PINOUT.TXT/PINOUT_CONNECTORS.TXT do.
+  Since the expansion slave's own hardware has no real PCB layout yet at
+  all (confirmed against BOM_EXPANSION_*.TXT's own "hasn't been laid
+  out in Eagle yet" note), there's no real hardware version to anchor
+  this document to either way - it was fixed by removing the version
+  tag entirely rather than assigning it Track B's "v1.0", since that
+  number describes the MAIN board's own real, laid-out PCB, not this
+  chip's own not-yet-designed one. If this chip's own hardware ever
+  gets a real PCB revision, THAT'S when a genuine version number
+  belongs on this document - and it would be its own new sub-track
+  within B, not automatically "v1.0" just because the main board's own
+  happens to be at that number.
+
+-----------------------------------------------------------------------------
+TRACK C - MAIN BOARD BOOTLOADER VERSION (currently 1.1.1 - fully
+independent, MAJOR.MINOR.PATCH, auto-bumps PATCH on every edit per the
+existing rule in chat.TXT, unrelated to Track A's number even when they
+happen to look similar)
+-----------------------------------------------------------------------------
+  src/F303-master/boot/bootloader_common.h
+    #define BOOTLOADER_VERSION_MAJOR/MINOR/PATCH
+  README.md - bootloader's OWN changelog table (separate from the
+      firmware's table just above it - don't add bootloader entries to
+      the firmware table or vice versa)
+  --> Binary filename NEVER includes a version number, on any bump,
+      ever: always URTC_BOOTLOADER.bin/.hex/.elf. Only one set of these
+      3 files exists now, not a monolithic-plus-partitioned pair - see
+      A3's own note on why.
+  --> This bootloader's own folder (src/F303-master/boot/) is a flat,
+      permanent path now, not something that moves with a version
+      number - see A2.
+  --> The bootloader has no OLED splash screen and shows no version
+      number on-screen at all (confirmed by checking every actual call
+      site of its string-drawing function) - only "ERROR"/"UPDATING"/
+      "FLASH OK". Nothing equivalent to Track A5 exists for it.
+
+-----------------------------------------------------------------------------
+TRACK D - NEVER CHANGES ON ANY VERSION BUMP (false positives to
+recognize and leave alone, not "fix")
+-----------------------------------------------------------------------------
+  - Changelog entries and auditoria_historial.txt entries - historical
+    record by definition, describes what a past version WAS, not what
+    the current one is
+  - chat.TXT's deliberate warning text about old path naming (see A6) -
+    including the section documenting the VX.X/ folder scheme's own
+    retirement; that's the historical record of a real past event, not
+    live guidance to follow again
+  - License version numbers that aren't this project's own: "CC BY-SA
+    4.0", "GPL-3.0", "CERN-OHL-S v2", "Apache License, Version 2.0" (the
+    3 vendored Melexis sensor libraries' own license header)
+  - Binary file metadata embedded by unrelated third-party tools (found
+    once: a JPEG's own "CREATOR: gd-jpeg v1.0" EXIF-adjacent string -
+    the version of the JPEG library that processed the image file,
+    zero relation to this project)
+  - Tkinter text-widget position indices - "1.0" is literally Tkinter's
+    own syntax for "line 1, character 0" (start of a text widget's
+    content), appears in both PC tools' code wherever they read/insert
+    text-box contents - not a version number, don't touch
+  - Bare numeric literals that happen to read "1.0" in code - timeout
+    values in seconds (`timeout=1.0`), scroll-position fractions
+    (`yview_moveto(1.0)` = 100%), interpolation fraction tuples - check
+    the actual surrounding code before assuming any bare "1.0" is a
+    version
+  - Mentions of an external tool's OWN version number in an explanatory
+    comment (found once: a comment noting that pyOCD, a third-party
+    library, "hasn't reached its own 1.0 release yet" - unrelated to
+    URTC's version)
+  - The root README's own top-of-document "constant evolution" note
+    (added 1 August 2026, per the user's own explicit request) - this
+    is deliberate, permanent framing text explaining that the project
+    has no tagged Release yet, not something to remove once a version
+    number exists somewhere else in the document
+
+-----------------------------------------------------------------------------
+TRACK E - EXPANSION SLAVE CHIP VERSIONS (application currently 1.0,
+bootloader currently 1.0.0 - both fully independent of every track
+above; a separate chip, on a separate board, versioned on its own
+schedule since it can be updated without touching the main board at all)
+-----------------------------------------------------------------------------
+This track didn't exist in this document's own original version - the
+expansion slave chip's own firmware was added to this project after
+that first version was written.
+
+--- E1. Application (bootloader is separate, see E2) ---
+  src/F303-slave/slave_common.h
+    Check for a version-constant #define here before assuming there
+    isn't one - as of this document's own last update, this chip's own
+    application doesn't expose a queryable semantic version the way the
+    main board's own firmware does via FIRMWARE_VERSION_MINOR; if a
+    future bump adds one, add its own entry here rather than leaving
+    this checklist silently out of date about it.
+  README.md - the "Expansion Slave" changelog table (separate from both
+      the main board's own firmware AND bootloader tables above it -
+      3 independent tables total on this document, don't cross-add
+      entries between them)
+  --> Binary filenames NEVER include a version number, on any bump,
+      ever: always URTC_SLAVE_APP.bin/.hex/.elf.
+  --> This chip's own source folder (src/F303-slave/) is a flat,
+      permanent path, same reasoning as Track A2/C.
+  --> 3 vendored sensor-library subfolders live here too
+      (melexis/ for MLX90640, melexis_mlx90641/, melexis_mlx90642/) -
+      these are Melexis's own third-party code with its own Apache-2.0
+      versioning entirely separate from this project's own; don't
+      confuse an upstream library update (a genuinely different task -
+      re-vendoring newer Melexis source, re-verifying it byte-for-byte
+      against the new upstream) with a URTC version bump. The 2 newer
+      folders are mirrored identically on the main board's own source
+      tree too (src/F303-master/melexis_mlx90641/,
+      melexis_mlx90642/, and now melexis_mlx90640/ as well) - if a
+      vendored library ever does get updated, update BOTH copies and
+      re-verify both, not just the one that happened to get noticed
+      first.
+
+--- E2. Bootloader ---
+  src/F303-slave/boot/slaveboot_common.h
+    Same MAJOR/MINOR/PATCH #define pattern as the main board's own
+    bootloader (Track C) - auto-bumps PATCH on every edit, same rule.
+  --> Binary filenames NEVER include a version number, on any bump,
+      ever: always URTC_SLAVE_BOOTLOADER.bin/.hex/.elf.
+  --> Same "no OLED, no on-screen version display" note as Track C
+      applies here too - this chip drives no display of its own at all.
+
+-----------------------------------------------------------------------------
+LESSONS FROM THE 1.0 -> 1.1 MIGRATION, AND THE LATER MONOLITHIC-FORM
+RETIREMENT (why this document exists, and why it needed a full rewrite)
+-----------------------------------------------------------------------------
+Every one of these caused a real, separate correction round with the
+user. Read them once so the pattern is familiar, not just the specific
+instance:
+
+1. Anchoring a grep pattern to "v1.0" or "V1.0" (the letter immediately
+   before the number) misses a bare "1.0" with no v/V directly attached,
+   e.g. "**Version:** 1.0". Search for the number itself as a fallback
+   pass: `\b1\.0\b`, then manually triage every hit using Track D above
+   to rule out false positives - there will be many, that's expected and
+   fine, the point is not missing a true positive because a narrower
+   pattern already felt exhaustive.
+2. Duplicate copies of the same asset in more than one folder (images/
+   at the project root vs. tools/*/assets/) are easy to update in
+   one place and forget in the other, since a single `find`/`grep` scoped
+   to "the tool's own folder" won't surface the root-level duplicate at
+   all. Explicitly check for a project-root images/ (or similar shared-
+   assets) folder every time, independent of the per-tool folders.
+   `find /project-root -iname "*.png" -o -iname "*.svg"` from the very
+   top, not from inside each tool's folder, is what actually catches this.
+3. A "screenshot" of an app window is a real capture of a specific past
+   run, not a template - it goes stale the moment the version-visible
+   parts of the UI it captured change, and grep can't find this at all
+   because there's no text to search, just pixels. Anything in the repo
+   that's an actual app screenshot (as opposed to a designed logo/banner)
+   needs to be explicitly regenerated by re-running the real app, every
+   version bump that touches anything visible in that screenshot.
+4. Distinguishing "this document's title just borrows the project's
+   name+version as a label" from "this document's content is tied to a
+   physical hardware revision that hasn't changed" takes actually
+   reading what the document is ABOUT, not just noticing the same
+   version string pattern in both. When genuinely unsure which side a
+   given file falls on, the content of the document is the tell: does it
+   describe physical pin/component/dimension facts that only change if
+   the PCB itself changes (Track B), or protocol/behavior facts that live
+   in firmware/software (Track A)? A BOM or pinout is never Track A. A
+   CAN command map or an EEPROM byte layout is never Track B.
+5. When something doesn't compile to code (a README title, an SVG text
+   element, a baked-in OLED bitmap), the fix isn't optional or lower-
+   priority just because it's not source code - the OLED splash bitmap
+   in particular is easy to forget entirely since it never shows up in
+   any text-based grep at all (it's a byte array, not a string).
+6. A checklist document like this one is itself subject to going stale -
+   this exact document described a VX.X/ folder scheme and a monolithic-
+   plus-partitioned file pair for months, right up until both were
+   retired in one pass, and nobody updated this file to match until a
+   later, separate request pointed out that "version change files"
+   needed updating too. A structural project change big enough to touch
+   file paths, binary names, or how many forms of a file exist is big
+   enough to also require re-reading (and likely rewriting parts of)
+   this checklist itself - it's not a write-once reference.
+7. A brand-new document created after this checklist's own last update
+   (docs/TOOLS.TXT, added alongside the 13-tool expansion) won't appear
+   anywhere in an old copy of this checklist at all, and a version-bump
+   pass that only follows the existing entries here will silently skip
+   it. When performing an actual version bump, cross-check the current
+   real file tree against this document's own entries first, rather
+   than trusting this list to already be complete - new files get added
+   between checklist revisions more often than this document itself
+   gets revised to mention them.
