@@ -7,7 +7,7 @@ LICENSE: This document is licensed under CC BY-SA 4.0 (https://creativecommons.o
          Firmware source (this chip's bootloader and application) is
          GPL-3.0; the 3 Melexis MLX9064x-family libraries it links
          against are all Apache-2.0 (see each one's own
-         LICENSE_MELEXIS_APACHE2.0 in src/F303-slave/melexis/,
+         LICENSE_MELEXIS_APACHE2.0 in src/F303-slave/melexis_mlx90640/,
          melexis_mlx90641/, and melexis_mlx90642/) - see the repo
          README's "License and Copyright Notices" section for the full
          breakdown.

@@ -514,7 +514,7 @@ this project's own coverage on the expansion slave chip.
 
 | File | Purpose |
 |---|---|
-| `MLX90640_API.h` / `.c` | Melexis's own official library (Apache-2.0, plain C), vendored unmodified - identical copy to the expansion slave chip's own `src/F303-slave/melexis/` (verified byte-for-byte before vendoring here, not a separate download). |
+| `MLX90640_API.h` / `.c` | Melexis's own official library (Apache-2.0, plain C), vendored unmodified - identical copy to the expansion slave chip's own `src/F303-slave/melexis_mlx90640/` (verified byte-for-byte before vendoring here, not a separate download). |
 | `MLX90640_I2C_Driver.h` | This library's own platform-transport interface. |
 | `firmware_mlx90640_transport.c` | This board's own implementation of that 5-function transport, built on `firmware_expansion_i2c.c`'s own bit-banged primitives. |
 | `firmware_mlx90640_app.c` / `.h` | Application-level capture and chunk-serving logic - 48 chunks (768 pixels at 16 per chunk). |

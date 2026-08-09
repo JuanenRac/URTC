@@ -5,8 +5,8 @@
 // GPL-3.0 - see LICENSE
 //
 // MLX90640 support built on Melexis's own official library
-// (melexis/MLX90640_API.c/.h, Apache-2.0, copied unmodified into this
-// project's melexis/ subfolder - its own copyright/license header is
+// (melexis_mlx90640/MLX90640_API.c/.h, Apache-2.0, copied unmodified into this
+// project's melexis_mlx90640/ subfolder - its own copyright/license header is
 // left exactly as Melexis wrote it, not replaced with this project's
 // own GPL-3.0 header, since that code isn't this project's to relicense).
 // MLX90641 support built the same way on melexis_mlx90641/MLX90641_API.h/.cpp

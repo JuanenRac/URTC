@@ -3,11 +3,11 @@
 **Project:** URTC (Universal Robot Tool Controller) - Expansion Ecosystem
 **Author:** JuanenRac (Electro Hobby 3D) — electrohobby3d@gmail.com
 **License:** This document is CC BY-SA 4.0; the source it describes
-(`src/F303-slave/`) is GPL-3.0. The Melexis MLX90640 and MLX90641
-libraries this firmware links against (`melexis/`, `melexis_mlx90641/`)
-are both Apache-2.0 - see each folder's own
-`LICENSE_MELEXIS_APACHE2.0` and the repo root README's "License and
-Copyright Notices" section for the full breakdown.
+(`src/F303-slave/`) is GPL-3.0. The 3 Melexis MLX9064x-family
+libraries this firmware links against (`melexis_mlx90640/`,
+`melexis_mlx90641/`, `melexis_mlx90642/`) are all Apache-2.0 - see each
+folder's own `LICENSE_MELEXIS_APACHE2.0` and the repo root README's
+"License and Copyright Notices" section for the full breakdown.
 
 This document is the engineering-level reference for the application
 firmware (`src/F303-slave/`, entry point `slave_main.c`) running on the
@@ -103,7 +103,7 @@ the main board's own CAN handlers on the other end of the link bus
 ever need to know which sensor is actually behind them.
 
 - **MLX90640** (32×24, 768px) - built on Melexis's own official library
-  (`melexis/MLX90640_API.c`, Apache-2.0, plain C), not a hand-rolled
+  (`melexis_mlx90640/MLX90640_API.c`, Apache-2.0, plain C), not a hand-rolled
   implementation. This sensor's own RAM register map and its
   interleaved "chess pattern" sub-page capture scheme (each raw read
   only returns half the 768 pixels; the library recombines two
@@ -248,7 +248,7 @@ a safe state than the main board's own 25 tool profiles.
 | `slave_i2c_link.c` / `.h` | The I2C1 link-bus protocol handler (section 4) - the "listen mode" interrupt callbacks and the register dispatch table. |
 | `slave_i2c_sensors.c` / `.h` | ADS1115 driver, both MLX90640 and MLX90641 platform-transport layers, and the generic `MLX_*` dispatch functions that branch on `mlx_sensor_variant` (section 3) - all built on shared I2C2 master primitives. |
 | `slave_pwm.c` / `.h` | TIM1 local PWM generation (section 5 of `docs/PINOUT_SLAVE.txt`) - channel configuration, timed pulses, and the millisecond countdown (`PWM_Tick`) that auto-stops a non-continuous pulse. |
-| `melexis/MLX90640_API.c` / `.h`, `MLX90640_I2C_Driver.h` | Melexis's own official MLX90640 library (Apache-2.0, plain C), unmodified. Lives at `src/F303-slave/melexis/`, a sibling folder to the files above rather than nested inside them - kept as its own separate compilation unit rather than folded into this project's own source, since Apache-2.0 requires that code's own copyright notice stay intact and merging third-party code under a different license into this project's own files would obscure that. |
+| `melexis_mlx90640/MLX90640_API.c` / `.h`, `MLX90640_I2C_Driver.h` | Melexis's own official MLX90640 library (Apache-2.0, plain C), unmodified. Lives at `src/F303-slave/melexis_mlx90640/`, a sibling folder to the files above rather than nested inside them - kept as its own separate compilation unit rather than folded into this project's own source, since Apache-2.0 requires that code's own copyright notice stay intact and merging third-party code under a different license into this project's own files would obscure that. |
 | `melexis_mlx90641/MLX90641_API.h` / `.cpp`, `MLX90641_I2C_Driver.h` | Melexis's own official MLX90641 library (Apache-2.0, **C++** - a genuinely separate library from MLX90640's own, not a variant of it), at `src/F303-slave/melexis_mlx90641/`. Only modification: an `extern "C"` linkage wrapper on both headers (documented inline). This is the one C++ code in this chip's otherwise all-C firmware - see section 3's own note on why, and on how the build process handles the C/C++ mix. |
 | `melexis_mlx90642/MLX90642.h` / `.c`, `MLX90642_depends.h` | Melexis's own official MLX90642 library (Apache-2.0, plain C), unmodified, at `src/F303-slave/melexis_mlx90642/`. Genuinely simpler transport interface than the other 2 sensors' own - see section 3's own note on why. |
 

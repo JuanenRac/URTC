@@ -408,6 +408,8 @@ If anyone in the community is working on custom end-effectors, smart tool-change
 │   ├── EXPANSION.TXT            CONN_EXPANSION connector and the add-on board variants
 │   ├── PINOUT_SLAVE.txt         Full pinout for the expansion slave chip (advanced variants only)
 │   ├── EEPROM.TXT               Full F-RAM register map (every persisted setting, byte offsets)
+│   ├── COMPILE_STM32F303.TXT    From-scratch build guide for all 4 firmware binaries -
+│   │                            toolchain, ST HAL/CMSIS setup, exact compile/link commands
 │   └── tool_image_generator/    Toolkit that generates images/TOOL_*.png (see below) - PCB.png
 │                                blank reference, render_engine.py + tool_data.py +
 │                                generate_all.py, and PROCEDURE.TXT explaining how to add
