@@ -272,6 +272,20 @@ fi
 fi
 
 # -----------------------------------------------------------------------
+if [ "$TARGET" = "all" ] && [ "$FAIL" = "0" ]; then
+step "8. Firmware manifest (firmware_manifest.json)"
+# -----------------------------------------------------------------------
+if python3 "$ROOT/generate_manifest.py" "$ROOT"; then
+    pass "firmware_manifest.json regenerated"
+else
+    warn "firmware_manifest.json regeneration failed - see the traceback above"
+fi
+fi
+if [ "$TARGET" != "all" ]; then
+    warn "firmware_manifest.json NOT regenerated - only ran a partial ($TARGET) build. Run without a target argument (or with 'all') to refresh it."
+fi
+
+# -----------------------------------------------------------------------
 step "Summary"
 # -----------------------------------------------------------------------
 echo "$PASS passed, $WARN warnings, $FAIL failed"

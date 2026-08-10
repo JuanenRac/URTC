@@ -479,7 +479,13 @@ If anyone in the community is working on custom end-effectors, smart tool-change
 │   ├── URTC_V1.1_F303CC.hex      Application HEX compiled, flash to 0x08008000 (address baked in)
 │   ├── URTC_SLAVE_BOOTLOADER.{bin,elf,hex}  Expansion slave's own bootloader, flash to 0x08000000
 │   │                             on the STM32F303CBT6 (advanced expansion boards only)
-│   └── URTC_SLAVE_APP.{bin,elf,hex}  Expansion slave's own application, flash to 0x08005000
+│   ├── URTC_SLAVE_APP.{bin,elf,hex}  Expansion slave's own application, flash to 0x08005000
+│   └── firmware_manifest.json    Machine-readable index of all 4 components above - version,
+│                                 flash address, and each file's own size/CRC32, for an
+│                                 external tool to check what's here and what's newer than
+│                                 whatever it currently has. Regenerated automatically by
+│                                 generate_manifest.py (called by build_firmware.sh/.bat's
+│                                 own last step) - never hand-edited.
 ├── images/
 │   ├── OLED_DIRECT_MOUNT.jpg     LCD1/CONN_OLED2 - bare 30-pin FPC panel, direct-mount option
 │   ├── OLED_BREAKOUT_MODULE.jpg  CONN_OLED - external I2C breakout module, alternate option
@@ -504,6 +510,10 @@ If anyone in the community is working on custom end-effectors, smart tool-change
 │                                compiles all 4 firmware binaries end to end (Linux)
 ├── build_firmware.bat           Same, for Windows - see docs/COMPILE_STM32F303.TXT for
 │                                the full manual process either script automates
+├── generate_manifest.py         Regenerates firmware/firmware_manifest.json - called
+│                                automatically as the last step of a full
+│                                build_firmware.sh/.bat run, or standalone any time the
+│                                manifest needs to catch up without a full rebuild
 ├── LICENSE
 └── README.md                    This file
 ```

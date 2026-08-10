@@ -297,6 +297,22 @@ echo   OK   URTC_SLAVE_APP.bin/.hex/.elf built
 set /a PASS+=1
 )
 
+REM -----------------------------------------------------------------------
+if "%TARGET%"=="all" if %FAIL% EQU 0 (
+echo.
+echo === 8. Firmware manifest ^(firmware_manifest.json^) ===
+python "%ROOT%\generate_manifest.py" "%ROOT%"
+if errorlevel 1 (
+    echo   WARN firmware_manifest.json regeneration failed - see the traceback above
+) else (
+    echo   OK   firmware_manifest.json regenerated
+    set /a PASS+=1
+)
+)
+if NOT "%TARGET%"=="all" (
+    echo   WARN firmware_manifest.json NOT regenerated - only ran a partial ^(%TARGET%^) build. Run without a target argument ^(or with 'all'^) to refresh it.
+)
+
 :summary
 echo.
 echo === Summary ===
