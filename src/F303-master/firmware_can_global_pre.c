@@ -12,6 +12,7 @@
 // =============================================================================
 #include "firmware_common.h"
 #include "firmware_can_global.h"
+#include "firmware_expansion_i2c.h"
 
 void Handle_CAN_GlobalCommands_PreErrorGate(void) {
 
@@ -249,7 +250,7 @@ void Handle_CAN_GlobalCommands_PreErrorGate(void) {
         if (rxHeader.StdId == 0x1A6 && rxHeader.DLC >= 1 && rxData[0] <= 3) {
             mlx_sensor_variant = rxData[0];
             if (expansion_board_type == 3 || expansion_board_type == 4) {
-                ExpansionI2C_SlaveWriteRegister(0x14, &mlx_sensor_variant, 1); // REG_MLX_SENSOR_VARIANT, see slave_common.h
+                ExpansionI2C_SlaveWriteRegister(0x14, &rxData[0], 1); // REG_MLX_SENSOR_VARIANT, see slave_common.h - rxData[0] holds the same value just assigned to mlx_sensor_variant above, without that variable's volatile qualifier
             }
         }
         if (rxHeader.StdId == 0x1A6 || rxHeader.StdId == 0x1A7) {

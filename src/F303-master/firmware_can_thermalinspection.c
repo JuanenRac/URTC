@@ -42,6 +42,7 @@
 // =============================================================================
 #include "firmware_common.h"
 #include "firmware_can_thermalinspection.h"
+#include "firmware_expansion_i2c.h"
 #include "melexis_mlx90640/firmware_mlx90640_app.h"
 #include "melexis_mlx90641/firmware_mlx90641_app.h"
 #include "melexis_mlx90642/firmware_mlx90642_app.h"

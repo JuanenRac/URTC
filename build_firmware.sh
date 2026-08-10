@@ -206,7 +206,7 @@ step "5. Main board application (src/F303-master/)"
 # -----------------------------------------------------------------------
 OUT="$BUILD/master_app"; rm -rf "$OUT"; mkdir -p "$OUT"
 SRC="$ROOT/src/F303-master"
-compile_dir "$SRC" "$OUT" ""
+compile_dir "$SRC" "$OUT" "-I$SRC/melexis_mlx90640 -I$SRC/melexis_mlx90641 -I$SRC/melexis_mlx90642"
 compile_dir "$SRC/melexis_mlx90640" "$OUT" "-I$SRC -I$SRC/melexis_mlx90640"
 compile_dir "$SRC/melexis_mlx90641" "$OUT" "-I$SRC -I$SRC/melexis_mlx90641"
 compile_dir "$SRC/melexis_mlx90642" "$OUT" "-I$SRC -I$SRC/melexis_mlx90642"
@@ -219,8 +219,10 @@ arm-none-eabi-g++ $LDCOMMON -fno-exceptions -fno-rtti -fno-unwind-tables -fno-th
     "$OUT"/*.o "$BUILD/hal_obj"/*.o -o "$OUT/URTC_APP.elf" 2>&1 | grep -v "not implemented\|note: the message\|in function \`_" || true
 build_bin_hex "$OUT/URTC_APP.elf"
 # Filename encodes the firmware version - read it from firmware_common.h
-FW_VER=$(grep -oP '(?<=#define FIRMWARE_VERSION_MAJOR )\d+' "$SRC/firmware_common.h" 2>/dev/null || echo "?")
-FW_MIN=$(grep -oP '(?<=#define FIRMWARE_VERSION_MINOR )\d+' "$SRC/firmware_common.h" 2>/dev/null || echo "?")
+FW_VER=$(sed -n 's/^#define FIRMWARE_VERSION_MAJOR[[:space:]]\+\([0-9]\+\).*/\1/p' "$SRC/firmware_common.h")
+FW_MIN=$(sed -n 's/^#define FIRMWARE_VERSION_MINOR[[:space:]]\+\([0-9]\+\).*/\1/p' "$SRC/firmware_common.h")
+[ -z "$FW_VER" ] && FW_VER="?"
+[ -z "$FW_MIN" ] && FW_MIN="?"
 APP_NAME="URTC_V${FW_VER}.${FW_MIN}_F303CC"
 cp "$OUT/URTC_APP.elf" "$FIRMWARE_OUT/${APP_NAME}.elf"
 cp "$OUT/URTC_APP.bin" "$FIRMWARE_OUT/${APP_NAME}.bin"

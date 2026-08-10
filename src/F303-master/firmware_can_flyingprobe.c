@@ -35,6 +35,7 @@
 #include "firmware_common.h"
 #include "firmware_can_flyingprobe.h"
 #include "firmware_ads1115.h"
+#include "firmware_expansion_i2c.h"
 
 #define REG_APP_ADS_CONFIGURE 0x20
 #define REG_APP_ADS_TRIGGER   0x21

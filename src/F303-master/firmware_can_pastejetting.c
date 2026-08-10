@@ -18,6 +18,7 @@
 // =============================================================================
 #include "firmware_common.h"
 #include "firmware_can_pastejetting.h"
+#include "firmware_expansion_i2c.h"
 
 #define REG_APP_PWM_CONFIGURE 0x30
 #define REG_APP_PWM_PULSE     0x31

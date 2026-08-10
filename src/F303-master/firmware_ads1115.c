@@ -25,6 +25,7 @@
 // =============================================================================
 #include "firmware_common.h"
 #include "firmware_ads1115.h"
+#include "firmware_expansion_i2c.h"
 
 #define ADS1115_I2C_ADDR        0x48
 #define ADS1115_REG_CONVERSION  0x00
