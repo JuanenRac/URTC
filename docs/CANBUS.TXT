@@ -1216,6 +1216,27 @@ Data:
         or a wiring/termination problem specific to this board's own
         connection), not a fault in this board's own command handling.
 
+ID: 0x7FD [Master -> URTC Tool Head, handled by THIS bootloader only]
+Authorize downgrade for the current update attempt
+DLC: 4 bytes
+Data:
+  - rxData[0..3]: Magic payload 0xD0, 0x9E, 0x12, 0xAD
+Effect: bypasses HandleEndUpdate's own anti-rollback check (see 0x7F4
+        above) for THIS update attempt only - installing a validly-signed
+        image with a version older than what's already running is
+        normally rejected (verify-fail reason 0x05) specifically so a
+        version with a since-discovered vulnerability can't be replayed;
+        this command exists for the genuine, occasionally-needed case of
+        deliberately reverting to an older release. One-shot: reset to
+        unauthorized at the start of every fresh 0x7F1 (so it must be
+        sent again for each attempt that needs it, never carries over to
+        an unrelated later update), and consumed the moment 0x7F4's own
+        anti-rollback check runs, whether or not the version actually
+        turned out to need it. Sending this does NOT skip re-uploading
+        the firmware itself - the full image still goes through
+        0x7F1/0x7F2/0x7F7/0x7F4 exactly as any other update would, only
+        the version-ordering check is bypassed.
+
 =============================================================================
   0x095 -> Instant impact register (Touch probe - MAXIMUM PRIORITY)
   0x100 -> Status + ring LED control / OLED night mode (DLC:8)
@@ -1298,4 +1319,5 @@ Data:
   0x7FA -> Bootloader's own version, Bootloader-only, alongside 0x7F9 (DLC:3)
   0x7FB -> Query CAN error counters (App or Bootloader, whichever's running - DLC:any)
   0x7FC -> CAN error counter response, TEC + REC (App or Bootloader - DLC:2)
+  0x7FD -> Authorize downgrade for current update attempt, magic payload (Bootloader - DLC:4)
 =============================================================================

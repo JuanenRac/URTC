@@ -46,7 +46,7 @@ extern I2C_HandleTypeDef hi2c2;
 // of the partitioned bootloader source changes.
 #define BOOTLOADER_VERSION_MAJOR 1
 #define BOOTLOADER_VERSION_MINOR 1
-#define BOOTLOADER_VERSION_PATCH 3
+#define BOOTLOADER_VERSION_PATCH 4
 
 // -----------------------------------------------------------------------
 // HMAC-SHA256 signing key - shared between this bootloader and whatever
@@ -75,6 +75,7 @@ extern const uint8_t HMAC_KEY[32];
 #define CAN_ID_BOOTLOADER_VERSION_RESPONSE 0x7FA // sent ONLY by the bootloader, right alongside 0x7F9
 #define CAN_ID_QUERY_ERROR_COUNTERS 0x7FB // sent to either the application or this bootloader, whichever is currently running - same dual-answerable convention as CAN_ID_QUERY_VERSION
 #define CAN_ID_ERROR_COUNTERS_RESPONSE 0x7FC // sent BY whichever answered: DLC=2, TEC (Transmit Error Counter) + REC (Receive Error Counter), read directly from the CAN peripheral's own ESR register
+#define CAN_ID_AUTHORIZE_DOWNGRADE 0x7FD // sent to THIS bootloader: DLC=4, magic payload 0xD0,0x9E,0x12,0xAD - authorizes the CURRENT update attempt only to install an older version than what's running, bypassing HandleEndUpdate's own anti-rollback check just this once
 
 #define STATUS_LISTENING     0x01 // waiting for CAN_ID_START_UPDATE
 #define STATUS_ERASING       0x02 // erasing the backup slot

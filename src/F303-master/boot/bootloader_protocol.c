@@ -365,6 +365,13 @@ static uint32_t current_page_index = 0;
 uint8_t  update_in_progress = 0;
 uint32_t update_last_activity_tick = 0;
 uint8_t  update_failed = 0;
+// Set only by HandleAuthorizeDowngrade's own magic payload, reset to 0 at
+// the start of every fresh HandleStartUpdate (0x7F1) and consumed
+// unconditionally the moment HandleEndUpdate's own anti-rollback check
+// runs - one-shot per update attempt, so an authorization can never
+// silently carry over into a later, unrelated attempt. See
+// HandleAuthorizeDowngrade's own comment for why this exists at all.
+static uint8_t update_downgrade_authorized = 0;
 
 static uint8_t FlushPageBuffer(void) {
     uint32_t page_addr = BACKUP_APP_ADDR + (current_page_index * FLASH_PAGE_SIZE);
@@ -437,8 +444,25 @@ void HandleStartUpdate(uint8_t *data) {
     current_page_index = 0;
     update_in_progress = 1;
     update_failed = 0;
+    update_downgrade_authorized = 0; // every fresh update attempt starts unauthorized - see this flag's own declaration comment
     update_last_activity_tick = HAL_GetTick();
     CAN_SendStatus(STATUS_RECEIVING);
+}
+
+// Authorizes the CURRENT update attempt to install a version older than
+// what's already running, bypassing HandleEndUpdate's own anti-rollback
+// check just this once. Magic payload, same reasoning as
+// CAN_ID_ENTER_BOOTLOADER/CAN_ID_ERASE_FRAM's own magic payloads - a
+// deliberate downgrade is a real, occasionally-needed operation (reverting
+// a bad release), but it must never happen by accident the way a bare
+// "allow older version" flag with no confirmation could. Only meaningful
+// between HandleStartUpdate and HandleEndUpdate for the SAME attempt - see
+// update_downgrade_authorized's own declaration comment for the full
+// one-shot reasoning.
+void HandleAuthorizeDowngrade(uint8_t *data) {
+    if (data[0] == 0xD0 && data[1] == 0x9E && data[2] == 0x12 && data[3] == 0xAD) {
+        update_downgrade_authorized = 1;
+    }
 }
 
 void HandleHmacChunk(uint8_t *data) {
@@ -540,19 +564,22 @@ void HandleEndUpdate(uint8_t *data) {
     }
 
     // Anti-rollback: a cryptographically valid image is still rejected if
-    // it declares a version older than what's already running. Without
-    // this, a validly-signed-at-the-time image with a since-discovered
-    // vulnerability could be replayed indefinitely - HMAC alone only
-    // proves "signed with this project's key," not "not superseded."
-    // Only enforced when there's an existing valid version to roll back
-    // from - a blank board or one recovering from corrupted metadata has
-    // nothing to compare against, so any validly-signed image is accepted
-    // as it always was.
+    // it declares a version older than what's already running, UNLESS this
+    // exact attempt was explicitly authorized via HandleAuthorizeDowngrade
+    // (0x7FD's own magic payload) - see that function's own comment for why
+    // a deliberate downgrade needs its own explicit opt-in rather than a
+    // bare flag. Without this check at all, a validly-signed-at-the-time
+    // image with a since-discovered vulnerability could be replayed
+    // indefinitely - HMAC alone only proves "signed with this project's
+    // key," not "not superseded." Only enforced when there's an existing
+    // valid version to roll back from - a blank board or one recovering
+    // from corrupted metadata has nothing to compare against, so any
+    // validly-signed image is accepted as it always was.
     FirmwareMetadata_t current_meta;
     if (Metadata_Read(&current_meta) && current_meta.state == META_STATE_APP_VALID) {
         uint32_t current_version = (current_meta.version_major << 16) | current_meta.version_minor;
         uint32_t new_version = ((uint32_t)version_major << 16) | version_minor;
-        if (new_version < current_version) {
+        if (new_version < current_version && !update_downgrade_authorized) {
             CAN_SendVerifyFailReason(VERIFY_FAIL_REASON_ROLLBACK);
             update_in_progress = 0;
             update_failed = 1;
@@ -561,6 +588,11 @@ void HandleEndUpdate(uint8_t *data) {
             return;
         }
     }
+    // Consumed here regardless of whether the block above actually needed
+    // it (new_version could have been >= current_version, making the flag
+    // moot for this attempt) - one-shot per attempt either way, per this
+    // flag's own declaration comment.
+    update_downgrade_authorized = 0;
 
     // Backup slot is now fully verified: size matched, CRC32 matched, HMAC
     // matched, HardwareID was checked before a single byte was written.
