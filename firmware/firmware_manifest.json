@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-13T11:13:07Z",
+  "generated_at": "2026-08-13T11:34:17Z",
   "project": {
     "name": "URTC",
     "full_name": "Universal Robot Tool Controller",
@@ -23,25 +23,25 @@
       "version": {
         "major": 1,
         "minor": 1,
-        "patch": 4
+        "patch": 5
       },
-      "version_string": "1.1.4",
-      "version_code": 10104,
+      "version_string": "1.1.5",
+      "version_code": 10105,
       "flash_address": "0x08000000",
       "flash_region_max_bytes": 32768,
       "files": {
         "bin": {
           "filename": "URTC_BOOTLOADER.bin",
-          "size_bytes": 17092,
-          "crc32": "0xB20F11B3"
+          "size_bytes": 17760,
+          "crc32": "0xC19EAF6E"
         },
         "hex": {
           "filename": "URTC_BOOTLOADER.hex",
-          "size_bytes": 48171
+          "size_bytes": 50053
         },
         "elf": {
           "filename": "URTC_BOOTLOADER.elf",
-          "size_bytes": 144176
+          "size_bytes": 144244
         }
       }
     },

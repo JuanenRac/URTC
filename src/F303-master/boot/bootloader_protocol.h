@@ -31,6 +31,7 @@ void CAN_SendHeartbeat(uint8_t status, uint8_t progress_percent);
 void HandleVersionQuery(void);
 void HandleErrorCounterQuery(void);
 void HandleAuthorizeDowngrade(uint8_t *data);
+void HandleReadbackStart(void);
 
 // Checks the main slot's metadata (size/CRC32/HMAC/HardwareID) against its
 // actual flash contents. Also handles first-boot bootstrapping: a blank

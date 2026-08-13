@@ -148,6 +148,8 @@ int main(void) {
                     HandleVersionQuery();
                 } else if (rxHeader.StdId == CAN_ID_QUERY_ERROR_COUNTERS) {
                     HandleErrorCounterQuery();
+                } else if (rxHeader.StdId == CAN_ID_READBACK) {
+                    HandleReadbackStart();
                 }
             }
         }
@@ -192,6 +194,8 @@ int main(void) {
                     HandleErrorCounterQuery();
                 } else if (rxHeader.StdId == CAN_ID_AUTHORIZE_DOWNGRADE && rxHeader.DLC == 4) {
                     HandleAuthorizeDowngrade(rxData);
+                } else if (rxHeader.StdId == CAN_ID_READBACK) {
+                    HandleReadbackStart();
                 }
             }
         }

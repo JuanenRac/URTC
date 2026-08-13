@@ -16,6 +16,16 @@
 #include "firmware_common.h"
 #include "firmware_can_electromagnet.h"
 
+// Deliberately no communication-loss watchdog here, unlike every other
+// actuator on this board (UV Curing, Hot Air Rework, laser, drill, layer
+// fan, etc. all cut power if their own command stops arriving). For THIS
+// tool, staying energized is the safer failure mode, not the more
+// dangerous one: it's typically holding a ferromagnetic part in the air,
+// and de-energizing on a lost link would drop that part rather than
+// protect anything - the same reasoning a physical fail-safe brake or a
+// vacuum gripper's own check valve would use. Confirmed explicitly with
+// the project owner (not an oversight) - see mejoras_futuras.txt/
+// auditoria_historial.txt for the full reasoning if this needs revisiting.
 void Handle_CAN_Electromagnet(void) {
     if (rxHeader.StdId == 0x1B0 && rxHeader.DLC >= 1 && !boot_sequence_active) {
         // Any nonzero byte energizes the coil - not just 0x01 - so a

@@ -465,6 +465,106 @@ void HandleAuthorizeDowngrade(uint8_t *data) {
     }
 }
 
+// Blocks waiting for the host's own page-ack (CAN_ID_READBACK_PAGE_ACK)
+// confirming it safely received and stored the page just sent, refreshing
+// the watchdog throughout - same 3s-per-page window and refresh-while-
+// waiting reasoning as the write direction's own page-ACK wait. Returns 0
+// on timeout (host stopped listening, or the bus dropped every copy of
+// the ack) or a wrong page index (host desynced somehow) - either way the
+// caller abandons the transfer rather than sending more data nobody
+// confirmed wanting.
+static uint8_t WaitForReadbackPageAck(uint32_t page_index) {
+    uint32_t wait_start = HAL_GetTick();
+    while ((HAL_GetTick() - wait_start) < 3000) { // same unsigned-subtraction wraparound safety as every other tick comparison in this file
+        HAL_IWDG_Refresh(&hiwdg);
+        if (HAL_CAN_GetRxFifoFillLevel(&hcan, CAN_RX_FIFO0) > 0) {
+            CAN_RxHeaderTypeDef rxH;
+            uint8_t rxD[8];
+            if (HAL_CAN_GetRxMessage(&hcan, CAN_RX_FIFO0, &rxH, rxD) == HAL_OK) {
+                if (rxH.RTR == CAN_RTR_DATA && rxH.IDE == CAN_ID_STD &&
+                    rxH.StdId == CAN_ID_READBACK_PAGE_ACK && rxH.DLC == 4) {
+                    uint32_t acked = ((uint32_t)rxD[0] << 24) | ((uint32_t)rxD[1] << 16)
+                                    | ((uint32_t)rxD[2] << 8) | rxD[3];
+                    if (acked == page_index) return 1;
+                }
+            }
+        }
+    }
+    return 0;
+}
+
+// Reads the current MAIN slot back over CAN, unmodified - the CAN
+// equivalent of the Flasher's own "back up entire flash before erasing"
+// SWD feature, for the same reason: a real copy of what's currently
+// installed, worth having before deliberately overwriting it (a normal
+// update, or a CAN_ID_AUTHORIZE_DOWNGRADE-authorized one). Read-only -
+// never touches flash itself, so it's safe to call any time the
+// bootloader is idle. Ignored while an update is already in progress,
+// rather than interleaving with it.
+void HandleReadbackStart(void) {
+    if (update_in_progress) return;
+
+    FirmwareMetadata_t meta;
+    uint32_t total_size = 0;
+    if (Metadata_Read(&meta) && meta.state == META_STATE_APP_VALID) {
+        total_size = meta.size;
+    }
+
+    // First reply is always DLC=4 (the total byte count, 0 if there's
+    // nothing valid installed to back up) - every reply after this one is
+    // DLC=8 raw data, so the host tells them apart by DLC alone, no
+    // separate "here's how many bytes are coming" side-channel needed.
+    if (!CAN_WaitForFreeMailbox()) return;
+    {
+        CAN_TxHeaderTypeDef txH;
+        uint8_t txD[4] = {
+            (uint8_t)(total_size >> 24), (uint8_t)(total_size >> 16),
+            (uint8_t)(total_size >> 8), (uint8_t)(total_size)
+        };
+        uint32_t mb;
+        txH.StdId = CAN_ID_READBACK;
+        txH.IDE = CAN_ID_STD;
+        txH.RTR = CAN_RTR_DATA;
+        txH.DLC = 4;
+        txH.TransmitGlobalTime = DISABLE;
+        HAL_CAN_AddTxMessage(&hcan, &txH, txD, &mb);
+    }
+    if (total_size == 0) return;
+
+    uint32_t num_pages = (total_size + FLASH_PAGE_SIZE - 1) / FLASH_PAGE_SIZE;
+    uint32_t offset = 0;
+    for (uint32_t p = 0; p < num_pages; p++) {
+        uint32_t page_len = FLASH_PAGE_SIZE;
+        if (offset + page_len > total_size) page_len = total_size - offset;
+
+        for (uint32_t i = 0; i < page_len; i += 8) {
+            uint8_t chunk_len = (uint8_t)((page_len - i < 8) ? (page_len - i) : 8);
+            // CAN_WaitForFreeMailbox's own 50ms-of-retries-then-give-up
+            // already provides real backpressure here if the host (or the
+            // bus) can't keep up - no separate manual pacing delay needed
+            // between frames the way the Flasher's own upload direction
+            // adds one, since that pacing is about not overrunning the
+            // BOOTLOADER's own receive/flash-write pace, which doesn't
+            // apply to a read that never touches flash.
+            if (!CAN_WaitForFreeMailbox()) return;
+            CAN_TxHeaderTypeDef txH;
+            uint8_t txD[8] = {0};
+            memcpy(txD, (const void*)(MAIN_APP_ADDR + offset + i), chunk_len);
+            uint32_t mb;
+            txH.StdId = CAN_ID_READBACK;
+            txH.IDE = CAN_ID_STD;
+            txH.RTR = CAN_RTR_DATA;
+            txH.DLC = chunk_len;
+            txH.TransmitGlobalTime = DISABLE;
+            HAL_CAN_AddTxMessage(&hcan, &txH, txD, &mb);
+        }
+        offset += page_len;
+
+        if (!WaitForReadbackPageAck(p)) return;
+        OLED_DrawProgressBar_Boot((uint8_t)(((uint64_t)(p + 1) * 100) / num_pages));
+    }
+}
+
 void HandleHmacChunk(uint8_t *data) {
     if (!update_in_progress || update_failed) return;
     if (update_hmac_chunks_received >= 4) return; // already have all 32 bytes

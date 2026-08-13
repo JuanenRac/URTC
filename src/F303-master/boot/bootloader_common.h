@@ -46,7 +46,7 @@ extern I2C_HandleTypeDef hi2c2;
 // of the partitioned bootloader source changes.
 #define BOOTLOADER_VERSION_MAJOR 1
 #define BOOTLOADER_VERSION_MINOR 1
-#define BOOTLOADER_VERSION_PATCH 4
+#define BOOTLOADER_VERSION_PATCH 5
 
 // -----------------------------------------------------------------------
 // HMAC-SHA256 signing key - shared between this bootloader and whatever
@@ -76,6 +76,16 @@ extern const uint8_t HMAC_KEY[32];
 #define CAN_ID_QUERY_ERROR_COUNTERS 0x7FB // sent to either the application or this bootloader, whichever is currently running - same dual-answerable convention as CAN_ID_QUERY_VERSION
 #define CAN_ID_ERROR_COUNTERS_RESPONSE 0x7FC // sent BY whichever answered: DLC=2, TEC (Transmit Error Counter) + REC (Receive Error Counter), read directly from the CAN peripheral's own ESR register
 #define CAN_ID_AUTHORIZE_DOWNGRADE 0x7FD // sent to THIS bootloader: DLC=4, magic payload 0xD0,0x9E,0x12,0xAD - authorizes the CURRENT update attempt only to install an older version than what's running, bypassing HandleEndUpdate's own anti-rollback check just this once
+// CAN_ID_READBACK is used bidirectionally, distinguished by DLC - same
+// convention CAN_ID_STATUS already uses for its own DLC=1-vs-2 verify-fail
+// reason. Master->bootloader with any DLC starts the transfer; the very
+// first bootloader->master reply is DLC=4 (the total byte count, or 0 if
+// there's nothing valid to back up); every reply after that is DLC=8, raw
+// main-slot bytes, sequential from MAIN_APP_ADDR. This is the last 2 IDs
+// in the entire 11-bit standard CAN ID space (0x7FE/0x7FF) - nothing more
+// fits after these without extended (29-bit) IDs.
+#define CAN_ID_READBACK 0x7FE
+#define CAN_ID_READBACK_PAGE_ACK 0x7FF // sent to THIS bootloader after each 2048-byte page is safely received: DLC=4, big-endian page index - same big-endian-page-index convention as CAN_ID_PAGE_ACK, just the opposite direction (host acking a read instead of the bootloader acking a write)
 
 #define STATUS_LISTENING     0x01 // waiting for CAN_ID_START_UPDATE
 #define STATUS_ERASING       0x02 // erasing the backup slot

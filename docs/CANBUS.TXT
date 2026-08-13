@@ -654,6 +654,11 @@ Data:
                channel - an electromagnet has no use for a variable duty
                cycle the way this same physical pin's other use (the
                soldering iron's own bang-bang heater control) does.
+  Note: Deliberately no communication-loss watchdog, unlike every other
+        actuator on this board - staying energized is this tool's own
+        safer failure mode (a held part stays held), not the more
+        dangerous one, so a lost link intentionally does NOT release it.
+        Confirmed explicitly with the project owner, not an oversight.
 
 ID: 0x1C0 [Master -> URTC Tool Head]
 Spot Welder Head timed pulse
@@ -1237,6 +1242,41 @@ Effect: bypasses HandleEndUpdate's own anti-rollback check (see 0x7F4
         0x7F1/0x7F2/0x7F7/0x7F4 exactly as any other update would, only
         the version-ordering check is bypassed.
 
+ID: 0x7FE [Master -> URTC Tool Head to start; URTC Tool Head -> Master for
+every reply, handled by THIS bootloader only]
+Read back the main slot's own current contents
+DLC: any (request) / 4 bytes (first reply only) / 8 bytes (every reply
+after that)
+Data (first reply): big-endian total byte count currently installed
+        (from the stored metadata's own size field), or 0 if there's
+        nothing valid installed to back up. Distinguished from every
+        later reply purely by DLC (4 vs 8) - no separate "here's the
+        size" side-channel needed.
+Data (every reply after the first): raw bytes from the main slot,
+        sequential starting at its own base address, 8 bytes per frame.
+Effect: the CAN equivalent of the Flasher's own "back up entire flash
+        before erasing" SWD feature - reads the CURRENTLY INSTALLED
+        firmware back over the bus, unmodified, before deliberately
+        overwriting it (a normal update, or one authorized via 0x7FD
+        above). Read-only, never touches flash - safe to request any time
+        the bootloader is idle; ignored while an update is already in
+        progress. Paced by CAN_ID_READBACK_PAGE_ACK below: the bootloader
+        sends one 2048-byte page (256 frames), then waits up to 3s for
+        that exact page to be acked before sending the next one - the
+        transfer is abandoned (silently stops sending) if a page goes
+        unacked, the same way a stalled write-direction transfer would
+        eventually time out on the Flasher's own side instead.
+
+ID: 0x7FF [Master -> URTC Tool Head, handled by THIS bootloader only]
+Read-back page acknowledgement
+DLC: 4 bytes
+Data:
+  - rxData[0..3]: Big-endian page index being acknowledged (0-based) -
+        same big-endian-page-index convention as CAN_ID_PAGE_ACK, just
+        the opposite direction: here the HOST is confirming it safely
+        received and stored a page the bootloader sent, not the
+        bootloader confirming a page the host sent.
+
 =============================================================================
   0x095 -> Instant impact register (Touch probe - MAXIMUM PRIORITY)
   0x100 -> Status + ring LED control / OLED night mode (DLC:8)
@@ -1320,4 +1360,6 @@ Effect: bypasses HandleEndUpdate's own anti-rollback check (see 0x7F4
   0x7FB -> Query CAN error counters (App or Bootloader, whichever's running - DLC:any)
   0x7FC -> CAN error counter response, TEC + REC (App or Bootloader - DLC:2)
   0x7FD -> Authorize downgrade for current update attempt, magic payload (Bootloader - DLC:4)
+  0x7FE -> Read back main slot's current contents, size then raw bytes (Bootloader - DLC:any, 4 first reply, 8 after)
+  0x7FF -> Read-back page acknowledgement (Bootloader - DLC:4)
 =============================================================================
