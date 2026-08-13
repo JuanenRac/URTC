@@ -1,6 +1,6 @@
 // =============================================================================
 // URTC Firmware - CAN-to-I2C bridge to the expansion slave chip
-// (0x210-0x218 OTA relay, 0x220-0x221 application register access)
+// (0x210-0x219 OTA relay, 0x220-0x221 application register access)
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
 // GPL-3.0 - see LICENSE
 //
@@ -43,6 +43,7 @@
 #define REG_BOOT_END_UPDATE     0x04
 #define REG_BOOT_PROGRESS       0x05
 #define REG_BOOT_QUERY_VERSION  0x06
+#define REG_BOOT_VERIFY_FAIL_REASON 0x07
 #define REG_APP_ENTER_BOOTLOADER 0x02
 
 static uint8_t hmac_chunk_buf[32];
@@ -140,6 +141,15 @@ void Handle_CAN_SlaveBridge(void) {
         if (ExpansionI2C_SlaveReadRegister(REG_BOOT_QUERY_VERSION, version, 10)) {
             SendCanResponse(0x217, version, 8);
             SendCanResponse(0x218, &version[8], 2);
+        }
+
+    } else if (rxHeader.StdId == 0x219) {
+        // Verify-fail-reason query - only meaningful right after 0x215
+        // above reports STATUS_VERIFY_FAIL; same "any DLC request, 1 byte
+        // response" convention as 0x215/0x216.
+        uint8_t reason;
+        if (ExpansionI2C_SlaveReadRegister(REG_BOOT_VERIFY_FAIL_REASON, &reason, 1)) {
+            SendCanResponse(0x219, &reason, 1);
         }
 
     // ---- Application register access (advanced-board tools, e.g. Paste

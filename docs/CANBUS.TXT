@@ -821,6 +821,19 @@ Data:
         the same reason - the slave's 10-byte answer doesn't fit one
         CAN frame.
 
+ID: 0x219 [Master -> URTC Tool Head, or URTC Tool Head -> Master answering 0x219]
+Slave bootloader verify-fail-reason query
+DLC: any (request) / 1 byte (response)
+Data:
+  - txData[0]: The slave's own REG_VERIFY_FAIL_REASON byte
+               (slaveboot_common.h's own VERIFY_FAIL_REASON_* constants -
+               same values as this board's own CAN_ID_STATUS 0x7F5's
+               2nd byte) - only meaningful right after 0x215 above
+               reports STATUS_VERIFY_FAIL; stale (holds the previous
+               update's reason) until the next verification failure.
+               Same relay pattern as 0x215/0x216 - no response at all if
+               the I2C transaction itself fails.
+
 ID: 0x220 [Master -> URTC Tool Head]
 Write slave application register (generic)
 DLC: 2-8 bytes
@@ -1228,6 +1241,7 @@ Notes: this is bootloader_common.h's own version (BOOTLOADER_VERSION_MAJOR/MINOR
   0x216 -> Slave update progress (DLC:any, or 1 response)
   0x217 -> Slave bootloader version, part 1 (DLC:any, or 8 response)
   0x218 -> Slave bootloader version, part 2 (response only, DLC:2)
+  0x219 -> Slave bootloader verify-fail-reason (DLC:any, or 1 response)
   0x220 -> Write slave application register, generic (DLC:2-8)
   0x221 -> Read slave application register, generic (DLC:2, or up to 8 response)
   0x230 -> Local PWM config (Solder Paste Jetting - DLC:3)

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-13T06:52:44Z",
+  "generated_at": "2026-08-13T08:42:53Z",
   "project": {
     "name": "URTC",
     "full_name": "Universal Robot Tool Controller",
@@ -60,12 +60,12 @@
       "files": {
         "bin": {
           "filename": "URTC_V1.1_F303CC.bin",
-          "size_bytes": 69964,
-          "crc32": "0x8C4C745C"
+          "size_bytes": 70012,
+          "crc32": "0x2985DA8B"
         },
         "hex": {
           "filename": "URTC_V1.1_F303CC.hex",
-          "size_bytes": 196897
+          "size_bytes": 197032
         },
         "elf": {
           "filename": "URTC_V1.1_F303CC.elf",
