@@ -83,6 +83,32 @@ void Handle_CAN_GlobalCommands_PreErrorGate(void) {
             }
         }
 
+        // Error counter query (0x7FB) - read-only, same dual-answerable
+        // convention as 0x7F8 above (bootloader_protocol.c's own
+        // HandleErrorCounterQuery answers the same ID while the bootloader
+        // is the one running). Responds via 0x7FC: TEC/REC (Transmit/
+        // Receive Error Counter), read directly from the CAN peripheral's
+        // own ESR register (REC bits 31:24, TEC bits 23:16 - RM0316)
+        // rather than tracked in software, since the peripheral already
+        // maintains these per the CAN bus protocol's own fault-confinement
+        // rules.
+        if (rxHeader.StdId == 0x7FB) {
+            if (HAL_CAN_GetTxMailboxesFreeLevel(&hcan) > 0) {
+                uint32_t esr = hcan.Instance->ESR;
+                CAN_TxHeaderTypeDef txH;
+                uint8_t txD[2];
+                txD[0] = (uint8_t)((esr >> 16) & 0xFF); // TEC
+                txD[1] = (uint8_t)((esr >> 24) & 0xFF); // REC
+                txH.StdId = 0x7FC;
+                txH.IDE = CAN_ID_STD;
+                txH.RTR = CAN_RTR_DATA;
+                txH.DLC = 2;
+                txH.TransmitGlobalTime = DISABLE;
+                uint32_t mb;
+                HAL_CAN_AddTxMessage(&hcan, &txH, txD, &mb);
+            }
+        }
+
         // Active tool + quick state query (0x110) - read-only, no side
         // effects, same reasoning as 0x7F8 above: a host has no other way
         // to learn which of the 12 tool profiles this board is jumpered

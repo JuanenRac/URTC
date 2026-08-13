@@ -143,6 +143,31 @@ void HandleVersionQuery(void) {
     }
 }
 
+// Error counter query (0x7FB) response, sent as 0x7FC - shared between
+// both listening loops below, same dual-answerable convention as
+// HandleVersionQuery above. TEC/REC (Transmit/Receive Error Counter) are
+// read directly from the CAN peripheral's own ESR register (REC in bits
+// 31:24, TEC in bits 23:16 - RM0316) rather than tracked in software,
+// since the peripheral already maintains these per the CAN bus protocol's
+// own fault-confinement rules. Useful for telling "the bus itself has a
+// wiring/termination/bitrate problem" (climbing TEC/REC) apart from "this
+// bootloader's own logic is stuck" during a slow or failed update.
+void HandleErrorCounterQuery(void) {
+    uint32_t esr = hcan.Instance->ESR;
+    uint8_t tec = (uint8_t)((esr >> 16) & 0xFF);
+    uint8_t rec = (uint8_t)((esr >> 24) & 0xFF);
+    if (!CAN_WaitForFreeMailbox()) return;
+    CAN_TxHeaderTypeDef txH;
+    uint8_t txD[2] = {tec, rec};
+    uint32_t mb;
+    txH.StdId = CAN_ID_ERROR_COUNTERS_RESPONSE;
+    txH.IDE = CAN_ID_STD;
+    txH.RTR = CAN_RTR_DATA;
+    txH.DLC = 2;
+    txH.TransmitGlobalTime = DISABLE;
+    HAL_CAN_AddTxMessage(&hcan, &txH, txD, &mb);
+}
+
 // -----------------------------------------------------------------------
 // Validates the MAIN slot and, if a copy from backup was left unfinished
 // by an interrupted previous session, resumes and completes it before

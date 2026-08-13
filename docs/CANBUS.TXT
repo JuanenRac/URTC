@@ -1006,9 +1006,10 @@ a bootloader-protocol frame with a normal command, or vice versa. 0x7F0 is
 handled by the RUNNING APPLICATION; 0x7F1-0x7F4/0x7F7 are handled by the
 BOOTLOADER (which only runs before the application, or after 0x7F0 resets
 into it) - the application and bootloader never both listen for the same
-ID, with one deliberate exception: 0x7F8 (query version) is answered by
-whichever one is currently running, so a host can check what's installed
-without needing to trigger a reset first.
+ID, with 2 deliberate exceptions: 0x7F8 (query version) and 0x7FB (query
+CAN error counters) are both answered by whichever one is currently
+running, so a host can check what's installed - or diagnose the bus
+itself - without needing to trigger a reset first.
 
 Golden-image update model: every update is written into a backup/staging
 flash slot first, never into the slot currently running. Only after it
@@ -1188,6 +1189,33 @@ Notes: this is bootloader_common.h's own version (BOOTLOADER_VERSION_MAJOR/MINOR
        after 0x7F0, or on a fresh boot before the application has been
        jumped to).
 
+ID: 0x7FB [Master -> URTC Tool Head, handled by BOTH the application AND
+the bootloader, whichever is currently running]
+Query CAN error counters
+DLC: any
+Effect: whichever side is currently running answers with 0x7FC. Same
+        dual-answerable convention as 0x7F8/0x7F9 above - useful for
+        telling a genuine bus problem (wiring, termination, bitrate
+        mismatch) apart from an application/bootloader-side issue during
+        a slow or stuck update, without needing to know in advance which
+        side is currently running.
+
+ID: 0x7FC [URTC Tool Head -> Master, sent by whichever side answered 0x7FB]
+CAN error counter response
+DLC: 2 bytes
+Data:
+  - txData[0]: TEC (Transmit Error Counter), 0-255
+  - txData[1]: REC (Receive Error Counter), 0-255
+  Note: Read directly from the CAN peripheral's own ESR register (REC in
+        bits 31:24, TEC in bits 23:16) rather than tracked in software -
+        the peripheral already maintains these per the CAN bus protocol's
+        own fault-confinement rules (error-active below 128, error-passive
+        128-255, bus-off at TEC>255 specifically). A steadily climbing TEC
+        with no corresponding REC growth typically points at this board's
+        own transmissions going unacknowledged (no other node on the bus,
+        or a wiring/termination problem specific to this board's own
+        connection), not a fault in this board's own command handling.
+
 =============================================================================
   0x095 -> Instant impact register (Touch probe - MAXIMUM PRIORITY)
   0x100 -> Status + ring LED control / OLED night mode (DLC:8)
@@ -1268,4 +1296,6 @@ Notes: this is bootloader_common.h's own version (BOOTLOADER_VERSION_MAJOR/MINOR
   0x7F8 -> Query version (App or Bootloader, whichever's running - DLC:any)
   0x7F9 -> Version response (App or Bootloader - DLC:8)
   0x7FA -> Bootloader's own version, Bootloader-only, alongside 0x7F9 (DLC:3)
+  0x7FB -> Query CAN error counters (App or Bootloader, whichever's running - DLC:any)
+  0x7FC -> CAN error counter response, TEC + REC (App or Bootloader - DLC:2)
 =============================================================================

@@ -146,6 +146,8 @@ int main(void) {
                     break;
                 } else if (rxHeader.StdId == CAN_ID_QUERY_VERSION) {
                     HandleVersionQuery();
+                } else if (rxHeader.StdId == CAN_ID_QUERY_ERROR_COUNTERS) {
+                    HandleErrorCounterQuery();
                 }
             }
         }
@@ -186,6 +188,8 @@ int main(void) {
                     HandleEndUpdate(rxData);
                 } else if (rxHeader.StdId == CAN_ID_QUERY_VERSION) {
                     HandleVersionQuery();
+                } else if (rxHeader.StdId == CAN_ID_QUERY_ERROR_COUNTERS) {
+                    HandleErrorCounterQuery();
                 }
             }
         }
