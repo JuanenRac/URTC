@@ -63,7 +63,7 @@ static void MX_GPIO_Init(void) {
     HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 }
 
-static void MX_I2C1_Init_Slave(void) {
+static uint8_t MX_I2C1_Init_Slave(void) {
     hi2c1.Instance = I2C1;
     hi2c1.Init.Timing = 0x2000090E; // same computed value as the bootloader's own I2C1 init - identical PCLK1 (32MHz), identical target (100kHz standard mode)
     hi2c1.Init.OwnAddress1 = (I2C_SLAVE_ADDRESS << 1);
@@ -72,13 +72,14 @@ static void MX_I2C1_Init_Slave(void) {
     hi2c1.Init.OwnAddress2 = 0;
     hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
     hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE; // same reasoning as the bootloader - register handlers here (particularly anything touching the local sensor bus) aren't necessarily instant
-    HAL_I2C_Init(&hi2c1);
+    if (HAL_I2C_Init(&hi2c1) != HAL_OK) return 0;
 
     __HAL_RCC_I2C1_CLK_ENABLE();
     HAL_NVIC_SetPriority(I2C1_EV_IRQn, 1, 0);
     HAL_NVIC_EnableIRQ(I2C1_EV_IRQn);
     HAL_NVIC_SetPriority(I2C1_ER_IRQn, 1, 0);
     HAL_NVIC_EnableIRQ(I2C1_ER_IRQn);
+    return 1;
 }
 
 static void MX_I2C2_Init_Master(void) {
@@ -120,7 +121,17 @@ int main(void) {
     SystemClock_Config();
     MX_GPIO_Init();
     MX_IWDG_Init();
-    MX_I2C1_Init_Slave();
+    if (!MX_I2C1_Init_Slave()) {
+        // I2C1 is this chip's only link to the main board - if it fails to
+        // initialize (bad timing config, peripheral fault), continuing
+        // into a half-configured listen loop would leave it silently
+        // deaf to the link bus with no diagnostic. Refusing to refresh
+        // the IWDG here lets it force a full reset instead (~0.8s, same
+        // Prescaler/Reload as configured above), retrying the whole init
+        // sequence fresh - the same low-risk, self-retrying reasoning
+        // already established for CAN bus-off recovery on the main board.
+        while (1);
+    }
     MX_I2C2_Init_Master();
     PWM_Init();
     Sensors_Init();
@@ -129,6 +140,18 @@ int main(void) {
     while (1) {
         HAL_IWDG_Refresh(&hiwdg);
         PWM_Tick();
+
+        // Link-comms-loss failsafe: PWM_Tick above only ever auto-stops a
+        // timed pulse (duration_ms>0) counting down to 0 - a continuous
+        // pulse (duration_ms=0, used by spot-welder/ultrasonic-transducer
+        // tools) has no such countdown and would otherwise keep energizing
+        // its output forever if the main board crashes or the link cable
+        // is unplugged mid-pulse. A no-op on any channel that isn't
+        // currently running, so calling it unconditionally here is safe.
+        if (HAL_GetTick() - i2c_link_last_activity_tick > 1000) {
+            PWM_StopAll();
+        }
+
         HAL_Delay(1);
     }
 }

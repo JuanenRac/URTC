@@ -682,11 +682,21 @@ void Render_ToolScreen(void) {
                 tp += fmt_uint(txt+tp, steps_display, 5);
                 txt[tp] = 0;
                 OLED_PrintStr(5, 5, txt);
-                uint8_t pct = (steps_total_snapshot > 0)
-                    ? 100 - (uint8_t)(((uint64_t)steps_rem_snapshot * 100) / steps_total_snapshot)
-                    : 0; // defensive: steps_total_snapshot and steps_rem_snapshot are only ever
-                         // set together by the same command handler, so this shouldn't be
-                         // reachable, but a zero-cost guard removes any doubt rather than relying on that.
+                uint8_t pct;
+                if (steps_total_snapshot > 0) {
+                    // Clamped to [0,100] before the subtraction below, not
+                    // just after - steps_total_snapshot and steps_rem_snapshot
+                    // are only ever set together by the same command handler,
+                    // so steps_rem_snapshot shouldn't exceed steps_total_snapshot,
+                    // but clamping the raw fraction first (rather than trusting
+                    // that invariant) avoids the uint8_t underflow that
+                    // "100 - (fraction > 100)" would otherwise produce.
+                    uint64_t frac = ((uint64_t)steps_rem_snapshot * 100) / steps_total_snapshot;
+                    if (frac > 100) frac = 100;
+                    pct = 100 - (uint8_t)frac;
+                } else {
+                    pct = 0;
+                }
                 OLED_DrawHorizontalBar(7, 5, 85, pct);
             } else {
                 OLED_PrintStr(5, 5, "STATUS: READY");

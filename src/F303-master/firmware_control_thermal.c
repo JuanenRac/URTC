@@ -81,12 +81,20 @@ void Control_SolderingIron_PID(void) {
     // actually help either way; a real fix needs an independent hardware
     // cutoff downstream of this GPIO, which this alone can't provide.
     static uint8_t heater_on = 0;
+    // t12_off_timer_armed, not t12_pwm_off_since==0, is what distinguishes
+    // "timer not yet started" from "started right at a HAL_GetTick() value
+    // of 0" - the tick counter legitimately reads 0 both right at boot and
+    // again every ~49.7 days when the 32-bit millisecond counter wraps, and
+    // either would otherwise fail to arm this stuck-heater detector for
+    // that one cycle.
+    static uint8_t t12_off_timer_armed = 0;
     static uint32_t t12_pwm_off_since = 0;
     static uint16_t t12_temp_at_off = 0;
     if (heater_on) {
-        t12_pwm_off_since = 0;
+        t12_off_timer_armed = 0;
     } else {
-        if (t12_pwm_off_since == 0) {
+        if (!t12_off_timer_armed) {
+            t12_off_timer_armed = 1;
             t12_pwm_off_since = HAL_GetTick();
             t12_temp_at_off = current_temperature;
         } else if (HAL_GetTick() - t12_pwm_off_since > 3000 &&
@@ -208,12 +216,17 @@ void Control_3D_Hotend_PID(void) {
     // Stuck-heater detection - see the identical check in
     // Control_SolderingIron_PID for the full reasoning; same failure mode,
     // same GPIO (T12_PWM_PIN is shared between these two heater tools).
+    // hotend_off_timer_armed, not hotend_pwm_off_since==0 - see
+    // t12_off_timer_armed's own comment in Control_SolderingIron_PID for
+    // why this can't just use the tick value itself as its own sentinel.
+    static uint8_t hotend_off_timer_armed = 0;
     static uint32_t hotend_pwm_off_since = 0;
     static uint16_t hotend_temp_at_off = 0;
     if (hotend_heater_on) {
-        hotend_pwm_off_since = 0;
+        hotend_off_timer_armed = 0;
     } else {
-        if (hotend_pwm_off_since == 0) {
+        if (!hotend_off_timer_armed) {
+            hotend_off_timer_armed = 1;
             hotend_pwm_off_since = HAL_GetTick();
             hotend_temp_at_off = current_temperature;
         } else if (HAL_GetTick() - hotend_pwm_off_since > 3000 &&

@@ -525,8 +525,8 @@ Data:
 ID: 0x145 [URTC Tool Head -> Master] (Automatic telemetry every 150ms)
 DLC: 3 bytes
 Data:
-  - txData[0]: 12-bit analog ADC reading (PB0/Channel 8) - High byte (MSB) [BIG-ENDIAN]
-  - txData[1]: 12-bit analog ADC reading (PB0/Channel 8) - Low byte (LSB)
+  - txData[0]: 12-bit analog ADC reading (PB0/Channel 11) - High byte (MSB) [BIG-ENDIAN]
+  - txData[1]: 12-bit analog ADC reading (PB0/Channel 11) - Low byte (LSB)
   - txData[2]: LM393 digital output state (PB3 - Pin 24)
                0x01 = Object detected / Part picked up
                0x00 = Empty / No reading
@@ -616,8 +616,8 @@ Data:
 ID: 0x175 [URTC Tool Head -> Master] -> Thermal Telemetry (every 150ms)
 DLC: 2 bytes
 Data:
-  - txData[0]: Current hotend temperature (ADC Channel 8 on PB0) - High byte (MSB) [BIG-ENDIAN]
-  - txData[1]: Current hotend temperature (ADC Channel 8 on PB0) - Low byte (LSB)
+  - txData[0]: Current hotend temperature (ADC Channel 11 on PB0) - High byte (MSB) [BIG-ENDIAN]
+  - txData[1]: Current hotend temperature (ADC Channel 11 on PB0) - Low byte (LSB)
 
 ID: 0x177 [URTC Tool Head -> Master] -> Layer Fan RPM Telemetry (every 150ms)
 DLC: 2 bytes
@@ -660,7 +660,8 @@ Spot Welder Head timed pulse
 DLC: 3 bytes
 Data:
   - rxData[0]: 0x01 fires a pulse, any other value is ignored
-  - rxData[1..2]: Pulse duration in milliseconds (uint16_t) [BIG-ENDIAN]
+  - rxData[1..2]: Pulse duration in milliseconds (uint16_t) [BIG-ENDIAN],
+        clamped to 2000ms maximum
   Note: Refuses to fire unless the contact sensor (TCRT_D0_DIG_PIN, the
         same CONN_SEN digital input shared with the vacuum pickup's own
         comparator) reads HIGH first - "ensure pressure before firing"
@@ -719,7 +720,8 @@ Ultrasonic Welder/Packaging Sealer timed pulse
 DLC: 3 bytes
 Data:
   - rxData[0]: 0x01 fires a pulse, any other value is ignored
-  - rxData[1..2]: Pulse duration in milliseconds (uint16_t) [BIG-ENDIAN]
+  - rxData[1..2]: Pulse duration in milliseconds (uint16_t) [BIG-ENDIAN],
+        clamped to 2000ms maximum
   Note: Same shared pulse mechanism as 0x1C0 above, minus the contact-
         sensor gate - this tool's own design brief doesn't call for one
         the way the Spot Welder's does.
@@ -1196,7 +1198,7 @@ Notes: this is bootloader_common.h's own version (BOOTLOADER_VERSION_MAJOR/MINOR
   --- Per-tool commands (see dedicated sections above) ---
   0x120 -> Stepper motor control (Dispensers, Screwdriver, Grippers - DLC:5)
   0x130 -> T12 setpoint temperature (Soldering iron - DLC:2)
-  0x135 -> T12 thermal telemetry + endstop (Soldering iron - DLC:3)
+  0x135 -> T12 thermal telemetry (Soldering iron - DLC:2)
   0x140 -> BL4260 speed and direction control (Smart drill - DLC:2)
   0x145 -> ADC telemetry / Digital input (Vacuum pickup - DLC:3)
   0x147 -> Actual RPM telemetry + endstop, uint16_t (Drill - DLC:3)

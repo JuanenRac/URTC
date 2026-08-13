@@ -108,7 +108,11 @@ void MLX90642_Direct_GetCalibratedChunk(uint8_t chunk_index, uint8_t out[32]) {
         // reading REG_MLX_CALIBRATED_CHUNK never needs to know which
         // sensor variant answered it.
         int32_t rescaled = ((int32_t)mlx90642_pixval[base+i] * MLX_TEMP_SCALE) / 50;
-        int16_t v = (int16_t)rescaled;
+        // Saturate rather than narrow-cast directly - same reasoning as
+        // the MLX90640/90641 drivers' own equivalent fix: a pixel above
+        // ~327.67C would otherwise silently wrap instead of reporting a
+        // real, if clamped, reading.
+        int16_t v = (rescaled > 32767) ? 32767 : (rescaled < -32768) ? -32768 : (int16_t)rescaled;
         out[i*2]   = (uint8_t)(((uint16_t)v) >> 8);
         out[i*2+1] = (uint8_t)(((uint16_t)v) & 0xFF);
     }

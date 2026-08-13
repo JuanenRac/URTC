@@ -28,6 +28,7 @@ static uint8_t rx_buffer[8]; // largest real write is 4 bytes (1 register + 3 pa
 static uint8_t tx_buffer[32]; // largest real read is 32 bytes (REG_MLX_RAW_CHUNK/REG_MLX_CALIBRATED_CHUNK)
 static uint8_t pending_read_register = 0xFF;
 static uint8_t pending_mlx_chunk_index = 0;
+volatile uint32_t i2c_link_last_activity_tick = 0;
 
 void I2CLink_Init(void) {
     HAL_I2C_EnableListen_IT(&hi2c1);
@@ -92,6 +93,7 @@ void HAL_I2C_AddrCallback(I2C_HandleTypeDef *hi2c, uint8_t TransferDirection, ui
 void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef *hi2c) {
     uint32_t bytes_received = sizeof(rx_buffer) - hi2c->XferCount;
     if (bytes_received == 0) return;
+    i2c_link_last_activity_tick = HAL_GetTick();
 
     uint8_t reg = rx_buffer[0];
 
@@ -135,10 +137,21 @@ void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef *hi2c) {
                 // resetting, since a continuous-mode pulse (duration_ms=0)
                 // would otherwise keep driving its GPIO right up until the
                 // reset actually takes effect.
-                for (uint8_t ch = 0; ch < PWM_CHANNEL_COUNT; ch++) {
-                    PWM_Stop(ch);
-                }
-                HAL_Delay(5); // let the stop above settle before resetting, same order-of-operations reasoning as the main board's own ~5ms settle wait
+                PWM_StopAll();
+                // A plain cycle-counted busy-wait, not HAL_Delay(5) - this
+                // callback runs inside the I2C1 event ISR (priority 1,0 per
+                // slave_main.c), and HAL_Delay only advances by way of the
+                // SysTick ISR, which HAL_Init leaves at its default lowest
+                // priority and therefore can never preempt an
+                // already-running I2C1 ISR to actually increment the tick.
+                // HAL_Delay(5) here would never return, and the chip would
+                // only recover ~0.8s later via the IWDG forcing a reset
+                // instead of this intended clean one. ~320000 iterations
+                // at 64MHz (see slave_main.c's own SystemClock_Config)
+                // matches this project's existing settle-loop convention
+                // (firmware_control_thermal.c's own ~640-iteration/10us
+                // busy-wait on the main board), scaled up to ~5ms.
+                for (volatile uint32_t settle = 0; settle < 320000UL; settle++);
                 NVIC_SystemReset();
                 // never reached
             }

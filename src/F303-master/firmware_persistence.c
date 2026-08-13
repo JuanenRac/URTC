@@ -76,6 +76,8 @@ void SavedState_Load(void) {
     expansion_board_type = s.expansion_board_type; // passive config, not an actuator setpoint - safe to restore directly like the settings above
     free_tool_selection = s.free_tool_selection;    // same reasoning - passive config, not an actuator setpoint
     device_serial_number = s.device_serial_number;  // same reasoning - passive config, not an actuator setpoint
+    mlx_sensor_variant = s.mlx_sensor_variant;      // same reasoning - one-time hardware config, not an actuator setpoint
+    solder_spool_position = s.solder_spool_position; // real physical state, not a per-tool setpoint - restored directly like the settings above, not gated behind recovered_state
 }
 
 // Called every main-loop iteration. Cheap when nothing's changed (just a
@@ -128,6 +130,8 @@ void SavedState_MaybeSave(void) {
     s.expansion_board_type = expansion_board_type;
     s.free_tool_selection = free_tool_selection;
     s.device_serial_number = device_serial_number;
+    s.mlx_sensor_variant = mlx_sensor_variant;
+    s.solder_spool_position = solder_spool_position;
     __enable_irq();
     s.checksum = SavedState_Checksum(&s);
 

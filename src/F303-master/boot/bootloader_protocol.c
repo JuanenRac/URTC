@@ -216,6 +216,18 @@ uint8_t ApplicationIsValid(void) {
         // against the KEY, not against this adopted baseline.
     }
 
+    // Validated before anything below reads meta.size or meta.hardware_id,
+    // including the COPY_PENDING resume branch just below - the metadata
+    // page's own fields are written in ascending address order
+    // (Flash_WriteVerified), and only magic is checked by Metadata_Read, so
+    // a power loss between the magic+state halfwords committing and the
+    // hardware_id/size halfwords committing leaves state==COPY_PENDING with
+    // hardware_id/size still reading as erased flash (0xFFFFFFFF). Gating
+    // here means that torn-write case is caught before Flash_CopyRegion
+    // ever sees an unbounded size, rather than after.
+    if (meta.hardware_id != THIS_HARDWARE_ID) return 0;
+    if (meta.size == 0 || meta.size > APP_MAX_SIZE) return 0;
+
     if (meta.state == META_STATE_COPY_PENDING) {
         // Previous session was interrupted mid-copy. Backup was never
         // touched during that copy, so it's still exactly what it was when
@@ -229,9 +241,6 @@ uint8_t ApplicationIsValid(void) {
         if (!Metadata_EraseAndWrite(&done)) return 0;
         meta = done;
     }
-
-    if (meta.hardware_id != THIS_HARDWARE_ID) return 0;
-    if (meta.size == 0 || meta.size > APP_MAX_SIZE) return 0;
 
     uint32_t crc = 0xFFFFFFFFUL;
     crc = CRC32_Update(crc, (const uint8_t*)MAIN_APP_ADDR, meta.size);
@@ -436,6 +445,7 @@ void HandleData(uint8_t *data, uint32_t dlc) {
             if (!FlushPageBuffer()) {
                 update_running_crc = CRC32_Update(update_running_crc, data, i + 1);
                 CAN_SendStatus(STATUS_ERROR);
+                update_in_progress = 0;
                 update_failed = 1;
                 OLED_ClearAll_Boot();
                 OLED_PrintStr2x_Boot(2, 4, "ERROR");
@@ -453,6 +463,7 @@ void HandleEndUpdate(uint8_t *data) {
     if (page_buffer_fill > 0) {
         if (!FlushPageBuffer()) {
             CAN_SendStatus(STATUS_ERROR);
+            update_in_progress = 0;
             update_failed = 1;
             OLED_ClearAll_Boot();
             OLED_PrintStr2x_Boot(2, 4, "ERROR");

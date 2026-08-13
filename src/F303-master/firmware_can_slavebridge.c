@@ -73,6 +73,13 @@ void Handle_CAN_SlaveBridge(void) {
         ExpansionI2C_SlaveWriteRegister(REG_APP_ENTER_BOOTLOADER, rxData, 4);
 
     } else if (rxHeader.StdId == 0x211 && rxHeader.DLC == 8) {
+        // Resets any partial accumulation left behind by an aborted/retried
+        // sequence (bus glitch, Flasher restart) before this update's own
+        // real 0x212 chunks start landing - without this, stale bytes from
+        // a previous, never-completed attempt could still occupy the tail
+        // of hmac_chunk_buf when a new sequence only sends fewer than 4
+        // fresh chunks before something re-triggers completion.
+        hmac_chunks_received = 0;
         ExpansionI2C_SlaveWriteRegister(REG_BOOT_START_UPDATE, rxData, 8);
 
     } else if (rxHeader.StdId == 0x212 && rxHeader.DLC == 8) {

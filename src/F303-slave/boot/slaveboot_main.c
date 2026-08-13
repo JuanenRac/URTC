@@ -153,6 +153,10 @@ void HAL_I2C_AddrCallback(I2C_HandleTypeDef *hi2c, uint8_t TransferDirection, ui
                 BuildVersionQueryResponse(tx_buffer);
                 len = 10;
                 break;
+            case REG_VERIFY_FAIL_REASON:
+                tx_buffer[0] = verify_fail_reason;
+                len = 1;
+                break;
             default:
                 // An unrecognized pending register (protocol error on the
                 // master's side, or genuinely nothing set yet) gets
@@ -239,5 +243,21 @@ int main(void) {
     while (1) {
         HAL_IWDG_Refresh(&hiwdg);
         HAL_Delay(50);
+
+        // Without this, an update interrupted mid-transfer (link cable
+        // unplugged, main board crashed/reset before REG_END_UPDATE, etc.)
+        // left this chip waiting for more REG_DATA forever - the backup
+        // slot flash was already erased by HandleStartUpdate, so there was
+        // nothing to fall back to, and the only way out was a manual power
+        // cycle. Same 10s-of-silence-during-an-active-transfer abort as the
+        // main board's own bootloader_main.c - the main slot was never
+        // touched by any of this, so nothing is at risk, and the main
+        // board can just retry the whole update.
+        if (update_in_progress && !update_failed &&
+            (HAL_GetTick() - update_last_activity_tick > 10000)) {
+            update_in_progress = 0;
+            update_failed = 0;
+            current_status = STATUS_LISTENING;
+        }
     }
 }

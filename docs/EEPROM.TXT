@@ -8,8 +8,8 @@ LICENSE: This document is licensed under CC BY-SA 4.0 (https://creativecommons.o
 Everything URTC stores in its onboard FM24CL64B F-RAM (U8, I2C2, shares
 that bus with the OLED - see ../BOM/BOM.TXT and PINOUT.TXT's I2C2 block). One
 single packed struct, SavedState_t, written starting at address 0 - the
-chip holds 8192 bytes (64Kbit) total, and this struct currently uses 29
-bytes, leaving 8163 bytes of headroom for whatever gets added later.
+chip holds 8192 bytes (64Kbit) total, and this struct currently uses 34
+bytes, leaving 8158 bytes of headroom for whatever gets added later.
 
 For the load/save logic itself (when it reads, when it writes, what gets
 restored automatically vs. left for the host to decide) see

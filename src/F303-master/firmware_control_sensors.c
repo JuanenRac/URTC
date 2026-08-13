@@ -17,6 +17,14 @@ void Control_SensorTelemetry(void) {
     HAL_ADC_Start(&hadc);
     if(HAL_ADC_PollForConversion(&hadc, 2) == HAL_OK) {
         sensor_analog_reading = HAL_ADC_GetValue(&hadc);
+    } else {
+        // Same reasoning as the thermal ADC reads in
+        // firmware_control_thermal.c: a conversion that can't complete
+        // within this 2ms budget is untrustworthy, and leaving
+        // sensor_analog_reading frozen at its last value with no
+        // indication anything's wrong would let a vacuum-pickup/Flying
+        // Probe reading go stale silently.
+        system_error_flag = 1;
     }
     HAL_ADC_Stop(&hadc);
     

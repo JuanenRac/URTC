@@ -75,7 +75,7 @@ extern I2C_HandleTypeDef hi2c1;
 // main board's own version history.
 #define BOOTLOADER_VERSION_MAJOR 1
 #define BOOTLOADER_VERSION_MINOR 0
-#define BOOTLOADER_VERSION_PATCH 0
+#define BOOTLOADER_VERSION_PATCH 1
 
 // -----------------------------------------------------------------------
 // HMAC-SHA256 signing key - deliberately different from the main board's
@@ -110,6 +110,7 @@ extern const uint8_t HMAC_KEY[32];
 #define REG_END_UPDATE           0x04 // write-only, 8 bytes: big-endian CRC32 (4) + big-endian VersionMajor (2) + big-endian VersionMinor (2)
 #define REG_PROGRESS             0x05 // read-only, 1 byte: 0-100, 0xFF if not currently updating
 #define REG_QUERY_VERSION        0x06 // read-only, 10 bytes: byte0 (0=application,1=bootloader) + HardwareID (4) + version major (2) + version minor (2, all big-endian) - mirrors the main board's own 0x7F9 response fields, minus the CAN framing they need and this doesn't
+#define REG_VERIFY_FAIL_REASON   0x07 // read-only, 1 byte: one of the VERIFY_FAIL_REASON_* values below, valid to read once REG_STATUS reports STATUS_VERIFY_FAIL - same reason the main board's own CAN_ID_STATUS frame carries as its 2nd byte, exposed here as its own register instead since I2C reads don't share CAN's fixed-DLC framing
 
 #define STATUS_LISTENING     0x01 // waiting for REG_START_UPDATE
 #define STATUS_ERASING       0x02 // erasing the backup slot

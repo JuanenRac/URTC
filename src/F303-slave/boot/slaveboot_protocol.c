@@ -25,6 +25,9 @@
 
 // Defined here, read by the I2C1 interrupt handler's REG_STATUS read path.
 volatile uint8_t current_status = STATUS_LISTENING;
+// Defined here, read by the I2C1 interrupt handler's REG_VERIFY_FAIL_REASON
+// read path - see slaveboot_protocol.h's own note on when this is meaningful.
+volatile uint8_t verify_fail_reason = 0;
 
 void BuildVersionQueryResponse(uint8_t out[10]) {
     FirmwareMetadata_t meta;
@@ -88,6 +91,18 @@ uint8_t ApplicationIsValid(void) {
         return Metadata_EraseAndWrite(&adopted) ? 1 : 0;
     }
 
+    // Validated before anything below reads meta.size or meta.hardware_id,
+    // including the COPY_PENDING resume branch just below - same reasoning
+    // as the main board's own bootloader_protocol.c: the metadata page's
+    // fields are written in ascending address order, and only magic is
+    // checked by Metadata_Read, so a power loss between the magic+state
+    // halfwords committing and the hardware_id/size halfwords committing
+    // leaves state==COPY_PENDING with hardware_id/size still reading as
+    // erased flash (0xFFFFFFFF). Gating here means that torn-write case is
+    // caught before Flash_CopyRegion ever sees an unbounded size.
+    if (meta.hardware_id != THIS_HARDWARE_ID) return 0;
+    if (meta.size == 0 || meta.size > APP_MAX_SIZE) return 0;
+
     if (meta.state == META_STATE_COPY_PENDING) {
         current_status = STATUS_COPYING;
         if (!Flash_CopyRegion(MAIN_APP_ADDR, BACKUP_APP_ADDR, meta.size)) {
@@ -98,9 +113,6 @@ uint8_t ApplicationIsValid(void) {
         if (!Metadata_EraseAndWrite(&done)) return 0;
         meta = done;
     }
-
-    if (meta.hardware_id != THIS_HARDWARE_ID) return 0;
-    if (meta.size == 0 || meta.size > APP_MAX_SIZE) return 0;
 
     uint32_t crc = 0xFFFFFFFFUL;
     crc = CRC32_Update(crc, (const uint8_t*)MAIN_APP_ADDR, meta.size);
@@ -174,6 +186,7 @@ static uint32_t page_buffer_fill = 0;
 static uint32_t current_page_index = 0;
 uint8_t  update_in_progress = 0;
 uint8_t  update_failed = 0;
+uint32_t update_last_activity_tick = 0;
 
 static uint8_t FlushPageBuffer(void) {
     uint32_t page_addr = BACKUP_APP_ADDR + (current_page_index * FLASH_PAGE_SIZE);
@@ -203,6 +216,7 @@ void HandleStartUpdate(uint8_t *data) {
     }
     if (update_declared_hw_id != THIS_HARDWARE_ID) {
         current_status = STATUS_VERIFY_FAIL;
+        verify_fail_reason = VERIFY_FAIL_REASON_HARDWARE_ID;
         return;
     }
 
@@ -212,6 +226,12 @@ void HandleStartUpdate(uint8_t *data) {
         current_status = STATUS_ERROR;
         update_failed = 1;
         update_in_progress = 0;
+        // Restores the documented "not currently updating" sentinel
+        // (slaveboot_flash.h) rather than leaving whatever percentage a
+        // PRIOR update left behind - REG_STATUS and REG_PROGRESS are read
+        // independently, so without this a host could see STATUS_ERROR
+        // paired with a stale, misleadingly high leftover percentage.
+        update_progress_percent = 0xFF;
         return;
     }
 
@@ -224,6 +244,7 @@ void HandleStartUpdate(uint8_t *data) {
     update_in_progress = 1;
     update_failed = 0;
     update_progress_percent = 0;
+    update_last_activity_tick = HAL_GetTick();
     current_status = STATUS_RECEIVING;
 }
 
@@ -231,11 +252,13 @@ void HandleHmacExpected(uint8_t *data) {
     if (!update_in_progress || update_failed) return;
     memcpy(update_expected_hmac, data, 32); // REG_HMAC_EXPECTED is always exactly 32 bytes in one transaction - no chunking needed the way CAN's 8-byte frames required
     update_hmac_received = 1;
+    update_last_activity_tick = HAL_GetTick();
 }
 
 void HandleData(uint8_t *data, uint32_t len) {
     if (!update_in_progress || update_failed) return;
     if (len > 32) return; // REG_DATA's own documented ceiling - guards against a malformed/oversized transaction the same way the main board's own DLC>8 check does for CAN
+    update_last_activity_tick = HAL_GetTick();
 
     uint32_t i;
     for (i = 0; i < len; i++) {
@@ -247,6 +270,7 @@ void HandleData(uint8_t *data, uint32_t len) {
             if (!FlushPageBuffer()) {
                 update_running_crc = CRC32_Update(update_running_crc, data, i + 1);
                 current_status = STATUS_ERROR;
+                update_in_progress = 0;
                 update_failed = 1;
                 return;
             }
@@ -257,10 +281,12 @@ void HandleData(uint8_t *data, uint32_t len) {
 
 void HandleEndUpdate(uint8_t *data) {
     if (!update_in_progress || update_failed) return;
+    update_last_activity_tick = HAL_GetTick();
 
     if (page_buffer_fill > 0) {
         if (!FlushPageBuffer()) {
             current_status = STATUS_ERROR;
+            update_in_progress = 0;
             update_failed = 1;
             return;
         }
@@ -268,6 +294,7 @@ void HandleEndUpdate(uint8_t *data) {
 
     if (update_bytes_received != update_total_size || !update_hmac_received) {
         current_status = STATUS_VERIFY_FAIL;
+        verify_fail_reason = VERIFY_FAIL_REASON_INCOMPLETE;
         update_in_progress = 0;
         update_failed = 1;
         return;
@@ -283,6 +310,7 @@ void HandleEndUpdate(uint8_t *data) {
 
     if (actual_crc != expected_crc) {
         current_status = STATUS_VERIFY_FAIL;
+        verify_fail_reason = VERIFY_FAIL_REASON_CRC32;
         update_in_progress = 0;
         update_failed = 1;
         return;
@@ -292,6 +320,7 @@ void HandleEndUpdate(uint8_t *data) {
     hmac_sha256_flash_region(HMAC_KEY, 32, BACKUP_APP_ADDR, update_total_size, actual_hmac);
     if (!hmac_constant_time_compare(actual_hmac, update_expected_hmac, 32)) {
         current_status = STATUS_VERIFY_FAIL;
+        verify_fail_reason = VERIFY_FAIL_REASON_HMAC;
         update_in_progress = 0;
         update_failed = 1;
         return;
@@ -308,6 +337,7 @@ void HandleEndUpdate(uint8_t *data) {
         uint32_t new_version = ((uint32_t)version_major << 16) | version_minor;
         if (new_version < current_version) {
             current_status = STATUS_VERIFY_FAIL;
+            verify_fail_reason = VERIFY_FAIL_REASON_ROLLBACK;
             update_in_progress = 0;
             update_failed = 1;
             return;

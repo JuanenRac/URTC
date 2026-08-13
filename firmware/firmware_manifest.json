@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-10T09:18:08Z",
+  "generated_at": "2026-08-13T06:52:44Z",
   "project": {
     "name": "URTC",
     "full_name": "Universal Robot Tool Controller",
@@ -23,21 +23,21 @@
       "version": {
         "major": 1,
         "minor": 1,
-        "patch": 1
+        "patch": 2
       },
-      "version_string": "1.1.1",
-      "version_code": 10101,
+      "version_string": "1.1.2",
+      "version_code": 10102,
       "flash_address": "0x08000000",
       "flash_region_max_bytes": 32768,
       "files": {
         "bin": {
           "filename": "URTC_BOOTLOADER.bin",
-          "size_bytes": 16864,
-          "crc32": "0x43F53284"
+          "size_bytes": 16848,
+          "crc32": "0x4CB32171"
         },
         "hex": {
           "filename": "URTC_BOOTLOADER.hex",
-          "size_bytes": 47533
+          "size_bytes": 47488
         },
         "elf": {
           "filename": "URTC_BOOTLOADER.elf",
@@ -60,16 +60,16 @@
       "files": {
         "bin": {
           "filename": "URTC_V1.1_F303CC.bin",
-          "size_bytes": 69452,
-          "crc32": "0xD647371D"
+          "size_bytes": 69964,
+          "crc32": "0x8C4C745C"
         },
         "hex": {
           "filename": "URTC_V1.1_F303CC.hex",
-          "size_bytes": 195457
+          "size_bytes": 196897
         },
         "elf": {
           "filename": "URTC_V1.1_F303CC.elf",
-          "size_bytes": 167696
+          "size_bytes": 168172
         }
       }
     },
@@ -80,25 +80,25 @@
       "version": {
         "major": 1,
         "minor": 0,
-        "patch": 0
+        "patch": 1
       },
-      "version_string": "1.0.0",
-      "version_code": 10000,
+      "version_string": "1.0.1",
+      "version_code": 10001,
       "flash_address": "0x08000000",
       "flash_region_max_bytes": 18432,
       "files": {
         "bin": {
           "filename": "URTC_SLAVE_BOOTLOADER.bin",
-          "size_bytes": 12788,
-          "crc32": "0x4F3187C6"
+          "size_bytes": 12988,
+          "crc32": "0xE9918704"
         },
         "hex": {
           "filename": "URTC_SLAVE_BOOTLOADER.hex",
-          "size_bytes": 36066
+          "size_bytes": 36622
         },
         "elf": {
           "filename": "URTC_SLAVE_BOOTLOADER.elf",
-          "size_bytes": 143500
+          "size_bytes": 143644
         }
       }
     },
@@ -117,16 +117,16 @@
       "files": {
         "bin": {
           "filename": "URTC_SLAVE_APP.bin",
-          "size_bytes": 33336,
-          "crc32": "0x1934F299"
+          "size_bytes": 33696,
+          "crc32": "0x23319809"
         },
         "hex": {
           "filename": "URTC_SLAVE_APP.hex",
-          "size_bytes": 93854
+          "size_bytes": 94860
         },
         "elf": {
           "filename": "URTC_SLAVE_APP.elf",
-          "size_bytes": 86052
+          "size_bytes": 86204
         }
       }
     }

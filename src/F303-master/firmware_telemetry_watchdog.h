@@ -21,5 +21,7 @@ void Watchdog_Safety_SolderIron(void);
 void Watchdog_Safety_HotendHeater(void);
 void Watchdog_Safety_LayerFan(void);
 void Watchdog_Safety_HotendFan(void);
+void Watchdog_Safety_UVCuring(void);
+void Watchdog_Safety_HotAirBlower(void);
 
 #endif // FIRMWARE_TELEMETRY_WATCHDOG_H

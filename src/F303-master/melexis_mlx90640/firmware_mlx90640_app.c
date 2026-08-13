@@ -75,7 +75,13 @@ void MLX90640_Direct_GetCalibratedChunk(uint8_t chunk_index, uint8_t out[32]) {
     if (chunk_index >= 48) { for (int i = 0; i < 32; i++) out[i] = 0; return; }
     uint16_t base = chunk_index * 16;
     for (int i = 0; i < 16; i++) {
-        int16_t v = (int16_t)(mlx90640_calibrated_frame[base+i] * MLX_TEMP_SCALE);
+        // Saturate rather than narrow-cast directly - a pixel above
+        // ~327.67C (or below -327.68C) would otherwise silently wrap
+        // instead of reporting a real, if clamped, reading. Real range on
+        // this project's own boards: soldering iron reaches 445C, 3D
+        // printer hotend 300C, both realistic targets for this tool.
+        float scaled = mlx90640_calibrated_frame[base+i] * MLX_TEMP_SCALE;
+        int16_t v = (scaled > 32767.0f) ? 32767 : (scaled < -32768.0f) ? -32768 : (int16_t)scaled;
         out[i*2]   = (uint8_t)(((uint16_t)v) >> 8);
         out[i*2+1] = (uint8_t)(((uint16_t)v) & 0xFF);
     }

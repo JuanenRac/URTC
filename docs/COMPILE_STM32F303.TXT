@@ -272,9 +272,23 @@ byte content despite it being functionally 100% identical - this was
 hit and confirmed directly while verifying this document (same total
 byte count, ~40% of individual bytes different, purely from filename
 prefixes changing sort order). If two files from different source
-folders happen to share an exact filename (none do in this project
-today), that's the one case actually worth a real rename - just don't
-default to always prefixing everything.
+folders happen to share an exact filename, that's the one case actually
+worth a real rename - just don't default to always prefixing everything.
+This project actually has six such collisions today:
+firmware_mlx90640_app.c, firmware_mlx90640_transport.c,
+firmware_mlx90641_app.c, firmware_mlx90641_transport.c,
+firmware_mlx90642_app.c, and firmware_mlx90642_transport.c each exist
+both at the top level of src/F303-master/ (and src/F303-slave/) and
+duplicated inside their respective melexis_mlx9064x/ vendor folder.
+build_firmware.sh's own compile_dir() writes each object as
+$(basename file .c).o into a shared per-target OUT directory, and it
+compiles the top-level source directory first, then each melexis_*
+folder after - so for these six files, the melexis_mlx9064x/ copy's
+.o silently overwrites the top-level copy's .o before linking, and it
+is the melexis_mlx9064x/ copy that actually ends up in the built
+firmware. Anyone editing the top-level copy of these six files is
+editing dead code; edit the melexis_mlx9064x/ copy instead, or these
+duplicates should be removed and the top-level copy deleted.
 
 --- Main board bootloader ---
     arm-none-eabi-gcc -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard \

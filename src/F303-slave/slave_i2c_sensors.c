@@ -182,7 +182,13 @@ static void MLX90640_DoGetCalibratedChunk(uint8_t chunk_index, uint8_t out[32]) 
     if (chunk_index >= 48) { for (int i = 0; i < 32; i++) out[i] = 0; return; }
     uint16_t base = chunk_index * 16;
     for (int i = 0; i < 16; i++) {
-        int16_t v = (int16_t)(mlx90640_calibrated_frame[base+i] * MLX_TEMP_SCALE);
+        // Saturate rather than narrow-cast directly - a pixel above
+        // ~327.67C (or below -327.68C) would otherwise silently wrap
+        // instead of reporting a real, if clamped, reading - see the main
+        // board's own direct driver (firmware_mlx90640_app.c) for the
+        // same fix.
+        float scaled = mlx90640_calibrated_frame[base+i] * MLX_TEMP_SCALE;
+        int16_t v = (scaled > 32767.0f) ? 32767 : (scaled < -32768.0f) ? -32768 : (int16_t)scaled;
         out[i*2]   = (uint8_t)(((uint16_t)v) >> 8);
         out[i*2+1] = (uint8_t)(((uint16_t)v) & 0xFF);
     }
@@ -284,7 +290,10 @@ static void MLX90641_DoGetCalibratedChunk(uint8_t chunk_index, uint8_t out[32]) 
     if (chunk_index >= 12) { for (int i = 0; i < 32; i++) out[i] = 0; return; }
     uint16_t base = chunk_index * 16;
     for (int i = 0; i < 16; i++) {
-        int16_t v = (int16_t)(mlx90641_calibrated_frame[base+i] * MLX_TEMP_SCALE);
+        // Saturate rather than narrow-cast directly - see
+        // MLX90640_DoGetCalibratedChunk above for the full reasoning.
+        float scaled = mlx90641_calibrated_frame[base+i] * MLX_TEMP_SCALE;
+        int16_t v = (scaled > 32767.0f) ? 32767 : (scaled < -32768.0f) ? -32768 : (int16_t)scaled;
         out[i*2]   = (uint8_t)(((uint16_t)v) >> 8);
         out[i*2+1] = (uint8_t)(((uint16_t)v) & 0xFF);
     }
@@ -391,7 +400,9 @@ static void MLX90642_DoGetCalibratedChunk(uint8_t chunk_index, uint8_t out[32]) 
         // this project's own MLX_TEMP_SCALE (degC*100) - rescaled here,
         // same as the main board's own direct driver does.
         int32_t rescaled = ((int32_t)mlx90642_pixval[base+i] * MLX_TEMP_SCALE) / 50;
-        int16_t v = (int16_t)rescaled;
+        // Saturate rather than narrow-cast directly - see
+        // MLX90640_DoGetCalibratedChunk above for the full reasoning.
+        int16_t v = (rescaled > 32767) ? 32767 : (rescaled < -32768) ? -32768 : (int16_t)rescaled;
         out[i*2]   = (uint8_t)(((uint16_t)v) >> 8);
         out[i*2+1] = (uint8_t)(((uint16_t)v) & 0xFF);
     }

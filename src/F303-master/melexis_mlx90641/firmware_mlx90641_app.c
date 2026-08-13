@@ -85,7 +85,11 @@ void MLX90641_Direct_GetCalibratedChunk(uint8_t chunk_index, uint8_t out[32]) {
     if (chunk_index >= 12) { for (int i = 0; i < 32; i++) out[i] = 0; return; }
     uint16_t base = chunk_index * 16;
     for (int i = 0; i < 16; i++) {
-        int16_t v = (int16_t)(mlx641_calibrated_frame[base+i] * MLX_TEMP_SCALE);
+        // Saturate rather than narrow-cast directly - see
+        // firmware_mlx90640_app.c's own equivalent comment for the full
+        // reasoning (same fix, same failure mode, same convention).
+        float scaled = mlx641_calibrated_frame[base+i] * MLX_TEMP_SCALE;
+        int16_t v = (scaled > 32767.0f) ? 32767 : (scaled < -32768.0f) ? -32768 : (int16_t)scaled;
         out[i*2]   = (uint8_t)(((uint16_t)v) >> 8);
         out[i*2+1] = (uint8_t)(((uint16_t)v) & 0xFF);
     }

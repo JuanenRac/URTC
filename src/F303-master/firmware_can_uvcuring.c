@@ -16,7 +16,9 @@
 
 void Handle_CAN_UVCuring(void) {
     if (rxHeader.StdId == 0x1D0 && rxHeader.DLC >= 1 && !boot_sequence_active) {
-        uint32_t uv_duty = (rxData[0] * 3199) / 255;
+        uv_curing_duty = rxData[0];
+        uv_curing_last_kick_tick = HAL_GetTick();
+        uint32_t uv_duty = (uv_curing_duty * 3199) / 255;
         __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, uv_duty);
     }
 }

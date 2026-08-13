@@ -33,7 +33,14 @@ void Handle_CAN_WeldPulse(void) {
         // the master to have checked first.
         if (HAL_GPIO_ReadPin(GPIOB, TCRT_D0_DIG_PIN) != GPIO_PIN_SET) return;
 
-        weld_pulse_duration_ms = ((uint16_t)rxData[1] << 8) | rxData[2];
+        // Clamp: weld_pulse_duration_ms comes straight from a CAN command
+        // with no prior validation, same reasoning as aoi_strobe_period's
+        // own clamp above. Real spot-welding/ultrasonic-welding pulses are
+        // sub-second; without a cap, a garbled or malicious frame could
+        // hold CONN_T12 energized for up to 65 seconds (0xFFFF) instead of
+        // a normal short pulse.
+        uint16_t raw_duration = ((uint16_t)rxData[1] << 8) | rxData[2];
+        weld_pulse_duration_ms = (raw_duration > 2000) ? 2000 : raw_duration;
         weld_pulse_start_tick = HAL_GetTick();
         weld_pulse_active = 1;
         HAL_GPIO_WritePin(T12_PWM_PORT, T12_PWM_PIN, GPIO_PIN_SET);
@@ -42,7 +49,8 @@ void Handle_CAN_WeldPulse(void) {
         if (rxData[0] != 0x01) return;
         // No contact-sensor gate - doc #15 doesn't call for one the way
         // doc #4 explicitly does.
-        weld_pulse_duration_ms = ((uint16_t)rxData[1] << 8) | rxData[2];
+        uint16_t raw_duration = ((uint16_t)rxData[1] << 8) | rxData[2];
+        weld_pulse_duration_ms = (raw_duration > 2000) ? 2000 : raw_duration; // see the same clamp's own comment above
         weld_pulse_start_tick = HAL_GetTick();
         weld_pulse_active = 1;
         HAL_GPIO_WritePin(T12_PWM_PORT, T12_PWM_PIN, GPIO_PIN_SET);

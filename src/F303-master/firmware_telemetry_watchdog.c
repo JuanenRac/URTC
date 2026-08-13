@@ -113,6 +113,34 @@ void Watchdog_Safety_LayerFan(void) {
     }
 }
 
+// UV Curing LED - shares TIM1_CH1 with the laser, so it gets the laser's own
+// 250ms threshold rather than a fan's 1000ms: this is an optical/thermal
+// hazard if left lit, not just idle airflow.
+void Watchdog_Safety_UVCuring(void) {
+    if (active_tool != TOOL_UV_CURING) return;
+
+    if (uv_curing_duty > 0 && (HAL_GetTick() - uv_curing_last_kick_tick > 250)) {
+        uv_curing_duty = 0;
+        __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, 0);
+        system_error_flag = 1;
+    }
+}
+
+// Hot Air Rework's own blower - the heater side of this tool already reuses
+// Watchdog_Safety_SolderIron (same T12 mechanism as the soldering iron), but
+// that only ever touches target_temperature, never this blower's own duty -
+// same 1000ms threshold as the layer fan above, the same kind of airflow-only
+// actuator sharing this project's TIM1_CH1.
+void Watchdog_Safety_HotAirBlower(void) {
+    if (active_tool != TOOL_HOTAIR_REWORK) return;
+
+    if (hotair_blower_duty > 0 && (HAL_GetTick() - hotair_blower_last_kick_tick > 1000)) {
+        hotair_blower_duty = 0;
+        __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, 0);
+        system_error_flag = 1;
+    }
+}
+
 void Telemetry_HotendFan(void) {
     if (active_tool != TOOL_3D_PRINTER) return;
     // Same 2-pulses/revolution assumption as the layer fan - adjust if this

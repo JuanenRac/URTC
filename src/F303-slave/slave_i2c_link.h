@@ -9,4 +9,11 @@
 
 void I2CLink_Init(void);
 
+// HAL_GetTick() timestamp of the last I2C1 register transaction of any kind
+// from the main board - read by slave_main.c's own main loop to detect a
+// dead link (cable unplugged, main board crashed) and stop any
+// continuous-mode PWM pulse that would otherwise keep driving its output
+// forever with nothing left to command it off.
+extern volatile uint32_t i2c_link_last_activity_tick;
+
 #endif // SLAVE_I2C_LINK_H

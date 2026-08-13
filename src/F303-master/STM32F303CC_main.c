@@ -150,6 +150,15 @@ volatile uint32_t hotend_fan_last_kick_tick = 0;
 // forever, with nothing to cut power.
 volatile uint32_t solder_iron_last_kick_tick = 0;
 volatile uint32_t hotend_heater_last_kick_tick = 0;
+// UV Curing LED and Hot Air Rework's own blower share TIM1_CH1 with the
+// drill/laser/layer-fan/hotend-fan, all of which already have their own
+// communication watchdog - these 2 own duty variables exist so theirs can
+// too, the same shutdown-on-stale-comms pattern as every other tool on
+// this channel.
+volatile uint8_t uv_curing_duty = 0;
+volatile uint32_t uv_curing_last_kick_tick = 0;
+volatile uint8_t hotair_blower_duty = 0;
+volatile uint32_t hotair_blower_last_kick_tick = 0;
 volatile uint8_t aoi_mode = 0;
 volatile uint16_t aoi_strobe_period = 0;
 // Non-blocking state machine for the AOI strobe, instead of a blocking
@@ -421,6 +430,9 @@ int main(void) {
         Watchdog_Safety_Laser();
         Watchdog_Safety_Drill();
         Watchdog_Safety_LayerFan();
+        Watchdog_Safety_HotendFan();
+        Watchdog_Safety_UVCuring();
+        Watchdog_Safety_HotAirBlower();
         Watchdog_Safety_SolderIron();
         Watchdog_Safety_HotendHeater();
         Control_SolderingIron_PID();
@@ -463,6 +475,8 @@ int main(void) {
             Watchdog_Safety_Drill();
             Watchdog_Safety_LayerFan();
             Watchdog_Safety_HotendFan();
+            Watchdog_Safety_UVCuring();
+            Watchdog_Safety_HotAirBlower();
             Watchdog_Safety_SolderIron();
             Watchdog_Safety_HotendHeater();
             WeldPulse_Tick();

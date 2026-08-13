@@ -105,13 +105,13 @@ detail each one's own note describes.
       connector for whichever MLX9064x-family sensor module is plugged
       into it - see EEPROM.TXT section 6 and CANBUS.TXT's own 0x1A6/0x1A7
       for how which of the 3 family members (MLX90640, MLX90641, MLX90642)
-      is actually installed gets configured. MLX90640 and MLX90641 are
-      fully implemented and verified on this direct path
-      (melexis_mlx90641/firmware_mlx90641_app.c, and the same generic
-      dispatch pattern in Handle_CAN_ThermalInspection()); MLX90642 is
-      not yet implemented on either this direct path or the Advanced
-      variants' own slave-relayed path - see this project's own audit
-      trail. BOM: BOM_EXPANSION_BASIC_MLX9064X.TXT.
+      is actually installed gets configured. All 3 family members
+      (MLX90640, MLX90641, MLX90642) are fully implemented and verified
+      on this direct path (melexis_mlx90640/, melexis_mlx90641/, and
+      melexis_mlx90642/'s own firmware_mlx9064x_app.c files, all dispatched
+      through the same generic pattern in Handle_CAN_ThermalInspection()),
+      as well as on the Advanced variants' own slave-relayed path - see
+      CANBUS.TXT's own 0x1A6 entry. BOM: BOM_EXPANSION_BASIC_MLX9064X.TXT.
 
 Reminder that applies across every driver-carrying variant above (1-4):
 the TMC2209/TMC5160A on both the Basic and Advanced boards is always
