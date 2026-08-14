@@ -350,8 +350,15 @@ If anyone in the community is working on custom end-effectors, smart tool-change
 ```
 /
 ├── 3D/
-│   ├── STL/                     Directory of 3D Tools parts for print in STL format
-│   └── OpenSCAD/                Directory of 3D Tools parts
+│   ├── RACK/                    Board mounting rack, 2 variants (x1, x3) - each in
+│   │                            .stl/.3mf/.amf/.scad
+│   ├── REVOLVER/                Placeholder - empty, content not started yet
+│   └── TOOLS/
+│       └── PAROL6/              Per-tool 3D-printable parts for the PAROL6 robot arm -
+│                                one subfolder per tool (0.Universal parts, then 1-12
+│                                matching the Tool Catalog numbering above), each in
+│                                .stl/.3mf/.amf/.scad where populated; several
+│                                (4, 6-12) are still empty placeholders
 ├── ani/                          27 GIFs: one 4-frame animation per tool profile (00-24,
 │                                 matching each tool's own numeric ID), the boot splash
 │                                 (splash_boot.gif), and the invalid-ID warning
@@ -367,9 +374,7 @@ If anyone in the community is working on custom end-effectors, smart tool-change
 │   ├── BOM_EXPANSION_ADVANCED_TMC2209.TXT  Expansion board, advanced + TMC2209
 │   ├── BOM_EXPANSION_ADVANCED_TMC5160A.TXT Expansion board, advanced + TMC5160A
 │   ├── BOM_EXPANSION_BASIC_ADS1115.TXT     Expansion board, basic + ADS1115 (sensor-only, no driver/MCU)
-│   ├── BOM_EXPANSION_BASIC_MLX9064X.TXT    Expansion board, basic + MLX9064x (sensor-only, no driver/MCU)
-│   ├── BOM_PARTS.TXT            Full bill of materials and mechanical parts for 3D parts
-│   └── BOM_PARTS.PDF            Full bill of materials and mechanical parts for 3D parts
+│   └── BOM_EXPANSION_BASIC_MLX9064X.TXT    Expansion board, basic + MLX9064x (sensor-only, no driver/MCU)
 ├── docs/
 │   ├── MANUAL.PDF               Service manual of URTC board and 3D Files
 │   ├── MANUAL.ODT               Service manual of URTC board and 3D Files
@@ -391,7 +396,7 @@ If anyone in the community is working on custom end-effectors, smart tool-change
 ├── src/
 │   ├── F303-master/
 │   │   ├── STM32F303CC_main.c    Entry point - global definitions and main()
-│   │   ├── firmware_*.c/.h       ~40 more files, one per subsystem (OLED, LEDs, per-tool
+│   │   ├── firmware_*.c/.h       ~85 more files, one per subsystem (OLED, LEDs, per-tool
 │   │   │                         CAN handlers, init, persistence, etc.), including
 │   │   │                         firmware_ads1115.c (direct ADS1115 driver, Basic+ADS1115
 │   │   │                         board) - see this folder's own README.md for the full
@@ -420,7 +425,8 @@ If anyone in the community is working on custom end-effectors, smart tool-change
 │       │                         above. Own bootloader/application pair, own I2C-based
 │       │                         (not CAN) update protocol, own independent versioning.
 │       ├── slave_main.c          Entry point
-│       ├── slave_*.c/.h          4 more files (I2C link protocol, local sensor bus, local PWM)
+│       ├── slave_*.c/.h          7 more files (shared types/constants, I2C link protocol,
+│       │                         local sensor bus, local PWM)
 │       ├── STM32F303CBTx_SLAVEAPP.ld  Linker script (54K main slot at 0x08005000)
 │       ├── README.md             Technical reference: why this chip exists, the local
 │       │                         ADS1115/MLX9064x sensor bus, local PWM, the I2C link
@@ -462,8 +468,8 @@ If anyone in the community is working on custom end-effectors, smart tool-change
 │   ├── OLED_DIRECT_MOUNT.jpg     LCD1/CONN_OLED2 - bare 30-pin FPC panel, direct-mount option
 │   ├── OLED_BREAKOUT_MODULE.jpg  CONN_OLED - external I2C breakout module, alternate option
 │   ├── URTC_LOGO.svg             General project logo, embedded at the top of this README
-│   ├── URTC_BOARD.png           Board photo (when added)
-│   ├── URTC_SCHEMATIC.png       Board schematic (when added)
+│   ├── URTC_BOARD.png           Board photo
+│   ├── URTC_SCHEMATIC.png       Board schematic
 │   ├── URTC_PCB_TOP.png         Board TOP layer (when added)
 │   ├── URTC_PCB_BOTTOM.png      Board BOTTOM layer (when added)
 │   └── TOOL_*.png               Per-tool jumper/wiring reference diagram, one per profile
@@ -471,7 +477,9 @@ If anyone in the community is working on custom end-effectors, smart tool-change
 ├── PCB/
 │   ├── URTC_V1.0.sch            Eagle schematic (when added)
 │   ├── URTC_V1.0.brd            Eagle board layout (when added)
-│   ├── URTC_V1.0_JLCPCB.ZIP     Gerbers, bom and cpl files 
+│   ├── URTC_V1.0_JLCPCB.ZIP     Gerbers, bom and cpl files (when added)
+│   ├── URTC_BOM.TXT             Eagle-exported raw BOM (ground truth export - see
+│   │                            BOM/BOM.TXT for this project's own curated, organized version)
 │   ├── datasheet/               Datasheets of all parts used in board
 │   └── *_PARLIST/PINLIST/NETLIST.TXT   Eagle-exported netlists (ground truth for pin mapping)
 ├── VERSION_CHECKLIST.txt        Mechanical checklist for bumping any of this project's own
@@ -491,6 +499,23 @@ If anyone in the community is working on custom end-effectors, smart tool-change
 ```
 
 Hardware design files (Eagle schematic/board/netlists) will be added as the layout stabilizes.
+
+## 🔗 Related Projects
+
+This project is part of a larger robotics ecosystem by the same author (JuanenRac / Electro Hobby 3D). Worth knowing about, since a request might actually be about one of these rather than this repository:
+
+**HYDRA-UMC platform** — the multi-robot micro-factory cell
+- **[HYDRA-UMC](https://github.com/JuanenRac/HYDRA-UMC)** — the motherboard itself: Raspberry Pi CM5 host + dual-core STM32H745 real-time co-processor, orchestrating up to 8 distributed robot arms over CAN-OTA/SPI-OTA. Own hardware + firmware, GPL-3.0/CERN-OHL-S v2/CC BY-SA 4.0.
+- **[HYDRA-UMC STUDIO](https://github.com/JuanenRac/HYDRA-UMC-STUDIO)** — web-based control dashboard for HYDRA-UMC: multi-robot 3D visualization, kinematics/trajectory recording, CAN-OTA flashing and testing for the whole platform. React + Vite + Three.js.
+- **[HYDRA-UMC-ANDROID-CONTROL](https://github.com/JuanenRac/HYDRA-UMC-ANDROID-CONTROL)** — planned Android control app for HYDRA-UMC. Not yet started; scope to be defined.
+- **[HYDRA-UMC-IOS-CONTROL](https://github.com/JuanenRac/HYDRA-UMC-IOS-CONTROL)** — planned iOS control app for HYDRA-UMC. Not yet started; scope to be defined.
+- **[HYDRA-UMC-SUITE](https://github.com/JuanenRac/HYDRA-UMC-SUITE)** — planned; scope to be defined.
+
+**URTC platform** — the tool head controller every HYDRA-UMC robot arm carries
+- **URTC** *(this repository)* — Universal Robot Tool Controller: STM32F303-based CAN bus tool head controller, 25 fully-implemented tool profiles, CAN-OTA firmware update.
+- **[URTC Flasher](https://github.com/JuanenRac/URTC-FLASHER)** — desktop CAN-OTA + full-chip SWD/JTAG flashing tool for URTC boards (Windows/Linux).
+- **[URTC Tester](https://github.com/JuanenRac/URTC-TESTER)** — desktop live CAN-bus diagnostic tool for URTC boards, one panel per tool profile (Windows/Linux).
+- **[URTC Web Studio](https://github.com/JuanenRac/URTC-WEB-STUDIO)** — browser-based alternative to the 2 desktop tools above (Web Serial API + SLCAN), no local install needed.
 
 ## 👤 Author
 
