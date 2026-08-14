@@ -218,10 +218,37 @@ set "OUT=%BUILD%\master_boot"
 rmdir /s /q "!OUT!" 2>nul
 mkdir "!OUT!"
 set "SRC=%ROOT%\src\F303-master\boot"
-for %%f in ("!SRC!\*.c") do arm-none-eabi-gcc %CFLAGS% -I"!SRC!" -x c -c "%%f" -o "!OUT!\%%~nf.o"
+set "SECTION_FAIL=0"
+for %%f in ("!SRC!\*.c") do (
+    arm-none-eabi-gcc %CFLAGS% -I"!SRC!" -x c -c "%%f" -o "!OUT!\%%~nf.o"
+    if errorlevel 1 (
+        echo   FAIL %%~nf.c failed to compile
+        set "SECTION_FAIL=1"
+    )
+)
+if "!SECTION_FAIL!"=="1" (
+    echo   FAIL main board bootloader: one or more source files failed to compile - see errors above
+    set /a FAIL+=1
+    goto :summary
+)
 arm-none-eabi-gcc %LDCOMMON% -T"!SRC!\STM32F303CCTx_BOOTLOADER.ld" "%BUILD%\app_master\startup.o" "%BUILD%\app_master\system_stm32f3xx.o" "!OUT!\*.o" "%BUILD%\hal_obj\*.o" -o "!OUT!\URTC_BOOTLOADER.elf"
+if errorlevel 1 (
+    echo   FAIL main board bootloader: link failed
+    set /a FAIL+=1
+    goto :summary
+)
 arm-none-eabi-objcopy -O binary "!OUT!\URTC_BOOTLOADER.elf" "!OUT!\URTC_BOOTLOADER.bin"
+if errorlevel 1 (
+    echo   FAIL main board bootloader: objcopy ^(.bin^) failed
+    set /a FAIL+=1
+    goto :summary
+)
 arm-none-eabi-objcopy -O ihex "!OUT!\URTC_BOOTLOADER.elf" "!OUT!\URTC_BOOTLOADER.hex"
+if errorlevel 1 (
+    echo   FAIL main board bootloader: objcopy ^(.hex^) failed
+    set /a FAIL+=1
+    goto :summary
+)
 copy /y "!OUT!\URTC_BOOTLOADER.elf" "%FIRMWARE_OUT%\" >nul
 copy /y "!OUT!\URTC_BOOTLOADER.bin" "%FIRMWARE_OUT%\" >nul
 copy /y "!OUT!\URTC_BOOTLOADER.hex" "%FIRMWARE_OUT%\" >nul
