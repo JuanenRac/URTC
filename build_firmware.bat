@@ -262,15 +262,49 @@ rmdir /s /q "!OUT!" 2>nul
 mkdir "!OUT!"
 set "SRC=%ROOT%\src\F303-master"
 set "MASTER_INC=-I!SRC!\melexis_mlx90640 -I!SRC!\melexis_mlx90641 -I!SRC!\melexis_mlx90642"
-for %%f in ("!SRC!\*.c") do arm-none-eabi-gcc %CFLAGS% -I"!SRC!" !MASTER_INC! -x c -c "%%f" -o "!OUT!\%%~nf.o"
-for %%f in ("!SRC!\melexis_mlx90640\*.c") do arm-none-eabi-gcc %CFLAGS% -I"!SRC!" -I"!SRC!\melexis_mlx90640" -x c -c "%%f" -o "!OUT!\%%~nf.o"
-for %%f in ("!SRC!\melexis_mlx90641\*.c") do arm-none-eabi-gcc %CFLAGS% -I"!SRC!" -I"!SRC!\melexis_mlx90641" -x c -c "%%f" -o "!OUT!\%%~nf.o"
-for %%f in ("!SRC!\melexis_mlx90642\*.c") do arm-none-eabi-gcc %CFLAGS% -I"!SRC!" -I"!SRC!\melexis_mlx90642" -x c -c "%%f" -o "!OUT!\%%~nf.o"
+set "SECTION_FAIL=0"
+for %%f in ("!SRC!\*.c") do (
+    arm-none-eabi-gcc %CFLAGS% -I"!SRC!" !MASTER_INC! -x c -c "%%f" -o "!OUT!\%%~nf.o"
+    if errorlevel 1 (echo   FAIL %%~nf.c failed to compile & set "SECTION_FAIL=1")
+)
+for %%f in ("!SRC!\melexis_mlx90640\*.c") do (
+    arm-none-eabi-gcc %CFLAGS% -I"!SRC!" -I"!SRC!\melexis_mlx90640" -x c -c "%%f" -o "!OUT!\%%~nf.o"
+    if errorlevel 1 (echo   FAIL %%~nf.c failed to compile & set "SECTION_FAIL=1")
+)
+for %%f in ("!SRC!\melexis_mlx90641\*.c") do (
+    arm-none-eabi-gcc %CFLAGS% -I"!SRC!" -I"!SRC!\melexis_mlx90641" -x c -c "%%f" -o "!OUT!\%%~nf.o"
+    if errorlevel 1 (echo   FAIL %%~nf.c failed to compile & set "SECTION_FAIL=1")
+)
+for %%f in ("!SRC!\melexis_mlx90642\*.c") do (
+    arm-none-eabi-gcc %CFLAGS% -I"!SRC!" -I"!SRC!\melexis_mlx90642" -x c -c "%%f" -o "!OUT!\%%~nf.o"
+    if errorlevel 1 (echo   FAIL %%~nf.c failed to compile & set "SECTION_FAIL=1")
+)
 REM The one C++ file in the whole project - see docs\COMPILE_STM32F303.TXT section 6
 arm-none-eabi-g++ %CXXFLAGS% -I"!SRC!\melexis_mlx90641" -c "!SRC!\melexis_mlx90641\MLX90641_API.cpp" -o "!OUT!\MLX90641_API.o"
+if errorlevel 1 (echo   FAIL MLX90641_API.cpp failed to compile & set "SECTION_FAIL=1")
+if "!SECTION_FAIL!"=="1" (
+    echo   FAIL main board application: one or more source files failed to compile - see errors above
+    set /a FAIL+=1
+    goto :summary
+)
 arm-none-eabi-g++ %LDCOMMON% -fno-exceptions -fno-rtti -fno-unwind-tables -fno-threadsafe-statics -T"!SRC!\STM32F303CCTx_APP.ld" "%BUILD%\app_master\startup.o" "%BUILD%\app_master\system_stm32f3xx.o" "!OUT!\*.o" "%BUILD%\hal_obj\*.o" -o "!OUT!\URTC_APP.elf"
+if errorlevel 1 (
+    echo   FAIL main board application: link failed
+    set /a FAIL+=1
+    goto :summary
+)
 arm-none-eabi-objcopy -O binary "!OUT!\URTC_APP.elf" "!OUT!\URTC_APP.bin"
+if errorlevel 1 (
+    echo   FAIL main board application: objcopy ^(.bin^) failed
+    set /a FAIL+=1
+    goto :summary
+)
 arm-none-eabi-objcopy -O ihex "!OUT!\URTC_APP.elf" "!OUT!\URTC_APP.hex"
+if errorlevel 1 (
+    echo   FAIL main board application: objcopy ^(.hex^) failed
+    set /a FAIL+=1
+    goto :summary
+)
 REM Filename encodes the firmware version - read it from firmware_common.h
 set "FW_VER=?" & set "FW_MIN=?"
 for /f "tokens=3" %%v in ('findstr /c:"#define FIRMWARE_VERSION_MAJOR" "!SRC!\firmware_common.h"') do set "FW_VER=%%v"
@@ -294,10 +328,34 @@ set "OUT=%BUILD%\slave_boot"
 rmdir /s /q "!OUT!" 2>nul
 mkdir "!OUT!"
 set "SRC=%ROOT%\src\F303-slave\boot"
-for %%f in ("!SRC!\*.c") do arm-none-eabi-gcc %CFLAGS% -I"!SRC!" -x c -c "%%f" -o "!OUT!\%%~nf.o"
+set "SECTION_FAIL=0"
+for %%f in ("!SRC!\*.c") do (
+    arm-none-eabi-gcc %CFLAGS% -I"!SRC!" -x c -c "%%f" -o "!OUT!\%%~nf.o"
+    if errorlevel 1 (echo   FAIL %%~nf.c failed to compile & set "SECTION_FAIL=1")
+)
+if "!SECTION_FAIL!"=="1" (
+    echo   FAIL expansion slave bootloader: one or more source files failed to compile - see errors above
+    set /a FAIL+=1
+    goto :summary
+)
 arm-none-eabi-gcc %LDCOMMON% -T"!SRC!\STM32F303CBTx_SLAVEBOOT.ld" "%BUILD%\app_slave\startup.o" "%BUILD%\app_slave\system_stm32f3xx.o" "!OUT!\*.o" "%BUILD%\hal_obj\*.o" -o "!OUT!\URTC_SLAVE_BOOTLOADER.elf"
+if errorlevel 1 (
+    echo   FAIL expansion slave bootloader: link failed
+    set /a FAIL+=1
+    goto :summary
+)
 arm-none-eabi-objcopy -O binary "!OUT!\URTC_SLAVE_BOOTLOADER.elf" "!OUT!\URTC_SLAVE_BOOTLOADER.bin"
+if errorlevel 1 (
+    echo   FAIL expansion slave bootloader: objcopy ^(.bin^) failed
+    set /a FAIL+=1
+    goto :summary
+)
 arm-none-eabi-objcopy -O ihex "!OUT!\URTC_SLAVE_BOOTLOADER.elf" "!OUT!\URTC_SLAVE_BOOTLOADER.hex"
+if errorlevel 1 (
+    echo   FAIL expansion slave bootloader: objcopy ^(.hex^) failed
+    set /a FAIL+=1
+    goto :summary
+)
 copy /y "!OUT!\URTC_SLAVE_BOOTLOADER.elf" "%FIRMWARE_OUT%\" >nul
 copy /y "!OUT!\URTC_SLAVE_BOOTLOADER.bin" "%FIRMWARE_OUT%\" >nul
 copy /y "!OUT!\URTC_SLAVE_BOOTLOADER.hex" "%FIRMWARE_OUT%\" >nul
@@ -311,13 +369,44 @@ rmdir /s /q "!OUT!" 2>nul
 mkdir "!OUT!"
 set "SRC=%ROOT%\src\F303-slave"
 set "SLAVE_INC=-I!SRC!\melexis_mlx90640 -I!SRC!\melexis_mlx90641 -I!SRC!\melexis_mlx90642"
-for %%f in ("!SRC!\*.c") do arm-none-eabi-gcc %CFLAGS% -I"!SRC!" !SLAVE_INC! -x c -c "%%f" -o "!OUT!\%%~nf.o"
-for %%f in ("!SRC!\melexis_mlx90640\*.c") do arm-none-eabi-gcc %CFLAGS% -I"!SRC!" !SLAVE_INC! -x c -c "%%f" -o "!OUT!\%%~nf.o"
+set "SECTION_FAIL=0"
+for %%f in ("!SRC!\*.c") do (
+    arm-none-eabi-gcc %CFLAGS% -I"!SRC!" !SLAVE_INC! -x c -c "%%f" -o "!OUT!\%%~nf.o"
+    if errorlevel 1 (echo   FAIL %%~nf.c failed to compile & set "SECTION_FAIL=1")
+)
+for %%f in ("!SRC!\melexis_mlx90640\*.c") do (
+    arm-none-eabi-gcc %CFLAGS% -I"!SRC!" !SLAVE_INC! -x c -c "%%f" -o "!OUT!\%%~nf.o"
+    if errorlevel 1 (echo   FAIL %%~nf.c failed to compile & set "SECTION_FAIL=1")
+)
 arm-none-eabi-g++ %CXXFLAGS% -I"!SRC!\melexis_mlx90641" -c "!SRC!\melexis_mlx90641\MLX90641_API.cpp" -o "!OUT!\MLX90641_API.o"
-for %%f in ("!SRC!\melexis_mlx90642\*.c") do arm-none-eabi-gcc %CFLAGS% -I"!SRC!" !SLAVE_INC! -x c -c "%%f" -o "!OUT!\%%~nf.o"
+if errorlevel 1 (echo   FAIL MLX90641_API.cpp failed to compile & set "SECTION_FAIL=1")
+for %%f in ("!SRC!\melexis_mlx90642\*.c") do (
+    arm-none-eabi-gcc %CFLAGS% -I"!SRC!" !SLAVE_INC! -x c -c "%%f" -o "!OUT!\%%~nf.o"
+    if errorlevel 1 (echo   FAIL %%~nf.c failed to compile & set "SECTION_FAIL=1")
+)
+if "!SECTION_FAIL!"=="1" (
+    echo   FAIL expansion slave application: one or more source files failed to compile - see errors above
+    set /a FAIL+=1
+    goto :summary
+)
 arm-none-eabi-g++ %LDCOMMON% -fno-exceptions -fno-rtti -fno-unwind-tables -fno-threadsafe-statics -T"!SRC!\STM32F303CBTx_SLAVEAPP.ld" "%BUILD%\app_slave\startup.o" "%BUILD%\app_slave\system_stm32f3xx.o" "!OUT!\*.o" "%BUILD%\hal_obj\*.o" -lm -o "!OUT!\URTC_SLAVE_APP.elf"
+if errorlevel 1 (
+    echo   FAIL expansion slave application: link failed
+    set /a FAIL+=1
+    goto :summary
+)
 arm-none-eabi-objcopy -O binary "!OUT!\URTC_SLAVE_APP.elf" "!OUT!\URTC_SLAVE_APP.bin"
+if errorlevel 1 (
+    echo   FAIL expansion slave application: objcopy ^(.bin^) failed
+    set /a FAIL+=1
+    goto :summary
+)
 arm-none-eabi-objcopy -O ihex "!OUT!\URTC_SLAVE_APP.elf" "!OUT!\URTC_SLAVE_APP.hex"
+if errorlevel 1 (
+    echo   FAIL expansion slave application: objcopy ^(.hex^) failed
+    set /a FAIL+=1
+    goto :summary
+)
 copy /y "!OUT!\URTC_SLAVE_APP.elf" "%FIRMWARE_OUT%\" >nul
 copy /y "!OUT!\URTC_SLAVE_APP.bin" "%FIRMWARE_OUT%\" >nul
 copy /y "!OUT!\URTC_SLAVE_APP.hex" "%FIRMWARE_OUT%\" >nul
