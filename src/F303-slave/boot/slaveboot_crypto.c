@@ -12,14 +12,21 @@
 #include "slaveboot_common.h"
 #include "slaveboot_crypto.h"
 
-// Single definition matching slaveboot_common.h's extern declaration -
-// placeholder default; change it before relying on this for anything,
-// and keep the signing tool's copy in sync with whatever it's changed to.
+// Single definition matching slaveboot_common.h's extern declaration.
+// Real CSPRNG-generated key (Node's crypto.randomBytes(32), 2026-08-15),
+// deliberately DIFFERENT from bootloader_crypto.c's own HMAC_KEY (master)
+// - see slaveboot_common.h's own comment on this field for why the two
+// must never match: a master-signed image must never verify against
+// this chip's key, or vice versa. Same "committed to a public repo,
+// therefore not a real confidentiality boundary as shipped" caveat as
+// the master key - see bootloader_crypto.c's own comment for the full
+// reasoning. The host tools' own SLAVE_HMAC_KEY (flasher_config.py,
+// URTC-WEB-STUDIO's src/lib/flasher.ts) must match this exact value.
 const uint8_t HMAC_KEY[32] = {
-    0x55, 0x52, 0x54, 0x43, 0x2D, 0x48, 0x59, 0x44,
-    0x52, 0x41, 0x2D, 0x55, 0x4D, 0x43, 0x2D, 0x32,
-    0x30, 0x32, 0x36, 0x2D, 0x43, 0x48, 0x41, 0x4E,
-    0x47, 0x45, 0x2D, 0x4D, 0x45, 0x2D, 0x21, 0x21
+    0xF6, 0xFC, 0x5E, 0xC3, 0xC7, 0xC0, 0xB8, 0x32,
+    0x5F, 0x08, 0x83, 0x85, 0xCD, 0x10, 0x9E, 0x63,
+    0x7D, 0x45, 0x58, 0xD4, 0x53, 0x5F, 0x61, 0x9C,
+    0xD0, 0x6F, 0x3D, 0xF2, 0xAF, 0xDC, 0x38, 0x1D
 };
 
 typedef struct {

@@ -50,9 +50,12 @@ extern I2C_HandleTypeDef hi2c2;
 
 // -----------------------------------------------------------------------
 // HMAC-SHA256 signing key - shared between this bootloader and whatever
-// build/signing tool prepares a firmware image for a CAN update. This is a
-// placeholder default; change it before relying on this for anything, and
-// keep the signing tool's copy in sync with whatever it's changed to.
+// build/signing tool prepares a firmware image for a CAN update. A real
+// CSPRNG-generated value (see bootloader_crypto.c's own definition and
+// comment) - not the old human-readable placeholder, but still a
+// compiled-in default that's committed to a public repo, so treat it as
+// non-confidential and rotate it (with the signing tools' own copy kept
+// in sync) before relying on this for real production security.
 // Declared here, defined once in bootloader_crypto.c - a static array in
 // this header would otherwise get its own private copy compiled into
 // every .c file that includes it.
