@@ -268,6 +268,15 @@ URTC's flash is split into two independent pieces, so the board can be reflashed
 
 **Why a backup slot.** A CAN update is never written into the slot that's currently running. It goes into backup first, gets fully verified there — size, CRC32, and an HMAC-SHA256 signature proving it actually came from this project's own build process, not just that it arrived intact — and only then gets copied into the main slot. A power loss at any point before that copy starts leaves the currently running firmware completely untouched, so there's no window where an interrupted download can brick the board. If the power loss happens *during* the copy itself, the bootloader notices on the next boot (backup, never touched during the copy, is still fully intact) and simply resumes copying from it until it succeeds.
 
+### 0. Compiling from source (optional — `firmware/` already ships pre-built binaries)
+
+Two ways to get from this repository's source to the 4 binaries above:
+
+- **Automated:** `build_firmware.sh` (Linux) or `build_firmware.bat` (Windows), at the repo root. Either installs the ARM GNU toolchain if it's missing, fetches the pinned ST HAL/CMSIS commit, and compiles, links, and `objcopy`s all 4 binaries (main board app + bootloader, expansion slave app + bootloader) straight into `firmware/`, then regenerates `firmware/firmware_manifest.json`. Run with no arguments for a full build, `--clean` to wipe the local `build/` cache first, or `master`/`slave` to build only one chip's own pair. `build_firmware.sh` runs end to end against this project's real source tree; `build_firmware.bat` mirrors that same logic for Windows — if the two ever disagree, trust the `.sh` script's logic as the reference.
+- **Manual:** every command either script runs, plus the reasoning behind each toolchain/HAL choice, is spelled out step by step in `docs/COMPILE_STM32F303.TXT` — useful on a different OS, with a different HAL/CMSIS source, or just to see exactly what the scripts automate.
+
+After any firmware source change (or before trusting a version bump), run **`check_version_consistency.sh`** from the repo root: it reads the Track A/E version constants (main board firmware, expansion slave application) as source of truth and checks every location `VERSION_CHECKLIST.txt` documents for that version tag, reporting any mismatch — it only reports, it doesn't fix anything itself. `VERSION_CHECKLIST.txt` is the full reference for all 5 independent version tracks this project carries (main firmware, hardware/PCB, main bootloader, expansion slave application, expansion slave bootloader) and exactly what needs touching when bumping any one of them.
+
 ### 1. First-time setup — requires JTAG/SWD (once)
 
 The bootloader can only get onto the chip via physical programming — there's no way to CAN-flash a board that doesn't have a bootloader on it yet. This is a one-time step:
@@ -376,8 +385,6 @@ If anyone in the community is working on custom end-effectors, smart tool-change
 │   ├── BOM_EXPANSION_BASIC_ADS1115.TXT     Expansion board, basic + ADS1115 (sensor-only, no driver/MCU)
 │   └── BOM_EXPANSION_BASIC_MLX9064X.TXT    Expansion board, basic + MLX9064x (sensor-only, no driver/MCU)
 ├── docs/
-│   ├── MANUAL.PDF               Service manual of URTC board and 3D Files
-│   ├── MANUAL.ODT               Service manual of URTC board and 3D Files
 │   ├── CANBUS.TXT               CAN bus protocol reference (all command/telemetry IDs)
 │   ├── ECOVIA.TXT               Tool identification matrix and pin-mutation logic
 │   ├── TOOLS.TXT                High-level catalog of all 25 tools - what each does and
@@ -388,11 +395,15 @@ If anyone in the community is working on custom end-effectors, smart tool-change
 │   ├── PINOUT_SLAVE.txt         Full pinout for the expansion slave chip (advanced variants only)
 │   ├── EEPROM.TXT               Full F-RAM register map (every persisted setting, byte offsets)
 │   ├── COMPILE_STM32F303.TXT    From-scratch build guide for all 4 firmware binaries -
-│   │                            toolchain, ST HAL/CMSIS setup, exact compile/link commands
-│   └── tool_image_generator/    Toolkit that generates images/TOOL_*.png (see below) - PCB.png
-│                                blank reference, render_engine.py + tool_data.py +
-│                                generate_all.py, and PROCEDURE.TXT explaining how to add
-│                                a new tool's own image or regenerate an existing one
+│   │                            toolchain, ST HAL/CMSIS setup, exact compile/link commands;
+│   │                            build_firmware.sh/.bat at the repo root automate this same
+│   │                            process end to end
+│   ├── datasheet/               2 component datasheets not already covered under
+│   │                            PCB/datasheet/ (CFM_40.pdf, EFB0424VHD-CP0.pdf)
+│   └── tool_image_generator/    Toolkit that generates images/TOOL_*.png (see below) -
+│                                render_engine.py + tool_data.py + generate_all.py, and
+│                                PROCEDURE.TXT explaining how to add a new tool's own
+│                                image or regenerate an existing one
 ├── src/
 │   ├── F303-master/
 │   │   ├── STM32F303CC_main.c    Entry point - global definitions and main()
@@ -508,10 +519,10 @@ This project is part of a larger robotics ecosystem by the same author (JuanenRa
 - **[HYDRA-UMC](https://github.com/JuanenRac/HYDRA-UMC)** — the motherboard itself: Raspberry Pi CM5 host + dual-core STM32H745 real-time co-processor, orchestrating up to 8 distributed robot arms over CAN-OTA/SPI-OTA. Own hardware + firmware, GPL-3.0/CERN-OHL-S v2/CC BY-SA 4.0.
 - **[HYDRA-UMC STUDIO](https://github.com/JuanenRac/HYDRA-UMC-STUDIO)** — web-based control dashboard for HYDRA-UMC: multi-robot 3D visualization, kinematics/trajectory recording, CAN-OTA flashing and testing for the whole platform. React + Vite + Three.js.
 - **[HYDRA-UMC-ANDROID-CONTROL](https://github.com/JuanenRac/HYDRA-UMC-ANDROID-CONTROL)** — Android control app for HYDRA-UMC over Wi-Fi/Bluetooth. Real, working app - full remote-control feature set, JWT auth, encrypted credential storage.
-- **[HYDRA-UMC-IOS-CONTROL](https://github.com/JuanenRac/HYDRA-UMC-IOS-CONTROL)** — iOS/iPadOS control app for HYDRA-UMC over Wi-Fi, built in Flutter (cross-platform, verifiable on Windows without a Mac). Real, working app.
+- **[HYDRA-UMC-IOS-CONTROL](https://github.com/JuanenRac/HYDRA-UMC-IOS-CONTROL)** — iOS/iPadOS control app for HYDRA-UMC over Wi-Fi, built in Flutter (cross-platform, verifiable on Windows without a Mac; final `.ipa` packaging still needs Xcode). Real, working app - same feature set as the Android app.
 - **[HYDRA-UMC-SUITE](https://github.com/JuanenRac/HYDRA-UMC-SUITE)** — desktop (Python/PySide6) swarm command center: multi-controller network discovery, live bidirectional sync, real 3D robot viewport, Photoshop-style dockable workspace. Real and working, not a placeholder.
-- **[HYDRA-UMC-EDITOR-URDF](https://github.com/JuanenRac/HYDRA-UMC-EDITOR-URDF)** — planned: graphical URDF (3D object + kinematics) creator/editor for HYDRA-UMC STUDIO's model catalog. Not started yet.
-- **[HYDRA-UMC-DSI](https://github.com/JuanenRac/HYDRA-UMC-DSI)** — planned: native touch UI for HYDRA-UMC's own 7" DSI touchscreen (1280×800) on the Compute Module 5. Not started yet.
+- **[HYDRA-UMC-EDITOR-URDF](https://github.com/JuanenRac/HYDRA-UMC-EDITOR-URDF)** — desktop (Python/PySide6) graphical URDF creator/editor for this project's own model catalog: pulls source files from GitHub or a local folder, validates DOF feasibility, edits color/scale/kinematics with a live 3D preview, and pushes the finished result to a running STUDIO server. Real and working, not a placeholder.
+- **[HYDRA-UMC-DSI](https://github.com/JuanenRac/HYDRA-UMC-DSI)** — planned: a native touch UI for HYDRA-UMC's own 7" DSI touchscreen (1280×800) on the Compute Module 5, controlling this same server directly from the board. Not started yet.
 
 **URTC platform** — the tool head controller every HYDRA-UMC robot arm carries
 - **URTC** *(this repository)* — Universal Robot Tool Controller: STM32F303-based CAN bus tool head controller, 25 fully-implemented tool profiles, CAN-OTA firmware update.
@@ -535,7 +546,7 @@ Because this project consists of several different types of content, individual 
 
 2. The **hardware designs** (Eagle schematic/board files, gerbers, and the 3D-printable parts under `./PCB` and `./3D`) are available under the **CERN Open Hardware Licence v2 - Strongly Reciprocal (CERN-OHL-S v2)**. Full text at https://cern-ohl.web.cern.ch/.
 
-3. The **documentation** (this README, the service manual, and the reference files under `./docs`) is available under **Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)**. Full text at https://creativecommons.org/licenses/by-sa/4.0/.
+3. The **documentation** (this README and the reference files under `./docs`) is available under **Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)**. Full text at https://creativecommons.org/licenses/by-sa/4.0/.
 
 If you build on this project, keep the licensing split in mind: code changes to the firmware should stay GPL-3.0, hardware modifications should stay CERN-OHL-S, and documentation derivatives should stay CC BY-SA - each with attribution back to this project.
 
