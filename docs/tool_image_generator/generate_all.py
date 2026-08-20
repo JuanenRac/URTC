@@ -36,8 +36,12 @@ FILENAMES = {
 
 assert set(FILENAMES.keys()) == set(TOOLS.keys()), "Desajuste entre FILENAMES y TOOLS"
 
-OUT_DIR = "/home/claude/urtc_images/generated"
 import os
+# Ruta relativa al propio script, no absoluta - PROCEDURE.TXT documenta
+# "Output lands in a local ./generated/ subfolder"; un path absoluto tipo
+# /home/claude/... (residuo de una sesion de agente anterior) rompia esa
+# promesa y fallaba en cualquier otra maquina/usuario.
+OUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "generated")
 os.makedirs(OUT_DIR, exist_ok=True)
 
 for tid in sorted(TOOLS.keys()):

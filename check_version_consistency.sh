@@ -51,9 +51,20 @@ if [ ! -f "$FW_DIR/firmware_common.h" ]; then
     exit 2
 fi
 
-FW_MINOR=$(grep -oP '(?<=#define FIRMWARE_VERSION_MINOR )\d+' "$FW_DIR/firmware_common.h" 2>/dev/null)
-FLASHER_VER=$(grep -oP '(?<=FLASHER_VERSION = ")[^"]+' "$ROOT/tools/flasher/flasher_config.py" 2>/dev/null)
-TESTER_VER=$(grep -oP '(?<=TESTER_VERSION = ")[^"]+' "$ROOT/tools/tester/tester_config.py" 2>/dev/null)
+# sed (POSIX BRE), not grep -oP: PCRE lookbehind needs a UTF-8-aware grep
+# build/locale to work at all - on a plain/C locale (confirmed reproducible
+# on this exact machine: "grep: -P supports only unibyte and UTF-8 locales")
+# grep -P exits nonzero and prints nothing, which the 2>/dev/null here was
+# silently swallowing - FW_MINOR came back empty even though the #define
+# was right there, cascading into CURRENT=UNKNOWN and skipping sections
+# 3-5 entirely. sed's BRE engine has no such locale dependency, and
+# build_firmware.sh already reads this exact FIRMWARE_VERSION_MAJOR/MINOR
+# pair the same way (see its own FW_VER/FW_MIN) - reusing that proven
+# pattern here instead of a second, PCRE-only implementation of the same
+# extraction.
+FW_MINOR=$(sed -n 's/^#define[[:space:]]\+FIRMWARE_VERSION_MINOR[[:space:]]\+\([0-9]\+\).*/\1/p' "$FW_DIR/firmware_common.h" 2>/dev/null | head -1)
+FLASHER_VER=$(sed -n 's/^FLASHER_VERSION = "\([^"]*\)".*/\1/p' "$ROOT/tools/flasher/flasher_config.py" 2>/dev/null | head -1)
+TESTER_VER=$(sed -n 's/^TESTER_VERSION = "\([^"]*\)".*/\1/p' "$ROOT/tools/tester/tester_config.py" 2>/dev/null | head -1)
 
 echo "  FIRMWARE_VERSION_MINOR (main board):  ${FW_MINOR:-NOT FOUND}"
 echo "  FLASHER_VERSION:                      ${FLASHER_VER:-NOT FOUND}"
@@ -220,7 +231,9 @@ SLAVE_FILES=(
 for f in "${SLAVE_FILES[@]}"; do
     [ -f "$ROOT/$f" ] && pass "$f exists" || fail "$f MISSING"
 done
-SLAVE_BOOT_VER=$(grep -oP '(?<=#define BOOTLOADER_VERSION_MAJOR )\d+' "$ROOT/src/F303-slave/boot/slaveboot_common.h" 2>/dev/null)
+# sed, not grep -oP - see section 1's own note above on why (PCRE
+# lookbehind's locale dependency, reproducibly broken on this machine).
+SLAVE_BOOT_VER=$(sed -n 's/^#define[[:space:]]\+BOOTLOADER_VERSION_MAJOR[[:space:]]\+\([0-9]\+\).*/\1/p' "$ROOT/src/F303-slave/boot/slaveboot_common.h" 2>/dev/null | head -1)
 if [ -n "$SLAVE_BOOT_VER" ]; then
     pass "slave bootloader version constant readable (MAJOR=$SLAVE_BOOT_VER)"
 else
