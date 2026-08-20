@@ -56,8 +56,9 @@ uint32_t CRC32_Finalize(uint32_t crc) {
 // -----------------------------------------------------------------------
 uint8_t Flash_ErasePages(uint32_t start_addr, uint32_t num_pages) {
     // One page at a time with an IWDG refresh between each - the backup
-    // slot here is 58KB (29 pages), smaller than the main board's own
-    // 112KB/56-page slot, so this margin is even more comfortable here,
+    // slot here is 54KB (27 pages, see APP_MAX_SIZE in slaveboot_common.h),
+    // smaller than the main board's own 112KB/56-page slot, so this margin
+    // is even more comfortable here,
     // but the reasoning (a single erase-everything call can't refresh the
     // watchdog mid-loop) is identical.
     for (uint32_t i = 0; i < num_pages; i++) {

@@ -87,7 +87,7 @@ static void sha256_update(SHA256_CTX *ctx, const uint8_t data[], uint32_t len) {
             ctx->bitlen += 512;
             ctx->datalen = 0;
         }
-        // A single call here can span the full 112KB backup slot (via
+        // A single call here can span the full 54KB backup slot (via
         // hmac_sha256_flash_region) - comfortably inside the IWDG's ~800ms
         // window under nominal timing, but LSI's own accuracy is
         // notoriously loose across temperature, and this costs nothing to

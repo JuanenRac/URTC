@@ -9,7 +9,7 @@
 #include <stdint.h>
 
 // HMAC-SHA256 over an arbitrary flash region, read byte-by-byte rather than
-// requiring the whole thing in RAM at once (the backup slot here is 58KB;
+// requiring the whole thing in RAM at once (the backup slot here is 54KB;
 // RAM on this chip is 40KB+8KB CCM total - comfortable margin either way,
 // but reading in place rather than buffering costs nothing and keeps this
 // identical to the main board's own version of the same function).
