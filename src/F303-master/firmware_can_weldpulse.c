@@ -26,12 +26,28 @@ void Handle_CAN_WeldPulse(void) {
         && active_tool == TOOL_SPOT_WELDER) {
         if (rxData[0] != 0x01) return; // only an explicit fire command starts a pulse - anything else on this ID is ignored, not treated as a malformed-but-tolerated variant
         // Contact sensor gate - doc #4's own "ensure pressure before
-        // firing" requirement. TCRT_D0_DIG_PIN reads HIGH when contact
-        // is made (same polarity convention already established for
-        // this pin's other digital-input uses elsewhere in this
-        // firmware) - refuses to fire without it rather than trusting
-        // the master to have checked first.
-        if (HAL_GPIO_ReadPin(GPIOB, TCRT_D0_DIG_PIN) != GPIO_PIN_SET) return;
+        // firing" requirement. FIXED (was inverted): this pin is
+        // reconfigured for TOOL_SPOT_WELDER by the exact same
+        // GPIO_MODE_INPUT + GPIO_PULLUP branch in STM32F303CC_main.c
+        // ("PB3 reconfiguration") that the vacuum pickup's LM393
+        // comparator and the generic Drill/Laser/AOI endstop input also
+        // use - and every other reader of that same branch's pin
+        // (Control_EndstopTelemetry in firmware_control_sensors.c, plus
+        // both of that branch's own comments) documents it as
+        // active-low: idle/no-contact reads HIGH (GPIO_PIN_SET, via the
+        // internal pull-up), contact/triggered reads LOW
+        // (GPIO_PIN_RESET). The pull-up itself only makes electrical
+        // sense under that assumption - a sensor that instead drove HIGH
+        // on contact would need a pull-down here, not a pull-up. The
+        // previous `!= GPIO_PIN_SET` check required HIGH (idle/no
+        // contact) to proceed, which let a pulse fire with nothing
+        // touching CONN_SEN's contact input (or the sensor disconnected
+        // entirely) and refused to fire the one time contact really was
+        // made - inverted from the "ensure pressure before firing" this
+        // gate exists for. Corrected to require GPIO_PIN_RESET (LOW),
+        // matching the active-low convention used everywhere else this
+        // exact pin/pull-up combination is read in this firmware.
+        if (HAL_GPIO_ReadPin(GPIOB, TCRT_D0_DIG_PIN) != GPIO_PIN_RESET) return;
 
         // Clamp: weld_pulse_duration_ms comes straight from a CAN command
         // with no prior validation, same reasoning as aoi_strobe_period's

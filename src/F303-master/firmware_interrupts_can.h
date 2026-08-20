@@ -8,5 +8,6 @@
 
 void HAL_CAN_ErrorCallback(CAN_HandleTypeDef *hcan_e);
 void CAN_RX0_IRQHandler(void);
+void CAN_SCE_IRQHandler(void);
 
 #endif // FIRMWARE_INTERRUPTS_CAN_H

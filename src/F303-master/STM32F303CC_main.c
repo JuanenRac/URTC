@@ -70,7 +70,6 @@ uint8_t raw_id_pin_value = 0xFF;           // The actual 5-bit ID-jumper reading
                                             // a valid 5-bit reading - never mistaken
                                             // for a real one.
 SavedState_t last_saved_state;     // mirrors what's currently written to the F-RAM, for change detection in SavedState_MaybeSave()
-uint32_t last_fram_write_tick = 0;
 
 CAN_HandleTypeDef hcan;
 CAN_RxHeaderTypeDef rxHeader;
@@ -365,11 +364,25 @@ int main(void) {
     // peripheral itself as part of its own setup, before its first
     // transactions.
     OLED_Init();
+    // Refreshed here, and after each of the several I2C-touching init
+    // calls below, rather than only once the splash loop's own refresh
+    // starts a little further down: OLED_Init()'s worst case (display
+    // acks the initial short probe but then times out repeatedly across
+    // its ~25 individual command writes, each retried once via
+    // I2C2_TransmitWithRecovery's own 50ms+50ms budget) can accumulate
+    // close to this watchdog's own ~800ms window on its own, and
+    // SavedState_Load()/the MLX90640-family Direct_Init() calls/
+    // MX_ExpansionSPI_Init() below add more I2C/SPI time on top of that
+    // before the splash loop's first HAL_IWDG_Refresh() would otherwise
+    // run - refreshing after each step bounds the unrefreshed window to
+    // whichever single step is slowest, not their sum.
+    HAL_IWDG_Refresh(&hiwdg);
     // Parameter-persistence F-RAM shares I2C2 with the OLED above - see
     // the FRAM_I2C_ADDR comment for why. Loads (but doesn't act on)
     // whatever was saved before the last shutdown - see SavedState_Load's
     // own comment for the safety reasoning.
     SavedState_Load();
+    HAL_IWDG_Refresh(&hiwdg);
     // Expansion connector's bit-banged I2C bus - see
     // firmware_expansion_i2c.c's own comment for why this isn't a
     // hardware I2C peripheral either.
@@ -396,6 +409,7 @@ int main(void) {
     // slave_common.h's own REG_MLX_SENSOR_VARIANT comment. Skipped
     // entirely on any other board variant, since there's no slave chip
     // to relay to.
+    HAL_IWDG_Refresh(&hiwdg); // after whichever MLX9064x Direct_Init() ran above, same reasoning as the refreshes right after HAL_IWDG_Init()
     if (expansion_board_type == 3 || expansion_board_type == 4) {
         ExpansionI2C_SlaveWriteRegister(0x14, (uint8_t*)&mlx_sensor_variant, 1); // REG_MLX_SENSOR_VARIANT
     }
@@ -403,6 +417,7 @@ int main(void) {
     // comment and PINOUT_CONNECTORS.TXT for why this isn't a hardware
     // SPI peripheral.
     MX_ExpansionSPI_Init();
+    HAL_IWDG_Refresh(&hiwdg);
     Render_SplashScreen(0);
     // Big JuanenBOT/URTC splash, 5s total (CAN already active, no frames are
     // lost) - broken into small chunks with a refresh in between instead of

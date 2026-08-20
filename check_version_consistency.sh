@@ -4,19 +4,25 @@
 # =============================================================================
 # Companion to VERSION_CHECKLIST.txt - read that file first, this script is
 # the mechanical half of it. Run from the project root (the folder
-# containing README.md, src/, tools/, docs/, etc).
+# containing README.md, src/, docs/, etc).
 #
-# What this does: reads the 4 Track A/E code constants as the source of
-# truth (main board firmware, Flasher, Tester, expansion slave app -
-# only the main firmware and the 2 PC tools actually move together as
-# "the project version"; the slave's own version is reported separately,
-# never compared against Track A's number, since Track E is fully
-# independent), then greps every location VERSION_CHECKLIST.txt
-# documents under Track A/A6 for the version tag this bump should have
-# replaced, reporting any that still show the old one. Does NOT touch
-# Track B (hardware/PCB) or Track C (main board bootloader) - neither
-# moves with this number, checking them here would just create false
-# alarms.
+# What this does: reads the Track A/E code constants as the source of
+# truth (main board firmware, expansion slave app), then greps every
+# location VERSION_CHECKLIST.txt documents under Track A/A6 for the
+# version tag this bump should have replaced, reporting any that still
+# show the old one. Does NOT touch Track B (hardware/PCB) or Track C
+# (main board bootloader) - neither moves with this number, checking
+# them here would just create false alarms.
+#
+# Flasher and Tester (formerly tools/flasher, tools/tester in THIS repo)
+# are no longer checked here - they were split out into their own
+# URTC-FLASHER/URTC-TESTER repositories (confirmed against disk: tools/
+# does not exist anywhere in this checkout, and README.md's own "Related
+# Projects"/"PC Tools" sections already point at the 2 separate repos).
+# Verifying their version against this repo's own Track A number would
+# need cloning those repos alongside this one - out of scope for a
+# single-repo checker; do that comparison by hand if it matters for a
+# given release.
 #
 # Rewritten from scratch (previous version predated, and completely
 # assumed, the VX.X/ version-numbered folder scheme and the dual
@@ -63,12 +69,8 @@ fi
 # pattern here instead of a second, PCRE-only implementation of the same
 # extraction.
 FW_MINOR=$(sed -n 's/^#define[[:space:]]\+FIRMWARE_VERSION_MINOR[[:space:]]\+\([0-9]\+\).*/\1/p' "$FW_DIR/firmware_common.h" 2>/dev/null | head -1)
-FLASHER_VER=$(sed -n 's/^FLASHER_VERSION = "\([^"]*\)".*/\1/p' "$ROOT/tools/flasher/flasher_config.py" 2>/dev/null | head -1)
-TESTER_VER=$(sed -n 's/^TESTER_VERSION = "\([^"]*\)".*/\1/p' "$ROOT/tools/tester/tester_config.py" 2>/dev/null | head -1)
 
 echo "  FIRMWARE_VERSION_MINOR (main board):  ${FW_MINOR:-NOT FOUND}"
-echo "  FLASHER_VERSION:                      ${FLASHER_VER:-NOT FOUND}"
-echo "  TESTER_VERSION:                       ${TESTER_VER:-NOT FOUND}"
 
 if [ -z "$FW_MINOR" ]; then
     fail "could not read FIRMWARE_VERSION_MINOR from firmware_common.h - check the #define still exists with this exact name"
@@ -78,15 +80,6 @@ else
     CURRENT="1.${FW_MINOR}"
 fi
 
-if [ "$CURRENT" != "UNKNOWN" ]; then
-    if [ "$FLASHER_VER" != "$CURRENT" ]; then
-        warn "FLASHER_VERSION ($FLASHER_VER) != firmware-derived expectation ($CURRENT) - confirm this is intentional, the 2 PC tools don't have to match the firmware's own MAJOR.MINOR digit-for-digit unless a project-wide migration deliberately moved all 3 together, the way the 1.0->1.1 one did"
-    fi
-    if [ "$TESTER_VER" != "$CURRENT" ]; then
-        warn "TESTER_VERSION ($TESTER_VER) != firmware-derived expectation ($CURRENT) - same caveat"
-    fi
-fi
-
 echo ""
 echo "Using CURRENT=$CURRENT for the rest of this check."
 echo ""
@@ -94,7 +87,7 @@ echo "============================================================"
 echo "2. Folder structure (Track A2) - confirming the flat layout is"
 echo "   actually flat, no VX.X/ subfolder has reappeared"
 echo "============================================================"
-for d in "src/F303-master" "src/F303-master/boot" "src/F303-slave" "src/F303-slave/boot" "tools/flasher" "tools/tester"; do
+for d in "src/F303-master" "src/F303-master/boot" "src/F303-slave" "src/F303-slave/boot"; do
     if [ -d "$ROOT/$d" ]; then
         pass "$d exists"
     else
@@ -171,20 +164,9 @@ if [ "$CURRENT" != "UNKNOWN" ]; then
                 pass "$f"
             fi
         done
-        for tool in flasher tester; do
-            for lang in "" _spa _ita _fra _deu; do
-                f="tools/$tool/README${lang}.md"
-                full="$ROOT/$f"
-                [ -f "$full" ] || { warn "$f not found, skipped"; continue; }
-                HITS=$(grep -n "[Vv]ersion[^:]*:\*\* ${PREV}\b\|[Vv]ersion :\*\* ${PREV}\b" "$full" 2>/dev/null)
-                if [ -n "$HITS" ]; then
-                    fail "$f still shows version $PREV in its own header line:"
-                    echo "$HITS" | sed 's/^/         /'
-                else
-                    pass "$f"
-                fi
-            done
-        done
+        # Flasher/Tester README version-tag checks removed - those tools
+        # live in their own repos now (URTC-FLASHER/URTC-TESTER), not
+        # under tools/ here - see this script's own top-of-file note.
     else
         echo "  (skipped - can't derive a previous version below 1.0)"
     fi
@@ -200,9 +182,7 @@ echo "   data and need a human/Claude visual check, see"
 echo "   VERSION_CHECKLIST.txt section A5"
 echo "============================================================"
 if [ "$CURRENT" != "UNKNOWN" ] && [ "$PREV_MINOR" -ge 0 ]; then
-    for f in "tools/flasher/assets/URTC_LOGO_FLASHER.svg" \
-             "tools/tester/assets/URTC_LOGO_TESTER.svg" \
-             "images/URTC_LOGO_FLASHER.svg" \
+    for f in "images/URTC_LOGO_FLASHER.svg" \
              "images/URTC_LOGO_TESTER.svg"; do
         full="$ROOT/$f"
         [ -f "$full" ] || { warn "$f not found, skipped"; continue; }
@@ -256,19 +236,27 @@ done
 
 echo ""
 echo "============================================================"
-echo "7. Syntax sanity for both PC tools"
+echo "7. Syntax sanity for this repo's own Python tooling"
 echo "============================================================"
-for tool in flasher tester; do
-    d="$ROOT/tools/$tool"
-    if [ -d "$d" ]; then
-        if (cd "$d" && python3 -m py_compile *.py 2>/tmp/pycompile_err.log); then
-            pass "$tool: all .py files compile"
-            find "$d" -iname "__pycache__" -exec rm -rf {} + 2>/dev/null
-        else
-            fail "$tool: py_compile errors - see /tmp/pycompile_err.log"
-        fi
+# Flasher/Tester's own py_compile check removed along with the rest of
+# their tools/ references above - they're their own repos now, with
+# their own CI. What's actually still in THIS repo: generate_manifest.py
+# and docs/tool_image_generator/'s 3 scripts.
+PY_FILES=("generate_manifest.py" "docs/tool_image_generator/generate_all.py" \
+          "docs/tool_image_generator/render_engine.py" "docs/tool_image_generator/tool_data.py")
+PY_OK=1
+for f in "${PY_FILES[@]}"; do
+    [ -f "$ROOT/$f" ] || { warn "$f not found, skipped"; continue; }
+    if ! python3 -m py_compile "$ROOT/$f" 2>"$ROOT/.pycompile_err.log"; then
+        fail "$f: py_compile error - see .pycompile_err.log"
+        PY_OK=0
     fi
 done
+if [ "$PY_OK" = "1" ]; then
+    pass "all tracked .py files compile"
+    rm -f "$ROOT/.pycompile_err.log" 2>/dev/null
+fi
+find "$ROOT" -iname "__pycache__" -exec rm -rf {} + 2>/dev/null
 
 echo ""
 echo "============================================================"

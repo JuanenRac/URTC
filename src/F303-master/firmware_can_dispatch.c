@@ -9,7 +9,10 @@
 // (blocks everything except 0x100 while system_error_flag is set), then
 // global commands that ARE blocked during a fault, then the second
 // error-gate (blocks the entire per-tool switch below during a fault),
-// then dispatch to whichever of the 12 tool profiles is currently active.
+// then dispatch to whichever of the 25 tool profiles is currently active
+// (TOOL_VACUUM_PICKUP and TOOL_SCAN_PROBE take no CAN command of their
+// own - see CANBUS.TXT - so they correctly fall to the default case
+// alongside TOOL_CONFORMAL_COATING/TOOL_PRESSFIT_INSERTER below).
 //
 // Adding a new tool profile (see the 16 more planned) means: write its own
 // firmware_can_<toolname>.c/.h with a Handle_CAN_<ToolName>(void) function,

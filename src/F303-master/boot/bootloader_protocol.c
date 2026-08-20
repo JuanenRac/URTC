@@ -396,16 +396,30 @@ static uint8_t FlushPageBuffer(void) {
 }
 
 void HandleStartUpdate(uint8_t *data) {
-    update_total_size = ((uint32_t)data[0] << 24) | ((uint32_t)data[1] << 16)
-                       | ((uint32_t)data[2] << 8) | data[3];
-    update_declared_hw_id = ((uint32_t)data[4] << 24) | ((uint32_t)data[5] << 16)
-                           | ((uint32_t)data[6] << 8) | data[7];
+    // Parsed into locals and validated BEFORE touching update_total_size /
+    // update_declared_hw_id below - those two are the same shared globals
+    // HandleData/CAN_SendHeartbeat's progress math read on every frame of
+    // an update that might already be in progress. Writing them first and
+    // validating after (the previous order here) meant a malformed or
+    // out-of-order START_UPDATE arriving mid-transfer - a duplicate/retried
+    // frame, a bit-flip on the bus, a confused host - would overwrite
+    // update_total_size with a rejected value while leaving
+    // update_in_progress, update_bytes_received, page_buffer_fill, and
+    // current_page_index exactly as they were from the good update already
+    // underway: an early return here left the state machine internally
+    // inconsistent (an in-progress transfer with a size that no longer
+    // matches what was actually erased/allocated for it) rather than either
+    // cleanly continuing the original update or cleanly aborting it.
+    uint32_t new_total_size = ((uint32_t)data[0] << 24) | ((uint32_t)data[1] << 16)
+                             | ((uint32_t)data[2] << 8) | data[3];
+    uint32_t new_hw_id = ((uint32_t)data[4] << 24) | ((uint32_t)data[5] << 16)
+                        | ((uint32_t)data[6] << 8) | data[7];
 
-    if (update_total_size == 0 || update_total_size > APP_MAX_SIZE) {
+    if (new_total_size == 0 || new_total_size > APP_MAX_SIZE) {
         CAN_SendStatus(STATUS_ERROR);
         return;
     }
-    if (update_declared_hw_id != THIS_HARDWARE_ID) {
+    if (new_hw_id != THIS_HARDWARE_ID) {
         // Rejected before touching flash at all - an image built for
         // different hardware doesn't even get a chance to erase anything.
         // Uses the same reason-coded path as the other verification
@@ -414,6 +428,9 @@ void HandleStartUpdate(uint8_t *data) {
         CAN_SendVerifyFailReason(VERIFY_FAIL_REASON_HARDWARE_ID);
         return;
     }
+
+    update_total_size = new_total_size;
+    update_declared_hw_id = new_hw_id;
 
     OLED_ClearAll_Boot();
     OLED_PrintStr2x_Boot(0, 16, "UPDATING");

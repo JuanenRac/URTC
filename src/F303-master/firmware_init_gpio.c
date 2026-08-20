@@ -65,6 +65,16 @@ void MX_GPIO_Post_Init(void) {
         HAL_GPIO_WritePin(GPIOB, TMC_ENN_PIN, GPIO_PIN_RESET); // Laser: LOW is safe/locked
     } else if (active_tool == TOOL_DRILL) {
         HAL_GPIO_WritePin(DRILL_BRAKE_PORT, DRILL_BRAKE_PIN, GPIO_PIN_RESET); // Drill: LOW is braked, on its own dedicated pin
+        // The drill never drives anything through the onboard TMC2209/
+        // STEP/DIR/TMC_ENN mechanism (see Handle_CAN_Drill - it only ever
+        // touches DRILL_FRIN/DRILL_BRAKE/TIM1), but TMC_ENN_PIN's own GPIO
+        // reset default is LOW (=ENABLED, active-low) until explicitly
+        // written otherwise - without this, the onboard driver is left
+        // energized/enabled for the entire time TOOL_DRILL is active,
+        // instead of the disabled default every other non-motor tool
+        // below gets (same reasoning as the TOOL_INVALID branch forcing
+        // this same pin below).
+        HAL_GPIO_WritePin(GPIOB, TMC_ENN_PIN, GPIO_PIN_SET);
     } else if (active_tool == TOOL_INVALID) {
         // Covers every possible physical identity this state could
         // correspond to - LOW is safe for the shared stepper/laser pin,

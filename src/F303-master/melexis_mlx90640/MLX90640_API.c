@@ -48,25 +48,37 @@ int MLX90640_SynchFrame(uint8_t slaveAddr)
     uint16_t dataReady = 0;
     uint16_t statusRegister;
     int error = 1;
-    
+    // This project's own addition, not part of Melexis's original file:
+    // a bounded poll count instead of an unbounded while() - this function
+    // runs synchronously on this board's own main/CAN-handler context
+    // (see firmware_mlx90640_app.c's MLX90640_Direct_TriggerCapture), so a
+    // sensor that acks every I2C transaction but never actually sets its
+    // own data-ready bit (stuck/misconfigured/marginal bus) would otherwise
+    // hang the whole firmware forever instead of reporting a real error.
+    uint16_t pollsLeft = MLX90640_DATA_READY_MAX_POLLS;
+
     error = MLX90640_I2CWrite(slaveAddr, MLX90640_STATUS_REG, MLX90640_INIT_STATUS_VALUE);
     if(error == -MLX90640_I2C_NACK_ERROR)
     {
         return error;
     }
-    
+
     while(dataReady == 0)
     {
         error = MLX90640_I2CRead(slaveAddr, MLX90640_STATUS_REG, 1, &statusRegister);
         if(error != MLX90640_NO_ERROR)
         {
             return error;
-        }    
+        }
         //dataReady = statusRegister & 0x0008;
-        dataReady = MLX90640_GET_DATA_READY(statusRegister); 
-    }     
-    
-   return MLX90640_NO_ERROR;   
+        dataReady = MLX90640_GET_DATA_READY(statusRegister);
+        if(dataReady == 0 && --pollsLeft == 0)
+        {
+            return -MLX90640_DATA_READY_TIMEOUT_ERROR;
+        }
+    }
+
+   return MLX90640_NO_ERROR;
 }
 
 int MLX90640_TriggerMeasurement(uint8_t slaveAddr)
@@ -119,18 +131,26 @@ int MLX90640_GetFrameData(uint8_t slaveAddr, uint16_t *frameData)
     int error = 1;
     uint16_t data[64];
     uint8_t cnt = 0;
-    
+    // This project's own addition, not part of Melexis's original file -
+    // see MLX90640_SynchFrame's own comment above for why an unbounded
+    // wait here is unsafe on this board.
+    uint16_t pollsLeft = MLX90640_DATA_READY_MAX_POLLS;
+
     while(dataReady == 0)
     {
         error = MLX90640_I2CRead(slaveAddr, MLX90640_STATUS_REG, 1, &statusRegister);
         if(error != MLX90640_NO_ERROR)
         {
             return error;
-        }    
+        }
         //dataReady = statusRegister & 0x0008;
-        dataReady = MLX90640_GET_DATA_READY(statusRegister); 
-    }      
-    
+        dataReady = MLX90640_GET_DATA_READY(statusRegister);
+        if(dataReady == 0 && --pollsLeft == 0)
+        {
+            return -MLX90640_DATA_READY_TIMEOUT_ERROR;
+        }
+    }
+
     error = MLX90640_I2CWrite(slaveAddr, MLX90640_STATUS_REG, MLX90640_INIT_STATUS_VALUE);
     if(error == -MLX90640_I2C_NACK_ERROR)
     {

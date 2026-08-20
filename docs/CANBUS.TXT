@@ -669,8 +669,12 @@ Data:
         clamped to 2000ms maximum
   Note: Refuses to fire unless the contact sensor (TCRT_D0_DIG_PIN, the
         same CONN_SEN digital input shared with the vacuum pickup's own
-        comparator) reads HIGH first - "ensure pressure before firing"
-        per the tool's own design brief. Ignored entirely while a pulse
+        comparator, active-low via the shared internal pull-up - see
+        firmware_can_weldpulse.c) reads LOW (contact made) first -
+        "ensure pressure before firing" per the tool's own design brief.
+        Fixed in firmware: previously checked for HIGH, which is this
+        pin's idle/no-contact state, so the gate did the opposite of its
+        job. Ignored entirely while a pulse
         from this command OR 0x200 below is already in progress (shared
         pulse state, only one of these 2 tools is ever active at once).
         Real timing resolution is ~20ms (this project's existing 20ms

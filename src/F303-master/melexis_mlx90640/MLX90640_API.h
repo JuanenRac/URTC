@@ -27,6 +27,19 @@
 #define MLX90640_EEPROM_DATA_ERROR 7
 #define MLX90640_FRAME_DATA_ERROR 8
 #define MLX90640_MEAS_TRIGGER_ERROR 9
+// This project's own addition, not part of Melexis's original file:
+// returned by MLX90640_SynchFrame/MLX90640_GetFrameData when the sensor's
+// own data-ready status bit never sets within MLX90640_DATA_READY_MAX_POLLS
+// read attempts, instead of polling it forever - see those functions' own
+// comments in MLX90640_API.c for why an unbounded wait is unsafe here.
+#define MLX90640_DATA_READY_TIMEOUT_ERROR 10
+// This project's own addition, not part of Melexis's original file: the
+// poll-attempt cap used with MLX90640_DATA_READY_TIMEOUT_ERROR above. Not a
+// wall-clock timeout (this file doesn't include the HAL) - just a large
+// enough bound that a real sensor's own refresh cycle (worst case a few
+// hundred ms at the slowest configurable refresh rate) always finishes well
+// within it, while a stuck bus still fails in bounded time instead of never.
+#define MLX90640_DATA_READY_MAX_POLLS 20000
 
 #define BIT_MASK(x) (1UL << (x))
 #define REG_MASK(sbit,nbits) ~((~(~0UL << (nbits))) << (sbit))

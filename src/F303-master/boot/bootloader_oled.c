@@ -85,7 +85,14 @@ static void MX_I2C2_Init_Boot(void) {
     // firmware's own OLED init.
     HAL_GPIO_Init(OLED_PORT, &gpio);
 
-    __HAL_RCC_I2C1_CLK_ENABLE();
+    __HAL_RCC_I2C2_CLK_ENABLE(); // must match hi2c2.Instance = I2C2 below -
+    // enabling I2C1's clock here left I2C2's peripheral clock gated off
+    // entirely, so every I2C2 register access below (HAL_I2C_Init and
+    // everything after it) operated on an unclocked peripheral: the bus
+    // never actually toggled, HAL_I2C_IsDeviceReady always timed out, and
+    // oled_present_boot latched 0 even with a working display attached -
+    // this is what actually made I2C2 not I2C1 true for the pins/instance
+    // above but not for the clock gating that has to match it.
     hi2c2.Instance = I2C2;
     hi2c2.Init.Timing = 0x0010232A; // ~100kHz, same derivation as the application's
     hi2c2.Init.OwnAddress1 = 0;
