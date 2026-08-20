@@ -506,7 +506,8 @@ If anyone in the community is working on custom end-effectors, smart tool-change
 │                                build_firmware.sh/.bat run, or standalone any time the
 │                                manifest needs to catch up without a full rebuild
 ├── LICENSE
-└── README.md                    This file
+├── README.md                    This file
+└── README_spa.md / README_ita.md / README_fra.md / README_deu.md  <- translations
 ```
 
 Hardware design files (Eagle schematic/board/netlists) will be added as the layout stabilizes.
@@ -546,7 +547,7 @@ Because this project consists of several different types of content, individual 
 
 2. The **hardware designs** (Eagle schematic/board files, gerbers, and the 3D-printable parts under `./PCB` and `./3D`) are available under the **CERN Open Hardware Licence v2 - Strongly Reciprocal (CERN-OHL-S v2)**. Full text at https://cern-ohl.web.cern.ch/.
 
-3. The **documentation** (this README and the reference files under `./docs`) is available under **Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)**. Full text at https://creativecommons.org/licenses/by-sa/4.0/.
+3. The **documentation** (this README and its own translations - `README_spa.md`, `README_ita.md`, `README_fra.md`, `README_deu.md` - plus the reference files under `./docs`) is available under **Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)**. Full text at https://creativecommons.org/licenses/by-sa/4.0/.
 
 If you build on this project, keep the licensing split in mind: code changes to the firmware should stay GPL-3.0, hardware modifications should stay CERN-OHL-S, and documentation derivatives should stay CC BY-SA - each with attribution back to this project.
 
