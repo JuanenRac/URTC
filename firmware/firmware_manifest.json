@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-21T11:48:04Z",
+  "generated_at": "2026-08-21T16:14:44Z",
   "project": {
     "name": "URTC",
     "full_name": "Universal Robot Tool Controller",
@@ -9,7 +9,7 @@
   },
   "notes": [
     "This indexes 4 INDEPENDENT components (2 chips, each with its own bootloader and application) - version_code is only meaningful compared against an EARLIER manifest's own value for that exact same component key. Comparing version_code ACROSS different component keys means nothing.",
-    "version_code = major*10000 + minor*100 + patch (patch=0 for the 2 application components) - bigger is newer, safe for simple numeric comparison. Don't compare version_string alphabetically.",
+    "version_code = major*10000 + minor*100 + patch - bigger is newer, safe for simple numeric comparison. Don't compare version_string alphabetically.",
     "crc32 is computed over the real .bin file exactly as shipped here (standard CRC-32/ISO-HDLC), the same variant this project's own bootloader computes internally during a real update (see src/F303-master/boot/bootloader_flash.c's own CRC32_Update/CRC32_Finalize) - a mismatch against a freshly-downloaded copy means the file changed since this manifest was generated.",
     "hardware_id is what CAN 0x7F8/0x7F9 (version query) reports live from a real connected board - cross-check it against that live answer before flashing anything, not just this manifest's own filename-to-chip mapping.",
     "flash_region_max_bytes is the maximum this component could ever be, not this specific build's own actual size (see files.bin.size_bytes for that).",
@@ -22,22 +22,22 @@
       "hardware_id": "0x0303CC01",
       "version": {
         "major": 1,
-        "minor": 1,
-        "patch": 9
+        "minor": 2,
+        "patch": 1
       },
-      "version_string": "1.1.9",
-      "version_code": 10109,
+      "version_string": "1.2.1",
+      "version_code": 10201,
       "flash_address": "0x08000000",
       "flash_region_max_bytes": 32768,
       "files": {
         "bin": {
           "filename": "URTC_BOOTLOADER.bin",
-          "size_bytes": 17792,
-          "crc32": "0x0CE71FF3"
+          "size_bytes": 17796,
+          "crc32": "0xFCCFA75D"
         },
         "hex": {
           "filename": "URTC_BOOTLOADER.hex",
-          "size_bytes": 50143
+          "size_bytes": 50151
         },
         "elf": {
           "filename": "URTC_BOOTLOADER.elf",
@@ -51,17 +51,18 @@
       "hardware_id": "0x0303CC01",
       "version": {
         "major": 1,
-        "minor": 1
+        "minor": 1,
+        "patch": 2
       },
-      "version_string": "1.1",
-      "version_code": 10100,
+      "version_string": "1.1.2",
+      "version_code": 10102,
       "flash_address": "0x08008000",
       "flash_region_max_bytes": 114688,
       "files": {
         "bin": {
           "filename": "URTC_V1.1_F303CC.bin",
           "size_bytes": 70180,
-          "crc32": "0x10989B90"
+          "crc32": "0xB354EEF8"
         },
         "hex": {
           "filename": "URTC_V1.1_F303CC.hex",
@@ -80,10 +81,10 @@
       "version": {
         "major": 1,
         "minor": 0,
-        "patch": 3
+        "patch": 5
       },
-      "version_string": "1.0.3",
-      "version_code": 10003,
+      "version_string": "1.0.5",
+      "version_code": 10005,
       "flash_address": "0x08000000",
       "flash_region_max_bytes": 18432,
       "files": {
@@ -108,10 +109,11 @@
       "hardware_id": "0x0303CB01",
       "version": {
         "major": 1,
-        "minor": 0
+        "minor": 0,
+        "patch": 2
       },
-      "version_string": "1.0",
-      "version_code": 10000,
+      "version_string": "1.0.2",
+      "version_code": 10002,
       "flash_address": "0x08005000",
       "flash_region_max_bytes": 55296,
       "files": {

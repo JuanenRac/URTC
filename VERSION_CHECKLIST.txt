@@ -1,17 +1,27 @@
 =============================================================================
 URTC - VERSION BUMP CHECKLIST
 =============================================================================
-Built after the 1.0 -> 1.1 migration (1 August 2026), which took 4
-separate correction rounds with the user to find everything - each round
-using a grep pattern that missed a different real case. Rewritten
-completely after a later reorganization (also 1 August 2026, same day)
-retired the dual monolithic/partitioned form and the VX.X/ version-
-numbered subfolder scheme project-wide - the original version of this
-document described a folder/file layout that no longer exists at all.
-This document exists so the NEXT bump doesn't repeat either round's
-mistakes. Read this top-to-bottom before touching anything; don't just
-grep for the old number and replace it blindly - several of these
-entries explain why a match should NOT change.
+Built after the 1.0 -> 1.1 migration, which took 4 separate correction
+rounds with the user to find everything - each round using a grep
+pattern that missed a different real case. Rewritten completely after a
+later reorganization retired the dual monolithic/partitioned form and
+the VX.X/ version-numbered subfolder scheme project-wide - the original
+version of this document described a folder/file layout that no longer
+exists at all. This document exists so the NEXT bump doesn't repeat
+either round's mistakes. Read this top-to-bottom before touching
+anything; don't just grep for the old number and replace it blindly -
+several of these entries explain why a match should NOT change.
+
+AMENDMENT: Track A's application-firmware version is no longer "bumped
+only on explicit request" (see that section below) - it's now
+mechanized and incremental, same odometer-carry mechanism as Tracks C/E
+(bump_version.py at the repo root, called by build_firmware.sh/.bat
+before compiling each of the 4 components). Flasher and Tester also no
+longer live in this repo under tools/ - they're the separate
+URTC-FLASHER and URTC-TESTER repos now, each with its own independent
+version. Several path references below (tools/flasher/, tools/tester/)
+predate that split and are historical, not current guidance - see each
+repo's own README for its current layout.
 
 There are FIVE independent version tracks in this project now (a new
 Track E was added once the expansion slave chip's own firmware existed -
@@ -20,11 +30,20 @@ which track a given "1.0" belongs to is exactly what caused every miss
 in the last migration.
 
 -----------------------------------------------------------------------------
-TRACK A - PROJECT SOFTWARE VERSION (currently 1.1)
+TRACK A - MAIN BOARD APPLICATION FIRMWARE VERSION (MAJOR.MINOR.PATCH,
+currently 1.1.x)
 -----------------------------------------------------------------------------
-Covers the main board's own firmware + Flasher + Tester together, as one
-number, bumped only on explicit request (never automatically). This is
-the track most likely to be "the next bump" the user means by default.
+Covers ONLY the main board's own application firmware now - Flasher and
+Tester moved to their own repos (URTC-FLASHER, URTC-TESTER) with their
+own independent version numbers, no longer sharing this one. This track
+is fully MECHANIZED like Tracks C/E: bump_version.py (repo root), called
+by build_firmware.sh/.bat as the first step of compiling this
+application, bumps PATCH by 1 on every real build, with the same
+odometer-carry rule (see Track C's own note for the full mechanism).
+That same bump also mirrors the new version into
+src/F303-master/boot/bootloader_common.h's own FIRMWARE_VERSION_* copy
+(see that header's own comment for why it keeps a separate copy) - never
+hand-edit that copy, it will just drift again.
 
 --- A1. Code constants (single source of truth - everything below that
         reads these does NOT need separate editing) ---
@@ -38,7 +57,7 @@ the track most likely to be "the next bump" the user means by default.
       tools all read these constants dynamically (f-strings) - confirmed
       with a real GUI run under Xvfb, not just grep. Nothing to edit
       there by hand once the constant is correct.
-  --> No monolithic form exists anymore (retired 1 August 2026) - there
+  --> No monolithic form exists anymore (retired) - there
       is exactly ONE copy of firmware_common.h to edit, not a
       monolithic-and-partitioned pair. If a future session summary or
       search result ever references a "STM32F303CC.C" or a
@@ -48,7 +67,7 @@ the track most likely to be "the next bump" the user means by default.
 --- A2. Folder names ---
   There is nothing to do here anymore. The VX.X/ version-numbered
   subfolder scheme (src/F303-master/VX.X/, tools/flasher/VX.X/,
-  tools/tester/VX.X/) was retired project-wide on 1 August 2026 - every
+  tools/tester/VX.X/) was retired project-wide - every
   path is flat now (src/F303-master/, tools/flasher/, tools/tester/)
   and does NOT move or get renamed on a version bump. Don't recreate a
   version-numbered folder for a future bump; that pattern was
@@ -138,8 +157,8 @@ the track most likely to be "the next bump" the user means by default.
   README.md
     - main title line: "# URTC - Universal Robot Tool Controller"
       (this project's own README title does NOT carry a version number
-      at all as of the "constant evolution" note added at the top on
-      1 August 2026 - don't add one back on a future bump; see Track D)
+      at all, per the "constant evolution" note added at the top -
+      don't add one back on a future bump; see Track D)
     - changelog table: add a new row for the software version (firmware
       row - see the existing 1.1 entry for the phrasing pattern: state
       this bump IS the migration, point back at the previous version's
@@ -158,7 +177,7 @@ the track most likely to be "the next bump" the user means by default.
   chat.TXT
     - "Current versions" section
     - the deliberate historical section documenting the retirement of
-      the monolithic form and the VX.X/ folder scheme (1 August 2026) -
+      the monolithic form and the VX.X/ folder scheme -
       that's intentionally preserved lesson text, not a live reference;
       don't remove it on a future bump, and don't mistake its own path
       examples for current guidance
@@ -259,10 +278,10 @@ TRACK C - MAIN BOARD BOOTLOADER VERSION (fully independent, MAJOR.MINOR.
 PATCH, unrelated to Track A's number even when they happen to look
 similar)
 -----------------------------------------------------------------------------
-  As of 21 August 2026 this track is fully MECHANIZED, not a manual
-  checklist item anymore: bump_bootloader_version.py (repo root), called
-  by build_firmware.sh/.bat as the first step of compiling THIS
-  bootloader, bumps PATCH by 1 on every real build (a real compile+link
+  This track is fully MECHANIZED, not a manual checklist item anymore:
+  bump_version.py (repo root), called by build_firmware.sh/.bat as the
+  first step of compiling THIS bootloader, bumps PATCH by 1 on every
+  real build (a real compile+link
   that produces a fresh .bin - not on a source edit by itself, and not on
   a partial build that only targets the other chip). PATCH carries into
   MINOR the same way an odometer carries into its next digit once it
@@ -322,7 +341,7 @@ recognize and leave alone, not "fix")
     library, "hasn't reached its own 1.0 release yet" - unrelated to
     URTC's version)
   - The root README's own top-of-document "constant evolution" note
-    (added 1 August 2026, per the user's own explicit request) - this
+    (added per the user's own explicit request) - this
     is deliberate, permanent framing text explaining that the project
     has no tagged Release yet, not something to remove once a version
     number exists somewhere else in the document
@@ -339,12 +358,11 @@ that first version was written.
 
 --- E1. Application (bootloader is separate, see E2) ---
   src/F303-slave/slave_common.h
-    Check for a version-constant #define here before assuming there
-    isn't one - as of this document's own last update, this chip's own
-    application doesn't expose a queryable semantic version the way the
-    main board's own firmware does via FIRMWARE_VERSION_MINOR; if a
-    future bump adds one, add its own entry here rather than leaving
-    this checklist silently out of date about it.
+    FIRMWARE_VERSION_MAJOR/MINOR/PATCH - same MECHANIZED bump_version.py
+    auto-bump as Track A's main board application, same odometer-carry
+    rule, mirrored into src/F303-slave/boot/slaveboot_common.h's own
+    FIRMWARE_VERSION_* copy on every real build - never hand-edit either
+    copy directly.
   README.md - the "Expansion Slave" changelog table (separate from both
       the main board's own firmware AND bootloader tables above it -
       3 independent tables total on this document, don't cross-add
@@ -370,10 +388,10 @@ that first version was written.
 --- E2. Bootloader ---
   src/F303-slave/boot/slaveboot_common.h
     Same MAJOR/MINOR/PATCH #define pattern as the main board's own
-    bootloader (Track C) - same mechanized bump_bootloader_version.py
-    auto-bump on every real build, same odometer-carry rule, as of
-    21 August 2026 (see Track C's own note above for the full mechanism -
-    not repeated here since it's identical).
+    bootloader (Track C) - same mechanized bump_version.py auto-bump on
+    every real build, same odometer-carry rule (see Track C's own note
+    above for the full mechanism - not repeated here since it's
+    identical).
   --> Binary filenames NEVER include a version number, on any bump,
       ever: always URTC_SLAVE_BOOTLOADER.bin/.hex/.elf.
   --> Same "no OLED, no on-screen version display" note as Track C

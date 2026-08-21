@@ -71,7 +71,9 @@ def main():
     mb_hwid = read_define(mb_h, "THIS_HARDWARE_ID")
 
     ma_h = os.path.join(root, "src", "F303-master", "firmware_common.h")
-    ma_maj, ma_min = (int(read_define(ma_h, f"FIRMWARE_VERSION_{x}")) for x in ("MAJOR", "MINOR"))
+    ma_maj, ma_min, ma_pat = (
+        int(read_define(ma_h, f"FIRMWARE_VERSION_{x}")) for x in ("MAJOR", "MINOR", "PATCH")
+    )
     ma_hwid = read_define(ma_h, "THIS_HARDWARE_ID")
     app_bin = f"URTC_V{ma_maj}.{ma_min}_F303CC.bin"
 
@@ -82,7 +84,9 @@ def main():
     sb_hwid = read_define(sb_h, "THIS_HARDWARE_ID")
 
     sa_h = os.path.join(root, "src", "F303-slave", "slave_common.h")
-    sa_maj, sa_min = (int(read_define(sa_h, f"FIRMWARE_VERSION_{x}")) for x in ("MAJOR", "MINOR"))
+    sa_maj, sa_min, sa_pat = (
+        int(read_define(sa_h, f"FIRMWARE_VERSION_{x}")) for x in ("MAJOR", "MINOR", "PATCH")
+    )
     sa_hwid = read_define(sa_h, "THIS_HARDWARE_ID")
 
     manifest = {
@@ -100,9 +104,9 @@ def main():
             "compared against an EARLIER manifest's own value for that exact "
             "same component key. Comparing version_code ACROSS different "
             "component keys means nothing.",
-            "version_code = major*10000 + minor*100 + patch (patch=0 for the 2 "
-            "application components) - bigger is newer, safe for simple "
-            "numeric comparison. Don't compare version_string alphabetically.",
+            "version_code = major*10000 + minor*100 + patch - bigger is newer, "
+            "safe for simple numeric comparison. Don't compare version_string "
+            "alphabetically.",
             "crc32 is computed over the real .bin file exactly as shipped here "
             "(standard CRC-32/ISO-HDLC), the same variant this project's own "
             "bootloader computes internally during a real update (see "
@@ -141,9 +145,9 @@ def main():
                 "display_name": "URTC Application Firmware (main board)",
                 "chip": "STM32F303CCT6",
                 "hardware_id": ma_hwid,
-                "version": {"major": ma_maj, "minor": ma_min},
-                "version_string": f"{ma_maj}.{ma_min}",
-                "version_code": ma_maj * 10000 + ma_min * 100,
+                "version": {"major": ma_maj, "minor": ma_min, "patch": ma_pat},
+                "version_string": f"{ma_maj}.{ma_min}.{ma_pat}",
+                "version_code": ma_maj * 10000 + ma_min * 100 + ma_pat,
                 "flash_address": "0x08008000",
                 "flash_region_max_bytes": 114688,
                 "files": {
@@ -171,9 +175,9 @@ def main():
                 "display_name": "URTC Expansion Slave Application",
                 "chip": "STM32F303CBT6",
                 "hardware_id": sa_hwid,
-                "version": {"major": sa_maj, "minor": sa_min},
-                "version_string": f"{sa_maj}.{sa_min}",
-                "version_code": sa_maj * 10000 + sa_min * 100,
+                "version": {"major": sa_maj, "minor": sa_min, "patch": sa_pat},
+                "version_string": f"{sa_maj}.{sa_min}.{sa_pat}",
+                "version_code": sa_maj * 10000 + sa_min * 100 + sa_pat,
                 "flash_address": "0x08005000",
                 "flash_region_max_bytes": 55296,
                 "files": {

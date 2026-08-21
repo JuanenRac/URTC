@@ -472,6 +472,13 @@ int main(void) {
         // fires again and this tries once more next loop iteration.
         if (can_bus_error_flag) {
             can_bus_error_flag = 0;
+            // Discard whatever was still sitting in a TX mailbox at the
+            // moment of the fault before restarting - AutoRetransmission
+            // would otherwise fire those messages off in a burst the
+            // instant the bus comes back, carrying whatever stale
+            // telemetry/status payload they held from before the fault
+            // instead of a fresh read of that same data.
+            HAL_CAN_AbortTxRequest(&hcan, CAN_TX_MAILBOX0 | CAN_TX_MAILBOX1 | CAN_TX_MAILBOX2);
             HAL_CAN_Start(&hcan);
         }
 

@@ -24,8 +24,11 @@
 // running" before deciding what to flash, without needing to trigger a
 // reset into the bootloader first just to find out.
 #define THIS_HARDWARE_ID     0x0303CC01UL // STM32F303CCT6, URTC board revision 1
+// Incremental like the bootloaders (see bump_version.py at the repo root):
+// PATCH+1 on every real build, odometer-carry into MINOR/MAJOR.
 #define FIRMWARE_VERSION_MAJOR 1
 #define FIRMWARE_VERSION_MINOR 1
+#define FIRMWARE_VERSION_PATCH 3
 
 // ID configuration matrix (physical tool-head address readout)
 #define ID0_PIN         GPIO_PIN_0  // PF0 - Bit 0

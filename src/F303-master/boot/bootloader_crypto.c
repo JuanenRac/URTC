@@ -13,8 +13,8 @@
 #include "bootloader_crypto.h"
 
 // Single definition matching bootloader_common.h's extern declaration.
-// Generated with a CSPRNG (Python's `secrets.token_bytes(32)`) on
-// 2026-08-15 to replace the original human-readable "URTC-HYDRA-UMC-
+// Generated with a CSPRNG (Python's `secrets.token_bytes(32)`) to
+// replace the original human-readable "URTC-HYDRA-UMC-
 // 2026-CHANGE-ME-!!" placeholder - this is a real random key, not a
 // second placeholder, but it is STILL committed to a public GPL-3.0
 // repo, so it cannot be a genuine confidentiality boundary for anyone

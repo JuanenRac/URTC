@@ -15,32 +15,47 @@ This file only tracks the **current version** of all 4 at a glance and
 documents the versioning *policy* itself. For what actually changed in
 any given version, read the component's own file above.
 
-## Versioning policy (confirmed by the project owner, 21 August 2026)
+## Versioning policy (confirmed by the project owner)
 
-| Component | Scheme | Mechanism |
+All 4 components are **incremental** (`MAJOR.MINOR.PATCH`) - every real
+build (`build_firmware.sh`/`.bat`, a real compile+link that produces a
+fresh `.bin`) automatically bumps that component's own `PATCH` by 1, via
+`bump_version.py` (repo root), run as the first step of compiling it -
+*before* the compiler reads the header.
+
+| Component | Header | Macro prefix |
 |---|---|---|
-| Main board application firmware | **Static** (`MAJOR.MINOR`) | Only changes when a human hand-edits `FIRMWARE_VERSION_MAJOR`/`MINOR` in `src/F303-master/firmware_common.h`. Never touched by the build. |
-| Expansion slave application firmware | **Static** (`MAJOR.MINOR`) | Only changes when a human hand-edits `FIRMWARE_VERSION_MAJOR`/`MINOR` in `src/F303-slave/slave_common.h`. Never touched by the build. |
-| Main board bootloader | **Incremental** (`MAJOR.MINOR.PATCH`) | Every real build (`build_firmware.sh`/`.bat`, a real compile+link that produces a fresh `.bin`) automatically bumps `BOOTLOADER_VERSION_PATCH` by 1 in `src/F303-master/boot/bootloader_common.h`, via `bump_bootloader_version.py` (repo root), run as the first step of compiling this bootloader - *before* the compiler reads the header. |
-| Expansion slave bootloader | **Incremental** (`MAJOR.MINOR.PATCH`) | Same mechanism as the main board bootloader, applied to `BOOTLOADER_VERSION_PATCH` in `src/F303-slave/boot/slaveboot_common.h`. |
+| Main board application firmware | `src/F303-master/firmware_common.h` | `FIRMWARE_VERSION_*` |
+| Main board bootloader | `src/F303-master/boot/bootloader_common.h` | `BOOTLOADER_VERSION_*` |
+| Expansion slave application firmware | `src/F303-slave/slave_common.h` | `FIRMWARE_VERSION_*` |
+| Expansion slave bootloader | `src/F303-slave/boot/slaveboot_common.h` | `BOOTLOADER_VERSION_*` |
 
-**The carry rule** for the 2 incremental bootloaders is a base-10
-"odometer" rule: if bumping `PATCH` would take it past 9, it resets to 0
-and `MINOR` gains 1 instead (and the same rule applies one level up, from
-`MINOR` into `MAJOR`, if `MINOR` would ever pass 9). For example:
+Each bootloader also keeps its own copy of `FIRMWARE_VERSION_MAJOR/MINOR/
+PATCH` (the version of whatever application image is currently
+installed - used by the anti-rollback check in `HandleEndUpdate()`,
+since the bootloader and application never build together and can't
+share a header). `bump_version.py` mirrors the new version into that
+copy every time the matching application is built, so the two can never
+drift apart - never hand-edit either copy directly.
+
+**The carry rule** is a base-10 "odometer" rule: if bumping `PATCH`
+would take it past 9, it resets to 0 and `MINOR` gains 1 instead (and
+the same rule applies one level up, from `MINOR` into `MAJOR`, if
+`MINOR` would ever pass 9). For example:
 `1.1.7` → `1.1.8` → `1.1.9` → `1.2.0` — never `1.1.10`.
 
 Building only one target (`build_firmware.sh master` / `slave`) only
-bumps that target's own bootloader; the other bootloader's version is
-untouched, exactly as if that build hadn't run at all.
+bumps that target's own 2 components (application + bootloader); the
+other target's components are untouched, exactly as if that build
+hadn't run at all.
 
 ## Current versions
 
 | Component | Version | Source of truth |
 |---|---|---|
-| Main board application firmware | 1.1 (static) | `src/F303-master/firmware_common.h` |
+| Main board application firmware | 1.1.0 (incremental) | `src/F303-master/firmware_common.h` |
 | Main board bootloader | 1.1.9 (incremental) | `src/F303-master/boot/bootloader_common.h` |
-| Expansion slave application firmware | 1.0 (static) | `src/F303-slave/slave_common.h` |
+| Expansion slave application firmware | 1.0.0 (incremental) | `src/F303-slave/slave_common.h` |
 | Expansion slave bootloader | 1.0.3 (incremental) | `src/F303-slave/boot/slaveboot_common.h` |
 
 The bootloader numbers above will already be higher again by the time

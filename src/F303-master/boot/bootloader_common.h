@@ -34,8 +34,17 @@ extern I2C_HandleTypeDef hi2c2;
 // declared incompatible, before ever trusting its CRC/HMAC.
 // -----------------------------------------------------------------------
 #define THIS_HARDWARE_ID     0x0303CC01UL // STM32F303CCT6, URTC board revision 1
+// Kept in sync with firmware_common.h's own FIRMWARE_VERSION_* by
+// bump_version.py's mirror-header argument (repo root) every time the
+// application is built - never edit this by hand, it will just drift
+// again (exactly what had happened here before that argument existed:
+// this copy sat at MINOR 0 while the real application had already moved
+// to MINOR 1, weakening the anti-rollback check in HandleEndUpdate() for
+// any chip that adopts this as its baseline on first boot / after a
+// non-OTA flash).
 #define FIRMWARE_VERSION_MAJOR 1
-#define FIRMWARE_VERSION_MINOR 0
+#define FIRMWARE_VERSION_MINOR 1
+#define FIRMWARE_VERSION_PATCH 3
 
 // BOOTLOADER_VERSION_* describes THIS bootloader binary itself - separate
 // from FIRMWARE_VERSION_MAJOR/MINOR above, which is the version of
@@ -45,8 +54,8 @@ extern I2C_HandleTypeDef hi2c2;
 // (so 1.0.9's next change becomes 1.1.0). Bump this every time any part
 // of the partitioned bootloader source changes.
 #define BOOTLOADER_VERSION_MAJOR 1
-#define BOOTLOADER_VERSION_MINOR 1
-#define BOOTLOADER_VERSION_PATCH 9
+#define BOOTLOADER_VERSION_MINOR 2
+#define BOOTLOADER_VERSION_PATCH 2
 
 // -----------------------------------------------------------------------
 // HMAC-SHA256 signing key - shared between this bootloader and whatever

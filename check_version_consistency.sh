@@ -26,11 +26,11 @@
 #
 # Rewritten from scratch (previous version predated, and completely
 # assumed, the VX.X/ version-numbered folder scheme and the dual
-# monolithic/partitioned source form - both retired project-wide on
-# 1 August 2026. The old script's very first check would have failed
-# outright ("no src/F303-master/VX.X/ folder found") against the
-# current flat, single-form layout - confirmed by actually trying to
-# run it before rewriting, not assumed from reading it alone.
+# monolithic/partitioned source form - both retired project-wide since.
+# The old script's very first check would have failed outright ("no
+# src/F303-master/VX.X/ folder found") against the current flat,
+# single-form layout - confirmed by actually trying to run it before
+# rewriting, not assumed from reading it alone.
 #
 # Exit code 0 = everything consistent. Non-zero = see the printed report.
 # This does not fix anything by itself - it only reports. Fixing still

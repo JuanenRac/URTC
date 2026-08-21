@@ -13,7 +13,7 @@
 #include "slaveboot_crypto.h"
 
 // Single definition matching slaveboot_common.h's extern declaration.
-// Real CSPRNG-generated key (Node's crypto.randomBytes(32), 2026-08-15),
+// Real CSPRNG-generated key (Node's crypto.randomBytes(32)),
 // deliberately DIFFERENT from bootloader_crypto.c's own HMAC_KEY (master)
 // - see slaveboot_common.h's own comment on this field for why the two
 // must never match: a master-signed image must never verify against

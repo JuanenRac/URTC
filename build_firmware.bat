@@ -237,9 +237,8 @@ mkdir "!OUT!"
 set "SRC=%ROOT%\src\F303-master\boot"
 REM Bootloader version is INCREMENTAL - bump PATCH (odometer-carry into
 REM MINOR/MAJOR) before the compiler reads this header, so the .bin built
-REM below already embeds the new version. Application firmware version is
-REM static and is never touched here - see bump_bootloader_version.py.
-python "%ROOT%\bump_bootloader_version.py" "!SRC!\bootloader_common.h"
+REM below already embeds the new version - see bump_version.py.
+python "%ROOT%\bump_version.py" "!SRC!\bootloader_common.h" BOOTLOADER_VERSION
 if errorlevel 1 (
     echo   FAIL bootloader version bump script failed - see traceback above
     set /a FAIL+=1
@@ -288,6 +287,16 @@ set "OUT=%BUILD%\master_app"
 rmdir /s /q "!OUT!" 2>nul
 mkdir "!OUT!"
 set "SRC=%ROOT%\src\F303-master"
+REM Application firmware is INCREMENTAL too - same odometer-carry bump as
+REM the bootloader above, plus mirroring the new version into
+REM bootloader_common.h's own FIRMWARE_VERSION_* copy so the two can never
+REM drift apart (see bump_version.py's own header).
+python "%ROOT%\bump_version.py" "!SRC!\firmware_common.h" FIRMWARE_VERSION "!SRC!\boot\bootloader_common.h"
+if errorlevel 1 (
+    echo   FAIL application version bump script failed - see traceback above
+    set /a FAIL+=1
+    goto :summary
+)
 set "MASTER_INC=-I!SRC!\melexis_mlx90640 -I!SRC!\melexis_mlx90641 -I!SRC!\melexis_mlx90642"
 set "SECTION_FAIL=0"
 for %%f in ("!SRC!\*.c") do (
@@ -356,8 +365,8 @@ rmdir /s /q "!OUT!" 2>nul
 mkdir "!OUT!"
 set "SRC=%ROOT%\src\F303-slave\boot"
 REM Same incremental-version bump as the main board bootloader above - see
-REM bump_bootloader_version.py's own header for the full policy.
-python "%ROOT%\bump_bootloader_version.py" "!SRC!\slaveboot_common.h"
+REM bump_version.py's own header for the full policy.
+python "%ROOT%\bump_version.py" "!SRC!\slaveboot_common.h" BOOTLOADER_VERSION
 if errorlevel 1 (
     echo   FAIL bootloader version bump script failed - see traceback above
     set /a FAIL+=1
@@ -403,6 +412,13 @@ set "OUT=%BUILD%\slave_app"
 rmdir /s /q "!OUT!" 2>nul
 mkdir "!OUT!"
 set "SRC=%ROOT%\src\F303-slave"
+REM Same incremental bump + bootloader-mirror as the main board application above.
+python "%ROOT%\bump_version.py" "!SRC!\slave_common.h" FIRMWARE_VERSION "!SRC!\boot\slaveboot_common.h"
+if errorlevel 1 (
+    echo   FAIL application version bump script failed - see traceback above
+    set /a FAIL+=1
+    goto :summary
+)
 set "SLAVE_INC=-I!SRC!\melexis_mlx90640 -I!SRC!\melexis_mlx90641 -I!SRC!\melexis_mlx90642"
 set "SECTION_FAIL=0"
 for %%f in ("!SRC!\*.c") do (
@@ -482,13 +498,13 @@ echo is expected and not a sign anything is wrong ^(see
 echo docs\COMPILE_STM32F303.TXT for the full reasoning^). A DIFFERENT file
 echo size, or a build failure, is the real thing worth investigating.
 echo.
-echo Versioning: application firmware ^(FIRMWARE_VERSION_MAJOR/MINOR^) is
-echo static and was NOT touched by this run - it only changes by a human
-echo hand-editing it. Each bootloader built above just had its own PATCH
-echo auto-bumped ^(odometer-carry into MINOR/MAJOR^) by
-echo bump_bootloader_version.py before compiling, since every real
-echo bootloader build increments it automatically now - see
-echo VERSION_CHECKLIST.txt Track C/E and CHANGELOG.md.
+echo Versioning: all 4 components built above ^(2 applications, 2
+echo bootloaders^) are incremental - each had its own PATCH auto-bumped
+echo ^(odometer-carry into MINOR/MAJOR^) by bump_version.py before
+echo compiling, since every real build increments it automatically now.
+echo Each application's own bump also mirrored the new version into its
+echo bootloader's FIRMWARE_VERSION_* copy - see VERSION_CHECKLIST.txt
+echo and CHANGELOG.md.
 
 REM Keeps the window open when this script is double-clicked from Explorer,
 REM on success AND on failure - every FAIL path above reaches this same

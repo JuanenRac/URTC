@@ -225,9 +225,8 @@ OUT="$BUILD/master_boot"; rm -rf "$OUT"; mkdir -p "$OUT"
 SRC="$ROOT/src/F303-master/boot"
 # Bootloader version is INCREMENTAL - bump PATCH (odometer-carry into MINOR/
 # MAJOR) before the compiler reads this header, so the .bin built below
-# already embeds the new version. Application firmware version is static
-# and is never touched here - see bump_bootloader_version.py's own header.
-python3 "$ROOT/bump_bootloader_version.py" "$SRC/bootloader_common.h"
+# already embeds the new version - see bump_version.py's own header.
+python3 "$ROOT/bump_version.py" "$SRC/bootloader_common.h" BOOTLOADER_VERSION
 compile_dir "$SRC" "$OUT" ""
 arm-none-eabi-gcc $LDCOMMON -T"$SRC/STM32F303CCTx_BOOTLOADER.ld" \
     "$BUILD/app_master/startup.o" "$BUILD/app_master/system_stm32f3xx.o" \
@@ -241,6 +240,11 @@ step "5. Main board application (src/F303-master/)"
 # -----------------------------------------------------------------------
 OUT="$BUILD/master_app"; rm -rf "$OUT"; mkdir -p "$OUT"
 SRC="$ROOT/src/F303-master"
+# Application firmware is INCREMENTAL too - same odometer-carry bump as the
+# bootloader above, plus mirroring the new version into bootloader_common.h's
+# own FIRMWARE_VERSION_* copy so the two can never drift apart (see
+# bump_version.py's own header for why that copy exists and how it's used).
+python3 "$ROOT/bump_version.py" "$SRC/firmware_common.h" FIRMWARE_VERSION "$SRC/boot/bootloader_common.h"
 compile_dir "$SRC" "$OUT" "-I$SRC/melexis_mlx90640 -I$SRC/melexis_mlx90641 -I$SRC/melexis_mlx90642"
 compile_dir "$SRC/melexis_mlx90640" "$OUT" "-I$SRC -I$SRC/melexis_mlx90640"
 compile_dir "$SRC/melexis_mlx90641" "$OUT" "-I$SRC -I$SRC/melexis_mlx90641"
@@ -277,8 +281,8 @@ step "6. Expansion slave bootloader (src/F303-slave/boot/)"
 OUT="$BUILD/slave_boot"; rm -rf "$OUT"; mkdir -p "$OUT"
 SRC="$ROOT/src/F303-slave/boot"
 # Same incremental-version bump as the main board bootloader above - see
-# bump_bootloader_version.py's own header for the full policy.
-python3 "$ROOT/bump_bootloader_version.py" "$SRC/slaveboot_common.h"
+# bump_version.py's own header for the full policy.
+python3 "$ROOT/bump_version.py" "$SRC/slaveboot_common.h" BOOTLOADER_VERSION
 compile_dir "$SRC" "$OUT" ""
 arm-none-eabi-gcc $LDCOMMON -T"$SRC/STM32F303CBTx_SLAVEBOOT.ld" \
     "$BUILD/app_slave/startup.o" "$BUILD/app_slave/system_stm32f3xx.o" \
@@ -292,6 +296,8 @@ step "7. Expansion slave application (src/F303-slave/)"
 # -----------------------------------------------------------------------
 OUT="$BUILD/slave_app"; rm -rf "$OUT"; mkdir -p "$OUT"
 SRC="$ROOT/src/F303-slave"
+# Same incremental bump + bootloader-mirror as the main board application above.
+python3 "$ROOT/bump_version.py" "$SRC/slave_common.h" FIRMWARE_VERSION "$SRC/boot/slaveboot_common.h"
 compile_dir "$SRC" "$OUT" "-I$SRC/melexis_mlx90640 -I$SRC/melexis_mlx90641 -I$SRC/melexis_mlx90642"
 compile_dir "$SRC/melexis_mlx90640" "$OUT" "-I$SRC -I$SRC/melexis_mlx90640 -I$SRC/melexis_mlx90641 -I$SRC/melexis_mlx90642"
 arm-none-eabi-g++ $CXXFLAGS -I"$SRC/melexis_mlx90641" \
@@ -342,12 +348,12 @@ echo "is expected and not a sign anything is wrong (see"
 echo "docs/COMPILE_STM32F303.TXT for the full reasoning). A DIFFERENT file"
 echo "size, or a build failure, is the real thing worth investigating."
 echo ""
-echo "Versioning: application firmware (FIRMWARE_VERSION_MAJOR/MINOR) is"
-echo "static and was NOT touched by this run - it only changes by a human"
-echo "hand-editing it. Each bootloader built above just had its own PATCH"
-echo "auto-bumped (odometer-carry into MINOR/MAJOR) by"
-echo "bump_bootloader_version.py before compiling, since every real"
-echo "bootloader build increments it automatically now - see"
-echo "VERSION_CHECKLIST.txt Track C/E and CHANGELOG.md."
+echo "Versioning: all 4 components built above (2 applications, 2"
+echo "bootloaders) are incremental - each had its own PATCH auto-bumped"
+echo "(odometer-carry into MINOR/MAJOR) by bump_version.py before"
+echo "compiling, since every real build increments it automatically now."
+echo "Each application's own bump also mirrored the new version into its"
+echo "bootloader's FIRMWARE_VERSION_* copy - see VERSION_CHECKLIST.txt"
+echo "and CHANGELOG.md."
 
 if [ "$FAIL" -gt 0 ]; then exit 1; fi
