@@ -67,7 +67,7 @@ extern I2C_HandleTypeDef hi2c1;
 // application is built - never edit this by hand.
 #define FIRMWARE_VERSION_MAJOR 1
 #define FIRMWARE_VERSION_MINOR 0
-#define FIRMWARE_VERSION_PATCH 2
+#define FIRMWARE_VERSION_PATCH 3
 
 // BOOTLOADER_VERSION_* describes THIS bootloader binary itself - separate
 // from FIRMWARE_VERSION_MAJOR/MINOR above, which is the version of
@@ -79,7 +79,7 @@ extern I2C_HandleTypeDef hi2c1;
 // main board's own version history.
 #define BOOTLOADER_VERSION_MAJOR 1
 #define BOOTLOADER_VERSION_MINOR 0
-#define BOOTLOADER_VERSION_PATCH 5
+#define BOOTLOADER_VERSION_PATCH 6
 
 // -----------------------------------------------------------------------
 // HMAC-SHA256 signing key - deliberately different from the main board's
