@@ -47,6 +47,37 @@ pass() { echo "  OK   $1"; }
 fail() { echo "  FAIL $1"; FAIL=$((FAIL+1)); }
 warn() { echo "  WARN $1"; WARN=$((WARN+1)); }
 
+# -----------------------------------------------------------------------
+# Banner - printed on every run (not just a comment at the top of this
+# file), so anyone running this from a double-clicked terminal or a fresh
+# shell sees what project/script/author/license they're looking at before
+# any output scrolls past.
+# -----------------------------------------------------------------------
+echo "============================================================================="
+echo " URTC - version consistency checker"
+echo ""
+echo " Companion to VERSION_CHECKLIST.txt: reads the Track A/E code constants as"
+echo " the source of truth, then checks every location that document lists for"
+echo " stale version tags, missing binaries, and leftover retired-scheme files."
+echo " Reports only - never edits anything itself."
+echo ""
+echo " Author:  JuanenRac (Electro Hobby 3D) - electrohobby3d@gmail.com"
+echo " License: GPL-3.0 - source tooling, same category as build_firmware.sh"
+echo "          (see LICENSE at repo root for the full per-content-type split)"
+echo "============================================================================="
+
+# Keeps the window open when this script is run standalone from a real
+# terminal (this script is never invoked/sourced by build_firmware.sh or
+# any other script here - confirmed by grep, it's a human-run checker), on
+# success AND on failure - fires on every exit path via this EXIT trap
+# (normal completion or an explicit `exit N` anywhere above). Skipped when
+# stdin isn't a real terminal (`[ -t 0 ]` false - e.g. CI or another script
+# driving this one) so automation never hangs waiting for a keypress that
+# will never come.
+if [ -t 0 ]; then
+    trap 'echo ""; read -r -p "Press Enter to close this window..." _' EXIT
+fi
+
 echo "============================================================"
 echo "1. Reading Track A source-of-truth constants"
 echo "============================================================"
@@ -240,9 +271,12 @@ echo "7. Syntax sanity for this repo's own Python tooling"
 echo "============================================================"
 # Flasher/Tester's own py_compile check removed along with the rest of
 # their tools/ references above - they're their own repos now, with
-# their own CI. What's actually still in THIS repo: generate_manifest.py
-# and docs/tool_image_generator/'s 3 scripts.
-PY_FILES=("generate_manifest.py" "docs/tool_image_generator/generate_all.py" \
+# their own CI. What's actually still in THIS repo: generate_manifest.py,
+# bump_bootloader_version.py (the incremental-bootloader-version build
+# step added alongside this script's own last rewrite), and
+# docs/tool_image_generator/'s 3 scripts.
+PY_FILES=("generate_manifest.py" "bump_bootloader_version.py" \
+          "docs/tool_image_generator/generate_all.py" \
           "docs/tool_image_generator/render_engine.py" "docs/tool_image_generator/tool_data.py")
 PY_OK=1
 for f in "${PY_FILES[@]}"; do

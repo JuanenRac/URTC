@@ -46,7 +46,7 @@ extern I2C_HandleTypeDef hi2c2;
 // of the partitioned bootloader source changes.
 #define BOOTLOADER_VERSION_MAJOR 1
 #define BOOTLOADER_VERSION_MINOR 1
-#define BOOTLOADER_VERSION_PATCH 7
+#define BOOTLOADER_VERSION_PATCH 9
 
 // -----------------------------------------------------------------------
 // HMAC-SHA256 signing key - shared between this bootloader and whatever

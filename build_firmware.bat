@@ -36,6 +36,23 @@ if "%ROOT:~-1%"=="\" set "ROOT=%ROOT:~0,-1%"
 set "BUILD=%ROOT%\build"
 set "FIRMWARE_OUT=%ROOT%\firmware"
 
+REM -----------------------------------------------------------------------
+REM Banner - printed on every run (not just a comment at the top of this
+REM file), so anyone double-clicking this from Explorer or launching it
+REM from a fresh cmd window sees what project/script/author/license they're
+REM looking at before any output scrolls past.
+REM -----------------------------------------------------------------------
+echo =============================================================================
+echo  URTC - firmware build
+echo.
+echo  Installs tools, verifies everything, and compiles all 4 URTC firmware
+echo  binaries from a clean checkout: main board application + bootloader,
+echo  expansion slave application + bootloader (STM32F303).
+echo.
+echo  Author:  JuanenRac (Electro Hobby 3D^) - electrohobby3d@gmail.com
+echo  License: GPL-3.0 - see LICENSE at repo root
+echo =============================================================================
+
 REM Pinned to STM32CubeF3 v1.11.6's own known-good submodule combination -
 REM see docs\COMPILE_STM32F303.TXT for why these are pinned rather than
 REM tracking each repo's own latest master.
@@ -218,6 +235,16 @@ set "OUT=%BUILD%\master_boot"
 rmdir /s /q "!OUT!" 2>nul
 mkdir "!OUT!"
 set "SRC=%ROOT%\src\F303-master\boot"
+REM Bootloader version is INCREMENTAL - bump PATCH (odometer-carry into
+REM MINOR/MAJOR) before the compiler reads this header, so the .bin built
+REM below already embeds the new version. Application firmware version is
+REM static and is never touched here - see bump_bootloader_version.py.
+python "%ROOT%\bump_bootloader_version.py" "!SRC!\bootloader_common.h"
+if errorlevel 1 (
+    echo   FAIL bootloader version bump script failed - see traceback above
+    set /a FAIL+=1
+    goto :summary
+)
 set "SECTION_FAIL=0"
 for %%f in ("!SRC!\*.c") do (
     arm-none-eabi-gcc %CFLAGS% -I"!SRC!" -x c -c "%%f" -o "!OUT!\%%~nf.o"
@@ -328,6 +355,14 @@ set "OUT=%BUILD%\slave_boot"
 rmdir /s /q "!OUT!" 2>nul
 mkdir "!OUT!"
 set "SRC=%ROOT%\src\F303-slave\boot"
+REM Same incremental-version bump as the main board bootloader above - see
+REM bump_bootloader_version.py's own header for the full policy.
+python "%ROOT%\bump_bootloader_version.py" "!SRC!\slaveboot_common.h"
+if errorlevel 1 (
+    echo   FAIL bootloader version bump script failed - see traceback above
+    set /a FAIL+=1
+    goto :summary
+)
 set "SECTION_FAIL=0"
 for %%f in ("!SRC!\*.c") do (
     arm-none-eabi-gcc %CFLAGS% -I"!SRC!" -x c -c "%%f" -o "!OUT!\%%~nf.o"
@@ -447,10 +482,22 @@ echo is expected and not a sign anything is wrong ^(see
 echo docs\COMPILE_STM32F303.TXT for the full reasoning^). A DIFFERENT file
 echo size, or a build failure, is the real thing worth investigating.
 echo.
-echo Remember this project's own standing rules before committing any
-echo change that triggered this rebuild: a bootloader source edit needs
-echo its own version bump ^(BOOTLOADER_VERSION_MAJOR/MINOR/PATCH^) before
-echo this rebuild counts as final - see VERSION_CHECKLIST.txt.
+echo Versioning: application firmware ^(FIRMWARE_VERSION_MAJOR/MINOR^) is
+echo static and was NOT touched by this run - it only changes by a human
+echo hand-editing it. Each bootloader built above just had its own PATCH
+echo auto-bumped ^(odometer-carry into MINOR/MAJOR^) by
+echo bump_bootloader_version.py before compiling, since every real
+echo bootloader build increments it automatically now - see
+echo VERSION_CHECKLIST.txt Track C/E and CHANGELOG.md.
+
+REM Keeps the window open when this script is double-clicked from Explorer,
+REM on success AND on failure - every FAIL path above reaches this same
+REM :summary label via `goto :summary`, so one `pause` here covers all of
+REM them (same convention as sibling repo HYDRA-UMC's own build_firmware.bat).
+REM `pause` itself already no-ops instead of hanging when stdin isn't a real
+REM console (e.g. redirected from NUL or a pipe).
+echo.
+pause
 
 endlocal
 if %FAIL% GTR 0 exit /b 1

@@ -25,6 +25,36 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUILD="$ROOT/build"
 FIRMWARE_OUT="$ROOT/firmware"
 
+# -----------------------------------------------------------------------
+# Banner - printed on every run (not just a comment at the top of this
+# file), so anyone running this from a double-clicked terminal or a fresh
+# shell sees what project/script/author/license they're looking at before
+# any output scrolls past.
+# -----------------------------------------------------------------------
+echo "============================================================================="
+echo " URTC - firmware build"
+echo ""
+echo " Installs tools, verifies everything, and compiles all 4 URTC firmware"
+echo " binaries from a clean checkout: main board application + bootloader,"
+echo " expansion slave application + bootloader (STM32F303)."
+echo ""
+echo " Author:  JuanenRac (Electro Hobby 3D) - electrohobby3d@gmail.com"
+echo " License: GPL-3.0 - see LICENSE at repo root"
+echo "============================================================================="
+
+# Keeps the window open when this script is double-clicked/launched from a
+# real terminal, on success AND on failure (matches build_firmware.bat's
+# own `pause`, and mirrors sibling repo HYDRA-UMC's own build_firmware.sh) -
+# fires on every exit path via this EXIT trap (normal completion, an
+# explicit `exit N` anywhere above, or `set -e` aborting on a failed
+# command), not just the final line. Skipped when stdin isn't a real
+# terminal (`[ -t 0 ]` false - e.g. CI, a pipe, or another script driving
+# this one) so automation never hangs waiting for a keypress that will
+# never come.
+if [ -t 0 ]; then
+    trap 'echo ""; read -r -p "Press Enter to close this window..." _' EXIT
+fi
+
 # Pinned to STM32CubeF3 v1.11.6's own known-good submodule combination -
 # see docs/COMPILE_STM32F303.TXT for why these are pinned rather than
 # tracking each repo's own latest master (reproducibility between runs
@@ -193,6 +223,11 @@ step "4. Main board bootloader (src/F303-master/boot/)"
 # -----------------------------------------------------------------------
 OUT="$BUILD/master_boot"; rm -rf "$OUT"; mkdir -p "$OUT"
 SRC="$ROOT/src/F303-master/boot"
+# Bootloader version is INCREMENTAL - bump PATCH (odometer-carry into MINOR/
+# MAJOR) before the compiler reads this header, so the .bin built below
+# already embeds the new version. Application firmware version is static
+# and is never touched here - see bump_bootloader_version.py's own header.
+python3 "$ROOT/bump_bootloader_version.py" "$SRC/bootloader_common.h"
 compile_dir "$SRC" "$OUT" ""
 arm-none-eabi-gcc $LDCOMMON -T"$SRC/STM32F303CCTx_BOOTLOADER.ld" \
     "$BUILD/app_master/startup.o" "$BUILD/app_master/system_stm32f3xx.o" \
@@ -241,6 +276,9 @@ step "6. Expansion slave bootloader (src/F303-slave/boot/)"
 # -----------------------------------------------------------------------
 OUT="$BUILD/slave_boot"; rm -rf "$OUT"; mkdir -p "$OUT"
 SRC="$ROOT/src/F303-slave/boot"
+# Same incremental-version bump as the main board bootloader above - see
+# bump_bootloader_version.py's own header for the full policy.
+python3 "$ROOT/bump_bootloader_version.py" "$SRC/slaveboot_common.h"
 compile_dir "$SRC" "$OUT" ""
 arm-none-eabi-gcc $LDCOMMON -T"$SRC/STM32F303CBTx_SLAVEBOOT.ld" \
     "$BUILD/app_slave/startup.o" "$BUILD/app_slave/system_stm32f3xx.o" \
@@ -304,9 +342,12 @@ echo "is expected and not a sign anything is wrong (see"
 echo "docs/COMPILE_STM32F303.TXT for the full reasoning). A DIFFERENT file"
 echo "size, or a build failure, is the real thing worth investigating."
 echo ""
-echo "Remember this project's own standing rules before committing any"
-echo "change that triggered this rebuild: a bootloader source edit needs"
-echo "its own version bump (BOOTLOADER_VERSION_MAJOR/MINOR/PATCH) before"
-echo "this rebuild counts as final - see VERSION_CHECKLIST.txt."
+echo "Versioning: application firmware (FIRMWARE_VERSION_MAJOR/MINOR) is"
+echo "static and was NOT touched by this run - it only changes by a human"
+echo "hand-editing it. Each bootloader built above just had its own PATCH"
+echo "auto-bumped (odometer-carry into MINOR/MAJOR) by"
+echo "bump_bootloader_version.py before compiling, since every real"
+echo "bootloader build increments it automatically now - see"
+echo "VERSION_CHECKLIST.txt Track C/E and CHANGELOG.md."
 
 if [ "$FAIL" -gt 0 ]; then exit 1; fi

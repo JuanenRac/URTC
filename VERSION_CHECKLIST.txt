@@ -255,13 +255,26 @@ with Track A just because they happened to both start at "1.0".
   happens to be at that number.
 
 -----------------------------------------------------------------------------
-TRACK C - MAIN BOARD BOOTLOADER VERSION (currently 1.1.1 - fully
-independent, MAJOR.MINOR.PATCH, auto-bumps PATCH on every edit per the
-existing rule in chat.TXT, unrelated to Track A's number even when they
-happen to look similar)
+TRACK C - MAIN BOARD BOOTLOADER VERSION (fully independent, MAJOR.MINOR.
+PATCH, unrelated to Track A's number even when they happen to look
+similar)
 -----------------------------------------------------------------------------
+  As of 21 August 2026 this track is fully MECHANIZED, not a manual
+  checklist item anymore: bump_bootloader_version.py (repo root), called
+  by build_firmware.sh/.bat as the first step of compiling THIS
+  bootloader, bumps PATCH by 1 on every real build (a real compile+link
+  that produces a fresh .bin - not on a source edit by itself, and not on
+  a partial build that only targets the other chip). PATCH carries into
+  MINOR the same way an odometer carries into its next digit once it
+  would pass 9 (1.1.7 -> 1.1.8 -> 1.1.9 -> 1.2.0, never 1.1.10); MINOR
+  carries into MAJOR by the same rule if it would ever pass 9 itself.
+  There is nothing left to do here by hand on a normal build - this
+  section exists so a future reader knows WHERE the number comes from
+  and doesn't try to hand-edit it before a release.
   src/F303-master/boot/bootloader_common.h
-    #define BOOTLOADER_VERSION_MAJOR/MINOR/PATCH
+    #define BOOTLOADER_VERSION_MAJOR/MINOR/PATCH (source of truth; only
+    hand-edit this to correct a mistake - a normal build already bumps
+    it automatically, see above)
   README.md - bootloader's OWN changelog table (separate from the
       firmware's table just above it - don't add bootloader entries to
       the firmware table or vice versa)
@@ -357,7 +370,10 @@ that first version was written.
 --- E2. Bootloader ---
   src/F303-slave/boot/slaveboot_common.h
     Same MAJOR/MINOR/PATCH #define pattern as the main board's own
-    bootloader (Track C) - auto-bumps PATCH on every edit, same rule.
+    bootloader (Track C) - same mechanized bump_bootloader_version.py
+    auto-bump on every real build, same odometer-carry rule, as of
+    21 August 2026 (see Track C's own note above for the full mechanism -
+    not repeated here since it's identical).
   --> Binary filenames NEVER include a version number, on any bump,
       ever: always URTC_SLAVE_BOOTLOADER.bin/.hex/.elf.
   --> Same "no OLED, no on-screen version display" note as Track C
