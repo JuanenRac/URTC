@@ -506,10 +506,23 @@ int main(void) {
 
         // Parameter-persistence check (every 500ms) - cheap when nothing's
         // changed (a memcmp), the actual F-RAM write is separately
-        // rate-limited inside SavedState_MaybeSave itself.
+        // rate-limited inside SavedState_MaybeSave itself. Skipped for the
+        // one loop iteration where a write would actually happen while an
+        // AOI strobe pulse is lit (aoi_strobe_active): FRAM_WriteBytes uses
+        // a 50ms HAL_I2C_Mem_Write timeout on the failure path (F-RAM
+        // missing/unresponsive), and that would stall this iteration long
+        // enough to delay the aoi_strobe_off_tick check further down past
+        // its intended window - a real LED-stays-on-too-long risk for a
+        // strobe pulse that can be as short as 1ms. Deferring the save by
+        // up to one more 500ms tick costs nothing (it's not safety-relevant
+        // persistence, per SavedState_Load's own comment), while keeping
+        // the strobe's off-timing accurate is the actual point of this
+        // whole non-blocking design (see aoi_strobe_active's own comment).
         if (HAL_GetTick() - tick_fram_check >= 500) {
             tick_fram_check = HAL_GetTick();
-            SavedState_MaybeSave();
+            if (!aoi_strobe_active) {
+                SavedState_MaybeSave();
+            }
         }
 
         // Asynchronous loop for secondary telemetry and UI refresh (every 150ms)

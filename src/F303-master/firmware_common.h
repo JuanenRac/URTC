@@ -28,7 +28,7 @@
 // PATCH+1 on every real build, odometer-carry into MINOR/MAJOR.
 #define FIRMWARE_VERSION_MAJOR 1
 #define FIRMWARE_VERSION_MINOR 1
-#define FIRMWARE_VERSION_PATCH 4
+#define FIRMWARE_VERSION_PATCH 7
 
 // ID configuration matrix (physical tool-head address readout)
 #define ID0_PIN         GPIO_PIN_0  // PF0 - Bit 0
