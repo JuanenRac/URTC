@@ -53,10 +53,10 @@ hadn't run at all.
 
 | Component | Version | Source of truth |
 |---|---|---|
-| Main board application firmware | 1.1.0 (incremental) | `src/F303-master/firmware_common.h` |
-| Main board bootloader | 1.1.9 (incremental) | `src/F303-master/boot/bootloader_common.h` |
-| Expansion slave application firmware | 1.0.0 (incremental) | `src/F303-slave/slave_common.h` |
-| Expansion slave bootloader | 1.0.3 (incremental) | `src/F303-slave/boot/slaveboot_common.h` |
+| Main board application firmware | 1.1.8 (incremental) | `src/F303-master/firmware_common.h` |
+| Main board bootloader | 1.2.7 (incremental) | `src/F303-master/boot/bootloader_common.h` |
+| Expansion slave application firmware | 1.0.7 (incremental) | `src/F303-slave/slave_common.h` |
+| Expansion slave bootloader | 1.1.0 (incremental) | `src/F303-slave/boot/slaveboot_common.h` |
 
 The bootloader numbers above will already be higher again by the time
 you read this if a build has run since - that's expected, not stale
