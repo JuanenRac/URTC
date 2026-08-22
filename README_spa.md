@@ -4,6 +4,15 @@
 
 # 🚀 URTC — Universal Robot Tool Controller (v1.1)
 
+<p align="left">
+  <img src="https://img.shields.io/badge/Licencia-GPL%203.0-blue.svg" alt="GPL 3.0">
+  <img src="https://img.shields.io/badge/Hardware-CERN%20OHL--S-orange.svg" alt="CERN OHL-S">
+  <img src="https://img.shields.io/badge/Lenguaje-C-00599C.svg" alt="C">
+  <img src="https://img.shields.io/badge/Plataforma-STM32F303-003551.svg" alt="STM32">
+  <img src="https://img.shields.io/badge/Bus-CAN-yellow.svg" alt="CAN">
+</p>
+
+
 > **⚠️ Aviso de seguridad:** esta placa controla un **diodo láser de grabado de 10W** y varias etapas de calentamiento (cartucho de soldador T12, hotend de impresora 3D). Construirla y usarla implica trabajar con equipo que puede causar **quemaduras, incendios o daño ocular** si se ensambla o se opera sin las medidas de seguridad adecuadas (gafas láser calificadas para la longitud de onda del diodo, protección térmica, un corte de energía accesible). Este es un proyecto hobbyista/maker compartido tal cual - constrúyelo y úsalo bajo tu propio riesgo, y no te saltes las prácticas básicas de seguridad solo porque el firmware tenga watchdogs.
 
 ¡Hola a todos! Quería compartir un proyecto que he estado desarrollando llamado URTC (Universal Robot Tool Controller). Es una placa de control monolítica y altamente integrada, diseñada específicamente para expandir las capacidades de brazos robóticos y configuraciones de automatización, lo que la convierte en una pareja perfecta para plataformas como PAROL6 y Faze4 — dos brazos robóticos de código abierto diseñados y desarrollados por [Source-Robotics](https://source-robotics.com/) ([GitHub](https://github.com/Source-Robotics)).
