@@ -4,6 +4,15 @@
 
 # 🚀 URTC — Universal Robot Tool Controller (v1.1)
 
+<p align="left">
+  <img src="https://img.shields.io/badge/Licenza-GPL%203.0-blue.svg" alt="GPL 3.0">
+  <img src="https://img.shields.io/badge/Hardware-CERN%20OHL--S-orange.svg" alt="CERN OHL-S">
+  <img src="https://img.shields.io/badge/Linguaggio-C-00599C.svg" alt="C">
+  <img src="https://img.shields.io/badge/Piattaforma-STM32F303-003551.svg" alt="STM32">
+  <img src="https://img.shields.io/badge/Bus-CAN-yellow.svg" alt="CAN">
+</p>
+
+
 > **⚠️ Avviso di sicurezza:** questa scheda pilota un **diodo laser da incisione da 10W** e più stadi di riscaldamento (cartuccia per saldatore T12, hotend per stampante 3D). Costruirla e usarla significa lavorare con apparecchiature che possono causare **ustioni, incendi o danni agli occhi** se assemblate o utilizzate senza le adeguate misure di sicurezza (occhiali protettivi con classificazione adatta alla lunghezza d'onda del diodo, protezione termica, un interruttore di alimentazione accessibile). Questo è un progetto hobbistico/maker condiviso così com'è - costruiscilo e usalo a tuo rischio, e non saltare le pratiche di sicurezza di base solo perché il firmware ha dei watchdog.
 
 Ciao a tutti! Volevo condividere un progetto a cui sto lavorando chiamato URTC (Universal Robot Tool Controller). È una scheda di controllo monolitica e altamente integrata, progettata specificamente per espandere le capacità di bracci robotici e impianti di automazione, il che la rende perfetta per piattaforme come PAROL6 e Faze4 - due bracci robotici open-source progettati e sviluppati da [Source-Robotics](https://source-robotics.com/) ([GitHub](https://github.com/Source-Robotics)).

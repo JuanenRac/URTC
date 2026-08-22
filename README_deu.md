@@ -4,6 +4,15 @@
 
 # 🚀 URTC — Universal Robot Tool Controller (v1.1)
 
+<p align="left">
+  <img src="https://img.shields.io/badge/Lizenz-GPL%203.0-blue.svg" alt="GPL 3.0">
+  <img src="https://img.shields.io/badge/Hardware-CERN%20OHL--S-orange.svg" alt="CERN OHL-S">
+  <img src="https://img.shields.io/badge/Sprache-C-00599C.svg" alt="C">
+  <img src="https://img.shields.io/badge/Plattform-STM32F303-003551.svg" alt="STM32">
+  <img src="https://img.shields.io/badge/Bus-CAN-yellow.svg" alt="CAN">
+</p>
+
+
 > **⚠️ Sicherheitshinweis:** Diese Platine steuert eine **10W-Gravier-Laserdiode** und mehrere Heizstufen (T12-Lötkolben-Patrone, 3D-Drucker-Hotend). Der Bau und die Nutzung bedeuten den Umgang mit Ausrüstung, die bei Montage oder Betrieb ohne angemessene Sicherheitsmaßnahmen (Laserschutzbrille passend zur Wellenlänge der Diode, thermischer Schutz, eine zugängliche Stromabschaltung) **Verbrennungen, Brand oder Augenschäden** verursachen kann. Dies ist ein Hobbyisten-/Maker-Projekt, das im Ist-Zustand geteilt wird — Bau und Nutzung auf eigenes Risiko, und grundlegende Sicherheitspraxis sollte nicht übersprungen werden, nur weil die Firmware Watchdogs hat.
 
 Hallo zusammen! Ich wollte ein Projekt teilen, das ich entwickle: URTC (Universal Robot Tool Controller). Es handelt sich um eine monolithische, hochintegrierte Steuerplatine, die speziell dafür entwickelt wurde, die Fähigkeiten von Roboterarmen und Automatisierungs-Setups zu erweitern, wodurch sie perfekt zu Plattformen wie PAROL6 und Faze4 passt — zwei Open-Source-Roboterarme, entworfen und entwickelt von [Source-Robotics](https://source-robotics.com/) ([GitHub](https://github.com/Source-Robotics)).

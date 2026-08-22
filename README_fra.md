@@ -4,6 +4,15 @@
 
 # 🚀 URTC — Universal Robot Tool Controller (v1.1)
 
+<p align="left">
+  <img src="https://img.shields.io/badge/Licence-GPL%203.0-blue.svg" alt="GPL 3.0">
+  <img src="https://img.shields.io/badge/Hardware-CERN%20OHL--S-orange.svg" alt="CERN OHL-S">
+  <img src="https://img.shields.io/badge/Langage-C-00599C.svg" alt="C">
+  <img src="https://img.shields.io/badge/Plateforme-STM32F303-003551.svg" alt="STM32">
+  <img src="https://img.shields.io/badge/Bus-CAN-yellow.svg" alt="CAN">
+</p>
+
+
 > **⚠️ Avis de sécurité :** cette carte pilote une **diode laser de gravure de 10W** et plusieurs étages de chauffe (cartouche de fer à souder T12, hotend d'imprimante 3D). La construire et l'utiliser signifie travailler avec un équipement pouvant causer des **brûlures, un incendie, ou des dommages oculaires** si elle est assemblée ou utilisée sans mesures de sécurité adéquates (lunettes laser adaptées à la longueur d'onde de la diode, protection thermique, une coupure d'alimentation accessible). Il s'agit d'un projet amateur/maker partagé tel quel — construisez-le et utilisez-le à vos propres risques, et ne négligez pas les pratiques de sécurité de base simplement parce que le firmware dispose de watchdogs.
 
 Bonjour à tous ! Je voulais partager un projet que je développe, appelé URTC (Universal Robot Tool Controller). C'est une carte de contrôle monolithique, hautement intégrée, conçue spécifiquement pour étendre les capacités des bras robotiques et des installations d'automatisation, ce qui en fait un excellent complément pour des plateformes comme PAROL6 et Faze4 — deux bras robotiques open-source conçus et développés par [Source-Robotics](https://source-robotics.com/) ([GitHub](https://github.com/Source-Robotics)).
