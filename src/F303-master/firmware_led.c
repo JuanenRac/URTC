@@ -84,10 +84,22 @@ void Update_StatusLED_AutoColor(void) {
 uint8_t Update_StatusLED_SPI_DMA(void) {
     if (HAL_SPI_GetState(&hspi1) != HAL_SPI_STATE_READY) return 0;
 
+    // Atomic capture of the 3 color bytes before touching the SPI buffer -
+    // same reasoning as the ring color capture in Handle_CAN_AOI(). Without
+    // this, a CAN RX interrupt landing between these 3 reads (0x100 writes
+    // led_state_pixel.R/G/B directly from ISR context) could hand this
+    // function a torn mix of the old and new color for one transmitted
+    // frame. Cosmetic only - this drives the status LED's color, not any
+    // actuator - but free to close given the SPI busy-check right above
+    // already guarantees no two DMA transfers ever overlap.
+    __disable_irq();
+    uint8_t g = led_state_pixel.G, r = led_state_pixel.R, b = led_state_pixel.B;
+    __enable_irq();
+
     uint32_t idx = 0;
-    memcpy(&led_spi_buffer[idx], ws2812_lut[led_state_pixel.G], 3); idx += 3;
-    memcpy(&led_spi_buffer[idx], ws2812_lut[led_state_pixel.R], 3); idx += 3;
-    memcpy(&led_spi_buffer[idx], ws2812_lut[led_state_pixel.B], 3); idx += 3;
+    memcpy(&led_spi_buffer[idx], ws2812_lut[g], 3); idx += 3;
+    memcpy(&led_spi_buffer[idx], ws2812_lut[r], 3); idx += 3;
+    memcpy(&led_spi_buffer[idx], ws2812_lut[b], 3); idx += 3;
     memset(&led_spi_buffer[idx], 0x00, 100); // reset/latch, same reasoning as before
     idx += 100;
 

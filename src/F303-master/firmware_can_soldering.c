@@ -16,6 +16,18 @@
 
 void Handle_CAN_SolderingIron(void) {
                 if (rxHeader.StdId == 0x130 && rxHeader.DLC >= 2) {
+                    // Not gated on boot_sequence_active - same reasoning as
+                    // the 3D printer hotend's own 0x170 handler and Hot Air
+                    // Rework's 0x1E0: pre-warming during the ~5s splash is
+                    // fine (no physical motion involved), and it's not an
+                    // unsupervised heater either way - Control_SolderingIron_
+                    // PID() and every one of its safety checks (445C ceiling,
+                    // stuck-heater detection, ADC-fault handling) already run
+                    // every iteration of the splash loop itself (see main()),
+                    // specifically to close this exact window. What's
+                    // deferred by boot_sequence_active is motion only (see
+                    // Handle_CAN_MotionTools() for this tool's own wire
+                    // feeder), never the thermal loop.
                     // Big-endian reconstruction (MSB | LSB)
                     target_temperature = (rxData[0] << 8) | rxData[1];
                     solder_iron_last_kick_tick = HAL_GetTick();

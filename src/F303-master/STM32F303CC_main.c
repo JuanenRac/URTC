@@ -202,6 +202,19 @@ int main(void) {
     // the space ahead of it. The vector table moved with it, so the core
     // needs to be told where to find it before anything can rely on an
     // interrupt firing correctly.
+    // This literal is intentionally duplicated, not shared, across 3
+    // places that must all agree: this line, FLASH's ORIGIN in
+    // STM32F303CCTx_APP.ld (this app's own link address - what actually
+    // places its vector table here), and MAIN_APP_ADDR in
+    // boot/bootloader_common.h (what the bootloader itself uses for the
+    // same SCB->VTOR write before jumping here, and for validating a
+    // flashed image's size against APP_MAX_SIZE). This file doesn't
+    // include bootloader_common.h, so the compiler can't catch these 3
+    // drifting apart on its own - if the bootloader/app partition split
+    // ever needs to move, all 3 need updating together, then verified
+    // against real hardware (a wrong VTOR here means no interrupt of any
+    // kind ever fires again, silently, so this is not a change to make
+    // from a build/link check alone).
     SCB->VTOR = 0x08008000;
 
     uint32_t tick_heartbeat = 0;

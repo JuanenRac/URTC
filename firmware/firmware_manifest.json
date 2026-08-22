@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-21T21:01:07Z",
+  "generated_at": "2026-08-22T10:50:34Z",
   "project": {
     "name": "URTC",
     "full_name": "Universal Robot Tool Controller",
@@ -23,17 +23,17 @@
       "version": {
         "major": 1,
         "minor": 2,
-        "patch": 6
+        "patch": 7
       },
-      "version_string": "1.2.6",
-      "version_code": 10206,
+      "version_string": "1.2.7",
+      "version_code": 10207,
       "flash_address": "0x08000000",
       "flash_region_max_bytes": 32768,
       "files": {
         "bin": {
           "filename": "URTC_BOOTLOADER.bin",
           "size_bytes": 17796,
-          "crc32": "0x1B19911A"
+          "crc32": "0x7F23F7C0"
         },
         "hex": {
           "filename": "URTC_BOOTLOADER.hex",
@@ -52,21 +52,21 @@
       "version": {
         "major": 1,
         "minor": 1,
-        "patch": 7
+        "patch": 8
       },
-      "version_string": "1.1.7",
-      "version_code": 10107,
+      "version_string": "1.1.8",
+      "version_code": 10108,
       "flash_address": "0x08008000",
       "flash_region_max_bytes": 114688,
       "files": {
         "bin": {
           "filename": "URTC_V1.1_F303CC.bin",
-          "size_bytes": 70196,
-          "crc32": "0x52D48B90"
+          "size_bytes": 70204,
+          "crc32": "0x182A22F7"
         },
         "hex": {
           "filename": "URTC_V1.1_F303CC.hex",
-          "size_bytes": 197543
+          "size_bytes": 197572
         },
         "elf": {
           "filename": "URTC_V1.1_F303CC.elf",
@@ -80,11 +80,11 @@
       "hardware_id": "0x0303CB01",
       "version": {
         "major": 1,
-        "minor": 0,
-        "patch": 9
+        "minor": 1,
+        "patch": 0
       },
-      "version_string": "1.0.9",
-      "version_code": 10009,
+      "version_string": "1.1.0",
+      "version_code": 10100,
       "flash_address": "0x08000000",
       "flash_region_max_bytes": 18432,
       "files": {
@@ -110,10 +110,10 @@
       "version": {
         "major": 1,
         "minor": 0,
-        "patch": 6
+        "patch": 7
       },
-      "version_string": "1.0.6",
-      "version_code": 10006,
+      "version_string": "1.0.7",
+      "version_code": 10007,
       "flash_address": "0x08005000",
       "flash_region_max_bytes": 55296,
       "files": {
