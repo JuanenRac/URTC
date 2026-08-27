@@ -383,8 +383,7 @@ typedef struct __attribute__((packed)) {
 
 // -----------------------------------------------------------------------
 // "Black box" fault recorder (audit idea: "sistema de Black Box en la
-// F-RAM para registrar los últimos 10s antes de un error" -
-// SONNET/AUDITORIA_COMPLETA_44_PROYECTOS.txt) - a small continuously-
+// F-RAM para registrar los últimos 10s antes de un error") - a small continuously-
 // updated RAM ring buffer, flushed to F-RAM ONLY on the rising edge of
 // system_error_flag (see firmware_blackbox.c), not written every tick -
 // the point is capturing what led UP TO a fault, and a fault condition

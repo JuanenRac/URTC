@@ -86,6 +86,16 @@ if [ "$1" = "--clean" ]; then
     TARGET="${2:-all}"
 fi
 
+# WSL builds can run directly from a Windows-mounted checkout.  Windows may
+# keep the output directory itself open briefly (for example while an editor
+# refreshes its tree), even when it is empty.  Keep the directory and clear
+# its contents instead: every target still starts from fresh object files.
+prepare_output_dir() {
+    local output_dir="$1"
+    mkdir -p "$output_dir"
+    find "$output_dir" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+}
+
 # -----------------------------------------------------------------------
 step "1. Toolchain"
 # -----------------------------------------------------------------------
@@ -244,7 +254,7 @@ mkdir -p "$FIRMWARE_OUT"
 if [ "$TARGET" = "all" ] || [ "$TARGET" = "master" ]; then
 step "4. Main board bootloader (src/F303-master/boot/)"
 # -----------------------------------------------------------------------
-OUT="$BUILD/master_boot"; rm -rf "$OUT"; mkdir -p "$OUT"
+OUT="$BUILD/master_boot"; prepare_output_dir "$OUT"
 SRC="$ROOT/src/F303-master/boot"
 # Bootloader version is INCREMENTAL - bump PATCH (odometer-carry into MINOR/
 # MAJOR) before the compiler reads this header, so the .bin built below
@@ -269,7 +279,7 @@ pass "${BOOT_NAME}.bin/.hex/.elf built ($(arm-none-eabi-size "$OUT/${BOOT_NAME}.
 # -----------------------------------------------------------------------
 step "5. Main board application (src/F303-master/)"
 # -----------------------------------------------------------------------
-OUT="$BUILD/master_app"; rm -rf "$OUT"; mkdir -p "$OUT"
+OUT="$BUILD/master_app"; prepare_output_dir "$OUT"
 SRC="$ROOT/src/F303-master"
 # Application firmware is INCREMENTAL too - same odometer-carry bump as the
 # bootloader above, plus mirroring the new version into bootloader_common.h's
@@ -307,7 +317,7 @@ fi
 if [ "$TARGET" = "all" ] || [ "$TARGET" = "slave" ]; then
 step "6. Expansion slave bootloader (src/F303-slave/boot/)"
 # -----------------------------------------------------------------------
-OUT="$BUILD/slave_boot"; rm -rf "$OUT"; mkdir -p "$OUT"
+OUT="$BUILD/slave_boot"; prepare_output_dir "$OUT"
 SRC="$ROOT/src/F303-slave/boot"
 # Same incremental-version bump as the main board bootloader above - see
 # bump_version.py's own header for the full policy. Same stdout-capture
@@ -326,7 +336,7 @@ pass "${SLAVE_BOOT_NAME}.bin/.hex/.elf built ($(arm-none-eabi-size "$OUT/${SLAVE
 # -----------------------------------------------------------------------
 step "7. Expansion slave application (src/F303-slave/)"
 # -----------------------------------------------------------------------
-OUT="$BUILD/slave_app"; rm -rf "$OUT"; mkdir -p "$OUT"
+OUT="$BUILD/slave_app"; prepare_output_dir "$OUT"
 SRC="$ROOT/src/F303-slave"
 # Same incremental bump + bootloader-mirror as the main board application
 # above. Same stdout-capture pattern - filename convention

@@ -85,9 +85,8 @@ hand-edit that copy, it will just drift again.
       for this one bump. The 4 prefixes: URTC_MAIN_BOOTLOADER,
       URTC_MAIN_FIRMWARE, URTC_SLAVE_BOOTLOADER, URTC_SLAVE_FIRMWARE.
       Delete the old-numbered/old-named binaries after confirming the new
-      ones build and byte-compare correctly against a fresh compile (move
-      them to SONNET/_papelera/, never a permanent delete, per this
-      project's own no-permanent-delete convention).
+      ones build and byte-compare correctly against a fresh compile; retain
+      superseded files in the project's archival location rather than deleting them permanently.
   --> Only ONE set of these 3 files exists now, not a monolithic-plus-
       partitioned pair (the "_partitioned" suffix was dropped project-
       wide when the monolithic form was retired) - don't recreate that

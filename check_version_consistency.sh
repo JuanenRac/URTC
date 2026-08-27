@@ -158,7 +158,7 @@ for prefix in "URTC_MAIN_BOOTLOADER" "URTC_MAIN_FIRMWARE" "URTC_SLAVE_BOOTLOADER
     done
 done
 STALE_OLDNAME=$(find "$ROOT/firmware" -maxdepth 1 \( -iname "URTC_BOOTLOADER.*" -o -iname "URTC_SLAVE_APP.*" -o -iname "URTC_SLAVE_BOOTLOADER.bin" -o -iname "URTC_SLAVE_BOOTLOADER.hex" -o -iname "URTC_SLAVE_BOOTLOADER.elf" -o -iname "URTC_V[0-9]*_F303CC.*" \) 2>/dev/null)
-[ -n "$STALE_OLDNAME" ] && warn "old pre-unification binary name(s) still present (unversioned bootloaders/slave app, or the old URTC_V<MAJOR>.<MINOR>_F303CC main app name) - once confirmed superseded by a fresh build under the new names, move these to SONNET/_papelera/ (never a permanent delete): $STALE_OLDNAME"
+[ -n "$STALE_OLDNAME" ] && warn "old pre-unification binary name(s) still present (unversioned bootloaders/slave app, or the old URTC_V<MAJOR>.<MINOR>_F303CC main app name) - once confirmed superseded by a fresh build under the new names, archive these rather than deleting them permanently: $STALE_OLDNAME"
 STALE_SUFFIXED=$(find "$ROOT/firmware" -maxdepth 1 \( -iname "*_partitioned.*" -o -iname "*_monolithic.*" \) 2>/dev/null)
 if [ -n "$STALE_SUFFIXED" ]; then
     fail "binaries with the retired _partitioned/_monolithic suffix still present (only one form exists now): $STALE_SUFFIXED"

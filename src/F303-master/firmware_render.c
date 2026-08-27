@@ -119,8 +119,7 @@ void OLED_DrawHorizontalBar(uint8_t page, uint8_t col_start, uint8_t max_width, 
 }
 
 // Rolling temperature trend sparkline (audit idea: "gráficas de
-// temperatura en tiempo real en el OLED" -
-// SONNET/AUDITORIA_COMPLETA_44_PROYECTOS.txt) - confined to ONE 8px-tall
+// temperatura en tiempo real en el OLED") - confined to ONE 8px-tall
 // page, the only genuinely free page left on the soldering iron's tool
 // screen (page 4, between the tool-name/divider above and the temp
 // text/endstop/progress-bar below - confirmed unused by grepping every
