@@ -624,18 +624,3 @@ URTC の著作権は (c) 2026 JuanenRac（Electro Hobby 3D）に帰属します�
 本プロジェクトを基に開発を行う際は、このライセンス区分を念頭に置いてください：ファームウェアへのコード変更は GPL-3.0 を維持し、ハードウェアの改変は CERN-OHL-S を維持し、ドキュメントの派生物は CC BY-SA を維持してください——いずれも本プロジェクトへの帰属表示を伴う必要があります。
 
 本リポジトリは URTC ボード自身のファームウェアとハードウェアのみを対象としています——かつてここにあった PC ツール（URTC Flasher、URTC Tester）は、今では独自のライセンスを持つ独立したプロジェクトです。上記「PC ツール」を参照してください。
-
-## 関連プロジェクト
-
-> 正規の URTC 関係マップ。
-
-**URTC コアと関連ツール：**
-[URTC-FLASHER](https://github.com/JuanenRac/URTC-FLASHER) · [URTC-TESTER](https://github.com/JuanenRac/URTC-TESTER) · [URTC-WEB-STUDIO](https://github.com/JuanenRac/URTC-WEB-STUDIO) · [URTC-SMART-RACK](https://github.com/JuanenRac/URTC-SMART-RACK) · [URTC-VISION-TOOL](https://github.com/JuanenRac/URTC-VISION-TOOL)
-
-**任意の HYDRA-UMC 統合：**
-[HYDRA-UMC](https://github.com/JuanenRac/HYDRA-UMC) · [HYDRA-UMC-SDK](https://github.com/JuanenRac/HYDRA-UMC-SDK)
-
-URTC は独立した制御サブシステムです。HYDRA-UMC との統合には公開 SDK 契約を使用しますが、URTC は HYDRA-UMC コアの一部ではありません。
-
-**その他のエコシステム：**
-残りの公開プロジェクトは [JuanenRac エコシステムダッシュボード](https://juanenrac.github.io/JuanenRac/) で確認できます。

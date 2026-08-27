@@ -608,18 +608,3 @@ URTC 版权所有 (c) 2026 JuanenRac（Electro Hobby 3D）。分发本项目或�
 如果你基于本项目进行开发，请留意这种许可证划分：对固件的代码更改应保持 GPL-3.0，硬件改动应保持 CERN-OHL-S，文档衍生品应保持 CC BY-SA——每一项都需附带指向本项目的署名。
 
 本仓库仅涵盖 URTC 板卡自身的固件和硬件——曾经存在于此的 PC 工具（URTC Flasher、URTC Tester）如今是拥有各自许可证的独立项目，见上方“PC 工具”一节。
-
-## 关联项目
-
-> 规范的 URTC 关系图。
-
-**URTC 核心与相关工具：**
-[URTC-FLASHER](https://github.com/JuanenRac/URTC-FLASHER) · [URTC-TESTER](https://github.com/JuanenRac/URTC-TESTER) · [URTC-WEB-STUDIO](https://github.com/JuanenRac/URTC-WEB-STUDIO) · [URTC-SMART-RACK](https://github.com/JuanenRac/URTC-SMART-RACK) · [URTC-VISION-TOOL](https://github.com/JuanenRac/URTC-VISION-TOOL)
-
-**可选的 HYDRA-UMC 集成：**
-[HYDRA-UMC](https://github.com/JuanenRac/HYDRA-UMC) · [HYDRA-UMC-SDK](https://github.com/JuanenRac/HYDRA-UMC-SDK)
-
-URTC 是独立的控制子系统。它通过公开 SDK 契约与 HYDRA-UMC 集成，但不属于 HYDRA-UMC 核心。
-
-**其余生态系统：**
-其余公开项目可在 [JuanenRac 生态系统仪表板](https://juanenrac.github.io/JuanenRac/) 查看。

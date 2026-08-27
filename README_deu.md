@@ -613,18 +613,3 @@ Da dieses Projekt aus mehreren verschiedenen Arten von Inhalten besteht, werden 
 Wenn Sie auf diesem Projekt aufbauen, denken Sie an die Lizenzaufteilung: Code-Änderungen an der Firmware sollten GPL-3.0 bleiben, Hardware-Modifikationen sollten CERN-OHL-S bleiben, und Dokumentationsableitungen sollten CC BY-SA bleiben - jede mit Namensnennung zurück zu diesem Projekt.
 
 Dieses Repository deckt nur die eigene Firmware und Hardware der URTC-Platine ab - die PC-Tools (URTC Flasher, URTC Tester), die früher hier lebten, sind nun unabhängige Projekte mit eigener Lizenzierung, siehe "PC-Tools" oben.
-
-## Verwandte Projekte
-
-> Verbindliche URTC-Beziehungsübersicht.
-
-**URTC-Kern und zugehörige Werkzeuge:**
-[URTC-FLASHER](https://github.com/JuanenRac/URTC-FLASHER) · [URTC-TESTER](https://github.com/JuanenRac/URTC-TESTER) · [URTC-WEB-STUDIO](https://github.com/JuanenRac/URTC-WEB-STUDIO) · [URTC-SMART-RACK](https://github.com/JuanenRac/URTC-SMART-RACK) · [URTC-VISION-TOOL](https://github.com/JuanenRac/URTC-VISION-TOOL)
-
-**Optionale HYDRA-UMC-Integration:**
-[HYDRA-UMC](https://github.com/JuanenRac/HYDRA-UMC) · [HYDRA-UMC-SDK](https://github.com/JuanenRac/HYDRA-UMC-SDK)
-
-URTC ist ein unabhängiges Steuerungssubsystem. Seine Integration mit HYDRA-UMC verwendet öffentliche SDK-Verträge und macht URTC nicht zu einem Teil des HYDRA-UMC-Kerns.
-
-**Übriges Ökosystem:**
-Die übrigen öffentlichen Projekte stehen im [JuanenRac-Ökosystem-Dashboard](https://juanenrac.github.io/JuanenRac/) bereit.
