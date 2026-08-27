@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 850 260" width="100%" height="100%">
+  <!-- Fondo Oscuro Industrial -->
+  <rect width="100%" height="100%" fill="#14171C" rx="12"/>
+
+  <!-- Rejilla técnica sutil de fondo (Blueprint style) -->
+  <g stroke="#1C2029" stroke-width="1">
+    <path d="M 0,40 L 850,40 M 0,80 L 850,80 M 0,120 L 850,120 M 0,160 L 850,160 M 0,200 L 850,200 M 0,240 L 850,240" />
+    <path d="M 100,0 L 100,260 M 200,0 L 200,260 M 300,0 L 300,260 M 400,0 L 400,260 M 500,0 L 500,260 M 600,0 L 600,260 M 700,0 L 700,260" />
+  </g>
+
+  <!-- CONJUNTO MECÁNICO (Brazo en interacción directa con el ATC) -->
+  <g transform="translate(40, 35)">
+    
+    <!-- Brazo Parol6 -->
+    <g transform="translate(10, 0)">
+      <!-- Base del brazo -->
+      <path d="M 20,160 L 80,160 L 70,135 L 30,135 Z" fill="#22252D" stroke="#00ADB5" stroke-width="2.5"/>
+      <circle cx="50" cy="135" r="10" fill="#14171C" stroke="#00ADB5" stroke-width="3"/>
+      
+      <!-- Primer segmento (Boom) -->
+      <path d="M 50,135 L 110,85" stroke="#EEEEEE" stroke-width="12" stroke-linecap="round"/>
+      <path d="M 50,135 L 110,85" stroke="#00ADB5" stroke-width="4" stroke-linecap="round"/>
+      <circle cx="110" cy="85" r="9" fill="#14171C" stroke="#EEEEEE" stroke-width="3"/>
+      
+      <!-- Segundo segmento (Arm) - Extensión horizontal directa hacia el ATC -->
+      <path d="M 110,85 L 230,85" stroke="#EEEEEE" stroke-width="8" stroke-linecap="round"/>
+      <path d="M 140,85 L 210,85" stroke="#00ADB5" stroke-width="2"/>
+      <circle cx="230" cy="85" r="7" fill="#14171C" stroke="#00ADB5" stroke-width="3"/>
+      
+      <!-- Herramienta de Taladro (Entrando al Slot del Revólver) -->
+      <g transform="translate(230, 85)">
+        <!-- Acople y Mandril -->
+        <path d="M 0,-7 L 14,-7 L 18,-12 L 32,-12 L 32,12 L 18,12 L 14,7 L 0,7 Z" fill="#22252D" stroke="#EEEEEE" stroke-width="2"/>
+        <!-- Broca / Punta Helicoidal (Cruza hacia el interior del ATC) -->
+        <path d="M 32,-4 L 54,-1.5 L 54,1.5 L 32,4 Z" fill="#FF5722"/>
+        <!-- Estrías de la broca -->
+        <path d="M 37,-3 L 40,3 M 43,-2 L 46,2 M 49,-1 L 51,1" stroke="#14171C" stroke-width="1.5"/>
+      </g>
+    </g>
+
+    <!-- Revólver ATC Acercado -->
+    <g transform="translate(345, 85)">
+      <!-- Cuerpo del plato del revólver -->
+      <circle cx="0" cy="0" r="68" fill="none" stroke="#22252D" stroke-width="7"/>
+      <circle cx="0" cy="0" r="68" fill="none" stroke="#00ADB5" stroke-width="2" stroke-dasharray="12, 6"/>
+      <circle cx="0" cy="0" r="18" fill="#14171C" stroke="#EEEEEE" stroke-width="3"/>
+      
+      <!-- Herramienta 1: Gripper Neumático (Arriba) -->
+      <g transform="rotate(0) translate(0, -68)">
+        <circle cx="0" cy="0" r="11" fill="#22252D" stroke="#EEEEEE" stroke-width="2"/>
+        <path d="M -6,-10 L -6,-19 L -2,-19 M 6,-10 L 6,-19 L 2,-19" stroke="#EEEEEE" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+      </g>
+      
+      <!-- Herramienta 2: Sonda/Palpador 3D (Derecha) -->
+      <g transform="rotate(90) translate(0, -68)">
+        <circle cx="0" cy="0" r="11" fill="#22252D" stroke="#00ADB5" stroke-width="2"/>
+        <path d="M 0,-10 L 0,-24" stroke="#FF5722" stroke-width="2.5"/>
+        <circle cx="0" cy="-24" r="3.5" fill="#FF5722"/>
+      </g>
+      
+      <!-- Herramienta 3: Fresa de Corte (Abajo) -->
+      <g transform="rotate(180) translate(0, -68)">
+        <circle cx="0" cy="0" r="11" fill="#22252D" stroke="#EEEEEE" stroke-width="2"/>
+        <path d="M -4,-10 L -4,-18 L 0,-24 L 4,-18 L 4,-10 Z" fill="#EEEEEE"/>
+      </g>
+      
+      <!-- Slot Vacio (Izquierda) - Recibiendo la broca con precisión milimétrica -->
+      <g transform="rotate(270) translate(0, -68)">
+        <circle cx="0" cy="0" r="11" fill="#14171C" stroke="#00ADB5" stroke-width="2.5" stroke-dasharray="4,2"/>
+      </g>
+    </g>
+
+  </g>
+
+
+  <!-- Autoría, debajo del brazo -->
+  <text x="175" y="230" text-anchor="middle" font-family="'Segoe UI', Roboto, sans-serif" font-weight="700" font-size="13" fill="#627284" letter-spacing="1.5">JuanenRac &#169; 2026</text>
+
+  <!-- BLOQUE DE TEXTO MARCA (Desplazado a la izquierda para optimizar espacio) -->
+  <g transform="translate(490, 140)">
+    <!-- Siglas URTC -->
+    <text font-family="'Segoe UI', Roboto, 'Arial Black', sans-serif" font-weight="900" font-size="64" fill="#EEEEEE" letter-spacing="1">
+      UR<tspan fill="#00ADB5">TC</tspan>
+    </text>
+    <!-- Línea de acento térmico/seguridad -->
+    <path d="M 0,14 L 285,14" stroke="#FF5722" stroke-width="3.5" stroke-linecap="round"/>
+    <!-- Nombre Completo -->
+    <text y="36" font-family="'Segoe UI', Roboto, sans-serif" font-weight="700" font-size="11.5" fill="#627284" letter-spacing="3.5">
+      UNIVERSAL ROBOT TOOL CONTROLLER
+    </text>
+  </g>
+</svg>

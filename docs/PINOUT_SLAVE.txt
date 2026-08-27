@@ -1,0 +1,150 @@
+=============================================================================
+URTC EXPANSION SLAVE - PINOUT ASSIGNMENT (ADVANCED VARIANTS ONLY)
+MICROCONTROLLER: STM32F303CBT6 (LQFP48 Package - 48 Pins, 128KB Flash, 40KB SRAM)
+PROJECT: URTC (Universal Robot Tool Controller) - Expansion Ecosystem
+AUTHOR: JuanenRac (Electro Hobby 3D) - electrohobby3d@gmail.com
+LICENSE: This document is licensed under CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/).
+         Firmware source (this chip's bootloader and application) is
+         GPL-3.0; the 3 Melexis MLX9064x-family libraries it links
+         against are all Apache-2.0 (see each one's own
+         LICENSE_MELEXIS_APACHE2.0 in src/F303-slave/melexis_mlx90640/,
+         melexis_mlx90641/, and melexis_mlx90642/) - see the repo
+         README's "License and Copyright Notices" section for the full
+         breakdown.
+
+SCOPE: this chip is only populated on the 2 ADVANCED expansion board
+variants (Advanced+TMC2209, Advanced+TMC5160A). The 2 BASIC variants
+carry the same stepper driver and the same tool-facing connectors, but
+no MCU at all - the main URTC board's own STM32F303CC drives the
+driver's STEP/DIR/EN lines directly over the existing expansion
+connector on those boards, same as it already can for any expansion
+board today. Nothing in this document applies to the basic variants.
+
+NOTE ON PHYSICAL PIN NUMBERS: same convention as PINOUT.TXT - this
+document identifies pins by their GPIO signal name, verified against
+this chip's real HAL/CMSIS headers, not by physical LQFP48 pin number.
+Cross-check against the datasheet's own pinout table or Eagle's part
+footprint at layout time.
+=============================================================================
+
+-----------------------------------------------------------------------------
+[BLOCK 1: POWER SUPPLY AND BOOT SYSTEM]
+-----------------------------------------------------------------------------
+NRST        -> STM_RST Active-Low Reset Line
+VSS (x2-3)  -> Expansion board ground plane
+VDD (x2-3)  -> Digital power (+3.3V), 100nF decoupling at each pin
+BOOT0       -> Same role and default-LOW convention as the main board's
+               own BOOT0 (PINOUT.TXT Block 1) - pulled low so this chip
+               boots into slaveboot's own bootloader at 0x08000000 on
+               every normal power-up, with a pushbutton path to force
+               ST's own factory bootloader for recovery.
+VDDA        -> Analog power (+3.3V) + 100nF capacitor
+VBAT        -> Tied to VDD, same no-RTC-backup-battery reasoning as the
+               main board.
+
+-----------------------------------------------------------------------------
+[BLOCK 2: LINK BUS TO MAIN BOARD (I2C1, this chip as SLAVE)]
+-----------------------------------------------------------------------------
+PB6   -> I2C1_SCL (AF4) - shared physical bus with EXP_I2C2_SCL on the
+         main board's own expansion connector (PINOUT_CONNECTORS.TXT) -
+         this is the SAME wire, not a second one; the main board bit-
+         bangs this bus as master (ExpansionI2C_* in its own firmware),
+         this chip answers as a real hardware I2C slave at address 0x42
+         (see slaveboot_common.h / slave_common.h's own
+         I2C_SLAVE_ADDRESS).
+PB7   -> I2C1_SDA (AF4), same bus.
+         External pull-ups: same convention as every other I2C bus in
+         this project - required, not optional, and this chip's own
+         GPIO init deliberately leaves internal pull-ups disabled
+         (GPIO_NOPULL) assuming they're present on the board, exactly
+         like the main board's own I2C2 expansion bus already does.
+
+-----------------------------------------------------------------------------
+[BLOCK 3: LOCAL SENSOR BUS (I2C2, this chip as MASTER)]
+-----------------------------------------------------------------------------
+PB10  -> I2C2_SCL (AF4) - this bus is LOCAL to the expansion board only;
+         it never leaves it. Drives the 2 onboard sensor chips.
+PB11  -> I2C2_SDA (AF4), same bus.
+         External pull-ups required on the expansion board itself (not
+         shared with any main-board pull-up, since this bus doesn't
+         reach the main board at all).
+
+ADS1115 (16-bit ADC, doc tool #7 - Functional Testing Head)
+  -> I2C address 0x48 (ADDR pin tied to GND - the datasheet default of
+     the 4 selectable addresses; this is a board-wiring assumption this
+     firmware is built against, not something the chip enforces itself
+     - if a future board revision ties ADDR differently, both this
+     document and slave_common.h's own ADS1115_I2C_ADDR need updating
+     together).
+
+MLX90640 (32x24 thermal array, doc tool #13 - PCB Advanced Inspection)
+  -> I2C address 0x33 (fixed, not configurable - every unit answers
+     here regardless of board wiring).
+
+-----------------------------------------------------------------------------
+[BLOCK 4: LOCAL PWM GENERATION (TIM1, 4 channels)]
+-----------------------------------------------------------------------------
+PA8   -> TIM1_CH1 (AF6) - PWM_CHANNEL 0 in slave_common.h's own REG_PWM_*
+PA9   -> TIM1_CH2 (AF6) - PWM_CHANNEL 1
+PA10  -> TIM1_CH3 (AF6) - PWM_CHANNEL 2
+PA11  -> TIM1_CH4 (AF6) - PWM_CHANNEL 3
+         Routed to the tool-facing connector block (Block 6) for
+         whichever of the 3 timing-critical tools (doc #4 Spot Welder,
+         doc #14 Solder Paste Jetting, doc #15 Ultrasonic Welder) this
+         specific tool head actually is - generated locally here rather
+         than routed from the main board's own CONN_T12, since cable/
+         connector length between the main board and a remote tool head
+         costs exactly the timing precision these tools want. See
+         slave_pwm.c's own note on the 1us counter resolution this
+         provides.
+
+-----------------------------------------------------------------------------
+[BLOCK 5: STEPPER DRIVER INTERFACE (TMC2209 or TMC5160A - populated on
+ALL 4 board variants, basic and advanced alike)]
+-----------------------------------------------------------------------------
+This chip does NOT drive the stepper driver directly - STEP/DIR/EN come
+straight from the main board's own EXP_TMC_STEP/DIR/EN pins
+(PINOUT_CONNECTORS.TXT), through the existing expansion connector,
+exactly the same way on both basic and advanced variants. This chip's
+own GPIO isn't part of this signal path at all; it's documented here
+only so a reader looking at the driver's own pins on this board doesn't
+go searching this chip's own pinout for them and come up empty-handed
+for no discoverable reason.
+
+The driver choice itself (TMC2209 vs. TMC5160A) is a per-board
+population choice, not something this chip's firmware branches on -
+neither this chip nor the main board's own firmware currently
+distinguishes which driver variant is populated; the SPI passthrough
+(main board's own CANBUS.TXT 0x180/0x181) already treats whatever's on
+the other end of that bus generically, by design.
+
+-----------------------------------------------------------------------------
+[BLOCK 6: TOOL-FACING CONNECTOR BLOCK]
+-----------------------------------------------------------------------------
+Physical connectors on the expansion board itself for whatever the tool
+head actually needs, populated per-tool rather than uniformly:
+  - Motor connector: driver's own A+/A-/B+/B- coil outputs (Block 5) -
+    present on every variant, since the driver itself is.
+  - PWM connector(s): routes 1-4 of Block 4's own TIM1 channels,
+    populated only on tool heads that actually use local PWM.
+  - Sensor connector: I2C2 (Block 3) breakout for a tool head with its
+    own additional local I2C peripheral beyond the onboard ADS1115/
+    MLX90640, if a future tool ever needs one - not used by any of the
+    15 tools this document currently covers, included for headroom.
+
+Exact connector part numbers/pinout ordering: not yet specified - this
+section documents which SIGNALS reach the tool-facing side, not the
+physical connector footprint itself, which is an Eagle layout decision
+still pending.
+
+-----------------------------------------------------------------------------
+[BLOCK 7: DEBUG]
+-----------------------------------------------------------------------------
+PA13  -> SWDIO
+PA14  -> SWCLK
+         Standard SWD debug/programming header - same as the main
+         board's own PINOUT.TXT convention, populated for bring-up and
+         recovery even though normal firmware updates go through this
+         chip's own I2C bootloader (Block 2), not SWD.
+
+=============================================================================

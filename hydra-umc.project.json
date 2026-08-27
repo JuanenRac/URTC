@@ -1,0 +1,27 @@
+{
+  "schema_version": "1.0",
+  "ecosystem": "HYDRA-UMC",
+  "name": "URTC",
+  "version": "0.2.5",
+  "role": "firmware",
+  "stack": "firmware-c",
+  "technologies": [
+    "STM32F303",
+    "FDCAN",
+    "S-Curve profiles"
+  ],
+  "deployment_target": "user-pc",
+  "maturity": "production",
+  "family": "URTC Tool Platform",
+  "parent": null,
+  "build": "4 independently-versioned components (main + slave, app + bootloader each). This registry tracks the main application as representative. Real build: bash build_firmware.sh.",
+  "notes": "The real firmware for this ecosystem's physical Universal Robot Tool Controller PCB - 25+ tool profiles, CAN bus.",
+  "native_version": {
+    "file": "src/F303-master/firmware_common.h",
+    "pattern": {
+      "major": "#define\\s+FIRMWARE_VERSION_MAJOR\\s+(\\d+)",
+      "minor": "#define\\s+FIRMWARE_VERSION_MINOR\\s+(\\d+)",
+      "patch": "#define\\s+FIRMWARE_VERSION_PATCH\\s+(\\d+)"
+    }
+  }
+}

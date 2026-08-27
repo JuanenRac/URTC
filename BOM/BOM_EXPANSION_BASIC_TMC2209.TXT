@@ -1,0 +1,72 @@
+================================================================================
+BILL OF MATERIALS (BOM) - URTC EXPANSION BOARD, BASIC + TMC2209 VARIANT
+================================================================================
+AUTHOR: JuanenRac (Electro Hobby 3D) - electrohobby3d@gmail.com
+LICENSE: This document is licensed under CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/).
+         Firmware source is GPL-3.0; hardware design files (once drawn)
+         will be CERN-OHL-S v2, same as the main URTC board - see the
+         repo README.
+VARIANT: BASIC - no MCU. Carries the stepper driver and the tool-facing
+         connectors only; STEP/DIR/EN come directly from the main URTC
+         board's own STM32F303CC over the existing expansion connector.
+         Fits any of the 15 new tools that don't need local PWM or the
+         2 local I2C sensor chips (see docs/PINOUT_SLAVE.txt for the
+         full basic-vs-advanced breakdown).
+DRIVER: TMC2209 - integrated power MOSFETs (up to 2A RMS per coil per
+        the driver's own datasheet), no external power stage needed.
+SOURCE: Component selection below is a first-pass BOM for a board that
+        hasn't been laid out in Eagle yet - unlike the main URTC board's
+        own BOM.TXT (sourced from an actual exported schematic/netlist),
+        treat reference designators here as provisional until a real
+        schematic exists to assign them from.
+================================================================================
+
+--------------------------------------------------------------------------------
+1. STEPPER DRIVER (TMC2209)
+--------------------------------------------------------------------------------
+RefDes      Qty        Value / Model       Package         Notes / Description
+--------------------------------------------------------------------------------
+U1          1          TMC2209-LA          QFN-28 (5x5)    Integrated stepper driver - same part already
+                                                            used for the main URTC board's own onboard
+                                                            driver (see main board's own BOM.TXT section
+                                                            covering U6), same footprint/support-component
+                                                            pattern reused here rather than re-derived
+R1,R2       2          0.11R 1%            R1206           Current-sense resistors - same value as the
+                                                            main board's own onboard TMC2209 sense resistors,
+                                                            for matching current-sense behavior across both
+C1          1          4.7uF/50V           C1206           5VOUT stabilization capacitor (driver's own
+                                                            internal charge pump output) - same value the
+                                                            main board's own BOM already uses for this
+                                                            same driver IC (its C17)
+C2,C3       2          100nF               C0603           VM (motor supply) local decoupling
+C4          1          10uF/25V            C1206           VM bulk decoupling, close to the driver
+
+--------------------------------------------------------------------------------
+2. LOCAL POWER
+--------------------------------------------------------------------------------
+RefDes      Qty        Value / Model       Package         Notes / Description
+--------------------------------------------------------------------------------
+Note: this board draws its own logic power from the main board's own
+expansion connector rather than regulating its own - the connector
+already carries a +3.3V rail from the main board's own AP2112K LDO
+(main board's own BOM.TXT section 1), and a basic-variant board has no
+load beyond the driver's own logic pins, well within that rail's
+existing budget. No local regulator populated.
+
+--------------------------------------------------------------------------------
+3. CONNECTORS
+--------------------------------------------------------------------------------
+RefDes      Qty        Value / Model       Package         Notes / Description
+--------------------------------------------------------------------------------
+J1          1          TBD (link)          THT/SMD header  Link connector to the main board's own
+                                                            CONN_EXPANSION - carries STEP/DIR/EN, +3.3V,
+                                                            GND. Exact part TBD at layout time, matched to
+                                                            whatever connector the main board's own
+                                                            CONN_EXPANSION uses.
+J2          1          TBD (motor)         THT terminal    Motor coil output (A+/A-/B+/B- from the driver)
+J3          1          TBD (tool-specific) THT/SMD header  Tool-facing connector - populated per-tool per
+                                                            docs/PINOUT_SLAVE.txt Block 6; exact pinout
+                                                            depends on which of the 15 tools this specific
+                                                            board variant is wired for
+
+================================================================================

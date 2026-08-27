@@ -1,0 +1,374 @@
+=============================================================================
+EEPROM.TXT - FM24CL64B F-RAM register map
+PROJECT: URTC (Universal Robot Tool Controller)
+AUTHOR: JuanenRac (Electro Hobby 3D) - electrohobby3d@gmail.com
+LICENSE: This document is licensed under CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/).
+         Firmware source is GPL-3.0; hardware design files are CERN-OHL-S v2 - see the repo README.
+=============================================================================
+Everything URTC stores in its onboard FM24CL64B F-RAM (U8, I2C2, shares
+that bus with the OLED - see ../BOM/BOM.TXT and PINOUT.TXT's I2C2 block). One
+single packed struct, SavedState_t, written starting at address 0 - the
+chip holds 8192 bytes (64Kbit) total, and this struct currently uses 34
+bytes, leaving 8158 bytes of headroom for whatever gets added later.
+
+For the load/save logic itself (when it reads, when it writes, what gets
+restored automatically vs. left for the host to decide) see
+firmware_persistence.c - this document is the register map, not the
+behavior around it. For the CAN commands that read/write parts of this
+from off-board, see CANBUS.TXT (0x190/0x191 query, 0x192 erase,
+0x1A0/0x1A1 for the expansion board type field specifically).
+
+-----------------------------------------------------------------------------
+1. Layout (SavedState_t, packed - no compiler-inserted padding)
+-----------------------------------------------------------------------------
+Offset | Size | Field                    | Type     | Notes
+-------|------|--------------------------|----------|---------------------
+0      | 4    | magic                    | uint32_t | 0x55525443 ('URTC').
+       |      |                          |          | Confirms this F-RAM
+       |      |                          |          | was actually written
+       |      |                          |          | by this firmware -
+       |      |                          |          | blank/uninitialized
+       |      |                          |          | F-RAM won't match by
+       |      |                          |          | astronomical chance.
+4      | 1    | struct_version           | uint8_t  | Currently 7. Bumped
+       |      |                          |          | whenever this layout
+       |      |                          |          | OR the checksum
+       |      |                          |          | algorithm changes, so
+       |      |                          |          | old/new firmware can
+       |      |                          |          | tell a mismatched save
+       |      |                          |          | apart instead of
+       |      |                          |          | misreading a shorter
+       |      |                          |          | old record
+       |      |                          |          | as if new fields were
+       |      |                          |          | already there.
+5      | 1    | active_tool_at_save      | uint8_t  | Which tool profile
+       |      |                          |          | (0-24, or 25/
+       |      |                          |          | TOOL_INVALID for
+       |      |                          |          | none) was active when
+       |      |                          |          | this was saved -
+       |      |                          |          | cross-checked against
+       |      |                          |          | the CURRENT active_tool
+       |      |                          |          | at load time, so a
+       |      |                          |          | saved soldering-iron
+       |      |                          |          | setpoint can't get
+       |      |                          |          | misapplied if the
+       |      |                          |          | board's jumpers ever
+       |      |                          |          | changed since.
+6      | 2    | solder_setpoint          | uint16_t | °C. Only meaningful
+       |      |                          |          | if active_tool_at_save
+       |      |                          |          | was the soldering iron.
+8      | 2    | printer_nozzle_setpoint  | uint16_t | °C. Only meaningful if
+       |      |                          |          | active_tool_at_save was
+       |      |                          |          | the 3D printer.
+10     | 1    | drill_speed              | uint8_t  | 0-255 PWM duty. Only
+       |      |                          |          | meaningful for the
+       |      |                          |          | drill.
+11     | 1    | drill_direction          | uint8_t  | 0/1. Read directly off
+       |      |                          |          | the GPIO pin at save
+       |      |                          |          | time (no dedicated RAM
+       |      |                          |          | variable exists for
+       |      |                          |          | this - see the
+       |      |                          |          | SavedState_MaybeSave()
+       |      |                          |          | comment in the source).
+12     | 1    | laser_power              | uint8_t  | 0-255. Only meaningful
+       |      |                          |          | for the laser engraver.
+13     | 1    | laser_interlock          | uint8_t  | 0/1, same GPIO-read
+       |      |                          |          | reasoning as
+       |      |                          |          | drill_direction above.
+14     | 1    | layer_fan_power          | uint8_t  | 0-255 PWM duty, 3D
+       |      |                          |          | printer's layer fan.
+15     | 1    | hotend_fan_power         | uint8_t  | 0-255 PWM duty, 3D
+       |      |                          |          | printer's hotend fan.
+16     | 1    | status_r                 | uint8_t  | Status LED (CONN_LED1)
+17     | 1    | status_g                 | uint8_t  | color - applies
+18     | 1    | status_b                 | uint8_t  | regardless of tool.
+19     | 1    | ring_r                   | uint8_t  | Ring LED (CONN_LED2)
+20     | 1    | ring_g                   | uint8_t  | color - applies
+21     | 1    | ring_b                   | uint8_t  | regardless of tool.
+22     | 1    | ring_on                  | uint8_t  | 0/1, ring on/off.
+23     | 1    | oled_night_mode          | uint8_t  | 0x00 Standard, 0x01
+       |      |                          |          | Night, 0x0F Standby -
+       |      |                          |          | same encoding as 0x100's
+       |      |                          |          | own byte for this.
+24     | 1    | had_critical_error       | uint8_t  | Was system_error_flag
+       |      |                          |          | set at the moment of
+       |      |                          |          | this save, before
+       |      |                          |          | whatever powered the
+       |      |                          |          | board off? Diagnostic
+       |      |                          |          | only - doesn't re-raise
+       |      |                          |          | the fault at boot.
+25     | 1    | expansion_board_type     | uint8_t  | 0-6, see EXPANSION.TXT.
+       |      |                          |          | Set via CAN (0x1A0),
+       |      |                          |          | not derived from
+       |      |                          |          | anything else this
+       |      |                          |          | firmware tracks - a
+       |      |                          |          | genuinely independent,
+       |      |                          |          | host-provided setting.
+26     | 1    | free_tool_selection      | uint8_t  | Only consulted when the
+       |      |                          |          | ID-jumper reading is
+       |      |                          |          | 0x1F (11111b, all 5
+       |      |                          |          | jumpers installed) -
+       |      |                          |          | see section 4 below.
+       |      |                          |          | 0 = no tool selected,
+       |      |                          |          | 1-25 = one of the 25
+       |      |                          |          | currently supported
+       |      |                          |          | tool profiles (stored
+       |      |                          |          | as id+1, so 0 can
+       |      |                          |          | unambiguously mean
+       |      |                          |          | "nothing chosen yet"
+       |      |                          |          | rather than colliding
+       |      |                          |          | with tool 0, the
+       |      |                          |          | soldering iron). Set
+       |      |                          |          | via CAN (0x1A2), same
+       |      |                          |          | reasoning as
+       |      |                          |          | expansion_board_type
+       |      |                          |          | above.
+27     | 1    | device_serial_number     | uint8_t  | 0-255, default 0.
+       |      |                          |          | Purely a host-assigned
+       |      |                          |          | label for telling
+       |      |                          |          | multiple URTC boards
+       |      |                          |          | apart on the same CAN
+       |      |                          |          | bus - this firmware
+       |      |                          |          | never reads its own
+       |      |                          |          | value for any
+       |      |                          |          | decision, it's
+       |      |                          |          | answered purely for a
+       |      |                          |          | host/Flasher/Tester's
+       |      |                          |          | own bookkeeping. Set
+       |      |                          |          | via CAN (0x1A4), same
+       |      |                          |          | reasoning as
+       |      |                          |          | free_tool_selection
+       |      |                          |          | above. See section 6
+       |      |                          |          | below for why this
+       |      |                          |          | exists.
+28     | 1    | mlx_sensor_variant       | uint8_t  | 0=no sensor configured
+       |      |                          |          | (safe default), 1=
+       |      |                          |          | MLX90640, 2=MLX90641,
+       |      |                          |          | 3=MLX90642 - which
+       |      |                          |          | MLX9064x-family sensor
+       |      |                          |          | is actually populated,
+       |      |                          |          | on either this board's
+       |      |                          |          | own Basic+MLX9064x
+       |      |                          |          | direct connection or
+       |      |                          |          | an Advanced board's
+       |      |                          |          | own slave-chip sensor
+       |      |                          |          | bus - see
+       |      |                          |          | EXPANSION.TXT. 0
+       |      |                          |          | deliberately does NOT
+       |      |                          |          | mean "assume
+       |      |                          |          | MLX90640" - a real
+       |      |                          |          | MLX90640 needs this
+       |      |                          |          | set explicitly, same
+       |      |                          |          | one-time hardware-
+       |      |                          |          | configuration step
+       |      |                          |          | expansion_board_type
+       |      |                          |          | itself already
+       |      |                          |          | requires. Set via CAN
+       |      |                          |          | (0x1A6), same
+       |      |                          |          | reasoning as
+       |      |                          |          | expansion_board_type
+       |      |                          |          | above.
+29     | 4    | solder_spool_position    | int32_t  | Signed, open-loop
+       |      |                          |          | estimate of the
+       |      |                          |          | soldering iron's own
+       |      |                          |          | wire feeder position
+       |      |                          |          | (doc #16) - positive
+       |      |                          |          | = net fed forward
+       |      |                          |          | since the last
+       |      |                          |          | reset, negative =
+       |      |                          |          | net retracted past
+       |      |                          |          | it. NOT gated by
+       |      |                          |          | which tool is
+       |      |                          |          | currently active
+       |      |                          |          | (unlike
+       |      |                          |          | solder_setpoint/
+       |      |                          |          | drill_speed/etc.
+       |      |                          |          | above) - this is
+       |      |                          |          | real physical state,
+       |      |                          |          | not a per-session
+       |      |                          |          | setpoint, so it
+       |      |                          |          | keeps its own real
+       |      |                          |          | value saved even
+       |      |                          |          | while some other
+       |      |                          |          | tool is mounted.
+       |      |                          |          | Restored directly on
+       |      |                          |          | boot, same reasoning
+       |      |                          |          | as
+       |      |                          |          | expansion_board_type
+       |      |                          |          | above - passive
+       |      |                          |          | position tracking,
+       |      |                          |          | not an actuator
+       |      |                          |          | setpoint that could
+       |      |                          |          | re-arm something
+       |      |                          |          | hazardous by
+       |      |                          |          | restoring it
+       |      |                          |          | automatically. Set/
+       |      |                          |          | reset/queried via
+       |      |                          |          | CAN (0x131/0x132) -
+       |      |                          |          | see CANBUS.TXT.
+33     | 1    | checksum                 | uint8_t  | CRC-8 (polynomial
+       |      |                          |          | 0x07, the standard
+       |      |                          |          | CRC-8/SMBUS variant)
+       |      |                          |          | over every byte above
+       |      |                          |          | (offsets 0-32) -
+       |      |                          |          | proportionate for
+       |      |                          |          | "was this corrupted
+       |      |                          |          | by a partial write",
+       |      |                          |          | not a security
+       |      |                          |          | boundary the way the
+       |      |                          |          | CAN bootloader's own
+       |      |                          |          | HMAC-SHA256 is.
+       |      |                          |          | Upgraded from a plain
+       |      |                          |          | additive sum, which
+       |      |                          |          | couldn't catch two
+       |      |                          |          | bytes corrupted in a
+       |      |                          |          | way that happened to
+       |      |                          |          | cancel out.
+-------|------|--------------------------|----------|---------------------
+Total: 34 bytes (offsets 0-33). Verified against the actual compiled
+struct via offsetof(), not hand-counted - packed structs have no
+compiler-inserted padding, so this is also simply the sum of each field's
+own size, but the exact figures above were checked, not assumed.
+
+-----------------------------------------------------------------------------
+2. What's restored automatically at boot, and what isn't
+-----------------------------------------------------------------------------
+Passive settings - restored directly, no hazard either way:
+  status_r/g/b, ring_r/g/b, oled_night_mode, expansion_board_type
+
+ring_on itself isn't separately restored, but doesn't need to be: it's a
+derived value, not independent state - at save time it's computed as
+"is any of ring_r/g/b non-zero" (see SavedState_MaybeSave() in
+firmware_persistence.c), not read from a dedicated variable. Restoring ring_r/g/b
+already gives the same answer to that same question on the next boot,
+so there's nothing separate left to restore.
+
+Everything else (setpoints, motor/laser state) is loaded into RAM
+(recovered_state) and made available to query over CAN (0x190/0x191), but
+is deliberately NOT automatically re-applied to a live setpoint or motor
+output - re-energizing a heater or motor immediately at boot, with nobody
+having confirmed it's safe to do so, is exactly the kind of surprise this
+firmware avoids throughout. Re-applying a recovered setpoint (or a
+different one) after reviewing what's there is the host's decision to
+make.
+
+-----------------------------------------------------------------------------
+3. When a save actually happens
+-----------------------------------------------------------------------------
+Checked every main loop iteration, but only actually written when BOTH:
+  - something in the struct differs from what's already on the chip
+    (a memcmp against the last-known-written copy, cheap when nothing
+    changed), AND
+  - at least 3000ms (FRAM_MIN_SAVE_INTERVAL_MS) has passed since the last
+    actual write.
+The interval isn't protecting a limited write-cycle budget the way it
+would for a real EEPROM - the FM24CL64B's F-RAM endurance is rated in the
+trillions of cycles, effectively unlimited for anything this board would
+ever do. It exists for a more mundane reason: if a setpoint were ever
+adjusted rapidly (a UI slider being dragged, say), there's no reason to
+write every single intermediate value instead of just the one it settles
+on.
+
+-----------------------------------------------------------------------------
+4. Erasing it
+-----------------------------------------------------------------------------
+0x192 (magic payload E3 A5 E0 FF - see CANBUS.TXT) overwrites the entire
+29-byte region with 0xFF. Unlike Flash/EEPROM, F-RAM has no
+erase-before-write step, so 0xFF has no special hardware significance
+here - it's simply a pattern this firmware will always recognize as
+failing the magic/checksum check on the next read, the same way a
+genuinely blank chip would. Erasing this way resets free_tool_selection
+to 0 (no tool selected) and device_serial_number to 0 (unassigned) along
+with everything else - a board whose jumpers read 0x1F will show the
+"CHECK ID JUMPERS" error again until free_tool_selection is set again
+via 0x1A2.
+
+-----------------------------------------------------------------------------
+5. Free tool configuration (ID-jumper address 0x1F)
+-----------------------------------------------------------------------------
+The 5-bit ID-jumper matrix (see PINOUT.TXT and ECOVIA.TXT) has 32
+possible readings (0-31). 0-11 map directly to one of the 12 currently
+supported tool profiles; 0x1F (11111b, all 5 jumpers installed) is
+reserved as the "free configuration" address rather than a 13th direct
+tool mapping - readings 12-30 remain simply invalid, same as before this
+feature existed.
+
+When Identify_PhysicalTool() reads 0x1F at boot, it doesn't pick a fixed
+tool - it reads free_tool_selection from this same F-RAM (this is why
+I2C2 is initialized early in boot, before anything tool-dependent runs -
+see MX_I2C2_Init_Early() in the firmware source) and resolves the tool
+from there:
+  - free_tool_selection = 0: no tool selected. Same fail-safe/error state
+    (TOOL_INVALID, the "CHECK ID JUMPERS" OLED screen, every actuator
+    forced to its safe default) as any other unrecognized ID-jumper
+    reading.
+  - free_tool_selection = 1-12: resolves to that tool (stored as id+1 -
+    see this field's own row in section 1 above for why), exactly as if
+    the jumpers had been set to that tool's own direct address.
+  - free_tool_selection = 13-255, or the F-RAM itself is missing/blank/
+    corrupted: treated the same as 0 - no tool selected, safe/error
+    state.
+
+free_tool_selection is set via CAN (0x1A2, see CANBUS.TXT) - the Flasher
+is the only tool that writes it; the Tester can read it (0x1A2 with no
+payload, or 0x1A3 directly) but doesn't offer a way to change it, the
+same asymmetry already used for the OTA update process itself. The
+response to either ID carries the raw ID-jumper reading (0-31) alongside
+the current free_tool_selection value, not just the selection alone -
+this lets a reader tell "the jumpers read something other than 0x1F, so
+this register isn't even being consulted" apart from "the jumpers read
+0x1F but nothing's configured yet", which the selection value alone
+couldn't distinguish.
+
+Persists the same way expansion_board_type does: written into
+SavedState_t and saved via the normal SavedState_MaybeSave() path (a
+memcmp-driven check every main loop iteration, actually written only
+when something changed and at least 3000ms have passed - see section 3
+above), not forced immediately when 0x1A2 arrives. A board reads its
+free_tool_selection back out of the F-RAM only once, at boot, in
+Identify_PhysicalTool() - changing it over CAN while already running
+takes effect on the next power cycle, not immediately, the same as
+changing the ID jumpers themselves would.
+
+-----------------------------------------------------------------------------
+6. Peripheral type and device serial number
+-----------------------------------------------------------------------------
+Two unrelated values, answered together in one response for the same
+reason section 5's 0x1A3 pairs two unrelated values: fewer round trips
+for a host that wants both.
+
+**Peripheral type** (0x03 for URTC firmware) is a fixed identity
+constant, not a F-RAM field at all - URTC_PERIPHERAL_TYPE in the
+firmware source, the same value for every URTC build, nothing to
+persist or configure. 0x04-0x05 are reserved for the expansion board's
+own firmware (the STM32F303CBT6 on an "advanced" expansion board - see
+EXPANSION.TXT) to report about itself; this codebase doesn't answer on
+an expansion board's behalf, since that's different silicon running
+different firmware entirely, not something URTC's own firmware has any
+way to speak for.
+
+**Device serial number** (0-255, default 0) is the field that actually
+lives in this F-RAM struct, restored/saved the same way
+free_tool_selection is (see section 3). It exists to solve a specific
+problem: several URTC boards on the same CAN bus, all running identical
+firmware with identical default configuration, are otherwise completely
+indistinguishable from a host's perspective - every query (version,
+active tool, telemetry, anything) gets answered by every board
+simultaneously under the same CAN ID, which is a genuine bus-level
+collision, not just an inconvenience. Assigning each board a distinct
+serial number (via 0x1A4, from the Flasher - typically done with one
+board connected at a time before wiring them all onto a shared bus)
+gives a host a way to tell them apart once queried, even though this
+firmware itself never reads its own serial number for any decision -
+it's purely a label answered on request. This is the identification
+mechanism the boards need to be distinguishable at all; it does not by
+itself change how the rest of this protocol addresses commands (every
+existing CAN ID in this document is still answered by every board that
+receives it, regardless of serial number) - a future addressed-command
+scheme, if one gets added, would build on top of these serial numbers
+rather than needing new hardware.
+
+Set via CAN (0x1A4, see CANBUS.TXT) - the Flasher is the only tool that
+writes it; the Tester can read it (0x1A4 with no payload, or 0x1A5
+directly) but doesn't offer a way to change it, same asymmetry as
+free_tool_selection above.

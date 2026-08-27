@@ -1,0 +1,5 @@
+build/
+# HYDRA-UMC shared secret protection
+.env
+.env.*
+!.env.example
