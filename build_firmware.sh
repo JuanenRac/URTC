@@ -1,62 +1,45 @@
-#!/usr/bin/env bash
-# =============================================================================
-# build_firmware.sh - Install tools, verify everything, compile all 4 URTC
-# firmware binaries (main board app/bootloader, expansion slave app/bootloader)
-# from a clean checkout.
-#
-# PROJECT: URTC (Universal Robot Tool Controller)
-# AUTHOR: JuanenRac (Electro Hobby 3D) - electrohobby3d@gmail.com
-# LICENSE: GPL-3.0 (same as the firmware this builds - see LICENSE at repo root)
-#
-# Every step this script performs is documented in full, with the reasoning
-# behind each choice, in docs/COMPILE_STM32F303.TXT - read that first if
-# anything here needs adjusting. This script automates that document; it
-# doesn't replace it.
-#
-# Usage:
-#   ./build_firmware.sh              build all 4 binaries
-#   ./build_firmware.sh --clean      wipe the local build/ cache first
-#   ./build_firmware.sh master       build only the main board (app+bootloader)
-#   ./build_firmware.sh slave        build only the expansion slave (app+bootloader)
-# =============================================================================
 set -e
+# HYDRA_UMC_SCRIPT_STANDARD_HEADER_BEGIN
+# *****************************************************************************
+# Project   : URTC
+# Script    : build_firmware.sh
+# Purpose   : Incremental firmware build and versioned artifact packaging workflow.
+# Author    : JuanenRac (Electro Hobby 3D)
+# Email     : electrohobby3d@gmail.com
+# Copyright : (C) 2026 JuanenRac
+# License   : GPL-3.0 - see LICENSE
+# *****************************************************************************
+# HYDRA_UMC_SCRIPT_STANDARD_HEADER_END
+# HYDRA_UMC_SCRIPT_STANDARD_BANNER_BEGIN
+printf '\n*******************************************************************************\n'
+printf '%s\n' "* URTC - build_firmware.sh"
+printf '%s\n' "* Mode      : INCREMENTAL BUILD"
+printf '%s\n' "* Author    : JuanenRac (Electro Hobby 3D)"
+printf '%s\n' "* Email     : electrohobby3d@gmail.com"
+printf '%s\n' "* Copyright : (C) 2026 JuanenRac"
+printf '%s\n' "* License   : GPL-3.0 - see LICENSE"
+printf '%s\n' "* ------------------------------------------------------------------------- *"
+printf '%s\n' "* 1. Increment the project version and synchronise its manifest."
+printf '%s\n' "* 2. Run this project's declared build, verification and packaging commands."
+printf '%s\n' "* 3. Report the result and keep an interactive terminal open."
+printf '%s\n' "*******************************************************************************"
+printf '\n'
+# HYDRA_UMC_SCRIPT_STANDARD_BANNER_END
 HYDRA_UMC_CI_MODE="${HYDRA_UMC_CI:-0}"
 if [ "$HYDRA_UMC_CI_MODE" = "1" ]; then
     echo "URTC CI: version sources are read-only."
 else
-    python3 "$(dirname "$0")/bump_manifest_version.py" || exit 1
+    # HYDRA_UMC_SCRIPT_STANDARD_VERSION_STEP
+    printf '%s\n' "[1/3] Incrementing project version and synchronising its manifest..."
+    # HYDRA_UMC_SCRIPT_STANDARD_VERSION_CAPTURE_BEFORE
+    HYDRA_UMC_VERSION_BEFORE="$(python3 -c 'import json, pathlib, sys; print(json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))["version"])' "$(dirname "$0")/hydra-umc.project.json")"
+    # The registry tracks the main-board application version. It is bumped
+    # later, then --sync records that single authoritative native bump.
 fi
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUILD="$ROOT/build"
 FIRMWARE_OUT="$ROOT/firmware"
-
-# -----------------------------------------------------------------------
-# Banner - printed on every run (not just a comment at the top of this
-# file), so anyone running this from a double-clicked terminal or a fresh
-# shell sees what project/script/author/license they're looking at before
-# any output scrolls past.
-# -----------------------------------------------------------------------
-echo "============================================================================="
-echo " URTC - firmware build"
-echo ""
-echo " Installs tools, verifies everything, and compiles all 4 URTC firmware"
-echo " binaries from a clean checkout: main board application + bootloader,"
-echo " expansion slave application + bootloader (STM32F303)."
-echo ""
-echo " Author:  JuanenRac (Electro Hobby 3D) - electrohobby3d@gmail.com"
-echo " License: GPL-3.0 - see LICENSE at repo root"
-echo "============================================================================="
-
-# Keeps the window open when this script is double-clicked/launched from a
-# real terminal, on success AND on failure (matches build_firmware.bat's
-# own `pause`, and mirrors sibling repo HYDRA-UMC's own build_firmware.sh) -
-# fires on every exit path via this EXIT trap (normal completion, an
-# explicit `exit N` anywhere above, or `set -e` aborting on a failed
-# command), not just the final line. Skipped when stdin isn't a real
-# terminal (`[ -t 0 ]` false - e.g. CI, a pipe, or another script driving
-# this one) so automation never hangs waiting for a keypress that will
-# never come.
 if [ -t 0 ]; then
     trap 'echo ""; read -r -p "Press Enter to close this window..." _' EXIT
 fi
@@ -250,6 +233,23 @@ version_or_bump() {
 
 mkdir -p "$FIRMWARE_OUT"
 
+# The firmware directory is a single coherent build set, never a history of
+# mixed component versions. Preserve non-generated material, but remove every
+# artifact that this script itself publishes before compiling the new set.
+shopt -s nullglob
+firmware_artifacts=(
+    "$FIRMWARE_OUT"/URTC_*.bin
+    "$FIRMWARE_OUT"/URTC_*.elf
+    "$FIRMWARE_OUT"/URTC_*.hex
+    "$FIRMWARE_OUT"/firmware_manifest.json
+)
+if ((${#firmware_artifacts[@]})); then
+    step "Firmware output cleanup"
+    rm -f -- "${firmware_artifacts[@]}"
+    pass "removed ${#firmware_artifacts[@]} generated firmware artifact(s) from firmware/"
+fi
+shopt -u nullglob
+
 # -----------------------------------------------------------------------
 if [ "$TARGET" = "all" ] || [ "$TARGET" = "master" ]; then
 step "4. Main board bootloader (src/F303-master/boot/)"
@@ -289,6 +289,17 @@ SRC="$ROOT/src/F303-master"
 # URTC_MAIN_FIRMWARE_v{MAJOR}.{MINOR}.{PATCH} replaces the old
 # URTC_V{MAJOR}.{MINOR}_F303CC (no PATCH) name.
 APP_VER=$(version_or_bump "$SRC/firmware_common.h" FIRMWARE_VERSION "$SRC/boot/bootloader_common.h")
+if [ "$HYDRA_UMC_CI_MODE" != "1" ]; then
+    python3 "$ROOT/bump_manifest_version.py" --sync || exit 1
+    # HYDRA_UMC_SCRIPT_STANDARD_VERSION_CAPTURE_AFTER
+    HYDRA_UMC_VERSION_AFTER="$(python3 -c 'import json, pathlib, sys; print(json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))["version"])' "$ROOT/hydra-umc.project.json")"
+    printf '\n*******************************************************************************\n'
+    printf '%s\n' '* VERSION INCREMENT COMPLETED'
+    printf '%s\n' "* v${HYDRA_UMC_VERSION_BEFORE:-unknown} -> v${HYDRA_UMC_VERSION_AFTER:-unknown}"
+    printf '%s\n' '* Project manifest synchronized with the main-board application version.'
+    printf '%s\n' '*******************************************************************************'
+    printf '\n'
+fi
 compile_dir "$SRC" "$OUT" "-I$SRC/melexis_mlx90640 -I$SRC/melexis_mlx90641 -I$SRC/melexis_mlx90642"
 compile_dir "$SRC/melexis_mlx90640" "$OUT" "-I$SRC -I$SRC/melexis_mlx90640"
 compile_dir "$SRC/melexis_mlx90641" "$OUT" "-I$SRC -I$SRC/melexis_mlx90641"

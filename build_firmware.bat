@@ -1,63 +1,43 @@
 @echo off
-REM =============================================================================
-REM build_firmware.bat - Install tools, verify everything, compile all 4 URTC
-REM firmware binaries (main board app/bootloader, expansion slave app/bootloader)
-REM from a clean checkout.
-REM
-REM PROJECT: URTC (Universal Robot Tool Controller)
-REM AUTHOR: JuanenRac (Electro Hobby 3D) - electrohobby3d@gmail.com
-REM LICENSE: GPL-3.0 (same as the firmware this builds - see LICENSE at repo root)
-REM
-REM Every step this script performs is documented in full, with the reasoning
-REM behind each choice, in docs\COMPILE_STM32F303.TXT - read that first if
-REM anything here needs adjusting. This script automates that document; it
-REM doesn't replace it.
-REM
-REM HONESTY NOTE: this .bat was written by carefully translating
-REM build_firmware.sh - the Linux version - which WAS actually run end to
-REM end against this project's own real source and verified working. This
-REM Windows version could not be executed in the environment that wrote it
-REM (no Windows machine available there) - the logic mirrors the verified
-REM Linux script exactly, but hasn't itself been run start to finish on a
-REM real Windows machine. If something here doesn't work as written, trust
-REM build_firmware.sh's own logic as the source of truth and adjust this
-REM file's own syntax to match its intent.
-REM
-REM Usage:
-REM   build_firmware.bat              build all 4 binaries
-REM   build_firmware.bat --clean      wipe the local build\ cache first
-REM   build_firmware.bat master       build only the main board (app+bootloader)
-REM   build_firmware.bat slave        build only the expansion slave (app+bootloader)
-REM =============================================================================
+REM HYDRA_UMC_SCRIPT_STANDARD_HEADER_BEGIN
+REM *****************************************************************************
+REM Project   : URTC
+REM Script    : build_firmware.bat
+REM Purpose   : Incremental firmware build and versioned artifact packaging workflow.
+REM Author    : JuanenRac (Electro Hobby 3D)
+REM Email     : electrohobby3d@gmail.com
+REM Copyright : (C) 2026 JuanenRac
+REM License   : GPL-3.0 - see LICENSE
+REM *****************************************************************************
+REM HYDRA_UMC_SCRIPT_STANDARD_HEADER_END
+REM HYDRA_UMC_SCRIPT_STANDARD_BANNER_BEGIN
+echo.
+echo *****************************************************************************
+echo * URTC - build_firmware.bat
+echo * Mode      : INCREMENTAL BUILD
+echo * Author    : JuanenRac (Electro Hobby 3D)
+echo * Email     : electrohobby3d@gmail.com
+echo * Copyright : (C) 2026 JuanenRac
+echo * License   : GPL-3.0 - see LICENSE
+echo * ------------------------------------------------------------------------- *
+echo * 1. Increment the project version and synchronise its manifest.
+echo * 2. Run this project's declared build, verification and packaging commands.
+echo * 3. Report the result and keep an interactive terminal open.
+echo *****************************************************************************
+echo.
+REM HYDRA_UMC_SCRIPT_STANDARD_BANNER_END
 setlocal enabledelayedexpansion
-python "%~dp0bump_manifest_version.py"
-if errorlevel 1 ( echo VERSION BUMP FAILED. & pause & exit /b 1 )
-
+REM HYDRA_UMC_SCRIPT_STANDARD_VERSION_STEP
+echo [1/3] Incrementing project version and synchronising its manifest...
+REM HYDRA_UMC_SCRIPT_STANDARD_VERSION_CAPTURE_BEFORE
+for /f "usebackq delims=" %%V in (`python -c "import json; print(json.load(open(r'%~dp0hydra-umc.project.json', encoding='utf-8'))['version'])"`) do set "HYDRA_UMC_VERSION_BEFORE=%%V"
+REM The registry tracks the main-board application version. It is bumped
+REM later, then --sync records that single authoritative native bump.
+echo.
 set "ROOT=%~dp0"
 if "%ROOT:~-1%"=="\" set "ROOT=%ROOT:~0,-1%"
 set "BUILD=%ROOT%\build"
 set "FIRMWARE_OUT=%ROOT%\firmware"
-
-REM -----------------------------------------------------------------------
-REM Banner - printed on every run (not just a comment at the top of this
-REM file), so anyone double-clicking this from Explorer or launching it
-REM from a fresh cmd window sees what project/script/author/license they're
-REM looking at before any output scrolls past.
-REM -----------------------------------------------------------------------
-echo =============================================================================
-echo  URTC - firmware build
-echo.
-echo  Installs tools, verifies everything, and compiles all 4 URTC firmware
-echo  binaries from a clean checkout: main board application + bootloader,
-echo  expansion slave application + bootloader (STM32F303).
-echo.
-echo  Author:  JuanenRac (Electro Hobby 3D^) - electrohobby3d@gmail.com
-echo  License: GPL-3.0 - see LICENSE at repo root
-echo =============================================================================
-
-REM Pinned to STM32CubeF3 v1.11.6's own known-good submodule combination -
-REM see docs\COMPILE_STM32F303.TXT for why these are pinned rather than
-REM tracking each repo's own latest master.
 set "HAL_REPO=https://github.com/STMicroelectronics/stm32f3xx_hal_driver.git"
 set "HAL_COMMIT=953955afe65f89e60e556bbcdba752597f5da65d"
 set "CMSIS_DEVICE_REPO=https://github.com/STMicroelectronics/cmsis_device_f3.git"
@@ -225,6 +205,16 @@ set /a PASS+=1
 
 if not exist "%FIRMWARE_OUT%" mkdir "%FIRMWARE_OUT%"
 
+REM The firmware directory is one coherent build set. Remove only generated
+REM URTC artifacts and its generated manifest; preserve any other files.
+echo.
+echo === Firmware output cleanup ===
+del /q "%FIRMWARE_OUT%\URTC_*.bin" 2>nul
+del /q "%FIRMWARE_OUT%\URTC_*.elf" 2>nul
+del /q "%FIRMWARE_OUT%\URTC_*.hex" 2>nul
+del /q "%FIRMWARE_OUT%\firmware_manifest.json" 2>nul
+echo   OK   old generated firmware artifacts removed from firmware\
+
 REM -----------------------------------------------------------------------
 if "%TARGET%"=="all" set "DO_MASTER=1" & set "DO_SLAVE=1"
 if "%TARGET%"=="master" set "DO_MASTER=1"
@@ -312,6 +302,19 @@ if not defined APP_VER (
     set /a FAIL+=1
     goto :summary
 )
+python "%ROOT%\bump_manifest_version.py" --sync
+if errorlevel 1 ( echo VERSION SYNCHRONISATION FAILED. & pause & exit /b 1 )
+REM HYDRA_UMC_SCRIPT_STANDARD_VERSION_CAPTURE_AFTER
+for /f "usebackq delims=" %%V in (`python -c "import json; print(json.load(open(r'%ROOT%\hydra-umc.project.json', encoding='utf-8'))['version'])"`) do set "HYDRA_UMC_VERSION_AFTER=%%V"
+if not defined HYDRA_UMC_VERSION_BEFORE set "HYDRA_UMC_VERSION_BEFORE=unknown"
+if not defined HYDRA_UMC_VERSION_AFTER set "HYDRA_UMC_VERSION_AFTER=unknown"
+echo.
+echo *****************************************************************************
+echo * VERSION INCREMENT COMPLETED
+echo * v%HYDRA_UMC_VERSION_BEFORE% ^> v%HYDRA_UMC_VERSION_AFTER%
+echo * Project manifest synchronized with the main-board application version.
+echo *****************************************************************************
+echo.
 set "APP_NAME=URTC_MAIN_FIRMWARE_v!APP_VER!"
 set "MASTER_INC=-I!SRC!\melexis_mlx90640 -I!SRC!\melexis_mlx90641 -I!SRC!\melexis_mlx90642"
 set "SECTION_FAIL=0"

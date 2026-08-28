@@ -1,5 +1,13 @@
 # Changelog - URTC (repo-wide index)
 
+## [0.2.7]
+
+- Build version synchronized with `hydra-umc.project.json` and the repository-native version source.
+
+## [0.2.6]
+
+- Build version synchronized with `hydra-umc.project.json` and the repository-native version source.
+
 ## [0.2.5]
 
 - Build version synchronized with `hydra-umc.project.json` and the repository-native version source.
