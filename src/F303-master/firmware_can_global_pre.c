@@ -122,7 +122,7 @@ void Handle_CAN_GlobalCommands_PreErrorGate(void) {
             if (HAL_CAN_GetTxMailboxesFreeLevel(&hcan) > 0) {
                 CAN_TxHeaderTypeDef txH;
                 uint8_t txD[4];
-                txD[0] = (uint8_t)active_tool; // 0-11 = a real tool head, 12+ = no tool assigned to this jumper setting
+                txD[0] = (uint8_t)active_tool; // 0-24 = a real tool head (ToolMode_t), 25 (TOOL_INVALID) = no tool assigned to this jumper setting
                 txD[1] = system_error_flag ? 0x01 : 0x00;
                 txD[2] = can_bus_error_flag ? 0x01 : 0x00;
                 txD[3] = boot_sequence_active ? 0x01 : 0x00;
@@ -204,9 +204,10 @@ void Handle_CAN_GlobalCommands_PreErrorGate(void) {
         // Set/query free tool configuration (0x1A2/0x1A3) - the register
         // Identify_PhysicalTool() consults when the ID-jumper reading is
         // 0x1F/11111b (see that function's own comment, and EEPROM.TXT).
-        // 0=no tool selected, 1-12=one of the 12 currently supported tool
-        // profiles (stored as id+1 - see the SavedState_t field's own
-        // comment for why). Same positioning/persistence reasoning as
+        // 0=no tool selected, 1-25=one of the 25 currently supported tool
+        // profiles (stored as id+1, not the raw 0-24 ToolMode_t value -
+        // see the SavedState_t field's own comment for why). Same
+        // positioning/persistence reasoning as
         // 0x1A0 just above: configuration, not actuation, so it isn't
         // gated behind the error block below, and persists via the
         // normal SavedState_MaybeSave() path rather than a forced

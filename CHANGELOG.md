@@ -1,5 +1,17 @@
 # Changelog - URTC (repo-wide index)
 
+## [0.2.8] - Fixed after a live ecosystem bug audit
+
+- **`src/F303-master/firmware_can_global_pre.c`** - two stale comments
+  said the 5-bit tool-ID scheme supported "0-11 = a real tool head, 12+ =
+  no tool assigned" and "1-12=one of the 12 currently supported tool
+  profiles". The real `ToolMode_t` enum (`firmware_common.h`) has
+  supported 0-24 (25 real tool profiles, matching the README's own "25
+  Plug-and-Play Automated Profiles") since the 15-tool expansion; only
+  `firmware_can_global_pre.c`'s own comments never got updated, which
+  would mislead a maintainer into thinking IDs 12-24 are invalid. No
+  functional change - the code already handled 0-24 correctly.
+
 ## [0.2.7]
 
 - Build version synchronized with `hydra-umc.project.json` and the repository-native version source.

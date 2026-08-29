@@ -2,7 +2,7 @@
   "schema_version": "1.0",
   "ecosystem": "HYDRA-UMC",
   "name": "URTC",
-  "version": "0.2.7",
+  "version": "0.2.8",
   "role": "firmware",
   "stack": "firmware-c",
   "technologies": [
