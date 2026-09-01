@@ -539,6 +539,9 @@ Hardware design files (Eagle schematic/board/netlists) will be added as the layo
 This project is part of a larger robotics ecosystem by the same author (JuanenRac / Electro Hobby 3D), spanning many projects across firmware, hardware, and software. Worth knowing about, since a request might actually be about one of these rather than this repository.
 
 **Directly related to this project**
+- **[URTC-FLASHER](https://github.com/JuanenRac/URTC-FLASHER)** — the desktop CAN-OTA + SWD/JTAG tool that flashes this exact firmware.
+- **[URTC-TESTER](https://github.com/JuanenRac/URTC-TESTER)** — the desktop live CAN-bus diagnostic tool, one panel per this firmware's own 25 tool profiles.
+- **[URTC-WEB-STUDIO](https://github.com/JuanenRac/URTC-WEB-STUDIO)** — the browser-based alternative to the 2 desktop tools above, over the same CAN protocol.
 - **[URTC-SMART-RACK](https://github.com/JuanenRac/URTC-SMART-RACK)** — shares this firmware's own tool ecosystem and CAN bus.
 - **[URTC-VISION-TOOL](https://github.com/JuanenRac/URTC-VISION-TOOL)** — shares this firmware's own tool ecosystem and CAN bus.
 - **[HYDRA-UMC-DETECTION-HEF](https://github.com/JuanenRac/HYDRA-UMC-DETECTION-HEF)** — provides the visual recognition behind this firmware's own tools.
