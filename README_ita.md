@@ -598,13 +598,12 @@ Questo progetto fa parte di un ecosistema robotico più ampio dello stesso autor
 - [HYDRA-UMC-TOOL-CLI](https://github.com/JuanenRac/HYDRA-UMC-TOOL-CLI)
 - [HYDRA-UMC-DASHBOARD-AI](https://github.com/JuanenRac/HYDRA-UMC-DASHBOARD-AI)
 
-## 👤 Autore
-
+## 👤 AUTORE
 **JuanenRac** (Electro Hobby 3D)
 📧 electrohobby3d@gmail.com
 📺 [youtube.com/@electrohobby3d](https://youtube.com/@electrohobby3d)
 
-## 📜 Licenza e Note sul Copyright
+## 📜 LICENZA
 
 URTC è (c) 2026 JuanenRac (Electro Hobby 3D). Questa nota deve essere inclusa in qualsiasi distribuzione di questo progetto o lavoro derivato.
 

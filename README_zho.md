@@ -588,12 +588,11 @@ URTC 的闪存被拆分为两个独立部分，因此板卡可以通过它已经
 - [HYDRA-UMC-DASHBOARD-AI](https://github.com/JuanenRac/HYDRA-UMC-DASHBOARD-AI)
 
 ## 👤 作者
-
-**JuanenRac**（Electro Hobby 3D）
+**JuanenRac** (Electro Hobby 3D)
 📧 electrohobby3d@gmail.com
 📺 [youtube.com/@electrohobby3d](https://youtube.com/@electrohobby3d)
 
-## 📜 许可证与版权声明
+## 📜 许可证
 
 URTC 版权所有 (c) 2026 JuanenRac（Electro Hobby 3D）。分发本项目或其衍生作品时必须包含此声明。
 
