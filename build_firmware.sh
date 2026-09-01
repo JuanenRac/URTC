@@ -375,7 +375,15 @@ fi
 fi
 
 # -----------------------------------------------------------------------
-if [ "$TARGET" = "all" ] && [ "$FAIL" = "0" ] && [ "$HYDRA_UMC_CI_MODE" != "1" ]; then
+# Real bug fixed here: the cleanup step above unconditionally deletes
+# firmware_manifest.json for every run (CI included), but regeneration
+# used to be skipped whenever HYDRA_UMC_CI=1 - a CI/build-test run left
+# a previously-committed real file permanently missing from the working
+# tree. Describing the artifacts THIS run just built is not a versioning
+# or changelog mutation (this script's own read-only contract in CI mode
+# is about not bumping versions/CHANGELOG.md, not about withholding a
+# real compiler-output summary) - regenerate regardless of CI mode.
+if [ "$TARGET" = "all" ] && [ "$FAIL" = "0" ]; then
 step "8. Firmware manifest (firmware_manifest.json)"
 # -----------------------------------------------------------------------
 if python3 "$ROOT/generate_manifest.py" "$ROOT"; then

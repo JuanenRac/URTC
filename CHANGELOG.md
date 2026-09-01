@@ -1,5 +1,20 @@
 # Changelog - URTC (repo-wide index)
 
+## [Unreleased]
+
+- **`build_firmware.sh`** - the manifest regeneration step (step 8,
+  `firmware_manifest.json`) was skipped whenever `HYDRA_UMC_CI=1` (the
+  mode `tools/build_test.py` always runs under), but the earlier cleanup
+  step deletes that same file unconditionally on every run. A CI/
+  build-test run therefore left a previously-committed real
+  `firmware_manifest.json` permanently missing from the working tree.
+  Regenerating it just describes the artifacts the run itself built -
+  not a versioning or CHANGELOG mutation, so it now runs regardless of
+  CI mode. Verified with 2 real WSL/arm-none-eabi-gcc builds: the
+  manifest now regenerates correctly under `HYDRA_UMC_CI=1`, and the
+  4 real firmware/bootloader binaries rebuild with consistent, plausible
+  sizes (no corruption reproduced in this pass).
+
 ## [0.2.8] - Fixed after a live ecosystem bug audit
 
 - **`src/F303-master/firmware_can_global_pre.c`** - two stale comments
