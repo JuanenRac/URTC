@@ -619,14 +619,3 @@ Poiché questo progetto è composto da diversi tipi di contenuto, le singole par
 Se costruisci su questo progetto, tieni presente la separazione delle licenze: le modifiche al codice del firmware dovrebbero rimanere GPL-3.0, le modifiche all'hardware dovrebbero rimanere CERN-OHL-S, e i derivati della documentazione dovrebbero rimanere CC BY-SA - ciascuno con attribuzione a questo progetto.
 
 Questo repository copre solo il firmware e l'hardware propri della scheda URTC - gli strumenti PC (URTC Flasher, URTC Tester) che vivevano qui in precedenza sono ora progetti indipendenti con licenza propria, vedi "Strumenti PC" sopra.
-
-## 🛠️ BUILD & RUN
-
-Usa il controllo di compilazione senza versionamento prima di una compilazione di rilascio:
-
-| Azione | Windows | Linux / macOS |
-|---|---|---|
-| Controllo di compilazione (senza modificare versione o CHANGELOG) | `build-test.bat` | `./build-test.sh` |
-| Esecuzione / sviluppo (se disponibile) | `run*.bat` o `dev*.bat` | `./run*.sh` o `./dev*.sh` |
-
-`build-test.bat` e `build-test.sh` compilano o convalidano lo stack del progetto senza incrementare `hydra-umc.project.json` né modificare `CHANGELOG.md`. Possono creare solo i normali output del compilatore. Gli script esistenti `build*.bat`, `build*.sh`, `run*` e `dev*` mantengono il comportamento specifico di versione o esecuzione; usali quando tale comportamento è necessario.
