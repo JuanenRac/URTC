@@ -272,7 +272,7 @@ URTC's flash is split into two independent pieces, so the board can be reflashed
            │                                   │  before ever jumping to the app.
 0x08008000 ├─────────────────────────────────┤
            │  Main slot (112K)                 │  This is the application firmware /
-           │                                   │  URTC_MAIN_FIRMWARE_v0.2.3.* — the actual
+           │                                   │  URTC_MAIN_FIRMWARE_v0.2.7.* — the actual
            │                                   │  firmware that runs day to day,
            │                                   │  described everywhere else in
            │                                   │  this README. Never touched by
@@ -303,8 +303,8 @@ The bootloader can only get onto the chip via physical programming — there's n
 
 1. Open the project in **STM32CubeIDE** (built and tested against the STM32F303CC target), or use **STM32CubeProgrammer** directly with the compiled outputs below.
 2. Flash **both** images over SWD (ST-Link) via the onboard `STM_JTAG` header — each `.hex` file has its target address baked in, so most tools (including STM32CubeProgrammer) can load both in the same session:
-   * `URTC_MAIN_BOOTLOADER_v0.3.2.hex` → `0x08000000`
-   * `URTC_MAIN_FIRMWARE_v0.2.3.hex` → `0x08008000`
+   * `URTC_MAIN_BOOTLOADER_v0.3.6.hex` → `0x08000000`
+   * `URTC_MAIN_FIRMWARE_v0.2.7.hex` → `0x08008000`
 3. Set the tool identity via the ID solder jumpers before powering up — the board reads them once at boot, same as always. Five jumpers (ID0-ID4), covering the full 32-address space (31 direct tool addresses, plus the reserved `11111` free-configuration address - see the Tool Matrix section above).
 4. Power up. The bootloader listens for ~600ms, sees nothing, and jumps straight into the application — from here on, everything behaves exactly as described in the rest of this README.
 
@@ -482,15 +482,15 @@ If anyone in the community is working on custom end-effectors, smart tool-change
 │           ├── STM32F303CBTx_SLAVEBOOT.ld  Linker script (18K region at 0x08000000)
 │           └── README.md          Same technical-reference role as the application's
 ├── firmware/
-│   ├── URTC_MAIN_BOOTLOADER_v0.3.2.bin  Bootloader compiled, flash to 0x08000000
-│   ├── URTC_MAIN_BOOTLOADER_v0.3.2.elf  Bootloader compiled, flash to 0x08000000
-│   ├── URTC_MAIN_BOOTLOADER_v0.3.2.hex  Bootloader compiled, flash to 0x08000000 (address baked in)
-│   ├── URTC_MAIN_FIRMWARE_v0.2.3.bin    Application bin compiled, flash to 0x08008000
-│   ├── URTC_MAIN_FIRMWARE_v0.2.3.elf    Application elf compiled, flash to 0x08008000
-│   ├── URTC_MAIN_FIRMWARE_v0.2.3.hex    Application HEX compiled, flash to 0x08008000 (address baked in)
-│   ├── URTC_SLAVE_BOOTLOADER_v0.1.5.{bin,elf,hex}  Expansion slave's own bootloader, flash to 0x08000000
+│   ├── URTC_MAIN_BOOTLOADER_v0.3.6.bin  Bootloader compiled, flash to 0x08000000
+│   ├── URTC_MAIN_BOOTLOADER_v0.3.6.elf  Bootloader compiled, flash to 0x08000000
+│   ├── URTC_MAIN_BOOTLOADER_v0.3.6.hex  Bootloader compiled, flash to 0x08000000 (address baked in)
+│   ├── URTC_MAIN_FIRMWARE_v0.2.7.bin    Application bin compiled, flash to 0x08008000
+│   ├── URTC_MAIN_FIRMWARE_v0.2.7.elf    Application elf compiled, flash to 0x08008000
+│   ├── URTC_MAIN_FIRMWARE_v0.2.7.hex    Application HEX compiled, flash to 0x08008000 (address baked in)
+│   ├── URTC_SLAVE_BOOTLOADER_v0.1.9.{bin,elf,hex}  Expansion slave's own bootloader, flash to 0x08000000
 │   │                             on the STM32F303CBT6 (advanced expansion boards only)
-│   ├── URTC_SLAVE_FIRMWARE_v0.1.2.{bin,elf,hex}  Expansion slave's own application, flash to 0x08005000
+│   ├── URTC_SLAVE_FIRMWARE_v0.1.6.{bin,elf,hex}  Expansion slave's own application, flash to 0x08005000
 │   └── firmware_manifest.json    Machine-readable index of all 4 components above - version,
 │                                 flash address, and each file's own size/CRC32, for an
 │                                 external tool to check what's here and what's newer than

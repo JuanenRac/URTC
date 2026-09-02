@@ -271,7 +271,7 @@ URTC 的闪存被拆分为两个独立部分，因此板卡可以通过它已经
            │                                   │  之前会检查全部这些内容。
 0x08008000 ├─────────────────────────────────┤
            │  主槽（112K）                     │  这是应用固件 /
-           │                                   │  URTC_MAIN_FIRMWARE_v0.2.3.* ——
+           │                                   │  URTC_MAIN_FIRMWARE_v0.2.7.* ——
            │                                   │  日常运行的实际固件，
            │                                   │  本 README 其他部分描述的
            │                                   │  正是它。在一个经过验证的、
@@ -301,8 +301,8 @@ URTC 的闪存被拆分为两个独立部分，因此板卡可以通过它已经
 
 1. 在 **STM32CubeIDE** 中打开项目（已针对 STM32F303CC 目标构建和测试），或直接使用 **STM32CubeProgrammer** 配合下方的编译输出。
 2. 通过板载 `STM_JTAG` 接口，经由 SWD（ST-Link）刷写**两个**镜像——每个 `.hex` 文件都已内置目标地址，因此大多数工具（包括 STM32CubeProgrammer）都可以在同一会话中加载两者：
-   * `URTC_MAIN_BOOTLOADER_v0.3.2.hex` → `0x08000000`
-   * `URTC_MAIN_FIRMWARE_v0.2.3.hex` → `0x08008000`
+   * `URTC_MAIN_BOOTLOADER_v0.3.6.hex` → `0x08000000`
+   * `URTC_MAIN_FIRMWARE_v0.2.7.hex` → `0x08008000`
 3. 在通电之前通过 ID 焊接跳线设置工具身份——板卡在开机时读取一次，一如既往。5 个跳线（ID0-ID4），覆盖完整的 32 地址空间（31 个直接工具地址，加上保留的 `11111` 自由配置地址——见上方工具矩阵一节）。
 4. 通电。引导程序监听约 600ms，未发现任何内容，直接跳转进入应用程序——从此刻起，一切行为都与本 README 其余部分所描述的完全一致。
 
@@ -468,15 +468,15 @@ URTC 的闪存被拆分为两个独立部分，因此板卡可以通过它已经
 │           ├── STM32F303CBTx_SLAVEBOOT.ld  链接脚本（0x08000000 处的 18K 区域）
 │           └── README.md          与应用程序相同的技术参考角色
 ├── firmware/
-│   ├── URTC_MAIN_BOOTLOADER_v0.3.2.bin  引导程序编译产物，刷写至 0x08000000
-│   ├── URTC_MAIN_BOOTLOADER_v0.3.2.elf  引导程序编译产物，刷写至 0x08000000
-│   ├── URTC_MAIN_BOOTLOADER_v0.3.2.hex  引导程序编译产物，刷写至 0x08000000（地址已内置）
-│   ├── URTC_MAIN_FIRMWARE_v0.2.3.bin    应用程序 bin 编译产物，刷写至 0x08008000
-│   ├── URTC_MAIN_FIRMWARE_v0.2.3.elf    应用程序 elf 编译产物，刷写至 0x08008000
-│   ├── URTC_MAIN_FIRMWARE_v0.2.3.hex    应用程序 HEX 编译产物，刷写至 0x08008000（地址已内置）
-│   ├── URTC_SLAVE_BOOTLOADER_v0.1.5.{bin,elf,hex}  扩展从属自身的引导程序，
+│   ├── URTC_MAIN_BOOTLOADER_v0.3.6.bin  引导程序编译产物，刷写至 0x08000000
+│   ├── URTC_MAIN_BOOTLOADER_v0.3.6.elf  引导程序编译产物，刷写至 0x08000000
+│   ├── URTC_MAIN_BOOTLOADER_v0.3.6.hex  引导程序编译产物，刷写至 0x08000000（地址已内置）
+│   ├── URTC_MAIN_FIRMWARE_v0.2.7.bin    应用程序 bin 编译产物，刷写至 0x08008000
+│   ├── URTC_MAIN_FIRMWARE_v0.2.7.elf    应用程序 elf 编译产物，刷写至 0x08008000
+│   ├── URTC_MAIN_FIRMWARE_v0.2.7.hex    应用程序 HEX 编译产物，刷写至 0x08008000（地址已内置）
+│   ├── URTC_SLAVE_BOOTLOADER_v0.1.9.{bin,elf,hex}  扩展从属自身的引导程序，
 │   │                             刷写至 STM32F303CBT6 上的 0x08000000（仅限高级扩展板）
-│   ├── URTC_SLAVE_FIRMWARE_v0.1.2.{bin,elf,hex}  扩展从属自身的应用程序，刷写至 0x08005000
+│   ├── URTC_SLAVE_FIRMWARE_v0.1.6.{bin,elf,hex}  扩展从属自身的应用程序，刷写至 0x08005000
 │   └── firmware_manifest.json    上述全部 4 个组件的机器可读索引——版本、
 │                                 闪存地址，以及每个文件自身的大小/CRC32，
 │                                 供外部工具检查此处有什么以及比它当前所拥有

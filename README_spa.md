@@ -273,7 +273,7 @@ La flash de URTC está dividida en 2 piezas independientes, para que la placa pu
            │                                   │  de saltar a la app.
 0x08008000 ├─────────────────────────────────┤
            │  Slot principal (112K)            │  Este es el firmware de aplicación /
-           │                                   │  URTC_MAIN_FIRMWARE_v0.2.3.* — el firmware
+           │                                   │  URTC_MAIN_FIRMWARE_v0.2.7.* — el firmware
            │                                   │  real que se ejecuta día a día,
            │                                   │  descrito en el resto de este
            │                                   │  README. Nunca se toca en una
@@ -305,8 +305,8 @@ El bootloader solo puede entrar al chip mediante programación física — no ha
 
 1. Abre el proyecto en **STM32CubeIDE** (construido y probado contra el target STM32F303CC), o usa **STM32CubeProgrammer** directamente con los binarios compilados de abajo.
 2. Flashea **ambas** imágenes por SWD (ST-Link) mediante el header `STM_JTAG` integrado — cada archivo `.hex` tiene su dirección de destino incrustada, así que la mayoría de las herramientas (incluyendo STM32CubeProgrammer) pueden cargar ambas en la misma sesión:
-   * `URTC_MAIN_BOOTLOADER_v0.3.2.hex` → `0x08000000`
-   * `URTC_MAIN_FIRMWARE_v0.2.3.hex` → `0x08008000`
+   * `URTC_MAIN_BOOTLOADER_v0.3.6.hex` → `0x08000000`
+   * `URTC_MAIN_FIRMWARE_v0.2.7.hex` → `0x08008000`
 3. Establece la identidad de la herramienta mediante los jumpers de soldadura de ID antes de encender - la placa los lee una vez al arrancar, como siempre. Cinco jumpers (ID0-ID4), cubriendo el espacio completo de 32 direcciones (31 direcciones de herramienta directas, más la dirección reservada `11111` de configuración libre - ver la sección de Matriz de Herramientas de arriba).
 4. Enciende. El bootloader escucha durante ~600ms, no ve nada, y salta directamente a la aplicación — desde aquí en adelante, todo se comporta exactamente como se describe en el resto de este README.
 
@@ -492,15 +492,15 @@ Si alguien de la comunidad está trabajando en efectores finales personalizados,
 │           ├── STM32F303CBTx_SLAVEBOOT.ld  Script de enlazado (región de 18K en 0x08000000)
 │           └── README.md          Mismo rol de referencia técnica que el de la aplicación
 ├── firmware/
-│   ├── URTC_MAIN_BOOTLOADER_v0.3.2.bin  Bootloader compilado, flashear en 0x08000000
-│   ├── URTC_MAIN_BOOTLOADER_v0.3.2.elf  Bootloader compilado, flashear en 0x08000000
-│   ├── URTC_MAIN_BOOTLOADER_v0.3.2.hex  Bootloader compilado, flashear en 0x08000000 (dirección incrustada)
-│   ├── URTC_MAIN_FIRMWARE_v0.2.3.bin    Bin de aplicación compilado, flashear en 0x08008000
-│   ├── URTC_MAIN_FIRMWARE_v0.2.3.elf    Elf de aplicación compilado, flashear en 0x08008000
-│   ├── URTC_MAIN_FIRMWARE_v0.2.3.hex    HEX de aplicación compilado, flashear en 0x08008000 (dirección incrustada)
-│   ├── URTC_SLAVE_BOOTLOADER_v0.1.5.{bin,elf,hex}  Bootloader propio del esclavo de expansión, flashear en 0x08000000
+│   ├── URTC_MAIN_BOOTLOADER_v0.3.6.bin  Bootloader compilado, flashear en 0x08000000
+│   ├── URTC_MAIN_BOOTLOADER_v0.3.6.elf  Bootloader compilado, flashear en 0x08000000
+│   ├── URTC_MAIN_BOOTLOADER_v0.3.6.hex  Bootloader compilado, flashear en 0x08000000 (dirección incrustada)
+│   ├── URTC_MAIN_FIRMWARE_v0.2.7.bin    Bin de aplicación compilado, flashear en 0x08008000
+│   ├── URTC_MAIN_FIRMWARE_v0.2.7.elf    Elf de aplicación compilado, flashear en 0x08008000
+│   ├── URTC_MAIN_FIRMWARE_v0.2.7.hex    HEX de aplicación compilado, flashear en 0x08008000 (dirección incrustada)
+│   ├── URTC_SLAVE_BOOTLOADER_v0.1.9.{bin,elf,hex}  Bootloader propio del esclavo de expansión, flashear en 0x08000000
 │   │                             en el STM32F303CBT6 (solo placas de expansión avanzadas)
-│   ├── URTC_SLAVE_FIRMWARE_v0.1.2.{bin,elf,hex}  Aplicación propia del esclavo de expansión, flashear en 0x08005000
+│   ├── URTC_SLAVE_FIRMWARE_v0.1.6.{bin,elf,hex}  Aplicación propia del esclavo de expansión, flashear en 0x08005000
 │   └── firmware_manifest.json    Índice legible por máquina de los 4 componentes de arriba - versión,
 │                                 dirección de flash, y el tamaño/CRC32 propio de cada archivo, para
 │                                 que una herramienta externa compruebe qué hay aquí y qué es más

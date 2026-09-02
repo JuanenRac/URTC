@@ -276,7 +276,7 @@ Le flash d'URTC est divisé en deux parties indépendantes, de sorte que la cart
            │                                   │  l'application.
 0x08008000 ├─────────────────────────────────┤
            │  Slot principal (112K)            │  C'est le firmware applicatif /
-           │                                   │  URTC_MAIN_FIRMWARE_v0.2.3.* — le
+           │                                   │  URTC_MAIN_FIRMWARE_v0.2.7.* — le
            │                                   │  firmware réel qui tourne au
            │                                   │  quotidien, décrit partout
            │                                   │  ailleurs dans ce README. Jamais
@@ -308,8 +308,8 @@ Le bootloader ne peut arriver sur la puce que via une programmation physique —
 
 1. Ouvrez le projet dans **STM32CubeIDE** (construit et testé contre la cible STM32F303CC), ou utilisez **STM32CubeProgrammer** directement avec les sorties compilées ci-dessous.
 2. Flashez **les deux** images via SWD (ST-Link) via le connecteur `STM_JTAG` embarqué — chaque fichier `.hex` contient son adresse cible intégrée, donc la plupart des outils (y compris STM32CubeProgrammer) peuvent charger les deux dans la même session :
-   * `URTC_MAIN_BOOTLOADER_v0.3.2.hex` → `0x08000000`
-   * `URTC_MAIN_FIRMWARE_v0.2.3.hex` → `0x08008000`
+   * `URTC_MAIN_BOOTLOADER_v0.3.6.hex` → `0x08000000`
+   * `URTC_MAIN_FIRMWARE_v0.2.7.hex` → `0x08008000`
 3. Réglez l'identité de l'outil via les cavaliers à souder d'ID avant la mise sous tension — la carte les lit une fois au démarrage, comme toujours. Cinq cavaliers (ID0-ID4), couvrant l'espace complet de 32 adresses (31 adresses d'outils directes, plus l'adresse de configuration libre réservée `11111` - voir la section Matrice d'outils ci-dessus).
 4. Mise sous tension. Le bootloader écoute pendant ~600ms, ne voit rien, et saute directement dans l'application — à partir de là, tout se comporte exactement comme décrit dans le reste de ce README.
 
@@ -496,15 +496,15 @@ Si quelqu'un dans la communauté travaille sur des effecteurs terminaux personna
 │           ├── STM32F303CBTx_SLAVEBOOT.ld  Script de liaison (région 18K à 0x08000000)
 │           └── README.md          Même rôle de référence technique que celui de l'application
 ├── firmware/
-│   ├── URTC_MAIN_BOOTLOADER_v0.3.2.bin  Bootloader compilé, à flasher à 0x08000000
-│   ├── URTC_MAIN_BOOTLOADER_v0.3.2.elf  Bootloader compilé, à flasher à 0x08000000
-│   ├── URTC_MAIN_BOOTLOADER_v0.3.2.hex  Bootloader compilé, à flasher à 0x08000000 (adresse intégrée)
-│   ├── URTC_MAIN_FIRMWARE_v0.2.3.bin    Bin d'application compilé, à flasher à 0x08008000
-│   ├── URTC_MAIN_FIRMWARE_v0.2.3.elf    Elf d'application compilé, à flasher à 0x08008000
-│   ├── URTC_MAIN_FIRMWARE_v0.2.3.hex    HEX d'application compilé, à flasher à 0x08008000 (adresse intégrée)
-│   ├── URTC_SLAVE_BOOTLOADER_v0.1.5.{bin,elf,hex}  Bootloader propre à l'esclave d'extension, à flasher à 0x08000000
+│   ├── URTC_MAIN_BOOTLOADER_v0.3.6.bin  Bootloader compilé, à flasher à 0x08000000
+│   ├── URTC_MAIN_BOOTLOADER_v0.3.6.elf  Bootloader compilé, à flasher à 0x08000000
+│   ├── URTC_MAIN_BOOTLOADER_v0.3.6.hex  Bootloader compilé, à flasher à 0x08000000 (adresse intégrée)
+│   ├── URTC_MAIN_FIRMWARE_v0.2.7.bin    Bin d'application compilé, à flasher à 0x08008000
+│   ├── URTC_MAIN_FIRMWARE_v0.2.7.elf    Elf d'application compilé, à flasher à 0x08008000
+│   ├── URTC_MAIN_FIRMWARE_v0.2.7.hex    HEX d'application compilé, à flasher à 0x08008000 (adresse intégrée)
+│   ├── URTC_SLAVE_BOOTLOADER_v0.1.9.{bin,elf,hex}  Bootloader propre à l'esclave d'extension, à flasher à 0x08000000
 │   │                             sur le STM32F303CBT6 (cartes d'extension avancées uniquement)
-│   ├── URTC_SLAVE_FIRMWARE_v0.1.2.{bin,elf,hex}  Application propre à l'esclave d'extension, à flasher à 0x08005000
+│   ├── URTC_SLAVE_FIRMWARE_v0.1.6.{bin,elf,hex}  Application propre à l'esclave d'extension, à flasher à 0x08005000
 │   └── firmware_manifest.json    Index lisible par machine des 4 composants ci-dessus - version,
 │                                 adresse flash, et la taille/CRC32 propre à chaque fichier, pour
 │                                 qu'un outil externe puisse vérifier ce qui est présent et ce qui
