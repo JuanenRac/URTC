@@ -516,6 +516,9 @@ URTC のフラッシュは 2 つの独立した部分に分割されているた
 │   │                            自身の整理・体系化されたバージョンは BOM/BOM.TXT を参照）
 │   ├── datasheet/               ボードで使用されるすべての部品のデータシート
 │   └── *_PARLIST/PINLIST/NETLIST.TXT   Eagle エクスポートのネットリスト（ピンマッピングの正典）
+├── tools/
+│   ├── build_test.py            バージョンを更新しないビルド/コンパイル確認
+│   └── ci_validate.py           CI が使用する manifest/CHANGELOG/docs の検証
 ├── VERSION_CHECKLIST.txt        本プロジェクト自身の 4 つの独立したバージョン番号のいずれかを
 │                                正しく加算するための機械的なチェックリスト
 ├── check_version_consistency.sh  自動化されたバージョン/ファイル整合性チェック——
@@ -525,6 +528,10 @@ URTC のフラッシュは 2 つの独立した部分に分割されているた
 │                                コンパイル（Linux）
 ├── build_firmware.bat           同上、Windows 向け——両方のスクリプトが自動化する
 │                                完全な手動プロセスは docs/COMPILE_STM32F303.TXT を参照
+├── build-test.sh / build-test.bat  バージョンを更新しないビルド/コンパイル確認
+│                                （tools/build_test.py の薄いラッパー）
+├── bump_version.py              オドメーター式バージョンインクリメント、build_firmware.sh/.bat が実行
+├── bump_manifest_version.py     hydra-umc.project.json のバージョンをネイティブ側と同期（--sync）
 ├── generate_manifest.py         firmware/firmware_manifest.json を再生成——
 │                                完全な build_firmware.sh/.bat 実行の最終ステップとして
 │                                自動的に呼び出されるか、完全な再ビルドなしにマニフェストを

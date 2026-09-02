@@ -506,6 +506,9 @@ Falls jemand in der Community an benutzerdefinierten Endeffektoren, intelligente
 │   │                            BOM/BOM.TXT für die eigene kuratierte, organisierte Version dieses Projekts)
 │   ├── datasheet/               Datenblätter aller in der Platine verwendeten Teile
 │   └── *_PARLIST/PINLIST/NETLIST.TXT   Eagle-exportierte Netzlisten (Ground Truth für Pin-Zuordnung)
+├── tools/
+│   ├── build_test.py            Build-/Kompilierprüfung ohne Versionserhöhung
+│   └── ci_validate.py           Manifest-/CHANGELOG-/Doku-Validierung, von der CI genutzt
 ├── VERSION_CHECKLIST.txt        Mechanische Checkliste zum korrekten Erhöhen jeder der 4 eigenen
 │                                unabhängigen Versionsnummern dieses Projekts
 ├── check_version_consistency.sh  Automatisierte Versions-/Dateikonsistenzprüfungen - vor dem
@@ -514,6 +517,10 @@ Falls jemand in der Community an benutzerdefinierten Endeffektoren, intelligente
 │                                kompiliert alle 4 Firmware-Binärdateien end-to-end (Linux)
 ├── build_firmware.bat           Dasselbe, für Windows - siehe docs/COMPILE_STM32F303.TXT für
 │                                den vollständigen manuellen Prozess, den jedes Skript automatisiert
+├── build-test.sh / build-test.bat  Build-/Kompilierprüfung ohne Versionserhöhung (dünne
+│                                Wrapper um tools/build_test.py)
+├── bump_version.py              Versionserhöhung im Kilometerzähler-Stil, ausgeführt von build_firmware.sh/.bat
+├── bump_manifest_version.py     Synchronisiert die Version von hydra-umc.project.json mit der nativen (--sync)
 ├── generate_manifest.py         Regeneriert firmware/firmware_manifest.json - automatisch
 │                                aufgerufen als letzter Schritt eines vollständigen
 │                                build_firmware.sh/.bat-Laufs, oder eigenständig jederzeit, wenn das

@@ -530,6 +530,9 @@ Si quelqu'un dans la communauté travaille sur des effecteurs terminaux personna
 │   │                            BOM/BOM.TXT pour la propre version organisée et curée de ce projet)
 │   ├── datasheet/               Fiches techniques de tous les composants utilisés sur la carte
 │   └── *_PARLIST/PINLIST/NETLIST.TXT   Netlists exportées d'Eagle (référence pour le mappage des broches)
+├── tools/
+│   ├── build_test.py            Contrôle build/compilation sans gestion de version
+│   └── ci_validate.py           Validation manifest/CHANGELOG/docs utilisée par la CI
 ├── VERSION_CHECKLIST.txt        Liste de contrôle mécanique pour monter correctement l'un
 │                                quelconque des 4 numéros de version indépendants propres à ce projet
 ├── check_version_consistency.sh  Vérifications automatisées de cohérence version/fichier - à
@@ -538,6 +541,10 @@ Si quelqu'un dans la communauté travaille sur des effecteurs terminaux personna
 │                                compile les 4 binaires firmware de bout en bout (Linux)
 ├── build_firmware.bat           Idem, pour Windows - voir docs/COMPILE_STM32F303.TXT pour
 │                                le processus manuel complet que chaque script automatise
+├── build-test.sh / build-test.bat  Contrôle build/compilation sans gestion de version
+│                                (enveloppes légères autour de tools/build_test.py)
+├── bump_version.py              Incrément de version type compteur kilométrique, exécuté par build_firmware.sh/.bat
+├── bump_manifest_version.py     Synchronise la version de hydra-umc.project.json avec la version native (--sync)
 ├── generate_manifest.py         Régénère firmware/firmware_manifest.json - appelé
 │                                automatiquement comme dernière étape d'une exécution complète
 │                                de build_firmware.sh/.bat, ou de façon autonome à tout moment

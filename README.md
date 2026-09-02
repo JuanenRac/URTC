@@ -515,6 +515,9 @@ If anyone in the community is working on custom end-effectors, smart tool-change
 │   │                            BOM/BOM.TXT for this project's own curated, organized version)
 │   ├── datasheet/               Datasheets of all parts used in board
 │   └── *_PARLIST/PINLIST/NETLIST.TXT   Eagle-exported netlists (ground truth for pin mapping)
+├── tools/
+│   ├── build_test.py            Non-versioning build/compile check
+│   └── ci_validate.py           Manifest/CHANGELOG/docs validation used by CI
 ├── VERSION_CHECKLIST.txt        Mechanical checklist for bumping any of this project's own
 │                                4 independent version numbers correctly
 ├── check_version_consistency.sh  Automated version/file-consistency checks - run before
@@ -523,6 +526,10 @@ If anyone in the community is working on custom end-effectors, smart tool-change
 │                                compiles all 4 firmware binaries end to end (Linux)
 ├── build_firmware.bat           Same, for Windows - see docs/COMPILE_STM32F303.TXT for
 │                                the full manual process either script automates
+├── build-test.sh / build-test.bat  Non-versioning build/compile check (thin wrappers
+│                                around tools/build_test.py)
+├── bump_version.py              Odometer-style version bump, run by build_firmware.sh/.bat
+├── bump_manifest_version.py     Syncs hydra-umc.project.json's version to the native one (--sync)
 ├── generate_manifest.py         Regenerates firmware/firmware_manifest.json - called
 │                                automatically as the last step of a full
 │                                build_firmware.sh/.bat run, or standalone any time the

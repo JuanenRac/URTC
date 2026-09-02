@@ -501,6 +501,9 @@ URTC 的闪存被拆分为两个独立部分，因此板卡可以通过它已经
 │   │                            自身经过整理组织的版本见 BOM/BOM.TXT）
 │   ├── datasheet/               板上所用全部元件的数据手册
 │   └── *_PARLIST/PINLIST/NETLIST.TXT   Eagle 导出的网表（引脚映射的真实来源）
+├── tools/
+│   ├── build_test.py            不递增版本号的构建/编译检查
+│   └── ci_validate.py           CI 使用的 manifest/CHANGELOG/docs 校验
 ├── VERSION_CHECKLIST.txt        用于正确递增本项目自身 4 个独立版本号中
 │                                任意一个的机械化检查清单
 ├── check_version_consistency.sh  自动化的版本/文件一致性检查——在信任
@@ -509,6 +512,10 @@ URTC 的闪存被拆分为两个独立部分，因此板卡可以通过它已经
 │                                端到端编译全部 4 个固件二进制文件（Linux）
 ├── build_firmware.bat           同上，适用于 Windows——两个脚本自动化的
 │                                完整手动流程见 docs/COMPILE_STM32F303.TXT
+├── build-test.sh / build-test.bat  不递增版本号的构建/编译检查
+│                                （tools/build_test.py 的轻量包装）
+├── bump_version.py              里程表式版本递增，由 build_firmware.sh/.bat 运行
+├── bump_manifest_version.py     将 hydra-umc.project.json 的版本与原生版本同步（--sync）
 ├── generate_manifest.py         重新生成 firmware/firmware_manifest.json——
 │                                作为完整 build_firmware.sh/.bat 运行的最后
 │                                一步自动调用，或在清单需要跟上进度而无需
