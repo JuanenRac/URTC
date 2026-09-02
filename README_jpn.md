@@ -541,6 +541,9 @@ URTC のフラッシュは 2 つの独立した部分に分割されているた
 本プロジェクトは、同一著者（JuanenRac / Electro Hobby 3D）による、ファームウェア、ハードウェア、ソフトウェアにまたがる多数のプロジェクトからなる、より大きなロボティクスエコシステムの一部です。ご要望が実際にはこれらのプロジェクトのいずれかに関するものであり、本リポジトリのものではない可能性もあるため、知っておく価値があります。
 
 **本プロジェクトと直接関連**
+- **[URTC-FLASHER](https://github.com/JuanenRac/URTC-FLASHER)** —— まさにこのファームウェアを書き込む、デスクトップ版CAN-OTA + SWD/JTAGツール。
+- **[URTC-TESTER](https://github.com/JuanenRac/URTC-TESTER)** —— デスクトップ版のライブCANバス診断ツールで、このファームウェア自身の25種類のツールプロファイルごとに1つのパネルがあります。
+- **[URTC-WEB-STUDIO](https://github.com/JuanenRac/URTC-WEB-STUDIO)** —— 上記2つのデスクトップツールの、同じCANプロトコルを使うブラウザベースの代替手段。
 - **[URTC-SMART-RACK](https://github.com/JuanenRac/URTC-SMART-RACK)** —— 本ファームウェア自身のツールエコシステムと CAN バスを共有します。
 - **[URTC-VISION-TOOL](https://github.com/JuanenRac/URTC-VISION-TOOL)** —— 本ファームウェア自身のツールエコシステムと CAN バスを共有します。
 - **[HYDRA-UMC-DETECTION-HEF](https://github.com/JuanenRac/HYDRA-UMC-DETECTION-HEF)** —— 本ファームウェア自身のツールの背後にある視覚認識を提供します。

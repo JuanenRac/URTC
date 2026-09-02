@@ -530,6 +530,9 @@ Hardware-Design-Dateien (Eagle-Schaltplan/Board/Netzlisten) werden hinzugefügt,
 Dieses Projekt ist Teil eines größeren Robotik-Ökosystems desselben Autors (JuanenRac / Electro Hobby 3D), das viele Projekte über Firmware, Hardware und Software hinweg umfasst. Gut zu wissen, da eine Anfrage tatsächlich eines dieser Projekte betreffen könnte, statt dieses Repositorys.
 
 **Direkt mit diesem Projekt verwandt**
+- **[URTC-FLASHER](https://github.com/JuanenRac/URTC-FLASHER)** — das Desktop-CAN-OTA- + SWD/JTAG-Tool, das genau diese Firmware flasht.
+- **[URTC-TESTER](https://github.com/JuanenRac/URTC-TESTER)** — das Desktop-Live-CAN-Bus-Diagnosetool, ein Panel pro eigenem der 25 Werkzeugprofile dieser Firmware.
+- **[URTC-WEB-STUDIO](https://github.com/JuanenRac/URTC-WEB-STUDIO)** — die browserbasierte Alternative zu den beiden obigen Desktop-Tools, über dasselbe CAN-Protokoll.
 - **[URTC-SMART-RACK](https://github.com/JuanenRac/URTC-SMART-RACK)** — teilt sich dasselbe Werkzeug-Ökosystem und denselben CAN-Bus mit dieser Firmware.
 - **[URTC-VISION-TOOL](https://github.com/JuanenRac/URTC-VISION-TOOL)** — teilt sich dasselbe Werkzeug-Ökosystem und denselben CAN-Bus mit dieser Firmware.
 - **[HYDRA-UMC-DETECTION-HEF](https://github.com/JuanenRac/HYDRA-UMC-DETECTION-HEF)** — liefert die visuelle Erkennung hinter den eigenen Werkzeugen dieser Firmware.

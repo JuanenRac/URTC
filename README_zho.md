@@ -525,6 +525,9 @@ URTC 的闪存被拆分为两个独立部分，因此板卡可以通过它已经
 本项目是同一作者（JuanenRac / Electro Hobby 3D）打造的更大规模机器人生态系统的一部分，横跨固件、硬件和软件的众多项目。值得了解，因为某个请求实际所指的可能正是这些项目之一，而非本仓库。
 
 **与本项目直接相关**
+- **[URTC-FLASHER](https://github.com/JuanenRac/URTC-FLASHER)** —— 正是刷写这个固件的桌面端 CAN-OTA + SWD/JTAG 工具。
+- **[URTC-TESTER](https://github.com/JuanenRac/URTC-TESTER)** —— 桌面端实时 CAN 总线诊断工具,本固件自身 25 种工具配置各对应一个面板。
+- **[URTC-WEB-STUDIO](https://github.com/JuanenRac/URTC-WEB-STUDIO)** —— 上述 2 款桌面工具基于浏览器的替代方案,使用相同的 CAN 协议。
 - **[URTC-SMART-RACK](https://github.com/JuanenRac/URTC-SMART-RACK)** —— 共享本固件自身的工具生态系统和 CAN 总线。
 - **[URTC-VISION-TOOL](https://github.com/JuanenRac/URTC-VISION-TOOL)** —— 共享本固件自身的工具生态系统和 CAN 总线。
 - **[HYDRA-UMC-DETECTION-HEF](https://github.com/JuanenRac/HYDRA-UMC-DETECTION-HEF)** —— 为本固件自身的工具提供视觉识别能力。
