@@ -609,6 +609,16 @@ URTC 的闪存被拆分为两个独立部分，因此板卡可以通过它已经
 - **[HYDRA-UMC-WATCH](https://github.com/JuanenRac/HYDRA-UMC-WATCH)** —— 具备真实触觉提醒与配对手机语音中继功能的 WearOS 伴侣应用。
 - **[HYDRA-UMC-UPDATER](https://github.com/JuanenRac/HYDRA-UMC-UPDATER)** —— 发现、克隆并更新本生态系统中每个仓库的管理类桌面工具。
 
+---
+
+## 📚 文档与社区
+
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** —— 提交 Pull Request 所需的技术栈和编码规范。
+- **[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)** —— 本社区所期望的行为准则。
+- **[SECURITY.md](SECURITY.md)** —— 如何报告漏洞，以及本项目真实的安全关注重点。
+- **[SUPPORT.md](SUPPORT.md)** —— 在哪里提问和报告缺陷。
+- **[LICENSE.md](LICENSE.md)** —— 本项目自身的许可证。
+
 ## 👤 作者
 **JuanenRac** (Electro Hobby 3D)
 📧 electrohobby3d@gmail.com
