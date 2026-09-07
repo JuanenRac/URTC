@@ -1,0 +1,185 @@
+=============================================================================
+EXPANSION.TXT - CONN_EXPANSION and expansion board variants
+PROJECT: URTC (Universal Robot Tool Controller)
+AUTHOR: JuanenRac (Electro Hobby 3D) - electrohobby3d@gmail.com
+LICENSE: This document is licensed under CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/).
+         Firmware source is GPL-3.0; hardware design files are CERN-OHL-S v2 - see the repo README.
+=============================================================================
+This document covers the expansion connector itself, the family of add-on
+boards that plug into it, and the mechanism URTC uses to know which one
+(if any) is actually installed. For the connector's full pin-by-pin
+electrical detail, see PINOUT_CONNECTORS.TXT section 9 and PINOUT.TXT
+blocks 9-10 - this document doesn't repeat that, it covers the broader
+picture those two don't.
+
+-----------------------------------------------------------------------------
+1. CONN_EXPANSION - what it is
+-----------------------------------------------------------------------------
+A 20-pin header, separate from every tool-specific connector, carrying:
+  - 4 pins of +24V, 3 of GND, 1 of +3V3, 1 of +5V (main rail passthrough,
+    plus logic power)
+  - STEP/DIR/EN for an additional stepper driver (TMC2209 or TMC5160A)
+  - A bit-banged SPI bus (CS/SCK/MISO/MOSI) for that driver's own
+    configuration/diagnostics interface
+  - A combined diagnostic line (TMC_DIAG0) shared with the onboard
+    TMC2209's own DIAG output through a diode-OR (D4, a common-cathode
+    dual diode) - a stall/error on either driver pulls this line high.
+    The main board provides the pull-down (R50, 10K to GND) that keeps
+    this line at a clean, known low when neither driver is asserting;
+    the expansion board itself doesn't need one. A TMC5160 variant
+    populated here needs its own GCONF.diag0_int_pushpull bit set to 1
+    (push-pull/active-high, not its power-on default of open-drain/
+    active-low) for its side of this diode-OR to actually register a
+    stall here - see the main board's own CANBUS.TXT (0x182/0x183) for
+    the full reasoning.
+  - A second, independent I2C bus (I2C2, bit-banged - see the main
+    board's own PINOUT.TXT for why) - deliberately separate from the
+    OLED's own I2C2 (a second, hardware peripheral instance), so nothing
+    on an expansion board can interfere with display timing. This is
+    the same bus every variant below uses, whether it's reaching an
+    onboard slave MCU (the 2 Advanced variants) or a sensor chip wired
+    directly onto it (the 2 new Basic sensor variants) - see section 2.
+  - One general-purpose, EXTI-capable GPIO for whatever a future add-on
+    needs a fast interrupt-driven input for
+
+This connector's own pinout is fixed and finalized as of this document.
+
+-----------------------------------------------------------------------------
+2. The expansion board variants
+-----------------------------------------------------------------------------
+6 variants exist today, at 3 different levels of build maturity - see each
+one's own note below for exactly what that means for it. None have an
+Eagle schematic yet (no expansion board has been laid out at the time of
+writing); the firmware side is real and verified for variants 1-6, at the
+detail each one's own note describes.
+
+  1 - Basic, TMC2209 driver only. No onboard MCU - just the driver chip,
+      configured/monitored over the bit-banged SPI... actually, the
+      TMC2209 itself uses a single-wire UART for configuration, not SPI -
+      see PINOUT_CONNECTORS.TXT's own note on why EXP_SPI_MOSI doubles as
+      that UART line when this variant is what's populated. Lets URTC
+      drive a second stepper axis, or a more powerful motor than the
+      onboard TMC2209 handles, without needing a second brain to do it.
+      BOM: BOM_EXPANSION_BASIC_TMC2209.TXT.
+
+  2 - Basic, TMC5160A driver only. Same idea as variant 1, but with the
+      TMC5160A instead - genuinely more current capability and a real SPI
+      configuration interface (matching what CONN_EXPANSION's SPI bus was
+      designed around), for a NEMA23/34 motor running at its full rated
+      torque rather than what the onboard TMC2209 alone can supply.
+      BOM: BOM_EXPANSION_BASIC_TMC5160A.TXT.
+
+  3 - Advanced, TMC2209 + an onboard STM32F303CBT6 slave MCU. The slave
+      talks to the main URTC board's own STM32F303CC over I2C2 (the same
+      bus this connector already carries) - both for the main board to
+      push firmware updates to the slave, and for ongoing runtime
+      communication between the two. The slave's own I2C2 (a separate,
+      hardware peripheral instance from the link bus above) drives an
+      onboard ADS1115 16-bit ADC and an MLX9064x thermal sensor, plus
+      4-channel local PWM generation (TIM1) for tools needing
+      sub-millisecond pulse timing generated at the tool head itself.
+      Fully implemented and verified: src/F303-slave/ (bootloader +
+      application), reached from the main board's own
+      firmware_can_slavebridge.c over this same bus. BOM:
+      BOM_EXPANSION_ADVANCED_TMC2209.TXT.
+
+  4 - Advanced, TMC5160A + an onboard STM32F303CBT6 slave. Same idea as
+      variant 3, with the more capable driver. BOM:
+      BOM_EXPANSION_ADVANCED_TMC5160A.TXT.
+
+  5 - Basic, ADS1115 only. No stepper driver, no slave MCU - just the
+      ADC chip and its own minimal decoupling, wired directly onto this
+      connector's own bit-banged I2C bus (the same bus variant 3-4's own
+      slave chip uses - here there's no slave chip to relay through, the
+      main board's own STM32F303CC talks to the ADS1115 directly). Lets
+      doc #7 (Functional Testing Head)'s own "advanced reading" path work
+      without needing an Advanced board's own stepper driver and thermal
+      sensor along for the ride. Fully implemented and verified:
+      firmware_ads1115.c (main board's own direct driver),
+      Handle_CAN_FlyingProbe()'s own dual-path branching on
+      expansion_board_type. BOM: BOM_EXPANSION_BASIC_ADS1115.TXT.
+
+  6 - Basic, MLX9064x only. Same "no driver, no slave MCU, direct
+      connection" idea as variant 5, for doc #13 (PCB Advanced
+      Inspection)'s own thermal-imaging path instead. Carries a 4-pin
+      connector for whichever MLX9064x-family sensor module is plugged
+      into it - see EEPROM.TXT section 6 and CANBUS.TXT's own 0x1A6/0x1A7
+      for how which of the 3 family members (MLX90640, MLX90641, MLX90642)
+      is actually installed gets configured. All 3 family members
+      (MLX90640, MLX90641, MLX90642) are fully implemented and verified
+      on this direct path (melexis_mlx90640/, melexis_mlx90641/, and
+      melexis_mlx90642/'s own firmware_mlx9064x_app.c files, all dispatched
+      through the same generic pattern in Handle_CAN_ThermalInspection()),
+      as well as on the Advanced variants' own slave-relayed path - see
+      CANBUS.TXT's own 0x1A6 entry. BOM: BOM_EXPANSION_BASIC_MLX9064X.TXT.
+
+Reminder that applies across every driver-carrying variant above (1-4):
+the TMC2209/TMC5160A on both the Basic and Advanced boards is always
+configured and monitored by the main board's own STM32F303CC, over the
+same bit-banged SPI/UART this connector carries - an expansion board's
+own driver is never autonomous or self-configuring, regardless of which
+variant it's part of. The 2 Advanced variants remain open to adding more
+chips and functions to their own slave MCU as future tools need them; the
+2 driver-only Basic variants and the 2 new sensor-only Basic variants are
+about as minimal as they'll get, by design - there isn't much room left
+to add to a board that's deliberately just one chip and its own
+decoupling.
+
+-----------------------------------------------------------------------------
+3. expansion_board_type - telling URTC what's installed
+-----------------------------------------------------------------------------
+There is no electrical way for the main board to sense which of these 6
+variants (or none at all) is plugged into CONN_EXPANSION - none of them
+present a distinguishing signature on any pin it could read at boot. So
+instead of detection, it stores an explicit value the host sets once:
+
+  0 = No expansion board installed (the safe default - this is what a
+      freshly-flashed board starts at, and what a board with nothing on
+      CONN_EXPANSION should be told)
+  1 = Basic expansion board, TMC2209
+  2 = Basic expansion board, TMC5160A
+  3 = Advanced expansion board, TMC2209 + STM32F303CBT6
+  4 = Advanced expansion board, TMC5160A + STM32F303CBT6
+  5 = Basic expansion board, ADS1115 only (direct connection, no slave MCU)
+  6 = Basic expansion board, MLX9064x only (direct connection, no slave MCU)
+
+This value is set via CAN (0x1A0, see CANBUS.TXT), stored in the same
+FM24CL64B F-RAM that holds every other persisted setting (see
+src/F303-master/README.md and EEPROM.TXT), and survives a power cycle the
+same way those do - the host sets it once when the hardware configuration
+actually changes, not on every boot.
+
+**Where this stands today:** the firmware stores and reports this value
+faithfully (0x1A0 to set, 0x1A1 to query), restored from F-RAM at every
+boot, and DOES now change real runtime behavior based on it - not just a
+passive record. The generic SPI passthrough (0x180/0x181) and DIAG0 query
+(0x182/0x183) still work identically regardless of the value, since
+they're raw, board-agnostic transports reaching the driver on either
+Basic or Advanced variants the same way. But
+Handle_CAN_FlyingProbe()/Handle_CAN_ThermalInspection() both actively
+branch on this value to decide whether to talk to the ADS1115/MLX9064x
+directly (variants 5/6) or relay through the expansion slave chip
+(variants 3/4) - and on boot, if variant is 3 or 4, the main board pushes
+its own persisted mlx_sensor_variant setting to the slave chip's own
+REG_MLX_SENSOR_VARIANT, since that chip has no persistent storage of its
+own to remember it across its own resets.
+
+-----------------------------------------------------------------------------
+4. Setting it from URTC Flasher
+-----------------------------------------------------------------------------
+`URTC Flasher`'s CAN OTA section includes a control for reading and
+setting this value directly against a connected board, independent of
+flashing new firmware - see its own README
+(github.com/JuanenRac/URTC-FLASHER) for the specific control. This exists there (not only in URTC Tester) because setting the
+installed expansion board is a one-time hardware-configuration step most
+naturally done at the same time as, or right before, a firmware update -
+not something that needs its own separate tool run.
+
+-----------------------------------------------------------------------------
+5. Reading it from URTC Tester
+-----------------------------------------------------------------------------
+`URTC Tester` shows the currently-set value in its expansion panel, and
+will grow tool-specific controls that only make sense for a given
+expansion_board_type as those tools get exercised through it (e.g., a
+live thermal image for a board with variant 3, 4, or 6 actually set) -
+see its own README (github.com/JuanenRac/URTC-TESTER).

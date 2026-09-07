@@ -1,0 +1,82 @@
+// =============================================================================
+// URTC Firmware - CAN command handler: timed weld pulse (Spot Welder
+// 0x1C0, Ultrasonic Welder 0x200)
+// Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
+// GPL-3.0 - see LICENSE
+//
+// doc #4 and doc #15 - both fire a timed pulse on
+// CONN_T12, sharing this one handler since the protocol and mechanism
+// are otherwise identical: only one of them is ever the active tool at
+// a time, so sharing pulse state between them is safe. doc #4's own
+// contact sensor gate (CONN_SEN, TCRT_D0_DIG_PIN - already configured
+// as a digital input for this tool by the existing PB3 GPIO logic in
+// firmware_init_gpio.c/STM32F303CC_main.c, since neither of these tools
+// is in that logic's motor-tool exclusion list) is the one real
+// difference: doc #15 has no equivalent sensor requirement, so it skips
+// that check entirely rather than this handler pretending both tools
+// share a gate that only one of them actually has.
+// =============================================================================
+#include "firmware_common.h"
+#include "firmware_can_weldpulse.h"
+
+void Handle_CAN_WeldPulse(void) {
+    if (weld_pulse_active) return; // ignore a new fire command while a pulse is already running - not queued, just dropped
+
+    if (rxHeader.StdId == 0x1C0 && rxHeader.DLC >= 3 && !boot_sequence_active
+        && active_tool == TOOL_SPOT_WELDER) {
+        if (rxData[0] != 0x01) return; // only an explicit fire command starts a pulse - anything else on this ID is ignored, not treated as a malformed-but-tolerated variant
+        // Contact sensor gate - doc #4's own "ensure pressure before
+        // firing" requirement. FIXED (was inverted): this pin is
+        // reconfigured for TOOL_SPOT_WELDER by the exact same
+        // GPIO_MODE_INPUT + GPIO_PULLUP branch in STM32F303CC_main.c
+        // ("PB3 reconfiguration") that the vacuum pickup's LM393
+        // comparator and the generic Drill/Laser/AOI endstop input also
+        // use - and every other reader of that same branch's pin
+        // (Control_EndstopTelemetry in firmware_control_sensors.c, plus
+        // both of that branch's own comments) documents it as
+        // active-low: idle/no-contact reads HIGH (GPIO_PIN_SET, via the
+        // internal pull-up), contact/triggered reads LOW
+        // (GPIO_PIN_RESET). The pull-up itself only makes electrical
+        // sense under that assumption - a sensor that instead drove HIGH
+        // on contact would need a pull-down here, not a pull-up. The
+        // previous `!= GPIO_PIN_SET` check required HIGH (idle/no
+        // contact) to proceed, which let a pulse fire with nothing
+        // touching CONN_SEN's contact input (or the sensor disconnected
+        // entirely) and refused to fire the one time contact really was
+        // made - inverted from the "ensure pressure before firing" this
+        // gate exists for. Corrected to require GPIO_PIN_RESET (LOW),
+        // matching the active-low convention used everywhere else this
+        // exact pin/pull-up combination is read in this firmware.
+        if (HAL_GPIO_ReadPin(GPIOB, TCRT_D0_DIG_PIN) != GPIO_PIN_RESET) return;
+
+        // Clamp: weld_pulse_duration_ms comes straight from a CAN command
+        // with no prior validation, same reasoning as aoi_strobe_period's
+        // own clamp above. Real spot-welding/ultrasonic-welding pulses are
+        // sub-second; without a cap, a garbled or malicious frame could
+        // hold CONN_T12 energized for up to 65 seconds (0xFFFF) instead of
+        // a normal short pulse.
+        uint16_t raw_duration = ((uint16_t)rxData[1] << 8) | rxData[2];
+        weld_pulse_duration_ms = (raw_duration > 2000) ? 2000 : raw_duration;
+        weld_pulse_start_tick = HAL_GetTick();
+        weld_pulse_active = 1;
+        HAL_GPIO_WritePin(T12_PWM_PORT, T12_PWM_PIN, GPIO_PIN_SET);
+    } else if (rxHeader.StdId == 0x200 && rxHeader.DLC >= 3 && !boot_sequence_active
+               && active_tool == TOOL_ULTRASONIC_WELDER) {
+        if (rxData[0] != 0x01) return;
+        // No contact-sensor gate - doc #15 doesn't call for one the way
+        // doc #4 explicitly does.
+        uint16_t raw_duration = ((uint16_t)rxData[1] << 8) | rxData[2];
+        weld_pulse_duration_ms = (raw_duration > 2000) ? 2000 : raw_duration; // see the same clamp's own comment above
+        weld_pulse_start_tick = HAL_GetTick();
+        weld_pulse_active = 1;
+        HAL_GPIO_WritePin(T12_PWM_PORT, T12_PWM_PIN, GPIO_PIN_SET);
+    }
+}
+
+void WeldPulse_Tick(void) {
+    if (!weld_pulse_active) return;
+    if (HAL_GetTick() - weld_pulse_start_tick >= weld_pulse_duration_ms) {
+        HAL_GPIO_WritePin(T12_PWM_PORT, T12_PWM_PIN, GPIO_PIN_RESET);
+        weld_pulse_active = 0;
+    }
+}

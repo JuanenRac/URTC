@@ -1,0 +1,83 @@
+================================================================================
+BILL OF MATERIALS (BOM) - URTC EXPANSION BOARD, BASIC + MLX9064x VARIANT
+================================================================================
+AUTHOR: JuanenRac (Electro Hobby 3D) - electrohobby3d@gmail.com
+LICENSE: This document is licensed under CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/).
+         Firmware source is GPL-3.0; hardware design files (once drawn)
+         will be CERN-OHL-S v2, same as the main URTC board - see the
+         repo README.
+VARIANT: BASIC, sensor-only - no stepper driver, no MCU, and no sensor
+         chip itself mounted directly on this board. Carries a 4-pin
+         connector for whichever MLX9064x-family sensor module is
+         plugged into it (MLX90640, MLX90641, or MLX90642 - see
+         EEPROM.TXT section 6 and CANBUS.TXT's own 0x1A6/0x1A7 for how
+         which variant is actually installed gets configured), plus
+         decoupling, talking directly to the main URTC board's own
+         STM32F303CC over the existing expansion connector's bit-banged
+         I2C bus (same physical bus an Advanced board's own slave chip
+         uses, just no slave chip here - see
+         melexis_mlx90641/firmware_mlx90641_transport.c). Fits doc #13
+         (PCB Advanced Inspection)'s own thermal-imaging path when a
+         tool needs only this sensor and nothing else an Advanced board
+         also carries (the local PWM, the ADS1115).
+SENSOR: All 3 MLX9064x family members (MLX90640 32x24, MLX90641 16x12,
+        MLX90642 32x24 with onboard temperature calculation) share the
+        same industry-standard 4-lead TO39 package and the same 4
+        signals (VDD, GND, SDA, SCL) - confirmed against each sensor's
+        own short-form datasheet - so this board's own connector footprint
+        doesn't change between which of the 3 is actually populated on
+        the sensor module plugged into it.
+SOURCE: Component selection below is a first-pass BOM for a board that
+        hasn't been laid out in Eagle yet - unlike the main URTC board's
+        own BOM.TXT (sourced from an actual exported schematic/netlist),
+        treat reference designators here as provisional until a real
+        schematic exists to assign them from.
+================================================================================
+
+--------------------------------------------------------------------------------
+1. SENSOR CONNECTOR
+--------------------------------------------------------------------------------
+RefDes      Qty        Value / Model       Package         Notes / Description
+--------------------------------------------------------------------------------
+J1          1          TBD (4-pin)         THT/SMD header  4-pin connector to the MLX9064x sensor
+                                                            module (VDD, GND, SDA, SCL) - same 4-signal
+                                                            TO39 pinout regardless of which of the 3
+                                                            family members is actually populated on the
+                                                            sensor module itself; this board carries no
+                                                            sensor chip of its own
+C1          1          0.1uF               C0402           VDD decoupling for the sensor module, placed
+                                                            as close to J1's own VDD pin as the layout
+                                                            allows - standard decoupling practice for
+                                                            this chip family, same value already used
+                                                            for the ADS1115 board's own equivalent
+                                                            capacitor (BOM_EXPANSION_BASIC_ADS1115.TXT)
+
+Note: no pull-up resistors populated here, same reasoning as the
+Basic+ADS1115 board's own BOM (section 1's own note there) - the main
+URTC board's own expansion connector already carries 4.7k pull-ups on
+both I2C lines (R48/R44, see docs/PINOUT_CONNECTORS.TXT).
+
+--------------------------------------------------------------------------------
+2. LOCAL POWER
+--------------------------------------------------------------------------------
+RefDes      Qty        Value / Model       Package         Notes / Description
+--------------------------------------------------------------------------------
+Note: this board draws its own logic power from the main board's own
+expansion connector rather than regulating its own - same reasoning as
+every other expansion board variant in this project (see
+BOM_EXPANSION_BASIC_TMC2209.TXT section 2). No local regulator
+populated.
+
+--------------------------------------------------------------------------------
+3. CONNECTORS
+--------------------------------------------------------------------------------
+RefDes      Qty        Value / Model       Package         Notes / Description
+--------------------------------------------------------------------------------
+J2          1          TBD (link)          THT/SMD header  Link connector to the main board's own
+                                                            CONN_EXPANSION - carries the bit-banged I2C
+                                                            bus (EXP_I2C2_SCL/SDA), +3.3V, GND. Exact
+                                                            part TBD at layout time, matched to whatever
+                                                            connector the main board's own
+                                                            CONN_EXPANSION uses.
+
+================================================================================

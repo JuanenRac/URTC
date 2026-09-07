@@ -1,0 +1,412 @@
+=============================================================================
+COMPILE_STM32F303.TXT - Building URTC's 4 firmware binaries from source
+PROJECT: URTC (Universal Robot Tool Controller)
+AUTHOR: JuanenRac (Electro Hobby 3D) - electrohobby3d@gmail.com
+LICENSE: This document is licensed under CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/).
+=============================================================================
+Every command in this document was actually run against this project's
+own real source tree while writing it - not reconstructed from memory -
+and each resulting binary was verified byte-for-byte identical to the
+one shipped in firmware/. If you follow this exactly and get a
+different result, something in your own toolchain/HAL setup differs
+from what's documented here, not the other way around.
+
+-----------------------------------------------------------------------------
+1. What you're building - 4 separate binaries, 2 chips
+-----------------------------------------------------------------------------
+This project has TWO independent microcontrollers, each with its own
+bootloader and application - 4 builds total, each its own standalone
+compile+link+objcopy pipeline (none of them share an object file with
+another):
+
+  Main board (STM32F303CCT6, 256KB flash / 40KB SRAM):
+    - Bootloader: src/F303-master/boot/  -> URTC_MAIN_BOOTLOADER_v{MAJOR}.{MINOR}.{PATCH}.bin/.hex/.elf
+    - Application: src/F303-master/      -> URTC_MAIN_FIRMWARE_v{MAJOR}.{MINOR}.{PATCH}.bin/.hex/.elf
+      (version number in this filename changes on every real build - all
+      4 components are incremental, auto-bumped by bump_version.py before
+      compiling - see the root README's own changelog for the current one)
+
+  Expansion slave (STM32F303CBT6, 128KB flash / 40KB SRAM, only
+  populated on Advanced expansion board variants):
+    - Bootloader: src/F303-slave/boot/   -> URTC_SLAVE_BOOTLOADER_v{MAJOR}.{MINOR}.{PATCH}.bin/.hex/.elf
+    - Application: src/F303-slave/       -> URTC_SLAVE_FIRMWARE_v{MAJOR}.{MINOR}.{PATCH}.bin/.hex/.elf
+
+All 4 outputs land in firmware/ at the repo root once built.
+
+-----------------------------------------------------------------------------
+2. Tools you need
+-----------------------------------------------------------------------------
+On Debian/Ubuntu (what this was verified against):
+
+    sudo apt install gcc-arm-none-eabi binutils-arm-none-eabi \
+        libnewlib-arm-none-eabi libstdc++-arm-none-eabi-newlib \
+        libstdc++-arm-none-eabi-dev
+
+Verified working version: arm-none-eabi-gcc 13.2.1 (Ubuntu package
+15:13.2.rel1-2). Any reasonably recent GCC-based ARM toolchain should
+work the same way, but this is the one every command below was actually
+run against.
+
+The libstdc++-arm-none-eabi packages are NOT optional, even though this
+project is almost entirely C - see section 6 below on why one file
+needs a real C++ toolchain, not just a C one dressed up.
+
+You do not need STM32CubeIDE, STM32CubeMX, or any ST-branded IDE at
+all - this project is built entirely from the command line with the
+generic GNU ARM toolchain above. An ST-Link or compatible SWD/JTAG
+probe is needed to actually flash a binary onto real hardware (not
+covered here - flashing is URTC Flasher's own job, see
+github.com/JuanenRac/URTC-FLASHER), but isn't needed to just compile.
+
+-----------------------------------------------------------------------------
+3. Getting the ST HAL/CMSIS files this project depends on
+-----------------------------------------------------------------------------
+This repository does NOT vendor ST's own HAL driver or CMSIS device
+files - they're a large, separately-licensed (BSD-3-Clause) package
+that doesn't belong copied into this project's own source tree. Get
+them from ST's own official STM32CubeF3 repository:
+
+    git clone https://github.com/STMicroelectronics/STM32CubeF3.git
+
+You need exactly 3 subtrees out of that clone:
+
+    STM32CubeF3/Drivers/STM32F3xx_HAL_Driver/Src/    (HAL .c files)
+    STM32CubeF3/Drivers/STM32F3xx_HAL_Driver/Inc/    (HAL .h files)
+    STM32CubeF3/Drivers/CMSIS/Device/ST/STM32F3xx/Include/  (device headers)
+    STM32CubeF3/Drivers/CMSIS/Include/               (ARM CMSIS core headers)
+    STM32CubeF3/Drivers/CMSIS/Device/ST/STM32F3xx/Source/Templates/gcc/startup_stm32f303xc.s
+    STM32CubeF3/Drivers/CMSIS/Device/ST/STM32F3xx/Source/Templates/system_stm32f3xx.c
+
+Set up a local build tree however you like; this document assumes:
+
+    build/
+      common/
+        HAL_Include/     <- STM32F3xx_HAL_Driver/Inc/*.h
+        CMSIS_Include/   <- CMSIS/Include/*.h + CMSIS/Device/.../Include/*.h
+                             (both sets of headers together, flat)
+      hal_src/            <- STM32F3xx_HAL_Driver/Src/*.c (all of them,
+                             only some get compiled - see section 4)
+      hal_obj/             <- compiled HAL .o files land here (section 4)
+      app/                 <- startup_stm32f303xc.s + system_stm32f3xx.c,
+                             renamed/copied as startup.s and
+                             system_stm32f3xx.c for the MAIN board build
+      slave_app/            <- same 2 files again, separate copy, for the
+                             SLAVE chip build (kept separate on purpose -
+                             see section 4's own note on why)
+
+This HAL/CMSIS layer is completely generic ST code, identical for every
+STM32F303xC-family project - none of it is specific to URTC. Once set
+up, it doesn't need touching again unless you're bumping to a newer
+STM32CubeF3 release.
+
+-----------------------------------------------------------------------------
+4. Common compiler flags
+-----------------------------------------------------------------------------
+Every C file in every one of the 4 builds compiles with this exact base
+flag set (only the include paths change per-build):
+
+    CFLAGS="-mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard \
+            -DSTM32F303xC -DUSE_HAL_DRIVER \
+            -Ipath/to/CMSIS_Include -Ipath/to/HAL_Include \
+            -O2 -Wall -ffunction-sections -fdata-sections"
+
+-mcpu/-mthumb/-mfpu/-mfloat-abi: match the Cortex-M4F core with
+hardware single-precision FPU on both chips (STM32F303CC and
+STM32F303CB share this same core).
+-DSTM32F303xC: tells the CMSIS device header which exact variant this
+is (used for both chips - the CB is a lower-density member of the same
+xC device family in ST's own CMSIS headers, confirmed working this way
+throughout this project's own history, not a typo).
+-ffunction-sections -fdata-sections: paired with the linker's own
+--gc-sections (section 7 below) to strip unused code - meaningful
+savings given how many HAL modules get pulled in whole.
+
+Only 21 of the ~74 available HAL modules are actually used anywhere in
+this project - compiling all 74 wastes time and, without
+--gc-sections, bloats the binary for no reason. The 21 that matter:
+
+    stm32f3xx_hal.c            stm32f3xx_hal_pwr.c
+    stm32f3xx_hal_adc.c        stm32f3xx_hal_pwr_ex.c
+    stm32f3xx_hal_adc_ex.c     stm32f3xx_hal_rcc.c
+    stm32f3xx_hal_can.c        stm32f3xx_hal_rcc_ex.c
+    stm32f3xx_hal_cortex.c     stm32f3xx_hal_spi.c
+    stm32f3xx_hal_dac.c        stm32f3xx_hal_tim.c
+    stm32f3xx_hal_dac_ex.c     stm32f3xx_hal_tim_ex.c
+    stm32f3xx_hal_dma.c        stm32f3xx_hal_flash.c
+    stm32f3xx_hal_gpio.c       stm32f3xx_hal_flash_ex.c
+    stm32f3xx_hal_i2c.c        stm32f3xx_hal_iwdg.c
+    stm32f3xx_hal_i2c_ex.c
+
+Compile each once into build/hal_obj/ with the CFLAGS above (same 21
+objects get reused by all 4 builds - master and slave, app and
+bootloader all link against the identical HAL object set):
+
+    for f in stm32f3xx_hal stm32f3xx_hal_adc stm32f3xx_hal_adc_ex \
+             stm32f3xx_hal_can stm32f3xx_hal_cortex stm32f3xx_hal_dac \
+             stm32f3xx_hal_dac_ex stm32f3xx_hal_dma stm32f3xx_hal_flash \
+             stm32f3xx_hal_flash_ex stm32f3xx_hal_gpio stm32f3xx_hal_i2c \
+             stm32f3xx_hal_i2c_ex stm32f3xx_hal_iwdg stm32f3xx_hal_pwr \
+             stm32f3xx_hal_pwr_ex stm32f3xx_hal_rcc stm32f3xx_hal_rcc_ex \
+             stm32f3xx_hal_spi stm32f3xx_hal_tim stm32f3xx_hal_tim_ex; do
+        arm-none-eabi-gcc $CFLAGS -x c -c build/hal_src/$f.c -o build/hal_obj/$f.o
+    done
+
+The startup file and system_stm32f3xx.c compile the same way, once per
+chip (they're identical source, but kept as 2 separate copies/object
+sets on purpose - build/app/ for the main board, a separate slave_app/
+for the expansion slave - since STM32F303xx_startup code has no
+chip-specific content to differ on, but keeping them visibly separate
+avoids ever accidentally linking a main-board object into a slave
+build or vice versa):
+
+    arm-none-eabi-gcc $CFLAGS -x assembler-with-cpp -c startup_stm32f303xc.s -o startup.o
+    arm-none-eabi-gcc $CFLAGS -x c -c system_stm32f3xx.c -o system_stm32f3xx.o
+
+-----------------------------------------------------------------------------
+5. This project's own source - include paths per build
+-----------------------------------------------------------------------------
+Main board bootloader (src/F303-master/boot/):
+    -Isrc/F303-master/boot
+    (no other includes needed beyond the common CFLAGS' own HAL/CMSIS paths)
+
+Main board application (src/F303-master/):
+    -Isrc/F303-master
+    (plus each melexis_mlx9064x subfolder's own include path when
+    compiling ITS OWN files - see section 6)
+
+Expansion slave bootloader (src/F303-slave/boot/):
+    -Isrc/F303-slave/boot
+
+Expansion slave application (src/F303-slave/):
+    -Isrc/F303-slave -Isrc/F303-slave/melexis_mlx90640 \
+    -Isrc/F303-slave/melexis_mlx90641 -Isrc/F303-slave/melexis_mlx90642
+    (all 3 needed together for the main slave_*.c files - slave_i2c_sensors.h
+    itself includes all 3 sensor family headers at once, see section 6)
+
+    Historical note: earlier revisions of this repository had the
+    slave's own MLX90640 folder named just melexis/, inconsistent with
+    its 2 siblings melexis_mlx90641/ and melexis_mlx90642/ - renamed to
+    melexis_mlx90640/ for consistency once this inconsistency was
+    caught while writing this very document. If working from an older
+    checkout that still has the old name, either update it to match or
+    adjust the include path above accordingly.
+
+-----------------------------------------------------------------------------
+6. The C++ special case: MLX90641
+-----------------------------------------------------------------------------
+Every file in this project is plain C, with exactly ONE exception:
+Melexis's own official MLX90641_API.cpp (present twice - once under
+src/F303-master/melexis_mlx90641/, once under
+src/F303-slave/melexis_mlx90641/, one copy per chip's own direct or
+relayed sensor path). This is Melexis's own upstream choice, not this
+project's - the MLX90640 and MLX90642 libraries are both plain C from
+Melexis directly, only the MLX90641 one ships as C++.
+
+Compile ONLY this one file with g++, using a reduced C++ feature set
+appropriate for a bare-metal target with no exception unwinding, no
+RTTI, and no threading:
+
+    arm-none-eabi-g++ -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard \
+        -fno-exceptions -fno-rtti -fno-unwind-tables -fno-threadsafe-statics \
+        -specs=nano.specs -specs=nosys.specs -O2 -Wall \
+        -Ipath/to/melexis_mlx90641 \
+        -c path/to/melexis_mlx90641/MLX90641_API.cpp -o MLX90641_API.o
+
+Why each flag: -fno-exceptions/-fno-rtti strip C++ metadata this
+project never uses and that costs real flash space on a 256KB/128KB
+part. -fno-unwind-tables removes the stack-unwinding tables that only
+exception handling would need. -fno-threadsafe-statics removes the
+mutex-guard code GCC normally emits around function-local static
+initializers - meaningless overhead with no RTOS/threading on this
+target.
+
+Only the extern "C" wrapper was added to Melexis's own original
+MLX90641_API.h and MLX90641_I2C_Driver.h (so the C side of this project
+can call into it without C++ name-mangling getting in the way) -
+nothing else about Melexis's own file was modified.
+
+** LINKING **: the moment a single C++ object is part of the link, you
+MUST link the whole binary with arm-none-eabi-g++, not
+arm-none-eabi-gcc - even though every other object involved was
+compiled as plain C. Using gcc as the final link step here will either
+fail to find C++ runtime symbols or (worse) silently produce a binary
+that's missing needed C++ support code. This applies to both the main
+board application build AND the expansion slave application build -
+both link with g++, both bootloaders (which never touch this library
+at all) link with plain gcc.
+
+Verify the specific MLX90641 functions this project's own C code actually
+calls are correctly unmangled - the ones extern "C" needs to cover:
+
+    arm-none-eabi-nm your_output.elf | grep -E " T MLX90641_(DumpEE|ExtractParameters|GetFrameData|GetTa|CalculateTo)\b"
+
+All 5 should show up with plain, unmangled names (no leading _Z). Don't
+just grep for ANY "_Z"-prefixed symbol and expect zero results - Melexis's
+own MLX90641_API.cpp has ~17 internal-only helper functions (HammingDecode,
+ExtractCPParameters, ValidateAuxData, and similar) that are never declared
+in the public header, never called from this project's own C code, and
+stay mangled - correctly and harmlessly, since they're only ever called
+from other C++ code within that same .cpp file. Seeing those in a bare
+"_Z" grep is normal, not a sign the extern "C" wrapper failed - checking
+the specific public functions above is the check that actually matters.
+
+-----------------------------------------------------------------------------
+7. The 4 link steps
+-----------------------------------------------------------------------------
+Each of the 4 builds compiles its own .c files (see section 5 for
+per-build include paths) into its own local .o files, THEN links
+against: its own startup.o + system_stm32f3xx.o (section 4), the SAME
+21 shared HAL objects (section 4), and its own linker script.
+
+** REPRODUCIBILITY WARNING **: to get a byte-for-byte identical binary
+to a previously-built one (e.g. to verify nothing unintentionally
+changed), every .o file for one build must live together in a single
+flat directory with NO filename prefixes added to avoid collisions
+(don't rename melexis_mlx90640/MLX90640_API.c's own output to something
+like mlx90640_MLX90640_API.o to avoid clashing with a similarly-named
+file elsewhere) - the linker places code in the order objects are
+found, and a shell glob like *.o picks that order up alphabetically
+from whatever's actually in the directory. Different prefixes shift
+that alphabetical order, which shifts where the linker places each
+function in flash, which changes large stretches of the binary's own
+byte content despite it being functionally 100% identical - this was
+hit and confirmed directly while verifying this document (same total
+byte count, ~40% of individual bytes different, purely from filename
+prefixes changing sort order). If two files from different source
+folders happen to share an exact filename, that's the one case actually
+worth a real rename - just don't default to always prefixing everything.
+This project actually has six such collisions today:
+firmware_mlx90640_app.c, firmware_mlx90640_transport.c,
+firmware_mlx90641_app.c, firmware_mlx90641_transport.c,
+firmware_mlx90642_app.c, and firmware_mlx90642_transport.c each exist
+both at the top level of src/F303-master/ (and src/F303-slave/) and
+duplicated inside their respective melexis_mlx9064x/ vendor folder.
+build_firmware.sh's own compile_dir() writes each object as
+$(basename file .c).o into a shared per-target OUT directory, and it
+compiles the top-level source directory first, then each melexis_*
+folder after - so for these six files, the melexis_mlx9064x/ copy's
+.o silently overwrites the top-level copy's .o before linking, and it
+is the melexis_mlx9064x/ copy that actually ends up in the built
+firmware. Anyone editing the top-level copy of these six files is
+editing dead code; edit the melexis_mlx9064x/ copy instead, or these
+duplicates should be removed and the top-level copy deleted.
+
+--- Main board bootloader ---
+    arm-none-eabi-gcc -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard \
+        -specs=nano.specs -specs=nosys.specs \
+        -Tsrc/F303-master/boot/STM32F303CCTx_BOOTLOADER.ld -Wl,--gc-sections \
+        build/app/startup.o build/app/system_stm32f3xx.o \
+        bootloader_*.o build/hal_obj/*.o \
+        -o URTC_MAIN_BOOTLOADER_v{MAJOR}.{MINOR}.{PATCH}.elf
+
+--- Main board application ---
+    arm-none-eabi-g++ -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard \
+        -fno-exceptions -fno-rtti -fno-unwind-tables -fno-threadsafe-statics \
+        -specs=nano.specs -specs=nosys.specs \
+        -Tsrc/F303-master/STM32F303CCTx_APP.ld -Wl,--gc-sections \
+        build/app/startup.o build/app/system_stm32f3xx.o \
+        *.o build/hal_obj/*.o \
+        -o URTC_MAIN_FIRMWARE_v{MAJOR}.{MINOR}.{PATCH}.elf
+    (*.o here = every firmware_*.o, STM32F303CC_main.o, and all 3
+    melexis_mlx9064x/*.o object sets, all in one flat directory -
+    see the reproducibility warning above)
+
+--- Expansion slave bootloader ---
+    arm-none-eabi-gcc -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard \
+        -specs=nano.specs -specs=nosys.specs \
+        -Tsrc/F303-slave/boot/STM32F303CBTx_SLAVEBOOT.ld -Wl,--gc-sections \
+        build/slave_app/startup.o build/slave_app/system_stm32f3xx.o \
+        slaveboot_*.o build/hal_obj/*.o \
+        -o URTC_SLAVE_BOOTLOADER_v{MAJOR}.{MINOR}.{PATCH}.elf
+
+--- Expansion slave application ---
+    arm-none-eabi-g++ -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard \
+        -fno-exceptions -fno-rtti -fno-unwind-tables -fno-threadsafe-statics \
+        -specs=nano.specs -specs=nosys.specs \
+        -Tsrc/F303-slave/STM32F303CBTx_SLAVEAPP.ld -Wl,--gc-sections \
+        build/slave_app/startup.o build/slave_app/system_stm32f3xx.o \
+        *.o build/hal_obj/*.o -lm \
+        -o URTC_SLAVE_FIRMWARE_v{MAJOR}.{MINOR}.{PATCH}.elf
+
+    ** -lm is REQUIRED here and only here ** - the slave application is
+    the only one of the 4 builds that needs libm (the MLX9064x-family
+    calibration math - CalculateTo() and friends - uses real floating-
+    point functions like powf/expf from the standard math library).
+    Omitting -lm produces "undefined reference to `powf'"-style linker
+    errors; none of the other 3 builds need this flag at all.
+
+-Wl,--gc-sections here is what actually makes the earlier
+-ffunction-sections/-fdata-sections compile flags pay off - it strips
+every function/data section neither main() nor anything it calls
+(transitively) ever references, which matters a lot given all 21 HAL
+objects get linked against every single one of the 4 builds regardless
+of which HAL modules that particular build actually uses.
+
+You'll see linker warnings about libc_nano's own _close_r/_lseek_r/
+_read_r/_write_r referencing undefined syscalls - these are expected
+and harmless on every one of the 4 builds (-specs=nosys.specs provides
+stub syscalls; none of these 4 binaries do real file I/O), not a sign
+anything is actually wrong.
+
+-----------------------------------------------------------------------------
+8. Generating the final .bin/.hex from each .elf
+-----------------------------------------------------------------------------
+    arm-none-eabi-objcopy -O binary URTC_MAIN_BOOTLOADER_v{MAJOR}.{MINOR}.{PATCH}.elf URTC_MAIN_BOOTLOADER_v{MAJOR}.{MINOR}.{PATCH}.bin
+    arm-none-eabi-objcopy -O ihex   URTC_MAIN_BOOTLOADER_v{MAJOR}.{MINOR}.{PATCH}.elf URTC_MAIN_BOOTLOADER_v{MAJOR}.{MINOR}.{PATCH}.hex
+
+Repeat the same 2 commands for each of the other 3 .elf files. The
+.bin is what URTC Flasher's own CAN-OTA and SWD/JTAG paths actually
+consume; the .hex is kept alongside it for anyone using
+STM32CubeProgrammer or a similar GUI tool directly instead.
+
+-----------------------------------------------------------------------------
+9. Verifying your own build
+-----------------------------------------------------------------------------
+Confirm your own output is a real, plausible firmware image before
+assuming it's correct:
+
+    arm-none-eabi-size URTC_MAIN_FIRMWARE_v{MAJOR}.{MINOR}.{PATCH}.elf
+    (check .text+.data fits within the application's own real flash
+    slot size - see VERSION_CHECKLIST.txt and EEPROM.TXT for the exact
+    partition boundaries currently in effect)
+
+If comparing against an existing firmware/*.bin from this repository to
+confirm a from-scratch rebuild reproduces it exactly:
+
+    cmp your_output.bin firmware/URTC_MAIN_FIRMWARE_v{MAJOR}.{MINOR}.{PATCH}.bin && echo "identical"
+
+A mismatch doesn't necessarily mean something is wrong - see the
+reproducibility warning in section 7 above about object file ordering
+before assuming a real problem. A DIFFERENT total file size (not just
+different bytes at the same size) is the real red flag worth
+investigating; a same-size mismatch is very likely just link order.
+
+-----------------------------------------------------------------------------
+10. Standing project rules for what happens after a successful build
+-----------------------------------------------------------------------------
+Per this project's own standing conventions (see VERSION_CHECKLIST.txt
+and the root README's own changelog sections):
+  - Any edit to a bootloader's own source requires bumping its own
+    BOOTLOADER_VERSION_MAJOR/MINOR/PATCH in bootloader_common.h /
+    slaveboot_common.h before this rebuild - PATCH+1 normally, rolling
+    to MINOR+1/PATCH=0 past 9.
+  - An application firmware version bump is explicit-request-only, not
+    automatic on every edit - only bump FIRMWARE_VERSION_MAJOR/MINOR in
+    firmware_common.h / slave_common.h when actually asked to.
+  - Compiled binary FILENAMES DO change with every version bump for all
+    4 components now: each carries its own
+    <PREFIX>_v{MAJOR}.{MINOR}.{PATCH}.{bin,hex,elf} name (URTC_MAIN_
+    BOOTLOADER_v..., URTC_MAIN_FIRMWARE_v..., URTC_SLAVE_BOOTLOADER_v...,
+    URTC_SLAVE_FIRMWARE_v...) - same <PREFIX>_v<MAJOR>.<MINOR>.<PATCH>
+    convention as sibling repo HYDRA-UMC's own build_firmware.sh. This
+    replaced the older policy (only the main application's filename
+    encoded its own version; the 2 bootloaders and the slave application
+    were unversioned filenames) - see CHANGELOG.md for when and why.
+    build_firmware.sh/.bat compute each new name directly from
+    bump_version.py's own freshly-bumped MAJOR.MINOR.PATCH output, and
+    generate_manifest.py globs for <PREFIX>_v*.bin in firmware/ rather
+    than reconstructing the exact name, so it can never drift out of
+    sync with what the build scripts actually produced.
+=============================================================================
+END OF FILE
+=============================================================================

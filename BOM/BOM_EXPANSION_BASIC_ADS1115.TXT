@@ -1,0 +1,97 @@
+================================================================================
+BILL OF MATERIALS (BOM) - URTC EXPANSION BOARD, BASIC + ADS1115 VARIANT
+================================================================================
+AUTHOR: JuanenRac (Electro Hobby 3D) - electrohobby3d@gmail.com
+LICENSE: This document is licensed under CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/).
+         Firmware source is GPL-3.0; hardware design files (once drawn)
+         will be CERN-OHL-S v2, same as the main URTC board - see the
+         repo README.
+VARIANT: BASIC, sensor-only - no stepper driver, no MCU. Carries the
+         ADS1115 16-bit ADC and its own minimal support components
+         only; the chip talks directly to the main URTC board's own
+         STM32F303CC over the existing expansion connector's bit-banged
+         I2C bus (same physical bus an Advanced board's own slave chip
+         uses, just no slave chip here - see firmware_ads1115.c). Fits
+         doc #7 (Functional Testing Head)'s own "advanced reading" path
+         when a tool needs only this chip and nothing else an Advanced
+         board also carries (the local PWM, the thermal sensor).
+CHIP: ADS1115 - 16-bit I2C ADC, 4 single-ended or 2 differential
+      inputs, internal reference and oscillator - no external
+      crystal or reference needed.
+SOURCE: Component selection below is a first-pass BOM for a board that
+        hasn't been laid out in Eagle yet - unlike the main URTC board's
+        own BOM.TXT (sourced from an actual exported schematic/netlist),
+        treat reference designators here as provisional until a real
+        schematic exists to assign them from. Support-component values
+        verified against Texas Instruments' own ADS1115 datasheet
+        (SBAS444) rather than assumed - see the notes column below for
+        which requirement each part traces back to.
+================================================================================
+
+--------------------------------------------------------------------------------
+1. ADC (ADS1115)
+--------------------------------------------------------------------------------
+RefDes      Qty        Value / Model       Package         Notes / Description
+--------------------------------------------------------------------------------
+U1          1          ADS1115IDGST        VSSOP-10        16-bit ADC, I2C address 0x48 (ADDR tied to
+                                                            GND directly - a PCB trace, not its own
+                                                            component - see TI's own datasheet Table 6
+                                                            for why GND is the default/simplest choice
+                                                            among the 4 selectable addresses)
+C1          1          0.1uF               C0402           VDD decoupling - the one capacitor TI's own
+                                                            datasheet explicitly requires, placed as
+                                                            close to the VDD pin as the layout allows
+C2          1          10uF/16V            C0805           Bulk supply capacitor at the point power
+                                                            enters this board's own local ADC circuit -
+                                                            recommended (not strictly required) by TI's
+                                                            own application guidance for better ENOB in
+                                                            noisy environments
+
+Note: no pull-up resistors populated on SCL/SDA here - the main URTC
+board's own expansion connector already carries 4.7k pull-ups on both
+lines (R48/R44, see docs/PINOUT_CONNECTORS.TXT), since this is the same
+physical bus an Advanced board's own slave chip already uses. Adding a
+second pair here would only needlessly lower the bus's own effective
+pull-up resistance. ALERT/RDY is left unconnected (NC) - this project's
+own firmware polls the conversion result rather than using
+interrupt-driven or comparator-triggered reads, so the open-drain
+ALERT/RDY pin's own pull-up (which TI's datasheet does call out as
+needed if that pin is actually used) isn't needed on a board that
+never connects it to anything.
+
+Only 3 components support the ADC chip itself, not necessarily 4 -
+verified against the actual datasheet requirement rather than assumed;
+see the note above for what would add a 4th (an ALERT/RDY interrupt
+line) if a future design ever needs it.
+
+--------------------------------------------------------------------------------
+2. LOCAL POWER
+--------------------------------------------------------------------------------
+RefDes      Qty        Value / Model       Package         Notes / Description
+--------------------------------------------------------------------------------
+Note: this board draws its own logic power from the main board's own
+expansion connector rather than regulating its own - same reasoning as
+every other expansion board variant in this project (see
+BOM_EXPANSION_BASIC_TMC2209.TXT section 2). No local regulator
+populated.
+
+--------------------------------------------------------------------------------
+3. CONNECTORS
+--------------------------------------------------------------------------------
+RefDes      Qty        Value / Model       Package         Notes / Description
+--------------------------------------------------------------------------------
+J1          1          TBD (link)          THT/SMD header  Link connector to the main board's own
+                                                            CONN_EXPANSION - carries the bit-banged I2C
+                                                            bus (EXP_I2C2_SCL/SDA), +3.3V, GND. Exact
+                                                            part TBD at layout time, matched to whatever
+                                                            connector the main board's own
+                                                            CONN_EXPANSION uses.
+J2          1-4        TBD (ADC input)     THT/SMD header  One or more tool-facing connectors for the
+                                                            ADC's own 4 analog input channels (A0-A3) -
+                                                            exact count and pinout depends on which
+                                                            tool this specific board is wired for
+                                                            (single-ended vs. differential use of the
+                                                            4 channels changes how many physical signals
+                                                            actually need bringing out)
+
+================================================================================

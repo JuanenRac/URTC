@@ -1,0 +1,79 @@
+================================================================================
+BILL OF MATERIALS (BOM) - URTC EXPANSION BOARD, BASIC + TMC5160A VARIANT
+================================================================================
+AUTHOR: JuanenRac (Electro Hobby 3D) - electrohobby3d@gmail.com
+LICENSE: This document is licensed under CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/).
+         Firmware source is GPL-3.0; hardware design files (once drawn)
+         will be CERN-OHL-S v2, same as the main URTC board - see the
+         repo README.
+VARIANT: BASIC - no MCU. Same role as BOM_EXPANSION_BASIC_TMC2209.TXT,
+         higher-power driver for tools whose motor draws more than the
+         TMC2209's own 2A/coil ceiling.
+DRIVER: TMC5160A - unlike TMC2209, this driver has NO integrated power
+        MOSFETs; it drives external gate-level transistors instead (per
+        Analog Devices' own official datasheet, TMC5160A_datasheet_rev1.17:
+        "Eight MOSFETs are selected for the desired current, voltage and
+        package type. Two sense resistors set the motor coil current.").
+        This is the real, verified reason this variant's BOM is
+        substantially longer than the TMC2209 variant's - not an
+        oversight, the driver genuinely needs this support circuitry to
+        function at all.
+SOURCE: Same provisional-BOM caveat as BOM_EXPANSION_BASIC_TMC2209.TXT -
+        no schematic exists yet to source real reference designators
+        from. MOSFET part number below is a reasonable placeholder for a
+        10V-gate-drive, low-RDSon N-channel part in this power class -
+        confirm against the actual target coil current once that's
+        specified, this isn't a part number pulled from an existing
+        design the way the main board's own BOM.TXT entries are.
+================================================================================
+
+--------------------------------------------------------------------------------
+1. STEPPER DRIVER (TMC5160A)
+--------------------------------------------------------------------------------
+RefDes      Qty        Value / Model       Package         Notes / Description
+--------------------------------------------------------------------------------
+U1          1          TMC5160A-BOB        QFN-32 (5x5)    Stepper motor controller/driver IC - no
+                                                            integrated power stage, drives Q1-Q8 below
+Q1-Q8       8          IRLZ44N (or equiv.) TO-220 or        External N-channel power MOSFETs forming the
+                        10V-gate-drive,     D2PAK (SMD)     2 full H-bridges (4 each) - datasheet-required,
+                        low-RDSon part                      not optional. Package/exact part depends on
+                                                             target coil current and board thermal design,
+                                                             not yet finalized (see this doc's own SOURCE note)
+R1,R2       2          0.05R 1% (2W+)      R2512 or THT    Current-sense resistors - lower value and
+                                                            higher power rating than the TMC2209 variant's,
+                                                            since this driver targets higher coil current;
+                                                            exact value depends on target current per the
+                                                            driver's own sense-resistor selection formula
+                                                            (datasheet chapter 9) once that current is set
+C1-C4       4          100uF/50V low-ESR   Electrolytic/   VS (motor supply) bulk filtering - datasheet's
+                        (per amp of coil    Polymer         own "minimum 100uF per ampere of coil current
+                        current)                            near the power bridge" recommendation; final
+                                                             count depends on target current
+C5,C6       2          100nF               C0603           VSA (analog supply) local decoupling
+C7          1          2.2uF               C0603           5VOUT (internal LDO output) decoupling
+
+--------------------------------------------------------------------------------
+2. LOCAL POWER
+--------------------------------------------------------------------------------
+RefDes      Qty        Value / Model       Package         Notes / Description
+--------------------------------------------------------------------------------
+Same as BOM_EXPANSION_BASIC_TMC2209.TXT - logic power drawn from the
+main board's own expansion connector, no local regulator populated.
+Motor supply (VS/VM for Q1-Q8's own bridge) is a separate consideration
+from logic power - typically the same higher-voltage rail already
+feeding the main board's own onboard driver, routed to this board
+alongside the link connector's other signals; exact voltage/current
+budget TBD alongside the rest of this variant's power design.
+
+--------------------------------------------------------------------------------
+3. CONNECTORS
+--------------------------------------------------------------------------------
+RefDes      Qty        Value / Model       Package         Notes / Description
+--------------------------------------------------------------------------------
+J1          1          TBD (link)          THT/SMD header  Same link connector as the TMC2209 variant
+J2          1          TBD (motor)         THT terminal,   Motor coil output - higher current rating than
+                                            higher current  the TMC2209 variant's given this driver's own
+                                            rated                                    higher target current
+J3          1          TBD (tool-specific) THT/SMD header  Same per-tool convention as the TMC2209 variant
+
+================================================================================
