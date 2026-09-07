@@ -1,0 +1,117 @@
+================================================================================
+BILL OF MATERIALS (BOM) - URTC EXPANSION BOARD, ADVANCED + TMC2209 VARIANT
+================================================================================
+AUTHOR: JuanenRac (Electro Hobby 3D) - electrohobby3d@gmail.com
+LICENSE: This document is licensed under CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/).
+         Firmware source is GPL-3.0; hardware design files (once drawn)
+         will be CERN-OHL-S v2, same as the main URTC board - see the
+         repo README.
+VARIANT: ADVANCED - adds the STM32F303CBT6 slave MCU plus the 2 local
+         I2C sensor chips (ADS1115, MLX90640) and local PWM generation
+         on top of everything BOM_EXPANSION_BASIC_TMC2209.TXT already
+         has. Required for any of the 15 new tools needing local PWM
+         (doc #4/#14/#15) or the 2 sensor chips (doc #7/#13) - see
+         docs/PINOUT_SLAVE.txt for the full breakdown of which signals
+         this variant carries that the basic variant doesn't.
+DRIVER: TMC2209 - same driver section as BOM_EXPANSION_BASIC_TMC2209.TXT,
+        duplicated below rather than cross-referenced so this document
+        stands alone as a complete BOM for this variant.
+SOURCE: Same provisional-BOM caveat as the basic-variant BOMs - no
+        schematic exists yet.
+================================================================================
+
+--------------------------------------------------------------------------------
+1. STEPPER DRIVER (TMC2209) - identical to the basic variant's own section 1
+--------------------------------------------------------------------------------
+RefDes      Qty        Value / Model       Package         Notes / Description
+--------------------------------------------------------------------------------
+U1          1          TMC2209-LA          QFN-28 (5x5)    Same part/reasoning as
+                                                            BOM_EXPANSION_BASIC_TMC2209.TXT section 1
+R1,R2       2          0.11R 1%            R1206           Current-sense resistors
+C1          1          4.7uF/50V           C1206           5VOUT stabilization capacitor
+C2,C3       2          100nF               C0603           VM local decoupling
+C4          1          10uF/25V            C1206           VM bulk decoupling
+
+--------------------------------------------------------------------------------
+2. SLAVE MICROCONTROLLER (STM32F303CBT6)
+--------------------------------------------------------------------------------
+RefDes      Qty        Value / Model       Package         Notes / Description
+--------------------------------------------------------------------------------
+U2          1          STM32F303CBT6       LQFP48 (7x7)    128KB flash, 40KB SRAM - see
+                                                            docs/PINOUT_SLAVE.txt for the full pin
+                                                            assignment this firmware is built against
+C5-C8       4          100nF               C0402           VDD decoupling, one per VDD pin (same
+                                                            per-pin-decoupling convention as the main
+                                                            board's own STM32F303CC)
+C9          1          4.7uF                C0603           VDD bulk decoupling
+C10         1          100nF               C0402           VDDA decoupling
+R3          1          10K                 R0402           BOOT0 pull-down (default: boot into this
+                                                            chip's own bootloader) - same convention as
+                                                            the main board's own R6
+R4          1          10K                 R0402           BOOT0 pull-up path resistor, through SW1 -
+                                                            same convention as the main board's own R31
+SW1         1          Momentary pushbutton SMD/THT        Forces BOOT0 high when held during reset -
+                                                            same recovery-path role as the main board's
+                                                            own equivalent button
+Note: no crystal populated - this firmware runs from HSI (internal
+oscillator), see slaveboot_main.c/slave_main.c's own explicit design-
+decision note on why (I2C's timing tolerance doesn't need HSE's own
+accuracy the way the main board's own CAN bus does). Revisit if a
+future firmware revision changes this assumption.
+
+--------------------------------------------------------------------------------
+3. LOCAL SENSOR BUS (I2C2) - ADS1115 + MLX90640
+--------------------------------------------------------------------------------
+RefDes      Qty        Value / Model       Package         Notes / Description
+--------------------------------------------------------------------------------
+U3          1          ADS1115IDGST        VSSOP-10        16-bit ADC, doc tool #7 (Functional Testing
+                                                            Head) - ADDR tied to GND per
+                                                            slave_common.h's own ADS1115_I2C_ADDR
+                                                            assumption (address 0x48)
+U4          1          MLX90640ESF-BAA-     44-VLGA         32x24 thermal array, doc tool #13 (PCB
+                        000-TU                              Advanced Inspection) - fixed I2C address
+                                                            0x33, not configurable
+R5,R6       2          4.7K                R0402           I2C2 bus pull-ups (SCL/SDA) - local to this
+                                                            board only, does not share the link bus's own
+                                                            pull-ups
+C11,C12     2          100nF               C0402           U3/U4 local decoupling, one per chip
+
+--------------------------------------------------------------------------------
+4. LOCAL PWM CONNECTOR SUPPORT
+--------------------------------------------------------------------------------
+RefDes      Qty        Value / Model       Package         Notes / Description
+--------------------------------------------------------------------------------
+No additional passives required beyond the tool-facing connector itself
+(section 6 below) - TIM1's own 4 PWM channels drive directly from the
+MCU's own GPIO pins (docs/PINOUT_SLAVE.txt Block 4), any
+buffering/level-shifting needed is tool-specific and not part of this
+board's own base BOM.
+
+--------------------------------------------------------------------------------
+5. LINK BUS (I2C1) SUPPORT
+--------------------------------------------------------------------------------
+RefDes      Qty        Value / Model       Package         Notes / Description
+--------------------------------------------------------------------------------
+Note: I2C1's own pull-ups are NOT populated on this board - this bus is
+shared with the main board's own EXP_I2C2 (same physical wire through
+the link connector), and pull-ups for it already exist on the main
+board's own side (wherever ExpansionI2C_* assumes them today). Adding a
+second set here would double up the effective pull-up strength on a
+shared bus, which isn't what's wanted.
+
+--------------------------------------------------------------------------------
+6. CONNECTORS
+--------------------------------------------------------------------------------
+RefDes      Qty        Value / Model       Package         Notes / Description
+--------------------------------------------------------------------------------
+J1          1          TBD (link)          THT/SMD header  Same link connector as the basic variant
+J2          1          TBD (motor)         THT terminal    Same motor connector as the basic variant
+J3          1          TBD (tool-specific) THT/SMD header  Per-tool connector, now potentially carrying
+                                                            PWM and/or sensor-passthrough signals in
+                                                            addition to what the basic variant's J3 carries
+J4          1          TBD (SWD)           1.27mm 4-pin    SWD debug/programming header for this chip -
+                                            header          bring-up/recovery only, normal firmware
+                                                            updates go through the link bus's own I2C
+                                                            bootloader protocol, not this header
+
+================================================================================

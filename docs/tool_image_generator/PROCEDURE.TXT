@@ -1,0 +1,210 @@
+=============================================================================
+PROCEDURE.TXT - How to generate a new URTC tool jumper/wiring image
+PROJECT: URTC (Universal Robot Tool Controller)
+AUTHOR: JuanenRac (Electro Hobby 3D) - electrohobby3d@gmail.com
+LICENSE: This document is licensed under CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/).
+=============================================================================
+This folder holds everything needed to (re)generate any of the 25
+images/TOOL_*.png reference diagrams - the ones each tool's own entry in
+the root README.md links to under "Jumper/wiring config". Read this
+before touching any of the 3 .py files here, and before generating a
+new image for a tool that doesn't have one yet (e.g. a future 26th tool
+profile).
+
+-----------------------------------------------------------------------------
+1. What's in this folder
+-----------------------------------------------------------------------------
+PCB.png              The blank reference board image (Rev.1.06, 5 ID
+                      jumpers) everything is drawn on top of. This is
+                      the master template - never edit it directly for
+                      a specific tool; the scripts below load a fresh
+                      copy every time.
+render_engine.py      The drawing engine: connector bounding boxes, ID
+                      jumper positions, the CONN_EXPANSION connector
+                      (drawn separately - see section 5 below), and the
+                      text-panel renderer (title, jumper list,
+                      universal/specific connector sections, notes).
+tool_data.py           The actual data for all 25 tools - which
+                      connectors each one uses, pin descriptions, wire
+                      colors where documented, notes, expansion-board
+                      requirements. THIS is the file you edit to add a
+                      new tool or correct an existing one - you should
+                      almost never need to touch render_engine.py.
+generate_all.py        Entry point. Loops over every tool in
+                      tool_data.TOOLS, builds its image via
+                      render_engine.build_tool_image(), and saves it as
+                      TOOL_<NAME>.png. Run this after any edit to
+                      tool_data.py to regenerate everything.
+
+To regenerate everything:
+    cd docs/tool_image_generator
+    python3 generate_all.py
+Output lands in a local ./generated/ subfolder - copy whichever files
+changed into the real images/ folder at the repo root yourself
+afterward (the script does not write there directly, to avoid
+silently overwriting something mid-review).
+
+-----------------------------------------------------------------------------
+2. Adding a new tool (e.g. a future 26th profile)
+-----------------------------------------------------------------------------
+1. Read the new tool's own entry in docs/TOOLS.TXT (what it does, which
+   main-board peripherals it uses, whether it needs an expansion board).
+2. Cross-check docs/PINOUT_CONNECTORS.TXT for the exact pin-by-pin
+   detail of whichever connector(s) that peripheral list points to -
+   don't guess pin numbers or wire colors; if PINOUT_CONNECTORS.TXT
+   doesn't document a color for a given pin, leave it undocumented in
+   the image too (see section 6 below on this specific point).
+3. If the tool's own CAN protocol has meaningful detail worth a
+   reader's attention (e.g. "refuses to fire unless X reads HIGH
+   first"), check docs/CANBUS.TXT for the exact wording and reflect it
+   in a `notes` entry - don't paraphrase away a real constraint.
+4. Open tool_data.py and add a new `add(...)` call, following the
+   pattern of the existing 25. Required fields:
+     - tid: the tool's real hex ID (must match firmware_common.h's own
+       ToolMode_t enum exactly - this is what decides which ID jumpers
+       render green)
+     - name: display name for the image's own title, in the same
+       ALL-CAPS-ish style as the existing 25 (see their own titles for
+       tone - descriptive, not just the enum name)
+     - specific: list of (connector_name, description, [pin_lines])
+       tuples for whichever connectors are unique to this tool. Leave
+       empty ([]) if the tool has no tool-specific connector on this
+       board (e.g. Conformal Coating, Press-Fit Inserter) - the
+       renderer skips the "Connectors specific to this tool" heading
+       entirely when this list is empty, so don't add a placeholder
+       entry just to have something there.
+     - notes: list of strings for anything worth flagging separately
+       (optional - omit or pass [] if there's nothing to add beyond
+       the connector descriptions themselves)
+     - expansion_note: a single string if this tool needs
+       CONN_EXPANSION populated with an add-on board - omit or pass
+       None otherwise. See section 5 below for why this is handled
+       specially.
+5. Add the tool's own filename to the FILENAMES dict in generate_all.py
+   - MUST exactly match the ToolMode_t enum name from
+     src/F303-master/firmware_common.h, prefixed TOOL_ and suffixed
+     .png (e.g. enum TOOL_FOO_BAR -> filename TOOL_FOO_BAR.png). This
+     is what the root README.md's own image links expect.
+6. Run generate_all.py, review the output, then:
+   - Copy the new TOOL_<NAME>.png into images/ at the repo root
+   - Add its own numbered entry + image link to the "Tool Catalog"
+     section of the root README.md, matching the existing 25 entries'
+     format exactly (see how entries 1-25 are written there)
+   - Update PROJECT_INDEX.txt's own count of tool images if it's
+     tracked there
+
+-----------------------------------------------------------------------------
+3. CRITICAL: never duplicate a universal connector into "specific"
+-----------------------------------------------------------------------------
+CONN_MAIN, CONN_OLED, CONN_LED1, and CONN_LED2 are UNIVERSAL - they're
+already listed once under "Universal connectors (present on every
+tool)" for all 25 images, with their own generic descriptions. If a new
+tool's own real use of one of these 4 connectors is functionally
+different from the generic universal description (the way AOI
+Inspection and Thermal Inspection both actually use CONN_LED2 as their
+own real illumination source, not just a decorative status light),
+do NOT add a second entry for that same connector under `specific` -
+this renders as a confusing duplicate with 2 different descriptions for
+the same physical connector, and was a real bug caught and fixed during
+this procedure's own first 25-image generation run. Instead, describe
+the tool-specific role in a `notes` entry that references the connector
+by name, e.g.: "This tool's own actual inspection light is CONN_LED2
+above (universal connector) - it runs in synchronous stroboscopic mode
+here rather than the plain on/off status use other tools give it."
+
+-----------------------------------------------------------------------------
+4. Verified pixel coordinates (do not re-derive these from scratch)
+-----------------------------------------------------------------------------
+These were extracted from PCB.png via pixel-level analysis (connected-
+component detection + manual grid-overlay verification), not eyeballed
+- they're already correct in render_engine.py's own CONNECTOR_BOXES and
+ID_PIN_BOXES dicts. Listed here only so a future change to PCB.png
+itself (a new board revision) has a documented starting point to verify
+against, not so they get retyped by hand:
+
+  CONN_LED2:  (195, 10)-(355, 148)      CONN_SEN:  (390, 10)-(595, 148)
+  CONN_LED1:  (630, 10)-(785, 148)      CONN_OLED: (818, 10)-(1020, 148)
+  CONN_FAN1:  (1058, 148)-(1162, 380)   CONN_MOT:  (26, 163)-(200, 463)
+  CONN_MAIN:  (26, 693)-(200, 988)      CONN_DRILL:(1028, 588)-(1162, 995)
+  CONN_T12:   (780, 966)-(1025, 1160)
+
+  ID4: (553,205)-(598,267)  ID3: (600,205)-(645,267)  ID2: (647,205)-(692,267)
+  ID1: (694,205)-(739,267)  ID0: (741,205)-(786,267)
+
+If PCB.png is ever replaced with a new board revision, these boxes will
+be wrong and need re-deriving. The method that worked: crop suspect
+regions, overlay a labeled pixel grid (25px minor / 50px major
+gridlines with coordinate text), view the crop, read the true
+boundaries off the grid directly - connected-component/blob detection
+alone kept over- or under-merging elements because of the rotated
+silkscreen text labels crossing between adjacent connectors.
+
+-----------------------------------------------------------------------------
+5. CONN_EXPANSION - not part of the original reference photo
+-----------------------------------------------------------------------------
+The person's own original PCB.png reference image does not show
+CONN_EXPANSION at all - it was added to this diagram at the person's
+own explicit request, drawn programmatically (not present in the
+underlying photo), directly below MS1/MS2. It's a 20-pin, 1.27mm-pitch
+header per docs/PINOUT_CONNECTORS.TXT section 9 - drawn here as a 2-
+column x 10-row grid with standard header/IDC zigzag numbering (odd
+pins 1,3,5..19 on the left column, even pins 2,4,6..20 on the right,
+pin 1 nearest the polarization notch at the top-left) - this specific
+numbering convention was this session's own reasonable default, not
+confirmed against a real physical connector's own silkscreen, since
+none exists yet in the reference photo to check against. If the real
+hardware ends up numbered differently, update EXPANSION_TOP_Y and the
+pin-position logic in render_engine.py's own draw_conn_expansion()
+function accordingly - the zigzag assignment lives entirely in that one
+function's own `pin_positions` loop.
+
+CONN_EXPANSION is drawn on EVERY tool's image (same as MS1/MS2) via
+draw_pcb_diagram()'s own unconditional call to draw_conn_expansion() -
+this is deliberate, so every image shows the complete board regardless
+of whether that particular tool needs it. Whether it gets the orange
+highlight box is controlled separately, by whether "CONN_EXPANSION"
+appears in that tool's own `used_connectors` list - which happens
+automatically in generate_all.py whenever a tool's own `expansion_note`
+field is set (see section 2 above).
+
+EXPANSION_TOP_Y in render_engine.py controls its vertical position
+(currently 645, i.e. 100px below MS2's own bottom edge at y=545) -
+adjust this single constant if it ever needs to move again; the rest of
+the connector's own geometry (column spacing, row spacing, pin size)
+scales from it automatically. Leave at least ~30px clearance above
+CONN_T12's own top edge (y=966) if this value changes - the box's own
+real bottom edge lands at EXPANSION_TOP_Y + 9*ROW_GAP + 20.
+
+-----------------------------------------------------------------------------
+6. Known gaps - wire colors not documented for the 13 newer tools
+-----------------------------------------------------------------------------
+The original 12 tools' own documentation (particularly the Soldering
+Iron and 3D Printer examples this whole procedure was modeled on)
+specify wire-color conventions for several pins (red=+24V, black=GND,
+etc.) that docs/PINOUT_CONNECTORS.TXT and docs/CANBUS.TXT don't
+consistently repeat for the 13 newer tool profiles (IDs 0x0C-0x18) -
+their own pin descriptions in tool_data.py were written to only state a
+wire color where the source documentation actually specifies one for
+that exact tool/pin combination, leaving it unstated otherwise rather
+than inventing a convention. If the person wants full wire-color
+coverage for these 13, that's a documentation gap in
+docs/PINOUT_CONNECTORS.TXT itself to fill in first - propagating an
+invented color into the image would misrepresent it as a real,
+documented convention.
+
+-----------------------------------------------------------------------------
+7. Fonts and visual style
+-----------------------------------------------------------------------------
+DejaVu Sans (regular/bold/oblique/bold-oblique), from
+/usr/share/fonts/truetype/dejavu/ on this environment - present by
+default on most Debian/Ubuntu-based systems; install the
+`fonts-dejavu-core` package if regenerating on a system that lacks it.
+Orange (230,126,34) marks a used connector; green (39,174,96) with a
+white "S" marks an ID jumper that needs to be soldered closed. These
+exact values aren't arbitrary - they were picked to read clearly at
+this image's own resolution and were kept consistent across all 25
+images; changing them means regenerating every existing image, not just
+new ones, to keep the set visually consistent.
+=============================================================================
+END OF FILE
+=============================================================================
