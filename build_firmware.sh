@@ -115,6 +115,42 @@ else
 fi
 
 # -----------------------------------------------------------------------
+step "1b. Host logic tests (plain gcc, not arm-none-eabi-gcc)"
+# -----------------------------------------------------------------------
+# The Melexis MLX9064x sensor API (src/F303-master/melexis_mlx90640/
+# MLX90640_API.c) is portable C - it includes <math.h> and the I2C driver
+# header, never the STM32 HAL - so this project's own additions to it
+# (bounded data-ready polling instead of an unbounded while loop) and its
+# frame/EEPROM validation can be exercised on the host against a fake I2C
+# driver, with no F303 board attached. Final on-target timing/accuracy
+# validation of the thermal head still needs the physical MLX9064x.
+if [ "${HYDRA_UMC_SKIP_HOST_TESTS:-0}" = "1" ]; then
+    warn "host logic tests skipped (HYDRA_UMC_SKIP_HOST_TESTS=1)"
+elif ! command -v "${HOST_CC:-cc}" >/dev/null 2>&1 && ! command -v gcc >/dev/null 2>&1; then
+    warn "no host C compiler (cc/gcc) found - skipping host logic tests"
+else
+    HOST_CC="${HOST_CC:-$(command -v cc || command -v gcc)}"
+    MEL_DIR="$ROOT/src/F303-master/melexis_mlx90640"
+    HOST_BIN="$BUILD/host_tests"
+    mkdir -p "$BUILD"
+    if "$HOST_CC" -std=c11 -Wall -Wextra -Wno-unused-parameter \
+        -I"$ROOT/tests" -I"$MEL_DIR" -o "$HOST_BIN" \
+        "$ROOT/tests/test_mlx90640_api.c" "$ROOT/tests/fake_mlx90640_i2c.c" \
+        "$MEL_DIR/MLX90640_API.c" -lm; then
+        pass "host test suite compiled ($HOST_CC -std=c11 -Wall -Wextra)"
+    else
+        fail "host test suite failed to compile"
+        echo ""; echo "$PASS passed, $WARN warnings, $FAIL failed"; exit 1
+    fi
+    if "$HOST_BIN"; then
+        pass "MLX90640_API host logic tests passed"
+    else
+        fail "MLX90640_API host logic tests FAILED"
+        echo ""; echo "$PASS passed, $WARN warnings, $FAIL failed"; exit 1
+    fi
+fi
+
+# -----------------------------------------------------------------------
 step "2. ST HAL/CMSIS sources (cached locally under build/vendor/ after first run)"
 # -----------------------------------------------------------------------
 mkdir -p "$BUILD/vendor" "$BUILD/common/HAL_Include" "$BUILD/common/CMSIS_Include" "$BUILD/hal_src" "$BUILD/hal_obj"
