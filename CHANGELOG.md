@@ -2,6 +2,30 @@
 
 ## [Unreleased]
 
+- **Host logic tests for the MLX9064x sensor API** (new `tests/`). The
+  Melexis `MLX90640_API.c` is portable C (it includes `<math.h>` and the
+  I2C driver header, never the STM32 HAL), so this project's own
+  additions to it can now be exercised on the host with plain `gcc`,
+  against a fake I2C driver, with no F303 board attached:
+  `tests/test_mlx90640_api.c` + `tests/fake_mlx90640_i2c.c` +
+  `tests/test_runner.h`, wired into `build_firmware.sh` as step "1b"
+  (skipped cleanly if no host C compiler is present). 8 assertions:
+  `MLX90640_SynchFrame` / `MLX90640_GetFrameData` on a stuck bus return
+  the bounded-poll `DATA_READY_TIMEOUT_ERROR` after a bounded number of
+  reads (never spin), a real I2C NACK mid-poll is surfaced as itself,
+  the happy path returns a subpage number, a `0x7FFF` frame word is
+  rejected as `FRAME_DATA_ERROR`, `MLX90640_DumpEE` pulls the full
+  832-word window, and `MLX90640_GetSubPageNumber` is a pure accessor.
+  Verified compiling and passing under `gcc 14.2 -std=c11 -Wall
+  -Wextra`.
+- Noted while writing the above (not fixed here): the vendor
+  `MLX90640_ExtractParameters` maths still has unbounded
+  `while (temp < K)` normalisation loops that never terminate on a
+  degenerate/corrupt EEPROM dump - the same hang class the polling code
+  was already hardened against. A corrupt `DumpEE` at sensor bring-up
+  would hang the F303 there. Bounding it safely needs the physical
+  MLX9064x head plus Melexis reference vectors to confirm the maths is
+  unchanged, so it is left for on-target firmware validation.
 - **`build_firmware.sh`** - the manifest regeneration step (step 8,
   `firmware_manifest.json`) was skipped whenever `HYDRA_UMC_CI=1` (the
   mode `tools/build_test.py` always runs under), but the earlier cleanup
