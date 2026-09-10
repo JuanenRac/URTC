@@ -41,7 +41,7 @@
 
 ## [0.2.9] - Removed dangling references to private tracking documents (DOC-52)
 
-Found in an ecosystem-wide software-improvements audit, P2: `VERSION_CHECKLIST.txt`,
+Found while auditing the code: `VERSION_CHECKLIST.txt`,
 `check_version_consistency.sh` and `src/F303-master/firmware_can_electromagnet.c`
 referenced three private tracking documents by name - none of
 these files exist anywhere in this repo (confirmed - not even untracked on
@@ -61,7 +61,7 @@ Verified with `bash check_version_consistency.sh` (0 failures, same 4
 pre-existing warnings as before this change - missing SVG assets and
 `bump_bootloader_version.py`, neither related to this fix).
 
-## [0.2.8] - Fixed after a live ecosystem bug audit
+## [0.2.8] - Fixed after auditing the code
 
 - **`src/F303-master/firmware_can_global_pre.c`** - two stale comments
   said the 5-bit tool-ID scheme supported "0-11 = a real tool head, 12+ =
