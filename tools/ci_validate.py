@@ -57,7 +57,7 @@ VERSION_HEADING = re.compile(r"(?im)^#{1,3}\s*\[?(\d+\.\d+\.\d+)(?:\]|\s|$)")
 SEMVER = re.compile(r"^\d+\.\d+\.\d+$")
 
 # Found while investigating a systemic pattern of stale version/test-count
-# claims in README prose (2026-09-07): a version bump already updates the
+# claims in README prose: a version bump already updates the
 # manifest, the native version file and CHANGELOG.md's own heading (all
 # three already checked above) - but a README's own free prose ("Real
 # today: version `X.Y.Z`", "Status: vX.Y.Z", a `<project> vX.Y.Z` CLI
