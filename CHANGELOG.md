@@ -9,23 +9,33 @@
   against a fake I2C driver, with no F303 board attached:
   `tests/test_mlx90640_api.c` + `tests/fake_mlx90640_i2c.c` +
   `tests/test_runner.h`, wired into `build_firmware.sh` as step "1b"
-  (skipped cleanly if no host C compiler is present). 8 assertions:
+  (skipped cleanly if no host C compiler is present). 9 assertions:
   `MLX90640_SynchFrame` / `MLX90640_GetFrameData` on a stuck bus return
   the bounded-poll `DATA_READY_TIMEOUT_ERROR` after a bounded number of
   reads (never spin), a real I2C NACK mid-poll is surfaced as itself,
   the happy path returns a subpage number, a `0x7FFF` frame word is
   rejected as `FRAME_DATA_ERROR`, `MLX90640_DumpEE` pulls the full
-  832-word window, and `MLX90640_GetSubPageNumber` is a pure accessor.
-  Verified compiling and passing under `gcc 14.2 -std=c11 -Wall
-  -Wextra`.
-- Noted while writing the above (not fixed here): the vendor
-  `MLX90640_ExtractParameters` maths still has unbounded
-  `while (temp < K)` normalisation loops that never terminate on a
-  degenerate/corrupt EEPROM dump - the same hang class the polling code
-  was already hardened against. A corrupt `DumpEE` at sensor bring-up
-  would hang the F303 there. Bounding it safely needs the physical
-  MLX9064x head plus Melexis reference vectors to confirm the maths is
-  unchanged, so it is left for on-target firmware validation.
+  832-word window, `MLX90640_GetSubPageNumber` is a pure accessor, and
+  `MLX90640_ExtractParameters` on an all-zero EEPROM RETURNS a defined
+  bad-pixel error instead of hanging. Verified compiling and passing
+  under `gcc 14.2 -std=c11 -Wall -Wextra` and re-run through the full
+  `arm-none-eabi-gcc` firmware build.
+- **`MLX90640_ExtractParameters` no longer hangs on a degenerate EEPROM
+  dump.** The vendor scale-normalisation loops
+  (`while (temp < K) { temp *= 2; scale++; }` in
+  `ExtractAlphaParameters` / `ExtractKtaPixelParameters` /
+  `ExtractKvPixelParameters`) never terminated when `temp` was exactly
+  `0` - every value in a corrupt or unpopulated `DumpEE` reads as `0`,
+  and `0 * 2` stays `0` below the threshold forever, so a bad read at
+  sensor bring-up hung the F303 the same way the data-ready polling used
+  to. New `MLX90640_SCALE_ITER_MAX` (64) caps each loop far past any
+  real calibration EEPROM's own convergence (well under 20 steps), so
+  the maths is byte-identical for a real sensor; a garbage dump now
+  falls through with zeroed params and `ExtractDeviatingPixels` (run
+  last) still returns the honest `-MLX90640_BROKEN_PIXELS_NUM_ERROR`.
+  On-target thermal-accuracy validation against a real MLX9064x head is
+  still pending hardware, but the maths for a valid dump is unchanged by
+  construction (the cap is never reached).
 - **`build_firmware.sh`** - the manifest regeneration step (step 8,
   `firmware_manifest.json`) was skipped whenever `HYDRA_UMC_CI=1` (the
   mode `tools/build_test.py` always runs under), but the earlier cleanup

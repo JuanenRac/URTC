@@ -970,7 +970,7 @@ static void ExtractAlphaParameters(uint16_t *eeData, paramsMLX90640 *mlx90640)
     }
     
     alphaScale = 0;
-    while(temp < 32767.4)
+    while(temp < 32767.4 && alphaScale < MLX90640_SCALE_ITER_MAX)  /* iteration cap - see MLX90640_SCALE_ITER_MAX */
     {
         temp = temp*2;
         alphaScale = alphaScale + 1;
@@ -1103,7 +1103,7 @@ static void ExtractKtaPixelParameters(uint16_t *eeData, paramsMLX90640 *mlx90640
     }
     
     ktaScale1 = 0;
-    while(temp < 63.4)
+    while(temp < 63.4 && ktaScale1 < MLX90640_SCALE_ITER_MAX)  /* iteration cap - see MLX90640_SCALE_ITER_MAX */
     {
         temp = temp*2;
         ktaScale1 = ktaScale1 + 1;
@@ -1194,7 +1194,7 @@ static void ExtractKvPixelParameters(uint16_t *eeData, paramsMLX90640 *mlx90640)
     }
     
     kvScale = 0;
-    while(temp < 63.4)
+    while(temp < 63.4 && kvScale < MLX90640_SCALE_ITER_MAX)  /* iteration cap - see MLX90640_SCALE_ITER_MAX */
     {
         temp = temp*2;
         kvScale = kvScale + 1;
