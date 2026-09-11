@@ -13,6 +13,7 @@
 #include "firmware_common.h"
 #include "firmware_can_global.h"
 #include "firmware_expansion_i2c.h"
+#include "firmware_blackbox.h"
 
 void Handle_CAN_GlobalCommands_PreErrorGate(void) {
 
@@ -292,6 +293,18 @@ void Handle_CAN_GlobalCommands_PreErrorGate(void) {
                 uint32_t mb;
                 HAL_CAN_AddTxMessage(&hcan, &txH, txD, &mb);
             }
+        }
+
+        // "Black box" fault-recorder CAN readback (0x1A8 request / 0x1A9
+        // response) - one 32-byte chunk of the flushed record per request,
+        // rxData[0] selects which. Positioned here rather than in a
+        // per-tool handler since a recorded fault can be read back
+        // regardless of which tool is currently active, same reasoning as
+        // the sensor-variant query just above. See
+        // BlackBox_HandleReadbackRequest()'s own doc comment
+        // (firmware_blackbox.c) for the full protocol.
+        if (rxHeader.StdId == 0x1A8 && rxHeader.DLC >= 1) {
+            BlackBox_HandleReadbackRequest(rxData[0]);
         }
 
 }

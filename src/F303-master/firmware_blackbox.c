@@ -22,15 +22,14 @@
 //      depending on the driver's own chunking), not something to do
 //      every 150ms for no reason when nothing is actually wrong.
 //
-// READBACK: not implemented in this pass. A real CAN readback command
-// (paged reads, since ~680 bytes is far more than one 8-byte frame -
-// the natural next free global-command pair is 0x1A8/0x1A9, right after
-// the existing 0x1A6/0x1A7 in firmware_can_global_pre.c) is a real,
-// well-defined follow-up, deliberately left for a separate pass rather
-// than rushed alongside this capture mechanism - the capture itself is
-// independently valuable and inspectable via ST-Link/a F-RAM dump tool
-// even without a CAN command yet, and a chunked-transfer protocol
-// deserves its own focused review, not to ride along here unverified.
+// READBACK: CAN readback (0x1A8 request / 0x1A9 response, wired into
+// firmware_can_global_pre.c right after the existing 0x1A6/0x1A7 sensor-
+// variant query) - see BlackBox_HandleReadbackRequest()'s own doc comment
+// below for the chunked-transfer protocol. The capture mechanism above
+// stays independently valuable and inspectable via ST-Link/a F-RAM dump
+// tool even without this, and remains unchanged by it - the readback is a
+// pure export path, it never mutates the ring buffer or the flushed
+// record.
 // =============================================================================
 #include "firmware_common.h"
 #include "firmware_blackbox.h"
@@ -97,4 +96,58 @@ void BlackBox_Sample(void) {
         already_flushed_for_this_fault = 0; // re-armed for the next real fault, if system_error_flag is ever cleared (most set-sites in this firmware are one-way today, but this doesn't assume that stays true forever)
     }
     prev_error_flag = system_error_flag;
+}
+
+// 32-byte chunks answered as 4 consecutive 8-byte CAN frames on the
+// response ID, concatenated in the order sent - the exact same convention
+// firmware_can_thermalinspection.c's own SendChunkFrames() already
+// established for its own oversized (32-byte) MLX9064x pixel chunks. Kept
+// as its own small copy here rather than exporting that static function,
+// same reasoning as this file's own BlackBox_Checksum() above.
+#define BLACKBOX_CHUNK_BYTES 32
+// Integer constant expression (sizeof is compile-time), so this is a real
+// compile-time bound, not a runtime computation - ceil(678 / 32) = 22 for
+// the current BlackBoxRecord_t.
+enum { BLACKBOX_CHUNK_COUNT = (sizeof(BlackBoxRecord_t) + BLACKBOX_CHUNK_BYTES - 1) / BLACKBOX_CHUNK_BYTES };
+
+static void BlackBox_SendChunkFrames(const uint8_t *data32) {
+    for (uint8_t frame = 0; frame < 4; frame++) {
+        if (HAL_CAN_GetTxMailboxesFreeLevel(&hcan) == 0) return; // stop rather than send an out-of-order remainder if mailboxes run out mid-transfer - a host seeing fewer than 4 frames for this chunk already knows to treat it as incomplete, same as it would a dropped CAN frame from any other cause
+        CAN_TxHeaderTypeDef txH;
+        txH.StdId = 0x1A9;
+        txH.IDE = CAN_ID_STD;
+        txH.RTR = CAN_RTR_DATA;
+        txH.DLC = 8;
+        txH.TransmitGlobalTime = DISABLE;
+        uint32_t mb;
+        HAL_CAN_AddTxMessage(&hcan, &txH, (uint8_t *)&data32[frame * 8], &mb);
+    }
+}
+
+// Answers one 32-byte slice of the flushed BlackBoxRecord_t sitting in
+// F-RAM at BLACKBOX_FRAM_ADDR - a raw, byte-for-byte export, not a
+// validated read: this firmware does no magic/checksum/version check on
+// the way out, exactly like reading the F-RAM chip directly with an
+// external tool would give you. A host reconstructs BlackBoxRecord_t from
+// the concatenated chunks itself and is free to validate `magic` and
+// `checksum` (BlackBox_Checksum's own CRC-8/SMBUS, same algorithm) before
+// trusting the samples.
+//
+// [chunk_index] out of BLACKBOX_CHUNK_COUNT range, or the F-RAM read
+// itself failing (chip missing/unresponsive), both mean no response at
+// all - a host can't tell "no fault ever flushed yet" apart from "F-RAM
+// hardware fault" from silence alone, but a dedicated status query isn't
+// worth adding for a diagnostic-only command already independently
+// verifiable via a direct F-RAM dump (see this file's own header
+// comment). The last chunk is short (678 bytes is not a multiple of 32);
+// the unused tail of `chunk` is left zeroed rather than reading past the
+// record into whatever F-RAM holds next.
+void BlackBox_HandleReadbackRequest(uint8_t chunk_index) {
+    if (chunk_index >= BLACKBOX_CHUNK_COUNT) return;
+    uint8_t chunk[BLACKBOX_CHUNK_BYTES] = {0};
+    uint16_t offset = (uint16_t)chunk_index * BLACKBOX_CHUNK_BYTES;
+    uint16_t remaining = (uint16_t)sizeof(BlackBoxRecord_t) - offset;
+    uint16_t real_bytes = remaining < BLACKBOX_CHUNK_BYTES ? remaining : BLACKBOX_CHUNK_BYTES;
+    if (!FRAM_ReadBytes(BLACKBOX_FRAM_ADDR + offset, chunk, real_bytes)) return;
+    BlackBox_SendChunkFrames(chunk);
 }
