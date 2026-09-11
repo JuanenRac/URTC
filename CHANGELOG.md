@@ -1,7 +1,25 @@
 # Changelog - URTC (repo-wide index)
 
-## [Unreleased]
+## [0.3.0] - Black-box CAN readback, MLX9064x host tests, and a hang fixed
 
+- **Black-box fault-recorder CAN readback** (`firmware_blackbox.c`,
+  `firmware_can_global_pre.c`) - the F-RAM capture mechanism itself
+  (last ~10s of samples before a fault, flushed once per fault
+  occurrence) shipped earlier with readback deliberately left for a
+  separate pass. New global command pair `0x1A8` (request) / `0x1A9`
+  (response), right after the existing `0x1A6`/`0x1A7` sensor-variant
+  query: `rxData[0]` selects a 32-byte chunk (22 chunks cover the full
+  ~678-byte record), answered as 4 consecutive 8-byte CAN frames on
+  `0x1A9` - the exact same chunked-transfer convention
+  `firmware_can_thermalinspection.c`'s own `SendChunkFrames()` already
+  established for its oversized MLX9064x pixel chunks. A pure, raw
+  export: no magic/checksum validation on the way out (a host
+  reconstructs `BlackBoxRecord_t` from the concatenated chunks and
+  validates it itself), and it never mutates the ring buffer or the
+  flushed record. An out-of-range chunk index or a failed F-RAM read
+  both mean silence, same as an unconfigured-sensor chunk request
+  elsewhere in this firmware. Verified with a real `arm-none-eabi-gcc`
+  build (master target, 17/17 steps passed).
 - **Host logic tests for the MLX9064x sensor API** (new `tests/`). The
   Melexis `MLX90640_API.c` is portable C (it includes `<math.h>` and the
   I2C driver header, never the STM32 HAL), so this project's own
