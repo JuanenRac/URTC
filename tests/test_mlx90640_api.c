@@ -93,20 +93,32 @@ void run_mlx90640_api_tests(int *failures)
     TEST_ASSERT(ee[0] == 0xBEEF && ee[MLX90640_EEPROM_DUMP_NUM - 1] == 0xBEEF,
                 "DumpEE copied the full 832-word window");
 
-    // NOTE (not a test): MLX90640_ExtractParameters() is deliberately NOT
-    // exercised with pathological EEPROM here. Unlike SynchFrame /
-    // GetFrameData, the vendor parameter-extraction math still contains
-    // unbounded normalisation loops (`while (temp < 32767.4)` /
-    // `while (temp < 63.4)` in the Extract*Parameters helpers) that never
-    // terminate when fed degenerate input such as an all-zero dump - a
-    // corrupt DumpEE at sensor bring-up would hang the F303 the same way
-    // the polling loops used to. Bounding those safely needs the physical
-    // MLX9064x head plus Melexis reference vectors to check the maths did
-    // not change - tracked as firmware hardware-validation work, not fixed
-    // blind here.
+    // 8. MLX90640_ExtractParameters() on an all-zero EEPROM: every pixel
+    //    word reads as 0, so ExtractDeviatingPixels() (run last) returns a
+    //    defined bad-pixel error. The point of this test is that it
+    //    RETURNS - the Extract*Parameters scale-normalisation loops
+    //    (`while (temp < K) { temp *= 2; }`) used to spin forever on
+    //    temp == 0; MLX90640_SCALE_ITER_MAX now bounds them. If this test
+    //    hangs, that cap regressed.
+    {
+        static uint16_t eeZero[MLX90640_EEPROM_DUMP_NUM];
+        static paramsMLX90640 p0;
+        memset(eeZero, 0, sizeof(eeZero));
+        memset(&p0, 0, sizeof(p0));
+        int erc = MLX90640_ExtractParameters(eeZero, &p0);
+        TEST_ASSERT(erc < 0,
+                    "ExtractParameters flags an all-zero EEPROM as an error, not success");
+        TEST_ASSERT(erc == -MLX90640_BROKEN_PIXELS_NUM_ERROR
+                 || erc == -MLX90640_OUTLIER_PIXELS_NUM_ERROR
+                 || erc == -MLX90640_BAD_PIXELS_NUM_ERROR
+                 || erc == -MLX90640_ADJACENT_BAD_PIXELS_ERROR,
+                    "ExtractParameters returns a defined bad-pixel error code");
+        TEST_ASSERT(p0.alphaScale <= MLX90640_SCALE_ITER_MAX,
+                    "the alpha-scale normalisation loop is bounded, not infinite");
+    }
     (void)params;
 
-    // 8. MLX90640_GetSubPageNumber is a pure accessor for frameData[833].
+    // 9. MLX90640_GetSubPageNumber is a pure accessor for frameData[833].
     memset(frame, 0, sizeof(frame));
     frame[833] = 1;
     TEST_ASSERT(MLX90640_GetSubPageNumber(frame) == 1,
