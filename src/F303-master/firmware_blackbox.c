@@ -3,7 +3,7 @@
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
 // GPL-3.0 - see LICENSE
 //
-// Audit idea: "Implementar un sistema de Black Box en la F-RAM para
+// Planned feature: "Implementar un sistema de Black Box en la F-RAM para
 // registrar los últimos 10s antes de un error". A continuously-updated RAM
 // ring buffer (BLACKBOX_SAMPLES x ~150ms =~ 10s, matching the idea's own
 // number rather than a round one picked arbitrarily), flushed to F-RAM

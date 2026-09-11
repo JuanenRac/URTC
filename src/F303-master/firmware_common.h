@@ -382,7 +382,7 @@ typedef struct __attribute__((packed)) {
 #define SAVEDSTATE_FRAM_ADDR 0 // lives at the very start of the F-RAM - nothing else uses this chip yet
 
 // -----------------------------------------------------------------------
-// "Black box" fault recorder (audit idea: "sistema de Black Box en la
+// "Black box" fault recorder (planned: "sistema de Black Box en la
 // F-RAM para registrar los últimos 10s antes de un error") - a small continuously-
 // updated RAM ring buffer, flushed to F-RAM ONLY on the rising edge of
 // system_error_flag (see firmware_blackbox.c), not written every tick -
@@ -398,7 +398,7 @@ typedef struct __attribute__((packed)) {
     uint8_t  flags;              // bit0 endstop_triggered, bit1 system_error_flag (the sample where THIS is first set is the fault trigger itself)
 } BlackBoxSample_t; // 10 bytes
 
-// ~150ms x 67 samples =~ 10.0s, matching the audit idea's own "last 10s"
+// ~150ms x 67 samples =~ 10.0s, matching the requested "last 10s"
 // literally rather than a round number picked for its own sake.
 #define BLACKBOX_SAMPLES 67
 

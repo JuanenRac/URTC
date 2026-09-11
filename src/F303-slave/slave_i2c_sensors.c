@@ -451,8 +451,7 @@ static volatile uint8_t mlx_capture_requested = 0;
 
 void MLX_TriggerCapture(void) {
     if (mlx_sensor_variant == MLX_VARIANT_90640 || mlx_sensor_variant == MLX_VARIANT_90641) {
-        // V07-020 (found in an ecosystem-wide software-improvements
-        // audit): this used to call MLX90640_DoTriggerCapture/
+        // V07-020: this used to call MLX90640_DoTriggerCapture/
         // MLX90641_DoTriggerCapture() directly, right here - but this
         // function is itself called from HAL_I2C_SlaveRxCpltCallback
         // (slave_i2c_link.c), the I2C1 slave link's own ISR context.
