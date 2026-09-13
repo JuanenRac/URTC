@@ -2,7 +2,7 @@
   <img src="images/URTC_LOGO.svg" alt="URTC Logo" width="100%">
 </p>
 
-# 🚀 URTC — Universal Robot Tool Controller (v0.2)
+# 🚀 URTC — Universal Robot Tool Controller (v0.3)
 
 <p align="center">
   <a href="README.md">🇺🇸 English</a> |
@@ -272,7 +272,7 @@ La flash di URTC è divisa in due parti indipendenti, così la scheda può esser
            │                                   │  prima di saltare mai all'app.
 0x08008000 ├─────────────────────────────────┤
            │  Slot principale (112K)           │  Questo è il firmware applicativo /
-           │                                   │  URTC_MAIN_FIRMWARE_v0.2.9.* — il firmware
+           │                                   │  URTC_MAIN_FIRMWARE_v0.3.0.* — il firmware
            │                                   │  vero e proprio che gira giorno per giorno,
            │                                   │  descritto ovunque altrove in
            │                                   │  questo README. Mai toccato da
@@ -304,7 +304,7 @@ Il bootloader può arrivare sul chip solo tramite programmazione fisica - non c'
 1. Apri il progetto in **STM32CubeIDE** (compilato e testato contro il target STM32F303CC), o usa **STM32CubeProgrammer** direttamente con gli output compilati sotto.
 2. Flasha **entrambe** le immagini via SWD (ST-Link) tramite l'header integrato `STM_JTAG` - ogni file `.hex` ha il proprio indirizzo di destinazione incorporato, così la maggior parte degli strumenti (incluso STM32CubeProgrammer) può caricare entrambi nella stessa sessione:
    * `URTC_MAIN_BOOTLOADER_v0.3.6.hex` → `0x08000000`
-   * `URTC_MAIN_FIRMWARE_v0.2.9.hex` → `0x08008000`
+   * `URTC_MAIN_FIRMWARE_v0.3.0.hex` → `0x08008000`
 3. Imposta l'identità dello strumento tramite i jumper di saldatura ID prima di accendere - la scheda li legge una volta all'avvio, come sempre. Cinque jumper (ID0-ID4), che coprono l'intero spazio di 32 indirizzi (31 indirizzi diretti per strumento, più l'indirizzo riservato `11111` di configurazione libera - vedi la sezione Matrice degli Strumenti sopra).
 4. Accendi. Il bootloader ascolta per ~600ms, non vede nulla, e salta direttamente nell'applicazione - da qui in avanti, tutto si comporta esattamente come descritto nel resto di questo README.
 
@@ -482,9 +482,9 @@ Se qualcuno nella community sta lavorando su end-effector personalizzati, cambia
 │   ├── URTC_MAIN_BOOTLOADER_v0.3.6.bin  Bootloader compilato, flash a 0x08000000
 │   ├── URTC_MAIN_BOOTLOADER_v0.3.6.elf  Bootloader compilato, flash a 0x08000000
 │   ├── URTC_MAIN_BOOTLOADER_v0.3.6.hex  Bootloader compilato, flash a 0x08000000 (indirizzo incorporato)
-│   ├── URTC_MAIN_FIRMWARE_v0.2.9.bin    Bin applicazione compilato, flash a 0x08008000
-│   ├── URTC_MAIN_FIRMWARE_v0.2.9.elf    Elf applicazione compilato, flash a 0x08008000
-│   ├── URTC_MAIN_FIRMWARE_v0.2.9.hex    HEX applicazione compilato, flash a 0x08008000 (indirizzo incorporato)
+│   ├── URTC_MAIN_FIRMWARE_v0.3.0.bin    Bin applicazione compilato, flash a 0x08008000
+│   ├── URTC_MAIN_FIRMWARE_v0.3.0.elf    Elf applicazione compilato, flash a 0x08008000
+│   ├── URTC_MAIN_FIRMWARE_v0.3.0.hex    HEX applicazione compilato, flash a 0x08008000 (indirizzo incorporato)
 │   ├── URTC_SLAVE_BOOTLOADER_v0.1.9.{bin,elf,hex}  Bootloader proprio dello slave di espansione, flash a 0x08000000
 │   │                             sull'STM32F303CBT6 (solo schede di espansione advanced)
 │   ├── URTC_SLAVE_FIRMWARE_v0.1.6.{bin,elf,hex}  Applicazione propria dello slave di espansione, flash a 0x08005000
