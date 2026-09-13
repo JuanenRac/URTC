@@ -2,7 +2,7 @@
   <img src="images/URTC_LOGO.svg" alt="URTC Logo" width="100%">
 </p>
 
-# 🚀 URTC — Universal Robot Tool Controller (v0.2)
+# 🚀 URTC — Universal Robot Tool Controller (v0.3)
 
 <p align="center">
   <a href="README.md">🇺🇸 English</a> |
@@ -276,7 +276,7 @@ Le flash d'URTC est divisé en deux parties indépendantes, de sorte que la cart
            │                                   │  l'application.
 0x08008000 ├─────────────────────────────────┤
            │  Slot principal (112K)            │  C'est le firmware applicatif /
-           │                                   │  URTC_MAIN_FIRMWARE_v0.2.9.* — le
+           │                                   │  URTC_MAIN_FIRMWARE_v0.3.0.* — le
            │                                   │  firmware réel qui tourne au
            │                                   │  quotidien, décrit partout
            │                                   │  ailleurs dans ce README. Jamais
@@ -309,7 +309,7 @@ Le bootloader ne peut arriver sur la puce que via une programmation physique —
 1. Ouvrez le projet dans **STM32CubeIDE** (construit et testé contre la cible STM32F303CC), ou utilisez **STM32CubeProgrammer** directement avec les sorties compilées ci-dessous.
 2. Flashez **les deux** images via SWD (ST-Link) via le connecteur `STM_JTAG` embarqué — chaque fichier `.hex` contient son adresse cible intégrée, donc la plupart des outils (y compris STM32CubeProgrammer) peuvent charger les deux dans la même session :
    * `URTC_MAIN_BOOTLOADER_v0.3.6.hex` → `0x08000000`
-   * `URTC_MAIN_FIRMWARE_v0.2.9.hex` → `0x08008000`
+   * `URTC_MAIN_FIRMWARE_v0.3.0.hex` → `0x08008000`
 3. Réglez l'identité de l'outil via les cavaliers à souder d'ID avant la mise sous tension — la carte les lit une fois au démarrage, comme toujours. Cinq cavaliers (ID0-ID4), couvrant l'espace complet de 32 adresses (31 adresses d'outils directes, plus l'adresse de configuration libre réservée `11111` - voir la section Matrice d'outils ci-dessus).
 4. Mise sous tension. Le bootloader écoute pendant ~600ms, ne voit rien, et saute directement dans l'application — à partir de là, tout se comporte exactement comme décrit dans le reste de ce README.
 
@@ -499,9 +499,9 @@ Si quelqu'un dans la communauté travaille sur des effecteurs terminaux personna
 │   ├── URTC_MAIN_BOOTLOADER_v0.3.6.bin  Bootloader compilé, à flasher à 0x08000000
 │   ├── URTC_MAIN_BOOTLOADER_v0.3.6.elf  Bootloader compilé, à flasher à 0x08000000
 │   ├── URTC_MAIN_BOOTLOADER_v0.3.6.hex  Bootloader compilé, à flasher à 0x08000000 (adresse intégrée)
-│   ├── URTC_MAIN_FIRMWARE_v0.2.9.bin    Bin d'application compilé, à flasher à 0x08008000
-│   ├── URTC_MAIN_FIRMWARE_v0.2.9.elf    Elf d'application compilé, à flasher à 0x08008000
-│   ├── URTC_MAIN_FIRMWARE_v0.2.9.hex    HEX d'application compilé, à flasher à 0x08008000 (adresse intégrée)
+│   ├── URTC_MAIN_FIRMWARE_v0.3.0.bin    Bin d'application compilé, à flasher à 0x08008000
+│   ├── URTC_MAIN_FIRMWARE_v0.3.0.elf    Elf d'application compilé, à flasher à 0x08008000
+│   ├── URTC_MAIN_FIRMWARE_v0.3.0.hex    HEX d'application compilé, à flasher à 0x08008000 (adresse intégrée)
 │   ├── URTC_SLAVE_BOOTLOADER_v0.1.9.{bin,elf,hex}  Bootloader propre à l'esclave d'extension, à flasher à 0x08000000
 │   │                             sur le STM32F303CBT6 (cartes d'extension avancées uniquement)
 │   ├── URTC_SLAVE_FIRMWARE_v0.1.6.{bin,elf,hex}  Application propre à l'esclave d'extension, à flasher à 0x08005000

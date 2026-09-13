@@ -2,7 +2,7 @@
   <img src="images/URTC_LOGO.svg" alt="URTC Logo" width="100%">
 </p>
 
-# 🚀 URTC — Universal Robot Tool Controller (v0.2)
+# 🚀 URTC — Universal Robot Tool Controller (v0.3)
 
 <p align="center">
   <a href="README.md">🇺🇸 English</a> |
@@ -274,7 +274,7 @@ Der Flash von URTC ist in zwei unabhängige Teile aufgeteilt, sodass die Platine
            │                                   │  springt.
 0x08008000 ├─────────────────────────────────┤
            │  Hauptslot (112K)                 │  Dies ist die Anwendungs-Firmware /
-           │                                   │  URTC_MAIN_FIRMWARE_v0.2.9.* — die
+           │                                   │  URTC_MAIN_FIRMWARE_v0.3.0.* — die
            │                                   │  eigentliche Firmware, die
            │                                   │  Tag für Tag läuft, beschrieben
            │                                   │  überall sonst in diesem README.
@@ -307,7 +307,7 @@ Der Bootloader kann nur über physische Programmierung auf den Chip gelangen —
 1. Öffnen Sie das Projekt in **STM32CubeIDE** (gebaut und getestet gegen das STM32F303CC-Ziel), oder verwenden Sie **STM32CubeProgrammer** direkt mit den unten kompilierten Ausgaben.
 2. Flashen Sie **beide** Images über SWD (ST-Link) via den integrierten `STM_JTAG`-Header — jede `.hex`-Datei hat ihre Zieladresse eingebettet, sodass die meisten Tools (einschließlich STM32CubeProgrammer) beide in derselben Sitzung laden können:
    * `URTC_MAIN_BOOTLOADER_v0.3.6.hex` → `0x08000000`
-   * `URTC_MAIN_FIRMWARE_v0.2.9.hex` → `0x08008000`
+   * `URTC_MAIN_FIRMWARE_v0.3.0.hex` → `0x08008000`
 3. Setzen Sie die Werkzeugidentität über die ID-Lötbrücken, bevor Sie einschalten — die Platine liest sie beim Boot einmal, wie immer. Fünf Jumper (ID0-ID4), die den vollen 32-Adress-Raum abdecken (31 direkte Werkzeugadressen, plus die reservierte `11111`-Adresse für freie Konfiguration - siehe den Abschnitt Werkzeugmatrix oben).
 4. Schalten Sie ein. Der Bootloader lauscht ~600ms, sieht nichts, und springt direkt in die Anwendung — von hier an verhält sich alles genau so, wie im Rest dieses READMEs beschrieben.
 
@@ -476,9 +476,9 @@ Falls jemand in der Community an benutzerdefinierten Endeffektoren, intelligente
 │   ├── URTC_MAIN_BOOTLOADER_v0.3.6.bin  Bootloader kompiliert, flashen auf 0x08000000
 │   ├── URTC_MAIN_BOOTLOADER_v0.3.6.elf  Bootloader kompiliert, flashen auf 0x08000000
 │   ├── URTC_MAIN_BOOTLOADER_v0.3.6.hex  Bootloader kompiliert, flashen auf 0x08000000 (Adresse eingebettet)
-│   ├── URTC_MAIN_FIRMWARE_v0.2.9.bin    Anwendungs-bin kompiliert, flashen auf 0x08008000
-│   ├── URTC_MAIN_FIRMWARE_v0.2.9.elf    Anwendungs-elf kompiliert, flashen auf 0x08008000
-│   ├── URTC_MAIN_FIRMWARE_v0.2.9.hex    Anwendungs-HEX kompiliert, flashen auf 0x08008000 (Adresse eingebettet)
+│   ├── URTC_MAIN_FIRMWARE_v0.3.0.bin    Anwendungs-bin kompiliert, flashen auf 0x08008000
+│   ├── URTC_MAIN_FIRMWARE_v0.3.0.elf    Anwendungs-elf kompiliert, flashen auf 0x08008000
+│   ├── URTC_MAIN_FIRMWARE_v0.3.0.hex    Anwendungs-HEX kompiliert, flashen auf 0x08008000 (Adresse eingebettet)
 │   ├── URTC_SLAVE_BOOTLOADER_v0.1.9.{bin,elf,hex}  Eigener Bootloader des Erweiterungs-Slave, flashen auf 0x08000000
 │   │                             auf dem STM32F303CBT6 (nur advanced-Erweiterungsplatinen)
 │   ├── URTC_SLAVE_FIRMWARE_v0.1.6.{bin,elf,hex}  Eigene Anwendung des Erweiterungs-Slave, flashen auf 0x08005000

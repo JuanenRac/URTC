@@ -2,7 +2,7 @@
   <img src="images/URTC_LOGO.svg" alt="URTC Logo" width="100%">
 </p>
 
-# 🚀 URTC — Universal Robot Tool Controller（v0.2）
+# 🚀 URTC — Universal Robot Tool Controller（v0.3）
 
 <p align="center">
   <a href="README.md">🇺🇸 English</a> |
@@ -274,7 +274,7 @@ URTC のフラッシュは 2 つの独立した部分に分割されているた
 0x08008000 ├─────────────────────────────────┤
            │  メインスロット（112K）            │  これはアプリケーション
            │                                   │  ファームウェア /
-           │                                   │  URTC_MAIN_FIRMWARE_v0.2.9.* ——
+           │                                   │  URTC_MAIN_FIRMWARE_v0.3.0.* ——
            │                                   │  日々実行される実際の
            │                                   │  ファームウェアで、本
            │                                   │  README の他の場所で
@@ -309,7 +309,7 @@ URTC のフラッシュは 2 つの独立した部分に分割されているた
 1. **STM32CubeIDE**（STM32F303CC ターゲットに対してビルド・テスト済み）でプロジェクトを開くか、下記のコンパイル済み出力を使って **STM32CubeProgrammer** を直接使用します。
 2. 板載の `STM_JTAG` ヘッダー経由で、SWD（ST-Link）で**両方の**イメージを書き込みます——各 `.hex` ファイルにはターゲットアドレスが焼き込まれているため、（STM32CubeProgrammer を含む）ほとんどのツールは同じセッションで両方を読み込めます：
    * `URTC_MAIN_BOOTLOADER_v0.3.6.hex` → `0x08000000`
-   * `URTC_MAIN_FIRMWARE_v0.2.9.hex` → `0x08008000`
+   * `URTC_MAIN_FIRMWARE_v0.3.0.hex` → `0x08008000`
 3. 電源を入れる前に、ID はんだジャンパーでツールの識別情報を設定します——ボードは起動時に一度だけそれを読み取ります、いつもどおりです。5 つのジャンパー（ID0-ID4）で、完全な 32 アドレス空間をカバーします（31 の直接ツールアドレスに加え、予約された `11111` のフリー構成アドレス——上記のツールマトリクスの節を参照）。
 4. 電源を入れます。ブートローダーは約 600ms リッスンし、何も見つからず、直接アプリケーションへジャンプします——ここから先は、すべてが本 README の残りの部分で説明されているとおりに動作します。
 
@@ -484,9 +484,9 @@ URTC のフラッシュは 2 つの独立した部分に分割されているた
 │   ├── URTC_MAIN_BOOTLOADER_v0.3.6.bin  ブートローダーコンパイル済み、0x08000000 へフラッシュ
 │   ├── URTC_MAIN_BOOTLOADER_v0.3.6.elf  ブートローダーコンパイル済み、0x08000000 へフラッシュ
 │   ├── URTC_MAIN_BOOTLOADER_v0.3.6.hex  ブートローダーコンパイル済み、0x08000000 へフラッシュ（アドレス焼き込み済み）
-│   ├── URTC_MAIN_FIRMWARE_v0.2.9.bin    アプリケーション bin コンパイル済み、0x08008000 へフラッシュ
-│   ├── URTC_MAIN_FIRMWARE_v0.2.9.elf    アプリケーション elf コンパイル済み、0x08008000 へフラッシュ
-│   ├── URTC_MAIN_FIRMWARE_v0.2.9.hex    アプリケーション HEX コンパイル済み、0x08008000 へフラッシュ（アドレス焼き込み済み）
+│   ├── URTC_MAIN_FIRMWARE_v0.3.0.bin    アプリケーション bin コンパイル済み、0x08008000 へフラッシュ
+│   ├── URTC_MAIN_FIRMWARE_v0.3.0.elf    アプリケーション elf コンパイル済み、0x08008000 へフラッシュ
+│   ├── URTC_MAIN_FIRMWARE_v0.3.0.hex    アプリケーション HEX コンパイル済み、0x08008000 へフラッシュ（アドレス焼き込み済み）
 │   ├── URTC_SLAVE_BOOTLOADER_v0.1.9.{bin,elf,hex}  拡張スレーブ自身のブートローダー、
 │   │                             STM32F303CBT6 上の 0x08000000 へフラッシュ（アドバンスド拡張ボードのみ）
 │   ├── URTC_SLAVE_FIRMWARE_v0.1.6.{bin,elf,hex}  拡張スレーブ自身のアプリケーション、0x08005000 へフラッシュ

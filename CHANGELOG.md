@@ -66,6 +66,16 @@
   manifest now regenerates correctly under `HYDRA_UMC_CI=1`, and the
   4 real firmware/bootloader binaries rebuild with consistent, plausible
   sizes (no corruption reproduced in this pass).
+- README (all 7 languages) still titled itself "(v0.2)" and referenced
+  `URTC_MAIN_FIRMWARE_v0.2.9.*` in its flashing walkthrough - both stale
+  against this same `[0.3.0]` release. Corrected to "(v0.3)" and
+  `URTC_MAIN_FIRMWARE_v0.3.0.*`, matching `firmware_common.h`'s own
+  real `FIRMWARE_VERSION_MAJOR/MINOR/PATCH` and this project's own
+  manifest. A real build-test confirmed the actual current filename
+  (`URTC_MAIN_FIRMWARE_v0.3.0.bin`, produced by a live
+  `arm-none-eabi-gcc` build) before this doc fix; the freshly rebuilt
+  binaries themselves were discarded afterward rather than committed,
+  since regenerating them was never this fix's own goal.
 
 ## [0.2.9] - Removed dangling references to private tracking documents (DOC-52)
 
