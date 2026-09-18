@@ -96,7 +96,7 @@
   binaries themselves were discarded afterward rather than committed,
   since regenerating them was never this fix's own goal.
 
-## [0.2.9] - Removed dangling references to private tracking documents (DOC-52)
+## [0.2.9] - Removed dangling references to private tracking documents
 
 Found while auditing the code: `VERSION_CHECKLIST.txt`,
 `check_version_consistency.sh` and `src/F303-master/firmware_can_electromagnet.c`
