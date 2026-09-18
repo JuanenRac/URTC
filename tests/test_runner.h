@@ -24,5 +24,8 @@
     } while (0)
 
 void run_mlx90640_api_tests(int *failures);
+// firmware_can_dispatch_routing.c is likewise pure C, no STM32 HAL - see
+// tests/test_can_dispatch_routing.c and that file's own header comment.
+void run_can_dispatch_routing_tests(int *failures);
 
 #endif // TEST_RUNNER_H
