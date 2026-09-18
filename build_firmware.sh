@@ -148,6 +148,26 @@ else
         fail "MLX90640_API host logic tests FAILED"
         echo ""; echo "$PASS passed, $WARN warnings, $FAIL failed"; exit 1
     fi
+
+    # firmware_can_dispatch_routing.c is likewise pure C, no STM32 HAL -
+    # see that file's own header comment and tests/test_can_dispatch_routing.c.
+    DISPATCH_SRC="$ROOT/src/F303-master"
+    DISPATCH_HOST_BIN="$BUILD/host_tests_can_dispatch_routing"
+    if "$HOST_CC" -std=c11 -Wall -Wextra -Wno-unused-parameter \
+        -I"$ROOT/tests" -I"$DISPATCH_SRC" -o "$DISPATCH_HOST_BIN" \
+        "$ROOT/tests/test_can_dispatch_routing.c" \
+        "$DISPATCH_SRC/firmware_can_dispatch_routing.c"; then
+        pass "CAN dispatch routing host test suite compiled ($HOST_CC -std=c11 -Wall -Wextra)"
+    else
+        fail "CAN dispatch routing host test suite failed to compile"
+        echo ""; echo "$PASS passed, $WARN warnings, $FAIL failed"; exit 1
+    fi
+    if "$DISPATCH_HOST_BIN"; then
+        pass "CAN dispatch routing host logic tests passed"
+    else
+        fail "CAN dispatch routing host logic tests FAILED"
+        echo ""; echo "$PASS passed, $WARN warnings, $FAIL failed"; exit 1
+    fi
 fi
 
 # -----------------------------------------------------------------------

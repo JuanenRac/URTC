@@ -1,5 +1,24 @@
 # Changelog - URTC (repo-wide index)
 
+## [0.3.1] - Real host-native test harness for the general CAN dispatch table
+
+- **`firmware_can_dispatch_routing.c/.h`** (new) - the tool-ID -> handler
+  routing decision from `firmware_can_dispatch.c`'s own `HAL_CAN_RxFifo0MsgPendingCallback`
+  switch, extracted into a pure, HAL-free function. `tests/` previously
+  covered the MLX90640 sensor API on host but nothing exercised this
+  routing table at all - a mistake in it (a tool silently routed to the
+  wrong handler) had nothing to catch it before it reached real hardware.
+  `firmware_can_dispatch.c`'s own switch is unchanged behavior, just
+  restructured to call through this table; a `_Static_assert` block keeps
+  the pure table's hardcoded tool-ID literals honest against the real
+  `ToolMode_t` enum, failing the real on-target build loudly if they ever
+  drift.
+- **`tests/test_can_dispatch_routing.c`** (new) - drives every real
+  `ToolMode_t` value (0-25) plus deliberately-unassigned IDs (26-31)
+  against the extracted table on host `gcc`, no F303 board needed. Wired
+  into `build_firmware.sh`'s existing host-test step alongside the
+  MLX90640 suite.
+
 ## [0.3.0] - Black-box CAN readback, MLX9064x host tests, and a hang fixed
 
 - **Black-box fault-recorder CAN readback** (`firmware_blackbox.c`,

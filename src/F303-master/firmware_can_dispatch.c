@@ -35,6 +35,41 @@
 #include "firmware_can_pastejetting.h"
 #include "firmware_can_flyingprobe.h"
 #include "firmware_can_thermalinspection.h"
+#include "firmware_can_dispatch_routing.h"
+
+// Keeps firmware_can_dispatch_routing.c's own hardcoded tool-ID literals
+// (deliberately NOT #include-ing this file's ToolMode_t, to stay HAL-free
+// and host-testable - see that file's own header comment) honest against
+// this real enum. A future edit to ToolMode_t's numeric values that
+// silently drifts from those literals fails this real on-target build
+// loudly, rather than leaving tests/test_can_dispatch_routing.c quietly
+// checking numbers that no longer match production.
+_Static_assert(TOOL_SOLDERING_IRON == 0, "firmware_can_dispatch_routing.c's tool-ID literals are out of sync with ToolMode_t");
+_Static_assert(TOOL_PASTE_DISPENSER == 1, "firmware_can_dispatch_routing.c's tool-ID literals are out of sync with ToolMode_t");
+_Static_assert(TOOL_LIQUID_DISPENSER == 2, "firmware_can_dispatch_routing.c's tool-ID literals are out of sync with ToolMode_t");
+_Static_assert(TOOL_SCREWDRIVER == 3, "firmware_can_dispatch_routing.c's tool-ID literals are out of sync with ToolMode_t");
+_Static_assert(TOOL_VACUUM_PICKUP == 4, "firmware_can_dispatch_routing.c's tool-ID literals are out of sync with ToolMode_t");
+_Static_assert(TOOL_DRILL == 5, "firmware_can_dispatch_routing.c's tool-ID literals are out of sync with ToolMode_t");
+_Static_assert(TOOL_GRIPPER_GIMBAL == 6, "firmware_can_dispatch_routing.c's tool-ID literals are out of sync with ToolMode_t");
+_Static_assert(TOOL_GRIPPER_NEMA == 7, "firmware_can_dispatch_routing.c's tool-ID literals are out of sync with ToolMode_t");
+_Static_assert(TOOL_AOI_INSPECTION == 8, "firmware_can_dispatch_routing.c's tool-ID literals are out of sync with ToolMode_t");
+_Static_assert(TOOL_LASER_ENGRAVER == 9, "firmware_can_dispatch_routing.c's tool-ID literals are out of sync with ToolMode_t");
+_Static_assert(TOOL_3D_PRINTER == 10, "firmware_can_dispatch_routing.c's tool-ID literals are out of sync with ToolMode_t");
+_Static_assert(TOOL_SCAN_PROBE == 11, "firmware_can_dispatch_routing.c's tool-ID literals are out of sync with ToolMode_t");
+_Static_assert(TOOL_SMT_PICKPLACE == 12, "firmware_can_dispatch_routing.c's tool-ID literals are out of sync with ToolMode_t");
+_Static_assert(TOOL_ELECTROMAGNET == 13, "firmware_can_dispatch_routing.c's tool-ID literals are out of sync with ToolMode_t");
+_Static_assert(TOOL_SPOT_WELDER == 14, "firmware_can_dispatch_routing.c's tool-ID literals are out of sync with ToolMode_t");
+_Static_assert(TOOL_CONFORMAL_COATING == 15, "firmware_can_dispatch_routing.c's tool-ID literals are out of sync with ToolMode_t");
+_Static_assert(TOOL_VACUUM_GRIPPER_LG == 16, "firmware_can_dispatch_routing.c's tool-ID literals are out of sync with ToolMode_t");
+_Static_assert(TOOL_FLYING_PROBE == 17, "firmware_can_dispatch_routing.c's tool-ID literals are out of sync with ToolMode_t");
+_Static_assert(TOOL_UV_CURING == 18, "firmware_can_dispatch_routing.c's tool-ID literals are out of sync with ToolMode_t");
+_Static_assert(TOOL_HOTAIR_REWORK == 19, "firmware_can_dispatch_routing.c's tool-ID literals are out of sync with ToolMode_t");
+_Static_assert(TOOL_PRESSFIT_INSERTER == 20, "firmware_can_dispatch_routing.c's tool-ID literals are out of sync with ToolMode_t");
+_Static_assert(TOOL_CRIMPING_ACTUATOR == 21, "firmware_can_dispatch_routing.c's tool-ID literals are out of sync with ToolMode_t");
+_Static_assert(TOOL_THERMAL_INSPECTION == 22, "firmware_can_dispatch_routing.c's tool-ID literals are out of sync with ToolMode_t");
+_Static_assert(TOOL_PASTE_JETTING == 23, "firmware_can_dispatch_routing.c's tool-ID literals are out of sync with ToolMode_t");
+_Static_assert(TOOL_ULTRASONIC_WELDER == 24, "firmware_can_dispatch_routing.c's tool-ID literals are out of sync with ToolMode_t");
+_Static_assert(TOOL_INVALID == 25, "firmware_can_dispatch_routing.c's tool-ID literals are out of sync with ToolMode_t");
 
 void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan_m) {
     if (HAL_CAN_GetRxMessage(hcan_m, CAN_RX_FIFO0, &rxHeader, rxData) == HAL_OK) {
@@ -68,8 +103,23 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan_m) {
             return;
         }
 
-        switch (active_tool) {
-            case TOOL_SOLDERING_IRON:
+        // Real tool-ID -> handler routing decision now lives in the pure,
+        // host-tested CanDispatch_RouteForTool() (see
+        // firmware_can_dispatch_routing.c/.h and
+        // tests/test_can_dispatch_routing.c) - this switch only calls the
+        // real, HAL-touching handlers, exactly as before this split.
+        // TOOL_CONFORMAL_COATING (doc #5) and TOOL_PRESSFIT_INSERTER
+        // (doc #11) deliberately have no case here, not an oversight -
+        // both tools' own actuator (spray valve solenoid; press-fit
+        // linear actuator) and sensor (pressure-reached) are
+        // documented as physically "installed in mainboard of robot",
+        // outside this board's own scope entirely. This board's role
+        // for both is limited to identification (the ID jumper reading
+        // already handles that) and status LEDs (handled generically
+        // for every tool via 0x100, not per-tool) - there's no
+        // URTC-side command for either tool to actually respond to.
+        switch (CanDispatch_RouteForTool((uint8_t)active_tool)) {
+            case CAN_ROUTE_SOLDERING_AND_MOTION:
                 Handle_CAN_SolderingIron();
                 Handle_CAN_MotionTools(); // doc #16's own solder-wire-feeder motor,
                                           // sharing CONN_MOT and the 0x120 protocol
@@ -81,62 +131,46 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan_m) {
                                           // both is safe regardless of which ID this
                                           // particular frame actually is
                 break;
-            case TOOL_PASTE_DISPENSER:
-            case TOOL_LIQUID_DISPENSER:
-            case TOOL_SCREWDRIVER:
-            case TOOL_GRIPPER_GIMBAL:
-            case TOOL_GRIPPER_NEMA:
-            case TOOL_SMT_PICKPLACE:     // doc #1 - rotary A-axis, plain NEMA8 stepper
-            case TOOL_VACUUM_GRIPPER_LG: // doc #6 - open/close, plain stepper
+            case CAN_ROUTE_MOTION_ONLY: // doc #1/#6's own plain steppers, and the rest of the shared 0x120 group
                 Handle_CAN_MotionTools();
                 break;
-            case TOOL_DRILL:
+            case CAN_ROUTE_DRILL:
                 Handle_CAN_Drill();
                 break;
-            case TOOL_AOI_INSPECTION:
+            case CAN_ROUTE_AOI:
                 Handle_CAN_AOI();
                 break;
-            case TOOL_LASER_ENGRAVER:
+            case CAN_ROUTE_LASER:
                 Handle_CAN_Laser();
                 break;
-            case TOOL_3D_PRINTER:
+            case CAN_ROUTE_3DPRINTER:
                 Handle_CAN_3DPrinter();
                 break;
-            case TOOL_ELECTROMAGNET:     // doc #3
+            case CAN_ROUTE_ELECTROMAGNET: // doc #3
                 Handle_CAN_Electromagnet();
                 break;
-            case TOOL_UV_CURING:         // doc #8
+            case CAN_ROUTE_UVCURING:      // doc #8
                 Handle_CAN_UVCuring();
                 break;
-            case TOOL_SPOT_WELDER:       // doc #4
-            case TOOL_ULTRASONIC_WELDER: // doc #15
+            case CAN_ROUTE_WELDPULSE:     // doc #4/#15
                 Handle_CAN_WeldPulse();
                 break;
-            case TOOL_HOTAIR_REWORK:     // doc #10
+            case CAN_ROUTE_HOTAIR:        // doc #10
                 Handle_CAN_HotAirRework();
                 break;
-            case TOOL_CRIMPING_ACTUATOR: // doc #12
+            case CAN_ROUTE_CRIMPING:      // doc #12
                 Handle_CAN_CrimpingActuator();
                 break;
-            case TOOL_PASTE_JETTING: // doc #14
+            case CAN_ROUTE_PASTEJETTING:  // doc #14
                 Handle_CAN_PasteJetting();
                 break;
-            case TOOL_FLYING_PROBE: // doc #7
+            case CAN_ROUTE_FLYINGPROBE:   // doc #7
                 Handle_CAN_FlyingProbe();
                 break;
-            case TOOL_THERMAL_INSPECTION: // doc #13
+            case CAN_ROUTE_THERMALINSPECTION: // doc #13
                 Handle_CAN_ThermalInspection();
                 break;
-            // TOOL_CONFORMAL_COATING (doc #5) and TOOL_PRESSFIT_INSERTER
-            // (doc #11) deliberately have no case here, not an oversight -
-            // both tools' own actuator (spray valve solenoid; press-fit
-            // linear actuator) and sensor (pressure-reached) are
-            // documented as physically "installed in mainboard of robot",
-            // outside this board's own scope entirely. This board's role
-            // for both is limited to identification (the ID jumper reading
-            // already handles that) and status LEDs (handled generically
-            // for every tool via 0x100, not per-tool) - there's no
-            // URTC-side command for either tool to actually respond to.
+            case CAN_ROUTE_NONE:
             default:
                 break;
         }
