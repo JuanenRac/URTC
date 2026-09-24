@@ -21,7 +21,8 @@
     "pattern": {
       "major": "#define\\s+FIRMWARE_VERSION_MAJOR\\s+(\\d+)",
       "minor": "#define\\s+FIRMWARE_VERSION_MINOR\\s+(\\d+)",
-      "patch": "#define\\s+FIRMWARE_VERSION_PATCH\\s+(\\d+)"
+      "patch": "#define\\s+FIRMWARE_VERSION_PATCH\\s+(\\d+)",
+      "build": "#define\\s+FIRMWARE_VERSION_BUILD\\s+(\\d+)"
     }
   }
 }
