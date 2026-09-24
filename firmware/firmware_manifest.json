@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-09-24T16:43:44Z",
+  "generated_at": "2026-09-07T22:14:19Z",
   "project": {
     "name": "URTC",
     "full_name": "Universal Robot Tool Controller",
@@ -33,7 +33,7 @@
         "bin": {
           "filename": "URTC_MAIN_BOOTLOADER_v0.3.6.bin",
           "size_bytes": 18244,
-          "crc32": "0xBC23FB6F"
+          "crc32": "0xDD9DF6A3"
         },
         "hex": {
           "filename": "URTC_MAIN_BOOTLOADER_v0.3.6.hex",
@@ -51,26 +51,26 @@
       "hardware_id": "0x0303CC01",
       "version": {
         "major": 0,
-        "minor": 3,
-        "patch": 1
+        "minor": 2,
+        "patch": 9
       },
-      "version_string": "0.3.1",
-      "version_code": 301,
+      "version_string": "0.2.9",
+      "version_code": 209,
       "flash_address": "0x08008000",
       "flash_region_max_bytes": 114688,
       "files": {
         "bin": {
-          "filename": "URTC_MAIN_FIRMWARE_v0.3.1.bin",
-          "size_bytes": 71852,
-          "crc32": "0x2821A07B"
+          "filename": "URTC_MAIN_FIRMWARE_v0.2.9.bin",
+          "size_bytes": 71640,
+          "crc32": "0x1DB97B56"
         },
         "hex": {
-          "filename": "URTC_MAIN_FIRMWARE_v0.3.1.hex",
-          "size_bytes": 202199
+          "filename": "URTC_MAIN_FIRMWARE_v0.2.9.hex",
+          "size_bytes": 201606
         },
         "elf": {
-          "filename": "URTC_MAIN_FIRMWARE_v0.3.1.elf",
-          "size_bytes": 172316
+          "filename": "URTC_MAIN_FIRMWARE_v0.2.9.elf",
+          "size_bytes": 172076
         }
       }
     },
