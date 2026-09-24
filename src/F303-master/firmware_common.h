@@ -29,6 +29,7 @@
 #define FIRMWARE_VERSION_MAJOR 0
 #define FIRMWARE_VERSION_MINOR 3
 #define FIRMWARE_VERSION_PATCH 1
+#define FIRMWARE_VERSION_BUILD 0
 
 // ID configuration matrix (physical tool-head address readout)
 #define ID0_PIN         GPIO_PIN_0  // PF0 - Bit 0
