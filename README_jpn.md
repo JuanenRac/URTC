@@ -531,7 +531,7 @@ URTC のフラッシュは 2 つの独立した部分に分割されているた
 ├── build-test.sh / build-test.bat  バージョンを更新しないビルド/コンパイル確認
 │                                （tools/build_test.py の薄いラッパー）
 ├── bump_version.py              オドメーター式バージョンインクリメント、build_firmware.sh/.bat が実行
-├── bump_manifest_version.py     hydra-umc.project.json のバージョンをネイティブ側と同期（--sync）
+├── bump_manifest_version.py     urtc.project.json のバージョンをネイティブ側と同期（--sync）
 ├── generate_manifest.py         firmware/firmware_manifest.json を再生成——
 │                                完全な build_firmware.sh/.bat 実行の最終ステップとして
 │                                自動的に呼び出されるか、完全な再ビルドなしにマニフェストを

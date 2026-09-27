@@ -520,7 +520,7 @@ Falls jemand in der Community an benutzerdefinierten Endeffektoren, intelligente
 ├── build-test.sh / build-test.bat  Build-/Kompilierprüfung ohne Versionserhöhung (dünne
 │                                Wrapper um tools/build_test.py)
 ├── bump_version.py              Versionserhöhung im Kilometerzähler-Stil, ausgeführt von build_firmware.sh/.bat
-├── bump_manifest_version.py     Synchronisiert die Version von hydra-umc.project.json mit der nativen (--sync)
+├── bump_manifest_version.py     Synchronisiert die Version von urtc.project.json mit der nativen (--sync)
 ├── generate_manifest.py         Regeneriert firmware/firmware_manifest.json - automatisch
 │                                aufgerufen als letzter Schritt eines vollständigen
 │                                build_firmware.sh/.bat-Laufs, oder eigenständig jederzeit, wenn das

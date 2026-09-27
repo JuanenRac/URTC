@@ -544,7 +544,7 @@ Si quelqu'un dans la communauté travaille sur des effecteurs terminaux personna
 ├── build-test.sh / build-test.bat  Contrôle build/compilation sans gestion de version
 │                                (enveloppes légères autour de tools/build_test.py)
 ├── bump_version.py              Incrément de version type compteur kilométrique, exécuté par build_firmware.sh/.bat
-├── bump_manifest_version.py     Synchronise la version de hydra-umc.project.json avec la version native (--sync)
+├── bump_manifest_version.py     Synchronise la version de urtc.project.json avec la version native (--sync)
 ├── generate_manifest.py         Régénère firmware/firmware_manifest.json - appelé
 │                                automatiquement comme dernière étape d'une exécution complète
 │                                de build_firmware.sh/.bat, ou de façon autonome à tout moment
