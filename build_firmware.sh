@@ -32,7 +32,7 @@ else
     # HYDRA_UMC_SCRIPT_STANDARD_VERSION_STEP
     printf '%s\n' "[1/3] Incrementing project version and synchronising its manifest..."
     # HYDRA_UMC_SCRIPT_STANDARD_VERSION_CAPTURE_BEFORE
-    HYDRA_UMC_VERSION_BEFORE="$(python3 -c 'import json, pathlib, sys; print(json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))["version"])' "$(dirname "$0")/hydra-umc.project.json")"
+    HYDRA_UMC_VERSION_BEFORE="$(python3 -c 'import json, pathlib, sys; print(json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))["version"])' "$(dirname "$0")/urtc.project.json")"
     # The registry tracks the main-board application version. It is bumped
     # later, then --sync records that single authoritative native bump.
 fi
@@ -348,7 +348,7 @@ APP_VER=$(version_or_bump "$SRC/firmware_common.h" FIRMWARE_VERSION "$SRC/boot/b
 if [ "$HYDRA_UMC_CI_MODE" != "1" ]; then
     python3 "$ROOT/bump_manifest_version.py" --sync || exit 1
     # HYDRA_UMC_SCRIPT_STANDARD_VERSION_CAPTURE_AFTER
-    HYDRA_UMC_VERSION_AFTER="$(python3 -c 'import json, pathlib, sys; print(json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))["version"])' "$ROOT/hydra-umc.project.json")"
+    HYDRA_UMC_VERSION_AFTER="$(python3 -c 'import json, pathlib, sys; print(json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))["version"])' "$ROOT/urtc.project.json")"
     printf '\n*******************************************************************************\n'
     printf '%s\n' '* VERSION INCREMENT COMPLETED'
     printf '%s\n' "* v${HYDRA_UMC_VERSION_BEFORE:-unknown} -> v${HYDRA_UMC_VERSION_AFTER:-unknown}"

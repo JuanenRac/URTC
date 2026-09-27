@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # =============================================================================
-# HYDRA-UMC - ci_validate.py
+# URTC - ci_validate.py
 # Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
 # GPL-3.0 - see LICENSE
 # =============================================================================
@@ -19,7 +19,7 @@ from _doc_policy import check_public_private_boundary
 from _readme_parity import check_readme_section_parity
 
 ROOT = Path(__file__).resolve().parent.parent
-MANIFEST_PATH = ROOT / "hydra-umc.project.json"
+MANIFEST_PATH = ROOT / "urtc.project.json"
 REQUIRED_DOCUMENTS = (
     "README.md",
     "README_spa.md",
@@ -205,8 +205,8 @@ def main() -> int:
     missing = [key for key in REQUIRED_MANIFEST_KEYS if key not in manifest]
     if missing:
         fail(f"manifest missing required keys: {', '.join(missing)}")
-    if manifest["ecosystem"] != "HYDRA-UMC":
-        fail("manifest ecosystem must be HYDRA-UMC")
+    if manifest["ecosystem"] != "URTC":
+        fail("manifest ecosystem must be URTC")
     if manifest["name"] != ROOT.name:
         fail(f"manifest name {manifest['name']!r} must match repository directory {ROOT.name!r}")
     if not isinstance(manifest["version"], str) or not SEMVER.fullmatch(manifest["version"]):

@@ -515,7 +515,7 @@ URTC 的闪存被拆分为两个独立部分，因此板卡可以通过它已经
 ├── build-test.sh / build-test.bat  不递增版本号的构建/编译检查
 │                                （tools/build_test.py 的轻量包装）
 ├── bump_version.py              里程表式版本递增，由 build_firmware.sh/.bat 运行
-├── bump_manifest_version.py     将 hydra-umc.project.json 的版本与原生版本同步（--sync）
+├── bump_manifest_version.py     将 urtc.project.json 的版本与原生版本同步（--sync）
 ├── generate_manifest.py         重新生成 firmware/firmware_manifest.json——
 │                                作为完整 build_firmware.sh/.bat 运行的最后
 │                                一步自动调用，或在清单需要跟上进度而无需

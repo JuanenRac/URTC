@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "ecosystem": "HYDRA-UMC",
+  "ecosystem": "URTC",
   "name": "URTC",
   "version": "0.3.1",
   "role": "firmware",

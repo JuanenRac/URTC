@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 # =============================================================================
-# HYDRA-UMC - Manifest-backed build version utility
+# URTC - Manifest-backed build version utility
 # Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
 # GPL-3.0 - see LICENSE
 # =============================================================================
 """Increment or synchronize a repository-native version and its manifest.
 
-This file is intentionally copied to each HYDRA-UMC/URTC repository root so
+This file is intentionally copied to each URTC repository root so
 its build scripts work from a normal standalone checkout.  It reads only the
-repository's own ``hydra-umc.project.json``; there is no project catalogue or
+repository's own ``urtc.project.json``; there is no project catalogue or
 per-project conditional logic in this utility.
 """
 
@@ -21,7 +21,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parent
-MANIFEST_PATH = ROOT / "hydra-umc.project.json"
+MANIFEST_PATH = ROOT / "urtc.project.json"
 CHANGELOG_PATH = ROOT / "CHANGELOG.md"
 
 
@@ -185,7 +185,7 @@ def ensure_changelog_version(version: str) -> bool:
 
     entry = (
         f"## [{version}]\n\n"
-        "- Build version synchronized with `hydra-umc.project.json` and the "
+        "- Build version synchronized with `urtc.project.json` and the "
         "repository-native version source.\n\n"
     )
     previous = re.search(r"(?m)^##+\s+\[?\d+\.\d+\.\d+", text)
@@ -253,7 +253,7 @@ def main() -> int:
             if added:
                 print(f"Changelog synchronized: {current}")
             sync_package_lock(current)
-            print(f"HYDRA-UMC version: v{current} -> v{current} (already synchronized)")
+            print(f"URTC version: v{current} -> v{current} (already synchronized)")
             return 0
         expected = next_version(declared)
         if current != expected:
@@ -270,7 +270,7 @@ def main() -> int:
         write_manifest(manifest)
         ensure_changelog_version(current)
         sync_package_lock(current)
-        print(f"HYDRA-UMC version: v{declared} -> v{current}")
+        print(f"URTC version: v{declared} -> v{current}")
         return 0
 
     if current != declared:
@@ -290,7 +290,7 @@ def main() -> int:
     write_manifest(manifest)
     ensure_changelog_version(new)
     sync_package_lock(new)
-    print(f"HYDRA-UMC version: v{current} -> v{new}")
+    print(f"URTC version: v{current} -> v{new}")
     return 0
 
 

@@ -529,7 +529,7 @@ If anyone in the community is working on custom end-effectors, smart tool-change
 ├── build-test.sh / build-test.bat  Non-versioning build/compile check (thin wrappers
 │                                around tools/build_test.py)
 ├── bump_version.py              Odometer-style version bump, run by build_firmware.sh/.bat
-├── bump_manifest_version.py     Syncs hydra-umc.project.json's version to the native one (--sync)
+├── bump_manifest_version.py     Syncs urtc.project.json's version to the native one (--sync)
 ├── generate_manifest.py         Regenerates firmware/firmware_manifest.json - called
 │                                automatically as the last step of a full
 │                                build_firmware.sh/.bat run, or standalone any time the

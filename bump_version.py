@@ -143,7 +143,7 @@ def _delegate_to_shared_utility():
 
     here = _Path(__file__).resolve().parent
     root = here if (here / "bump_manifest_version.py").is_file() else here.parent
-    utility, manifest = root / "bump_manifest_version.py", root / "hydra-umc.project.json"
+    utility, manifest = root / "bump_manifest_version.py", root / "urtc.project.json"
     if not utility.is_file() or not manifest.is_file():
         return None
     spec = importlib.util.spec_from_file_location("_shared_bump", utility)

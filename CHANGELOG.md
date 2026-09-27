@@ -109,7 +109,7 @@ checklist ITEMS for those documents are removed outright
 reasoning in the firmware comment (why the electromagnet has no comms-loss
 watchdog) is unchanged and stays self-sufficient without the dangling pointer.
 
-Also carries a `hydra-umc.project.json` maturity correction
+Also carries a `urtc.project.json` maturity correction
 (`production` -> `functional`) that had been sitting uncommitted from
 earlier work, unrelated to this fix, bundled here rather than left
 stranded.
@@ -132,15 +132,15 @@ pre-existing warnings as before this change - missing SVG assets and
 
 ## [0.2.7]
 
-- Build version synchronized with `hydra-umc.project.json` and the repository-native version source.
+- Build version synchronized with `urtc.project.json` and the repository-native version source.
 
 ## [0.2.6]
 
-- Build version synchronized with `hydra-umc.project.json` and the repository-native version source.
+- Build version synchronized with `urtc.project.json` and the repository-native version source.
 
 ## [0.2.5]
 
-- Build version synchronized with `hydra-umc.project.json` and the repository-native version source.
+- Build version synchronized with `urtc.project.json` and the repository-native version source.
 
 
 This project has **4 independent version tracks**, one per compiled

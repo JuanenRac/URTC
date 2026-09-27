@@ -30,7 +30,7 @@ setlocal enabledelayedexpansion
 REM HYDRA_UMC_SCRIPT_STANDARD_VERSION_STEP
 echo [1/3] Incrementing project version and synchronising its manifest...
 REM HYDRA_UMC_SCRIPT_STANDARD_VERSION_CAPTURE_BEFORE
-for /f "usebackq delims=" %%V in (`python -c "import json; print(json.load(open(r'%~dp0hydra-umc.project.json', encoding='utf-8'))['version'])"`) do set "HYDRA_UMC_VERSION_BEFORE=%%V"
+for /f "usebackq delims=" %%V in (`python -c "import json; print(json.load(open(r'%~dp0urtc.project.json', encoding='utf-8'))['version'])"`) do set "HYDRA_UMC_VERSION_BEFORE=%%V"
 REM The registry tracks the main-board application version. It is bumped
 REM later, then --sync records that single authoritative native bump.
 echo.
@@ -305,7 +305,7 @@ if not defined APP_VER (
 python "%ROOT%\bump_manifest_version.py" --sync
 if errorlevel 1 ( echo VERSION SYNCHRONISATION FAILED. & pause & exit /b 1 )
 REM HYDRA_UMC_SCRIPT_STANDARD_VERSION_CAPTURE_AFTER
-for /f "usebackq delims=" %%V in (`python -c "import json; print(json.load(open(r'%ROOT%\hydra-umc.project.json', encoding='utf-8'))['version'])"`) do set "HYDRA_UMC_VERSION_AFTER=%%V"
+for /f "usebackq delims=" %%V in (`python -c "import json; print(json.load(open(r'%ROOT%\urtc.project.json', encoding='utf-8'))['version'])"`) do set "HYDRA_UMC_VERSION_AFTER=%%V"
 if not defined HYDRA_UMC_VERSION_BEFORE set "HYDRA_UMC_VERSION_BEFORE=unknown"
 if not defined HYDRA_UMC_VERSION_AFTER set "HYDRA_UMC_VERSION_AFTER=unknown"
 echo.
