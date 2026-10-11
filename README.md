@@ -272,7 +272,7 @@ URTC's flash is split into two independent pieces, so the board can be reflashed
            │                                   │  before ever jumping to the app.
 0x08008000 ├─────────────────────────────────┤
            │  Main slot (112K)                 │  This is the application firmware /
-           │                                   │  URTC_MAIN_FIRMWARE_v0.3.0.* — the actual
+           │                                   │  URTC_MAIN_FIRMWARE_v0.3.3.* — the actual
            │                                   │  firmware that runs day to day,
            │                                   │  described everywhere else in
            │                                   │  this README. Never touched by
@@ -303,8 +303,8 @@ The bootloader can only get onto the chip via physical programming — there's n
 
 1. Open the project in **STM32CubeIDE** (built and tested against the STM32F303CC target), or use **STM32CubeProgrammer** directly with the compiled outputs below.
 2. Flash **both** images over SWD (ST-Link) via the onboard `STM_JTAG` header — each `.hex` file has its target address baked in, so most tools (including STM32CubeProgrammer) can load both in the same session:
-   * `URTC_MAIN_BOOTLOADER_v0.3.6.hex` → `0x08000000`
-   * `URTC_MAIN_FIRMWARE_v0.3.0.hex` → `0x08008000`
+   * `URTC_MAIN_BOOTLOADER_v0.3.8.hex` → `0x08000000`
+   * `URTC_MAIN_FIRMWARE_v0.3.3.hex` → `0x08008000`
 3. Set the tool identity via the ID solder jumpers before powering up — the board reads them once at boot, same as always. Five jumpers (ID0-ID4), covering the full 32-address space (31 direct tool addresses, plus the reserved `11111` free-configuration address - see the Tool Matrix section above).
 4. Power up. The bootloader listens for ~600ms, sees nothing, and jumps straight into the application — from here on, everything behaves exactly as described in the rest of this README.
 
@@ -348,6 +348,13 @@ independent project, with its own README, license, and translations:
 A web-based alternative covering similar ground (live monitoring, CAN
 analysis, OTA flashing, thermal inspection) without installing anything
 locally also exists: [URTC Web Studio](https://github.com/JuanenRac/URTC-WEB-STUDIO).
+
+## 🛡️ Thermal Safety, Firmware Signing & CAN Security
+
+- **Thermal runaway protection** (`thermal_guard.c`, since application 0.3.2) on the soldering iron / hot air and the 3D hotend: a MAXTEMP on the *measured* temperature (449 °C T12, 310 °C hotend), a heating watch (the temperature must really rise while the heater is on - catches a loose thermistor or tip) and a holding check (once at target, no long sag with the heater on). A fault cuts the heater, latches the board error and reports why in `0x111` byte 4. Host-tested with a simulated heater (`tests/test_thermal_guard.c`).
+- **Diagnostics:** `0x111` byte 5 reports the last reset cause (bit0 = the hardware watchdog fired); `0x1AA`/`0x1AB` return lifetime counters kept in F-RAM - thermal faults, last fault code and total heater-on time (since 0.3.3); black-box samples record the thermal fault code.
+- **Firmware signing:** the bootloaders' HMAC key is injected at build time from a private file (`URTC_SIGNING_KEY_FILE`); without it the build uses the *public development key* and says so, and `URTC_RELEASE=1` refuses it. Every image in `firmware/` ships with `<bin>.sha256` and `<bin>.manifest.json` (including the precomputed signature), so URTC Flasher and URTC Web Studio carry no key at all. See [`docs/FIRMWARE_SIGNING.TXT`](docs/FIRMWARE_SIGNING.TXT).
+- **CAN bus:** it has no sender authentication - any node can command the tools. Laser, heater and welder installations **must** have a hardware interlock independent of the MCU and a closed bus: [`docs/CAN_THREAT_MODEL.TXT`](docs/CAN_THREAT_MODEL.TXT).
 
 ## 📋 Changelog
 
@@ -482,15 +489,15 @@ If anyone in the community is working on custom end-effectors, smart tool-change
 │           ├── STM32F303CBTx_SLAVEBOOT.ld  Linker script (18K region at 0x08000000)
 │           └── README.md          Same technical-reference role as the application's
 ├── firmware/
-│   ├── URTC_MAIN_BOOTLOADER_v0.3.6.bin  Bootloader compiled, flash to 0x08000000
-│   ├── URTC_MAIN_BOOTLOADER_v0.3.6.elf  Bootloader compiled, flash to 0x08000000
-│   ├── URTC_MAIN_BOOTLOADER_v0.3.6.hex  Bootloader compiled, flash to 0x08000000 (address baked in)
-│   ├── URTC_MAIN_FIRMWARE_v0.3.0.bin    Application bin compiled, flash to 0x08008000
-│   ├── URTC_MAIN_FIRMWARE_v0.3.0.elf    Application elf compiled, flash to 0x08008000
-│   ├── URTC_MAIN_FIRMWARE_v0.3.0.hex    Application HEX compiled, flash to 0x08008000 (address baked in)
-│   ├── URTC_SLAVE_BOOTLOADER_v0.1.9.{bin,elf,hex}  Expansion slave's own bootloader, flash to 0x08000000
+│   ├── URTC_MAIN_BOOTLOADER_v0.3.8.bin  Bootloader compiled, flash to 0x08000000
+│   ├── URTC_MAIN_BOOTLOADER_v0.3.8.elf  Bootloader compiled, flash to 0x08000000
+│   ├── URTC_MAIN_BOOTLOADER_v0.3.8.hex  Bootloader compiled, flash to 0x08000000 (address baked in)
+│   ├── URTC_MAIN_FIRMWARE_v0.3.3.bin    Application bin compiled, flash to 0x08008000
+│   ├── URTC_MAIN_FIRMWARE_v0.3.3.elf    Application elf compiled, flash to 0x08008000
+│   ├── URTC_MAIN_FIRMWARE_v0.3.3.hex    Application HEX compiled, flash to 0x08008000 (address baked in)
+│   ├── URTC_SLAVE_BOOTLOADER_v0.2.2.{bin,elf,hex}  Expansion slave's own bootloader, flash to 0x08000000
 │   │                             on the STM32F303CBT6 (advanced expansion boards only)
-│   ├── URTC_SLAVE_FIRMWARE_v0.1.6.{bin,elf,hex}  Expansion slave's own application, flash to 0x08005000
+│   ├── URTC_SLAVE_FIRMWARE_v0.1.9.{bin,elf,hex}  Expansion slave's own application, flash to 0x08005000
 │   └── firmware_manifest.json    Machine-readable index of all 4 components above - version,
 │                                 flash address, and each file's own size/CRC32, for an
 │                                 external tool to check what's here and what's newer than

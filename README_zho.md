@@ -271,7 +271,7 @@ URTC 的闪存被拆分为两个独立部分，因此板卡可以通过它已经
            │                                   │  之前会检查全部这些内容。
 0x08008000 ├─────────────────────────────────┤
            │  主槽（112K）                     │  这是应用固件 /
-           │                                   │  URTC_MAIN_FIRMWARE_v0.3.0.* ——
+           │                                   │  URTC_MAIN_FIRMWARE_v0.3.3.* ——
            │                                   │  日常运行的实际固件，
            │                                   │  本 README 其他部分描述的
            │                                   │  正是它。在一个经过验证的、
@@ -301,8 +301,8 @@ URTC 的闪存被拆分为两个独立部分，因此板卡可以通过它已经
 
 1. 在 **STM32CubeIDE** 中打开项目（已针对 STM32F303CC 目标构建和测试），或直接使用 **STM32CubeProgrammer** 配合下方的编译输出。
 2. 通过板载 `STM_JTAG` 接口，经由 SWD（ST-Link）刷写**两个**镜像——每个 `.hex` 文件都已内置目标地址，因此大多数工具（包括 STM32CubeProgrammer）都可以在同一会话中加载两者：
-   * `URTC_MAIN_BOOTLOADER_v0.3.6.hex` → `0x08000000`
-   * `URTC_MAIN_FIRMWARE_v0.3.0.hex` → `0x08008000`
+   * `URTC_MAIN_BOOTLOADER_v0.3.8.hex` → `0x08000000`
+   * `URTC_MAIN_FIRMWARE_v0.3.3.hex` → `0x08008000`
 3. 在通电之前通过 ID 焊接跳线设置工具身份——板卡在开机时读取一次，一如既往。5 个跳线（ID0-ID4），覆盖完整的 32 地址空间（31 个直接工具地址，加上保留的 `11111` 自由配置地址——见上方工具矩阵一节）。
 4. 通电。引导程序监听约 600ms，未发现任何内容，直接跳转进入应用程序——从此刻起，一切行为都与本 README 其余部分所描述的完全一致。
 
@@ -338,6 +338,13 @@ URTC 的闪存被拆分为两个独立部分，因此板卡可以通过它已经
 - [URTC Tester](https://github.com/JuanenRac/URTC-TESTER)
 
 还存在一个基于网页的替代方案，覆盖类似的功能范围（实时监控、CAN 分析、OTA 刷写、热成像检测），无需在本地安装任何东西：[URTC Web Studio](https://github.com/JuanenRac/URTC-WEB-STUDIO)。
+
+## 🛡️ 热安全、固件签名与 CAN 安全
+
+- **热失控保护**（`thermal_guard.c`，自应用 0.3.2 起）用于烙铁／热风和 3D 热端：对*实测*温度的 MAXTEMP（T12 449 °C，热端 310 °C）、加热监视（加热器开启时温度必须真正上升——可检测松脱的热敏电阻或烙铁头）以及保温检查（达到目标后，加热器开启时不得长时间下降）。一旦故障即切断加热器、锁定板卡错误，并通过 `0x111` 的第 4 字节报告原因。已在主机上用模拟加热器测试（`tests/test_thermal_guard.c`）。
+- **诊断：** `0x111` 的第 5 字节报告上次复位原因（bit0 = 硬件看门狗触发）；`0x1AA`/`0x1AB` 返回保存在 F-RAM 中的累计计数——热故障次数、最后一次故障代码和加热器总开启时间（自 0.3.3 起）；黑匣子采样也会记录热故障代码。
+- **固件签名：** 引导程序的 HMAC 密钥在构建时从私有文件（`URTC_SIGNING_KEY_FILE`）注入；没有该文件时构建使用*公开开发密钥*并给出提示，`URTC_RELEASE=1` 会拒绝该密钥。`firmware/` 中每个镜像都附带 `<bin>.sha256` 和 `<bin>.manifest.json`（含预先计算的签名），因此 URTC Flasher 和 URTC Web Studio 不包含任何密钥。参见 [`docs/FIRMWARE_SIGNING.TXT`](docs/FIRMWARE_SIGNING.TXT)。
+- **CAN 总线：** 不验证发送方——任何节点都可以控制工具。使用激光、加热器或焊接设备的安装**必须**配备独立于 MCU 的硬件联锁和封闭总线：[`docs/CAN_THREAT_MODEL.TXT`](docs/CAN_THREAT_MODEL.TXT)。
 
 ## 📋 更新日志
 
@@ -468,15 +475,15 @@ URTC 的闪存被拆分为两个独立部分，因此板卡可以通过它已经
 │           ├── STM32F303CBTx_SLAVEBOOT.ld  链接脚本（0x08000000 处的 18K 区域）
 │           └── README.md          与应用程序相同的技术参考角色
 ├── firmware/
-│   ├── URTC_MAIN_BOOTLOADER_v0.3.6.bin  引导程序编译产物，刷写至 0x08000000
-│   ├── URTC_MAIN_BOOTLOADER_v0.3.6.elf  引导程序编译产物，刷写至 0x08000000
-│   ├── URTC_MAIN_BOOTLOADER_v0.3.6.hex  引导程序编译产物，刷写至 0x08000000（地址已内置）
-│   ├── URTC_MAIN_FIRMWARE_v0.3.0.bin    应用程序 bin 编译产物，刷写至 0x08008000
-│   ├── URTC_MAIN_FIRMWARE_v0.3.0.elf    应用程序 elf 编译产物，刷写至 0x08008000
-│   ├── URTC_MAIN_FIRMWARE_v0.3.0.hex    应用程序 HEX 编译产物，刷写至 0x08008000（地址已内置）
-│   ├── URTC_SLAVE_BOOTLOADER_v0.1.9.{bin,elf,hex}  扩展从属自身的引导程序，
+│   ├── URTC_MAIN_BOOTLOADER_v0.3.8.bin  引导程序编译产物，刷写至 0x08000000
+│   ├── URTC_MAIN_BOOTLOADER_v0.3.8.elf  引导程序编译产物，刷写至 0x08000000
+│   ├── URTC_MAIN_BOOTLOADER_v0.3.8.hex  引导程序编译产物，刷写至 0x08000000（地址已内置）
+│   ├── URTC_MAIN_FIRMWARE_v0.3.3.bin    应用程序 bin 编译产物，刷写至 0x08008000
+│   ├── URTC_MAIN_FIRMWARE_v0.3.3.elf    应用程序 elf 编译产物，刷写至 0x08008000
+│   ├── URTC_MAIN_FIRMWARE_v0.3.3.hex    应用程序 HEX 编译产物，刷写至 0x08008000（地址已内置）
+│   ├── URTC_SLAVE_BOOTLOADER_v0.2.2.{bin,elf,hex}  扩展从属自身的引导程序，
 │   │                             刷写至 STM32F303CBT6 上的 0x08000000（仅限高级扩展板）
-│   ├── URTC_SLAVE_FIRMWARE_v0.1.6.{bin,elf,hex}  扩展从属自身的应用程序，刷写至 0x08005000
+│   ├── URTC_SLAVE_FIRMWARE_v0.1.9.{bin,elf,hex}  扩展从属自身的应用程序，刷写至 0x08005000
 │   └── firmware_manifest.json    上述全部 4 个组件的机器可读索引——版本、
 │                                 闪存地址，以及每个文件自身的大小/CRC32，
 │                                 供外部工具检查此处有什么以及比它当前所拥有

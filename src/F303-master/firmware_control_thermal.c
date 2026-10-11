@@ -6,6 +6,7 @@
 #include "firmware_common.h"
 #include "firmware_control_thermal.h"
 #include "thermal_guard.h"
+#include "firmware_thermal_stats.h"
 
 // Last thermal-guard fault (ThermalGuardFault_t), 0 = none. Reported as the
 // 5th byte of the 0x111 state answer so a host knows WHY the board blocked
@@ -40,6 +41,7 @@ static uint8_t ThermalGuard_Apply(ThermalGuardFault_t fault) {
     system_error_flag = 1;
     target_temperature = 0;
     HAL_GPIO_WritePin(T12_PWM_PORT, T12_PWM_PIN, GPIO_PIN_RESET);
+    ThermalStats_NoteFault((uint8_t)fault); // after the heater is already off
     return 1;
 }
 

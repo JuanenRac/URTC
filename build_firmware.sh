@@ -188,6 +188,28 @@ else
         fail "thermal guard host logic tests FAILED"
         echo ""; echo "$PASS passed, $WARN warnings, $FAIL failed"; exit 1
     fi
+
+    # thermal_stats.c (lifetime heater-on time and thermal fault counters).
+    STATS_HOST_BIN="$BUILD/host_tests_thermal_stats"
+    if "$HOST_CC" -std=c11 -Wall -Wextra -Wno-unused-parameter \
+        -I"$ROOT/tests" -I"$DISPATCH_SRC" -o "$STATS_HOST_BIN" \
+        "$ROOT/tests/test_thermal_stats.c" \
+        "$DISPATCH_SRC/thermal_stats.c" && "$STATS_HOST_BIN"; then
+        pass "thermal stats host logic tests passed"
+    else
+        fail "thermal stats host logic tests FAILED"
+        echo ""; echo "$PASS passed, $WARN warnings, $FAIL failed"; exit 1
+    fi
+fi
+
+# -----------------------------------------------------------------------
+step "1c. Shared Melexis drivers identical on master and slave"
+# -----------------------------------------------------------------------
+if python3 "$ROOT/check_shared_drivers.py"; then
+    pass "vendored MLX9064x drivers identical on both chips"
+else
+    fail "vendored MLX9064x drivers differ between src/F303-master and src/F303-slave"
+    echo ""; echo "$PASS passed, $WARN warnings, $FAIL failed"; exit 1
 fi
 
 # -----------------------------------------------------------------------

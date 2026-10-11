@@ -273,7 +273,7 @@ La flash de URTC está dividida en 2 piezas independientes, para que la placa pu
            │                                   │  de saltar a la app.
 0x08008000 ├─────────────────────────────────┤
            │  Slot principal (112K)            │  Este es el firmware de aplicación /
-           │                                   │  URTC_MAIN_FIRMWARE_v0.3.0.* — el firmware
+           │                                   │  URTC_MAIN_FIRMWARE_v0.3.3.* — el firmware
            │                                   │  real que se ejecuta día a día,
            │                                   │  descrito en el resto de este
            │                                   │  README. Nunca se toca en una
@@ -305,8 +305,8 @@ El bootloader solo puede entrar al chip mediante programación física — no ha
 
 1. Abre el proyecto en **STM32CubeIDE** (construido y probado contra el target STM32F303CC), o usa **STM32CubeProgrammer** directamente con los binarios compilados de abajo.
 2. Flashea **ambas** imágenes por SWD (ST-Link) mediante el header `STM_JTAG` integrado — cada archivo `.hex` tiene su dirección de destino incrustada, así que la mayoría de las herramientas (incluyendo STM32CubeProgrammer) pueden cargar ambas en la misma sesión:
-   * `URTC_MAIN_BOOTLOADER_v0.3.6.hex` → `0x08000000`
-   * `URTC_MAIN_FIRMWARE_v0.3.0.hex` → `0x08008000`
+   * `URTC_MAIN_BOOTLOADER_v0.3.8.hex` → `0x08000000`
+   * `URTC_MAIN_FIRMWARE_v0.3.3.hex` → `0x08008000`
 3. Establece la identidad de la herramienta mediante los jumpers de soldadura de ID antes de encender - la placa los lee una vez al arrancar, como siempre. Cinco jumpers (ID0-ID4), cubriendo el espacio completo de 32 direcciones (31 direcciones de herramienta directas, más la dirección reservada `11111` de configuración libre - ver la sección de Matriz de Herramientas de arriba).
 4. Enciende. El bootloader escucha durante ~600ms, no ve nada, y salta directamente a la aplicación — desde aquí en adelante, todo se comporta exactamente como se describe en el resto de este README.
 
@@ -352,6 +352,13 @@ y traducciones:
 También existe una alternativa basada en web que cubre terreno similar
 (monitorización en vivo, análisis CAN, flasheo OTA, inspección térmica)
 sin instalar nada localmente: [URTC Web Studio](https://github.com/JuanenRac/URTC-WEB-STUDIO).
+
+## 🛡️ Seguridad Térmica, Firma de Firmware y Seguridad CAN
+
+- **Protección contra embalamiento térmico** (`thermal_guard.c`, desde la aplicación 0.3.2) en el soldador / aire caliente y el hotend 3D: un MAXTEMP sobre la temperatura *medida* (449 °C T12, 310 °C hotend), una vigilancia de calentamiento (la temperatura debe subir de verdad con el calentador encendido - detecta un termistor o una punta suelta) y una comprobación de mantenimiento (una vez alcanzado el objetivo, sin caídas largas con el calentador encendido). Un fallo corta el calentador, enclava el error de la placa e indica la causa en el byte 4 de `0x111`. Probado en host con un calentador simulado (`tests/test_thermal_guard.c`).
+- **Diagnóstico:** el byte 5 de `0x111` indica la causa del último reinicio (bit0 = saltó el watchdog de hardware); `0x1AA`/`0x1AB` devuelven contadores de vida guardados en F-RAM - fallos térmicos, código del último fallo y tiempo total con el calentador encendido (desde 0.3.3); las muestras de la caja negra registran el código de fallo térmico.
+- **Firma del firmware:** la clave HMAC de los bootloaders se inyecta al compilar desde un fichero privado (`URTC_SIGNING_KEY_FILE`); sin él, el build usa la *clave pública de desarrollo* y lo avisa, y `URTC_RELEASE=1` la rechaza. Cada imagen de `firmware/` va acompañada de `<bin>.sha256` y `<bin>.manifest.json` (con la firma ya calculada), así que URTC Flasher y URTC Web Studio no llevan ninguna clave. Ver [`docs/FIRMWARE_SIGNING.TXT`](docs/FIRMWARE_SIGNING.TXT).
+- **Bus CAN:** no autentica al emisor - cualquier nodo puede mandar a las herramientas. Las instalaciones con láser, calentadores o soldadura **deben** tener un interlock de hardware independiente del MCU y un bus cerrado: [`docs/CAN_THREAT_MODEL.TXT`](docs/CAN_THREAT_MODEL.TXT).
 
 ## 📋 Registro de Cambios
 
@@ -492,15 +499,15 @@ Si alguien de la comunidad está trabajando en efectores finales personalizados,
 │           ├── STM32F303CBTx_SLAVEBOOT.ld  Script de enlazado (región de 18K en 0x08000000)
 │           └── README.md          Mismo rol de referencia técnica que el de la aplicación
 ├── firmware/
-│   ├── URTC_MAIN_BOOTLOADER_v0.3.6.bin  Bootloader compilado, flashear en 0x08000000
-│   ├── URTC_MAIN_BOOTLOADER_v0.3.6.elf  Bootloader compilado, flashear en 0x08000000
-│   ├── URTC_MAIN_BOOTLOADER_v0.3.6.hex  Bootloader compilado, flashear en 0x08000000 (dirección incrustada)
-│   ├── URTC_MAIN_FIRMWARE_v0.3.0.bin    Bin de aplicación compilado, flashear en 0x08008000
-│   ├── URTC_MAIN_FIRMWARE_v0.3.0.elf    Elf de aplicación compilado, flashear en 0x08008000
-│   ├── URTC_MAIN_FIRMWARE_v0.3.0.hex    HEX de aplicación compilado, flashear en 0x08008000 (dirección incrustada)
-│   ├── URTC_SLAVE_BOOTLOADER_v0.1.9.{bin,elf,hex}  Bootloader propio del esclavo de expansión, flashear en 0x08000000
+│   ├── URTC_MAIN_BOOTLOADER_v0.3.8.bin  Bootloader compilado, flashear en 0x08000000
+│   ├── URTC_MAIN_BOOTLOADER_v0.3.8.elf  Bootloader compilado, flashear en 0x08000000
+│   ├── URTC_MAIN_BOOTLOADER_v0.3.8.hex  Bootloader compilado, flashear en 0x08000000 (dirección incrustada)
+│   ├── URTC_MAIN_FIRMWARE_v0.3.3.bin    Bin de aplicación compilado, flashear en 0x08008000
+│   ├── URTC_MAIN_FIRMWARE_v0.3.3.elf    Elf de aplicación compilado, flashear en 0x08008000
+│   ├── URTC_MAIN_FIRMWARE_v0.3.3.hex    HEX de aplicación compilado, flashear en 0x08008000 (dirección incrustada)
+│   ├── URTC_SLAVE_BOOTLOADER_v0.2.2.{bin,elf,hex}  Bootloader propio del esclavo de expansión, flashear en 0x08000000
 │   │                             en el STM32F303CBT6 (solo placas de expansión avanzadas)
-│   ├── URTC_SLAVE_FIRMWARE_v0.1.6.{bin,elf,hex}  Aplicación propia del esclavo de expansión, flashear en 0x08005000
+│   ├── URTC_SLAVE_FIRMWARE_v0.1.9.{bin,elf,hex}  Aplicación propia del esclavo de expansión, flashear en 0x08005000
 │   └── firmware_manifest.json    Índice legible por máquina de los 4 componentes de arriba - versión,
 │                                 dirección de flash, y el tamaño/CRC32 propio de cada archivo, para
 │                                 que una herramienta externa compruebe qué hay aquí y qué es más

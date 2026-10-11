@@ -9,6 +9,7 @@
 // by side.
 // =============================================================================
 #include "firmware_common.h"
+#include "firmware_thermal_stats.h"
 #include "firmware_init_clocks.h"
 #include "firmware_init_gpio.h"
 #include "firmware_init_can.h"
@@ -411,6 +412,7 @@ int main(void) {
     // whatever was saved before the last shutdown - see SavedState_Load's
     // own comment for the safety reasoning.
     SavedState_Load();
+    ThermalStats_LoadFromFram(); // lifetime thermal counters - own F-RAM record, see thermal_stats.h
     HAL_IWDG_Refresh(&hiwdg);
     // Expansion connector's bit-banged I2C bus - see
     // firmware_expansion_i2c.c's own comment for why this isn't a
@@ -553,6 +555,10 @@ int main(void) {
                 SavedState_MaybeSave();
             }
         }
+        // Heater-on time and thermal fault counters: sampled every pass,
+        // saved at most once a minute (never during an AOI strobe, same
+        // reason as above).
+        ThermalStats_Service(!aoi_strobe_active);
 
         // Asynchronous loop for secondary telemetry and UI refresh (every 150ms)
         if (HAL_GetTick() - tick_screen >= 150) {

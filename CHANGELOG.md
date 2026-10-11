@@ -1,5 +1,30 @@
 # Changelog - URTC (repo-wide index)
 
+## [0.3.3] - Lifetime thermal counters, hardened slave MLX drivers, CAN threat model
+
+Components: main application 0.3.3, main bootloader 0.3.8, slave
+application 0.1.9, slave bootloader 0.2.2.
+
+- **Lifetime thermal counters** (`thermal_stats.c/.h` pure logic,
+  `firmware_thermal_stats.c` F-RAM/CAN side): thermal faults ever latched,
+  the last fault code and the total heater-on time, in their own CRC-8
+  record at F-RAM address 192 (not inside `SavedState_t`, so no
+  `SAVEDSTATE_VERSION` bump and no lost settings). Saved at once on a
+  fault and at most once a minute otherwise; read with `0x1AA` -> `0x1AB`.
+  `tests/test_thermal_stats.c` (new) runs in `build_firmware.sh` step 1b.
+- **Slave MLX9064x drivers hardened**: the expansion slave's copies of
+  `MLX90640_API.c/.h` and `MLX90641_API.cpp` lacked the bounded data-ready
+  wait and the scale-loop iteration cap the main board's copies have, so a
+  stuck sensor or a blank EEPROM dump could hang the slave until its IWDG
+  reset it. Both chips now compile the same files, and
+  `check_shared_drivers.py` (new, build step 1c) fails the build if they
+  ever drift apart again.
+- **`docs/CAN_THREAT_MODEL.TXT`** (new): what any node on the bus can do,
+  and the installation requirements (hardware interlock independent of the
+  MCU, closed bus, private signing key). Linked from `SECURITY.md`.
+- READMEs (all 7 languages): new safety/signing/CAN section, binary names
+  updated to the current versions.
+
 ## [0.3.2] - Thermal runaway guard, signing keys out of the tools, reset cause
 
 - **Thermal runaway protection** (`thermal_guard.c/.h`, new, pure C) for the

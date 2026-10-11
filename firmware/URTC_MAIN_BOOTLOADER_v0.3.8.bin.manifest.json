@@ -1,0 +1,10 @@
+{
+  "component": "main_bootloader",
+  "chip": "STM32F303CCT6",
+  "hardware_id": "0x0303CC01",
+  "version": "0.3.8",
+  "build_date": "2026-10-11T11:36:36Z",
+  "size_bytes": 18244,
+  "crc32": "0xC3A4FDE3",
+  "sha256": "9176c0ebb31da2bb6678884fa2c9a3d68e0153c2683de69b257ae344af18cc67"
+}

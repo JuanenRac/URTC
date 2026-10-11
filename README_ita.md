@@ -272,7 +272,7 @@ La flash di URTC è divisa in due parti indipendenti, così la scheda può esser
            │                                   │  prima di saltare mai all'app.
 0x08008000 ├─────────────────────────────────┤
            │  Slot principale (112K)           │  Questo è il firmware applicativo /
-           │                                   │  URTC_MAIN_FIRMWARE_v0.3.0.* — il firmware
+           │                                   │  URTC_MAIN_FIRMWARE_v0.3.3.* — il firmware
            │                                   │  vero e proprio che gira giorno per giorno,
            │                                   │  descritto ovunque altrove in
            │                                   │  questo README. Mai toccato da
@@ -303,8 +303,8 @@ Il bootloader può arrivare sul chip solo tramite programmazione fisica - non c'
 
 1. Apri il progetto in **STM32CubeIDE** (compilato e testato contro il target STM32F303CC), o usa **STM32CubeProgrammer** direttamente con gli output compilati sotto.
 2. Flasha **entrambe** le immagini via SWD (ST-Link) tramite l'header integrato `STM_JTAG` - ogni file `.hex` ha il proprio indirizzo di destinazione incorporato, così la maggior parte degli strumenti (incluso STM32CubeProgrammer) può caricare entrambi nella stessa sessione:
-   * `URTC_MAIN_BOOTLOADER_v0.3.6.hex` → `0x08000000`
-   * `URTC_MAIN_FIRMWARE_v0.3.0.hex` → `0x08008000`
+   * `URTC_MAIN_BOOTLOADER_v0.3.8.hex` → `0x08000000`
+   * `URTC_MAIN_FIRMWARE_v0.3.3.hex` → `0x08008000`
 3. Imposta l'identità dello strumento tramite i jumper di saldatura ID prima di accendere - la scheda li legge una volta all'avvio, come sempre. Cinque jumper (ID0-ID4), che coprono l'intero spazio di 32 indirizzi (31 indirizzi diretti per strumento, più l'indirizzo riservato `11111` di configurazione libera - vedi la sezione Matrice degli Strumenti sopra).
 4. Accendi. Il bootloader ascolta per ~600ms, non vede nulla, e salta direttamente nell'applicazione - da qui in avanti, tutto si comporta esattamente come descritto nel resto di questo README.
 
@@ -346,6 +346,13 @@ progetto indipendente, con proprio README, licenza, e traduzioni:
 - [URTC Tester](https://github.com/JuanenRac/URTC-TESTER)
 
 Esiste anche un'alternativa basata sul web che copre terreno simile (monitoraggio dal vivo, analisi CAN, flashing OTA, ispezione termica) senza installare nulla localmente: [URTC Web Studio](https://github.com/JuanenRac/URTC-WEB-STUDIO).
+
+## 🛡️ Sicurezza Termica, Firma del Firmware e Sicurezza CAN
+
+- **Protezione dalla fuga termica** (`thermal_guard.c`, dall'applicazione 0.3.2) su saldatore / aria calda e hotend 3D: un MAXTEMP sulla temperatura *misurata* (449 °C T12, 310 °C hotend), un controllo di riscaldamento (la temperatura deve salire davvero con il riscaldatore acceso - rileva un termistore o una punta allentati) e un controllo di mantenimento (raggiunto il target, nessun calo prolungato con il riscaldatore acceso). Un guasto spegne il riscaldatore, blocca l'errore della scheda e ne indica la causa nel byte 4 di `0x111`. Testato sull'host con un riscaldatore simulato (`tests/test_thermal_guard.c`).
+- **Diagnostica:** il byte 5 di `0x111` indica la causa dell'ultimo reset (bit0 = è intervenuto il watchdog hardware); `0x1AA`/`0x1AB` restituiscono contatori di vita salvati in F-RAM - guasti termici, codice dell'ultimo guasto e tempo totale con il riscaldatore acceso (dalla 0.3.3); i campioni della scatola nera registrano il codice di guasto termico.
+- **Firma del firmware:** la chiave HMAC dei bootloader viene inserita in compilazione da un file privato (`URTC_SIGNING_KEY_FILE`); senza di esso la build usa la *chiave pubblica di sviluppo* e lo segnala, e `URTC_RELEASE=1` la rifiuta. Ogni immagine in `firmware/` è accompagnata da `<bin>.sha256` e `<bin>.manifest.json` (con la firma già calcolata), quindi URTC Flasher e URTC Web Studio non contengono alcuna chiave. Vedi [`docs/FIRMWARE_SIGNING.TXT`](docs/FIRMWARE_SIGNING.TXT).
+- **Bus CAN:** non autentica il mittente - qualsiasi nodo può comandare gli utensili. Le installazioni con laser, riscaldatori o saldatrici **devono** avere un interblocco hardware indipendente dal MCU e un bus chiuso: [`docs/CAN_THREAT_MODEL.TXT`](docs/CAN_THREAT_MODEL.TXT).
 
 ## 📋 Changelog
 
@@ -479,15 +486,15 @@ Se qualcuno nella community sta lavorando su end-effector personalizzati, cambia
 │           ├── STM32F303CBTx_SLAVEBOOT.ld  Script di linking (regione 18K a 0x08000000)
 │           └── README.md          Stesso ruolo di riferimento tecnico dell'applicazione
 ├── firmware/
-│   ├── URTC_MAIN_BOOTLOADER_v0.3.6.bin  Bootloader compilato, flash a 0x08000000
-│   ├── URTC_MAIN_BOOTLOADER_v0.3.6.elf  Bootloader compilato, flash a 0x08000000
-│   ├── URTC_MAIN_BOOTLOADER_v0.3.6.hex  Bootloader compilato, flash a 0x08000000 (indirizzo incorporato)
-│   ├── URTC_MAIN_FIRMWARE_v0.3.0.bin    Bin applicazione compilato, flash a 0x08008000
-│   ├── URTC_MAIN_FIRMWARE_v0.3.0.elf    Elf applicazione compilato, flash a 0x08008000
-│   ├── URTC_MAIN_FIRMWARE_v0.3.0.hex    HEX applicazione compilato, flash a 0x08008000 (indirizzo incorporato)
-│   ├── URTC_SLAVE_BOOTLOADER_v0.1.9.{bin,elf,hex}  Bootloader proprio dello slave di espansione, flash a 0x08000000
+│   ├── URTC_MAIN_BOOTLOADER_v0.3.8.bin  Bootloader compilato, flash a 0x08000000
+│   ├── URTC_MAIN_BOOTLOADER_v0.3.8.elf  Bootloader compilato, flash a 0x08000000
+│   ├── URTC_MAIN_BOOTLOADER_v0.3.8.hex  Bootloader compilato, flash a 0x08000000 (indirizzo incorporato)
+│   ├── URTC_MAIN_FIRMWARE_v0.3.3.bin    Bin applicazione compilato, flash a 0x08008000
+│   ├── URTC_MAIN_FIRMWARE_v0.3.3.elf    Elf applicazione compilato, flash a 0x08008000
+│   ├── URTC_MAIN_FIRMWARE_v0.3.3.hex    HEX applicazione compilato, flash a 0x08008000 (indirizzo incorporato)
+│   ├── URTC_SLAVE_BOOTLOADER_v0.2.2.{bin,elf,hex}  Bootloader proprio dello slave di espansione, flash a 0x08000000
 │   │                             sull'STM32F303CBT6 (solo schede di espansione advanced)
-│   ├── URTC_SLAVE_FIRMWARE_v0.1.6.{bin,elf,hex}  Applicazione propria dello slave di espansione, flash a 0x08005000
+│   ├── URTC_SLAVE_FIRMWARE_v0.1.9.{bin,elf,hex}  Applicazione propria dello slave di espansione, flash a 0x08005000
 │   └── firmware_manifest.json    Indice leggibile da macchina di tutti e 4 i componenti sopra - versione,
 │                                 indirizzo flash, e dimensione/CRC32 proprio di ogni file, affinché
 │                                 uno strumento esterno controlli cosa c'è qui e cosa è più recente rispetto a

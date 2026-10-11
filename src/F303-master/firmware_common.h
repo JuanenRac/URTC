@@ -28,7 +28,7 @@
 // PATCH+1 on every real build, odometer-carry into MINOR/MAJOR.
 #define FIRMWARE_VERSION_MAJOR 0
 #define FIRMWARE_VERSION_MINOR 3
-#define FIRMWARE_VERSION_PATCH 2
+#define FIRMWARE_VERSION_PATCH 3
 #define FIRMWARE_VERSION_BUILD 0
 
 // ID configuration matrix (physical tool-head address readout)
@@ -414,6 +414,7 @@ typedef struct __attribute__((packed)) {
 #define BLACKBOX_MAGIC 0x424C4B42UL // 'BLKB' as bytes - distinct from SAVEDSTATE_MAGIC so a reader can't confuse the two regions even if addresses were ever misconfigured
 #define BLACKBOX_VERSION 1
 #define BLACKBOX_FRAM_ADDR 256 // well past SavedState_t's own ~34 bytes at address 0, generous margin for that struct to grow; ends well under FRAM_SIZE_BYTES (8192) even with BLACKBOX_SAMPLES x 10 bytes added
+#define THERMAL_STATS_FRAM_ADDR 192 // lifetime thermal counters (thermal_stats.h, 13 bytes) - between SavedState_t (address 0) and the black box (256)
 
 // Verified exactly 3 bytes with this toolchain (all-uint8_t members need
 // no alignment padding), but __attribute__((packed)) makes that

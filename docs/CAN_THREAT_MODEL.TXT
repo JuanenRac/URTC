@@ -1,0 +1,69 @@
+===============================================================================
+ URTC - CAN BUS THREAT MODEL AND INSTALLATION REQUIREMENTS
+ Copyright (C) 2026 JuanenRac (Electro Hobby 3D) - CC BY-SA 4.0
+===============================================================================
+
+1. WHAT THE BUS TRUSTS
+-------------------------------------------------------------------------------
+The URTC CAN bus (500 kbit/s, docs/CANBUS.TXT) has NO sender authentication
+and NO encryption, like almost every machine-internal CAN bus. Any node that
+can put a frame on the wires - a robot controller, a laptop with a USB-CAN
+adapter, or another node that has gone wrong - is obeyed as "the master".
+
+The firmware protects against ACCIDENTS, not against a hostile node:
+  * every actuator has a communication watchdog (250 ms for the laser,
+    drill, heaters, fans, UV...): if the commands stop, the output stops;
+  * a declared critical error blocks every command except lighting (0x100)
+    until the board is reset (firmware_can_dispatch.c);
+  * destructive one-shot commands need a 4-byte magic payload, so a
+    corrupted or misrouted frame cannot trigger them by chance;
+  * the thermal runaway guard (thermal_guard.c) and the sensor range checks
+    act on what the board MEASURES, whatever the bus says;
+  * firmware updates must carry a valid HMAC-SHA256 signature
+    (docs/FIRMWARE_SIGNING.TXT) - the one place where a hostile node is
+    actually stopped, as long as the signing key stays private.
+
+2. WHAT A NODE ON THE BUS CAN DO
+-------------------------------------------------------------------------------
+  0x160            arm the laser interlock line and set its power (2 bytes,
+                   no magic) - kept alive by repeating the frame
+  0x140/0x1C0/
+  0x1D0/0x200 ...  drive motors, weld/ultrasonic pulses, UV - same model
+  0x7F0 + magic    reset the board into its bootloader
+  0x7FD + magic    authorize a downgrade for the update in progress
+                   (the image must still be correctly signed)
+  0x7FE            read back the installed application (the firmware is
+                   not secret: it is published in this repository)
+  0x192 + magic    erase the recovered persisted state
+  0x1A2            change the free tool configuration of an 11111-jumper board
+
+So a malicious or broken node CAN fire the laser or start a tool. That is a
+property of the bus, not a bug to be fixed in this firmware: authenticating
+every 8-byte frame would need keys on every node and would not stop a node
+that holds them and malfunctions.
+
+3. INSTALLATION REQUIREMENTS (MANDATORY for laser, heater, welder, drill heads)
+-------------------------------------------------------------------------------
+  R1. HARDWARE INTERLOCK INDEPENDENT OF THE MCU. The laser (and any tool
+      that can injure or start a fire) must be cut by a physical circuit -
+      enclosure door switch, key switch, E-stop chain - wired in series
+      with the PB6 interlock line and the laser driver supply, which no
+      CAN frame can close. PB6 alone is a software-controlled line.
+  R2. CLOSED BUS. Only the robot controller and the URTC tool heads on the
+      wires. No permanently attached diagnostic adapter; a service adapter
+      (URTC-TESTER, URTC-FLASHER, URTC-WEB-STUDIO) is plugged in only while
+      someone is servicing the machine, with the hazardous heads disarmed.
+  R3. NO BRIDGING TO UNTRUSTED NETWORKS. Do not bridge this bus to Wi-Fi,
+      Ethernet or the internet without a gateway that only forwards a
+      whitelisted set of IDs and rate-limits them.
+  R4. PRIVATE SIGNING KEY for release boards (docs/FIRMWARE_SIGNING.TXT):
+      a board built with the public development key accepts firmware
+      signed by anyone.
+  R5. E-STOP CUTS POWER, NOT DATA. The emergency stop must remove actuator
+      power; a "stop" frame on the bus is not an emergency stop.
+
+4. WHAT WOULD CHANGE THIS
+-------------------------------------------------------------------------------
+If a future installation cannot meet R2/R3, the place to add protection is
+the gateway in front of the bus (ID whitelisting, rate limiting, a session
+key between gateway and robot controller), not each tool head.

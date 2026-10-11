@@ -78,7 +78,7 @@ Effect: answers with 0x111. Read-only, no side effects - answered even
 
 ID: 0x111 [URTC Tool Head -> Master, answers 0x110]
 Active tool + quick state response
-DLC: 6 bytes (firmware 0.3.1+; older firmware answers with the first 4 -
+DLC: 6 bytes (firmware 0.3.2+; older firmware answers with the first 4 -
      a host must treat missing bytes 4-5 as "not reported", not as 0)
 Data:
   - txData[0]: Active tool (matches the ToolMode_t enum in
@@ -288,6 +288,26 @@ Query/response: current expansion board type
 DLC: any as a query (payload ignored) | 1 byte as a response
 Data:
   - txData[0]: the currently-set value, 0-6 (see EXPANSION.TXT)
+
+ID: 0x1AA [Master -> URTC Tool Head]
+Query lifetime thermal counters
+DLC: any
+Effect: answers with 0x1AB. Read-only, answered whatever the active tool or
+        error state (like 0x110).
+
+ID: 0x1AB [URTC Tool Head -> Master, answers 0x1AA]
+Lifetime thermal counters (firmware 0.3.3+, thermal_stats.h)
+DLC: 8 bytes
+Data:
+  - txData[0..1]: thermal runaway faults ever latched (BE16, saturates)
+  - txData[2..5]: total time the heater output has been ON, in seconds
+                  (BE32, saturates) - T12/hot air and 3D hotend share the
+                  same heater output
+  - txData[6]:    code of the most recent fault (same values as 0x111
+                  byte 4), 0 = never
+  - txData[7]:    0x01 = kept in F-RAM (THERMAL_STATS_FRAM_ADDR 192, its
+                  own CRC-8 record, saved at most once a minute and at
+                  once on a fault), 0x00 = F-RAM missing - RAM-only since boot
 
 ID: 0x1A2 [Master -> URTC Tool Head]
 Set free tool configuration
@@ -1319,6 +1339,8 @@ Data:
   0x1A5 -> Query/response: peripheral type + device serial number (DLC:any/2)
   0x1A6 -> Set MLX9064x sensor variant (DLC:1+)
   0x1A7 -> Query/response: MLX9064x sensor variant (DLC:any/1)
+  0x1AA -> Query lifetime thermal counters (DLC:any)
+  0x1AB -> Lifetime thermal counters response (DLC:8)
   --- Per-tool commands (see dedicated sections above) ---
   0x120 -> Stepper motor control (Dispensers, Screwdriver, Grippers - DLC:5)
   0x130 -> T12 setpoint temperature (Soldering iron - DLC:2)

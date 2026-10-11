@@ -14,6 +14,7 @@
 #include "firmware_can_global.h"
 #include "firmware_expansion_i2c.h"
 #include "firmware_blackbox.h"
+#include "firmware_thermal_stats.h"
 
 void Handle_CAN_GlobalCommands_PreErrorGate(void) {
 
@@ -313,6 +314,12 @@ void Handle_CAN_GlobalCommands_PreErrorGate(void) {
         // (firmware_blackbox.c) for the full protocol.
         if (rxHeader.StdId == 0x1A8 && rxHeader.DLC >= 1) {
             BlackBox_HandleReadbackRequest(rxData[0]);
+        }
+
+        // Lifetime thermal counters (0x1AA query / 0x1AB answer) - read-only,
+        // answered whatever the active tool or error state, like 0x110.
+        if (rxHeader.StdId == 0x1AA) {
+            ThermalStats_HandleQuery();
         }
 
 }

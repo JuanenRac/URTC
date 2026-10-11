@@ -189,29 +189,46 @@ int HammingDecode(uint16_t *eeData)
 
 //------------------------------------------------------------------------------
 
+// This project's own addition, not part of Melexis's original file: the
+// poll-attempt cap used below in MLX90641_SynchFrame/MLX90641_GetFrameData,
+// and the -12 timeout error they return once it's exhausted. Not a
+// wall-clock timeout (this file has no HAL dependency) - just a bound large
+// enough that a real sensor's own refresh cycle always finishes well within
+// it, while a stuck bus (acking every transaction but never actually
+// setting its own data-ready bit) fails in bounded time instead of hanging
+// this board's own main/CAN-handler context forever - see
+// firmware_mlx90641_app.c's MLX90641_Direct_TriggerCapture, which calls
+// these synchronously.
+#define MLX90641_DATA_READY_MAX_POLLS 20000
+
 int MLX90641_SynchFrame(uint8_t slaveAddr)
 {
     uint16_t dataReady = 0;
     uint16_t statusRegister;
     int error = 1;
-    
+    uint16_t pollsLeft = MLX90641_DATA_READY_MAX_POLLS;
+
     error = MLX90641_I2CWrite(slaveAddr, 0x8000, 0x0030);
     if(error == -1)
     {
         return error;
     }
-    
+
     while(dataReady == 0)
     {
         error = MLX90641_I2CRead(slaveAddr, 0x8000, 1, &statusRegister);
         if(error != 0)
         {
             return error;
-        }    
+        }
         dataReady = statusRegister & 0x0008;
-    }      
-    
-   return 0;   
+        if(dataReady == 0 && --pollsLeft == 0)
+        {
+            return -12;
+        }
+    }
+
+   return 0;
 }
 
 //------------------------------------------------------------------------------
@@ -269,7 +286,11 @@ int MLX90641_GetFrameData(uint8_t slaveAddr, uint16_t *frameData)
     int error = 1;
     uint8_t cnt = 0;
     uint8_t subPage = 0;
-    
+    // This project's own addition, not part of Melexis's original file -
+    // see MLX90641_SynchFrame's own comment above for why an unbounded
+    // wait here is unsafe on this board.
+    uint16_t pollsLeft = MLX90641_DATA_READY_MAX_POLLS;
+
     dataReady = 0;
     while(dataReady == 0)
     {
@@ -277,9 +298,13 @@ int MLX90641_GetFrameData(uint8_t slaveAddr, uint16_t *frameData)
         if(error != 0)
         {
             return error;
-        }    
+        }
         dataReady = statusRegister & 0x0008;
-    }   
+        if(dataReady == 0 && --pollsLeft == 0)
+        {
+            return -12;
+        }
+    }
     subPage = statusRegister & 0x0001;
         
     error = MLX90641_I2CWrite(slaveAddr, 0x8000, 0x0030);

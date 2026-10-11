@@ -104,6 +104,19 @@ if errorlevel 1 (
 
 REM -----------------------------------------------------------------------
 echo.
+echo === 1c. Shared Melexis drivers identical on master and slave ===
+python "%ROOT%\check_shared_drivers.py"
+if errorlevel 1 (
+    echo   FAIL vendored MLX9064x drivers differ between src\F303-master and src\F303-slave
+    set /a FAIL+=1
+    goto :summary
+) else (
+    echo   OK   vendored MLX9064x drivers identical on both chips
+    set /a PASS+=1
+)
+
+REM -----------------------------------------------------------------------
+echo.
 echo === 2. ST HAL/CMSIS sources (cached locally under build\vendor\ after first run) ===
 REM -----------------------------------------------------------------------
 if not exist "%BUILD%\common\HAL_Include" mkdir "%BUILD%\common\HAL_Include"

@@ -29,5 +29,6 @@ void run_mlx90640_api_tests(int *failures);
 void run_can_dispatch_routing_tests(int *failures);
 // thermal_guard.c - thermal runaway protection, pure C (tests/test_thermal_guard.c).
 void run_thermal_guard_tests(int *failures);
+void run_thermal_stats_tests(int *failures);
 
 #endif // TEST_RUNNER_H

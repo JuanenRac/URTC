@@ -27,6 +27,31 @@
 #define MLX90640_EEPROM_DATA_ERROR 7
 #define MLX90640_FRAME_DATA_ERROR 8
 #define MLX90640_MEAS_TRIGGER_ERROR 9
+// This project's own addition, not part of Melexis's original file:
+// returned by MLX90640_SynchFrame/MLX90640_GetFrameData when the sensor's
+// own data-ready status bit never sets within MLX90640_DATA_READY_MAX_POLLS
+// read attempts, instead of polling it forever - see those functions' own
+// comments in MLX90640_API.c for why an unbounded wait is unsafe here.
+#define MLX90640_DATA_READY_TIMEOUT_ERROR 10
+// This project's own addition, not part of Melexis's original file: the
+// poll-attempt cap used with MLX90640_DATA_READY_TIMEOUT_ERROR above. Not a
+// wall-clock timeout (this file doesn't include the HAL) - just a large
+// enough bound that a real sensor's own refresh cycle (worst case a few
+// hundred ms at the slowest configurable refresh rate) always finishes well
+// within it, while a stuck bus still fails in bounded time instead of never.
+#define MLX90640_DATA_READY_MAX_POLLS 20000
+// This project's own addition, not part of Melexis's original file: an
+// iteration cap for the `while (temp < K) { temp *= 2; scale++; }`
+// scale-normalisation loops in ExtractAlphaParameters/ExtractKtaPixel-
+// Parameters/ExtractKvPixelParameters. `temp` is the max |value| over the
+// 768 pixels; for any real calibration EEPROM it doubles past K in well
+// under 20 steps, but a degenerate dump (every value exactly 0 - a
+// corrupt DumpEE, an unpopulated part) leaves temp == 0, and 0*2 == 0 < K
+// forever. The cap is far past any real convergence, so the maths is
+// unchanged for a real sensor; a garbage dump now falls through with
+// zeroed params instead of hanging the F303, and ExtractDeviatingPixels
+// (run last) still returns the honest -MLX90640_BROKEN_PIXELS_NUM_ERROR.
+#define MLX90640_SCALE_ITER_MAX 64
 
 #define BIT_MASK(x) (1UL << (x))
 #define REG_MASK(sbit,nbits) ~((~(~0UL << (nbits))) << (sbit))
