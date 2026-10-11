@@ -28,7 +28,7 @@
 // PATCH+1 on every real build, odometer-carry into MINOR/MAJOR.
 #define FIRMWARE_VERSION_MAJOR 0
 #define FIRMWARE_VERSION_MINOR 3
-#define FIRMWARE_VERSION_PATCH 1
+#define FIRMWARE_VERSION_PATCH 2
 #define FIRMWARE_VERSION_BUILD 0
 
 // ID configuration matrix (physical tool-head address readout)
@@ -396,7 +396,7 @@ typedef struct __attribute__((packed)) {
     uint8_t  active_tool;
     uint16_t current_temperature;
     uint16_t target_temperature;
-    uint8_t  flags;              // bit0 endstop_triggered, bit1 system_error_flag (the sample where THIS is first set is the fault trigger itself)
+    uint8_t  flags;              // bit0 endstop_triggered, bit1 system_error_flag (the sample where THIS is first set is the fault trigger itself), bits2-3 thermal_fault_code (thermal_guard.h)
 } BlackBoxSample_t; // 10 bytes
 
 // ~150ms x 67 samples =~ 10.0s, matching the requested "last 10s"
@@ -479,6 +479,8 @@ extern volatile uint8_t layer_fan_duty;
 extern volatile uint32_t layer_fan_rpm_pulses;
 extern volatile uint32_t layer_fan_actual_rpm;
 extern volatile uint8_t system_error_flag;
+extern volatile uint8_t thermal_fault_code; // ThermalGuardFault_t of the latched thermal fault, 0 = none (firmware_control_thermal.c)
+extern volatile uint8_t last_reset_cause;   // RCC reset-cause bits latched at boot (STM32F303CC_main.c), reported in 0x111 byte 5
 extern volatile uint8_t boot_sequence_active;
 extern volatile uint8_t can_bus_error_flag;
 extern volatile uint8_t laser_power_setpoint;

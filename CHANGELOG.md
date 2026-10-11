@@ -1,5 +1,34 @@
 # Changelog - URTC (repo-wide index)
 
+## [0.3.2] - Thermal runaway guard, signing keys out of the tools, reset cause
+
+- **Thermal runaway protection** (`thermal_guard.c/.h`, new, pure C) for the
+  T12/hot-air loop and the 3D hotend loop in `firmware_control_thermal.c`:
+  MAXTEMP on the MEASURED value (449 C T12/hot air, 310 C hotend), a heating
+  watch (the temperature must really rise while the heater is on and far
+  below target - catches a loose thermistor/tip reading room temperature)
+  and a holding check (once at target, a sag beyond the hysteresis that
+  lasts the whole hold period with the heater on). Any fault cuts the
+  heater, latches `system_error_flag` and records why in
+  `thermal_fault_code`. `tests/test_thermal_guard.c` (new) drives it with a
+  simulated heater/block/loose sensor: healthy heat-up and hold, setpoint
+  changes, a heavy soldering load and a HAL tick wrap never trip it; a loose
+  sensor while heating or while holding is always caught within its window.
+  Wired into `build_firmware.sh`/`.bat` step 1b.
+- **`0x111` grows to DLC 6** (backward compatible): byte 4 =
+  `thermal_fault_code`, byte 5 = `last_reset_cause` (RCC reset flags latched
+  at boot, bit0 = the IWDG fired). See `docs/CANBUS.TXT`.
+- **Black box**: each sample's `flags` now carries the thermal fault code in
+  bits 2-3 (no record layout change).
+- **Signing keys**: the bootloaders take their HMAC key from
+  `URTC_SIGNING_KEY_FILE` at build time (`firmware_signing.py`, new); without
+  it they build with the PUBLIC development key and say so, and
+  `URTC_RELEASE=1` refuses that. Every build now publishes `<bin>.sha256` and
+  `<bin>.manifest.json`, with the precomputed `hmac_sha256` for the two
+  application images, so URTC-FLASHER and URTC-WEB-STUDIO only transport a
+  signature and no longer carry the key. See `docs/FIRMWARE_SIGNING.TXT`
+  (also the measured flash budget and the plan for Ed25519).
+
 ## [0.3.1] - Real host-native test harness for the general CAN dispatch table
 
 - **`firmware_can_dispatch_routing.c/.h`** (new) - the tool-ID -> handler

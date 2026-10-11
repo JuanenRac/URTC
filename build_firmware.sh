@@ -168,6 +168,26 @@ else
         fail "CAN dispatch routing host logic tests FAILED"
         echo ""; echo "$PASS passed, $WARN warnings, $FAIL failed"; exit 1
     fi
+
+    # thermal_guard.c (thermal runaway protection for the T12 and the 3D
+    # hotend) is pure C too - tests/test_thermal_guard.c drives it with a
+    # simulated heater, block and loose sensor.
+    THERMAL_HOST_BIN="$BUILD/host_tests_thermal_guard"
+    if "$HOST_CC" -std=c11 -Wall -Wextra -Wno-unused-parameter \
+        -I"$ROOT/tests" -I"$DISPATCH_SRC" -o "$THERMAL_HOST_BIN" \
+        "$ROOT/tests/test_thermal_guard.c" \
+        "$DISPATCH_SRC/thermal_guard.c"; then
+        pass "thermal guard host test suite compiled ($HOST_CC -std=c11 -Wall -Wextra)"
+    else
+        fail "thermal guard host test suite failed to compile"
+        echo ""; echo "$PASS passed, $WARN warnings, $FAIL failed"; exit 1
+    fi
+    if "$THERMAL_HOST_BIN"; then
+        pass "thermal guard host logic tests passed"
+    else
+        fail "thermal guard host logic tests FAILED"
+        echo ""; echo "$PASS passed, $WARN warnings, $FAIL failed"; exit 1
+    fi
 fi
 
 # -----------------------------------------------------------------------
@@ -289,6 +309,23 @@ version_or_bump() {
 
 mkdir -p "$FIRMWARE_OUT"
 
+# -----------------------------------------------------------------------
+step "3b. Firmware signing keys (docs/FIRMWARE_SIGNING.TXT)"
+# -----------------------------------------------------------------------
+# The bootloaders get their HMAC key injected here from the PRIVATE file
+# named by URTC_SIGNING_KEY_FILE - it is never committed. Without it the
+# build uses the PUBLIC development key (bench boards only); URTC_RELEASE=1
+# refuses to build without a private key.
+if SIGNING_KINDS="$(python3 "$ROOT/firmware_signing.py" check)"; then
+    pass "signing keys: $SIGNING_KINDS"
+    case "$SIGNING_KINDS" in *dev*) warn "PUBLIC development signing key in use - these images are for bench boards only, never a release" ;; esac
+else
+    fail "signing keys unavailable (see the message above) - nothing built"
+    echo ""; echo "$PASS passed, $WARN warnings, $FAIL failed"; exit 1
+fi
+MASTER_KEY_FLAGS="$(python3 "$ROOT/firmware_signing.py" cflags master)" || exit 1
+SLAVE_KEY_FLAGS="$(python3 "$ROOT/firmware_signing.py" cflags slave)" || exit 1
+
 # The firmware directory is a single coherent build set, never a history of
 # mixed component versions. Preserve non-generated material, but remove every
 # artifact that this script itself publishes before compiling the new set.
@@ -297,6 +334,8 @@ firmware_artifacts=(
     "$FIRMWARE_OUT"/URTC_*.bin
     "$FIRMWARE_OUT"/URTC_*.elf
     "$FIRMWARE_OUT"/URTC_*.hex
+    "$FIRMWARE_OUT"/URTC_*.bin.sha256
+    "$FIRMWARE_OUT"/URTC_*.bin.manifest.json
     "$FIRMWARE_OUT"/firmware_manifest.json
 )
 if ((${#firmware_artifacts[@]})); then
@@ -323,7 +362,7 @@ SRC="$ROOT/src/F303-master/boot"
 # <PREFIX>_v<MAJOR>.<MINOR>.<PATCH> pattern - see CHANGELOG.md for why this
 # replaced the old unversioned URTC_BOOTLOADER name.
 BOOT_VER=$(version_or_bump "$SRC/bootloader_common.h" BOOTLOADER_VERSION)
-compile_dir "$SRC" "$OUT" ""
+compile_dir "$SRC" "$OUT" "$MASTER_KEY_FLAGS"
 BOOT_NAME="URTC_MAIN_BOOTLOADER_v${BOOT_VER}"
 arm-none-eabi-gcc $LDCOMMON -T"$SRC/STM32F303CCTx_BOOTLOADER.ld" \
     "$BUILD/app_master/startup.o" "$BUILD/app_master/system_stm32f3xx.o" \
@@ -391,7 +430,7 @@ SRC="$ROOT/src/F303-slave/boot"
 # pattern too - filename convention URTC_SLAVE_BOOTLOADER_v{MAJOR}.{MINOR}.
 # {PATCH} replaces the old unversioned URTC_SLAVE_BOOTLOADER name.
 SLAVE_BOOT_VER=$(version_or_bump "$SRC/slaveboot_common.h" BOOTLOADER_VERSION)
-compile_dir "$SRC" "$OUT" ""
+compile_dir "$SRC" "$OUT" "$SLAVE_KEY_FLAGS"
 SLAVE_BOOT_NAME="URTC_SLAVE_BOOTLOADER_v${SLAVE_BOOT_VER}"
 arm-none-eabi-gcc $LDCOMMON -T"$SRC/STM32F303CBTx_SLAVEBOOT.ld" \
     "$BUILD/app_slave/startup.o" "$BUILD/app_slave/system_stm32f3xx.o" \

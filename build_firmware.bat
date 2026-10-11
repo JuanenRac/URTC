@@ -213,7 +213,25 @@ del /q "%FIRMWARE_OUT%\URTC_*.bin" 2>nul
 del /q "%FIRMWARE_OUT%\URTC_*.elf" 2>nul
 del /q "%FIRMWARE_OUT%\URTC_*.hex" 2>nul
 del /q "%FIRMWARE_OUT%\firmware_manifest.json" 2>nul
+del /q "%FIRMWARE_OUT%\URTC_*.bin.sha256" 2>nul
+del /q "%FIRMWARE_OUT%\URTC_*.bin.manifest.json" 2>nul
 echo   OK   old generated firmware artifacts removed from firmware\
+
+echo.
+echo === 3b. Firmware signing keys ^(docs\FIRMWARE_SIGNING.TXT^) ===
+REM The bootloaders get their HMAC key injected from the PRIVATE file named
+REM by URTC_SIGNING_KEY_FILE - never committed. Without it: the PUBLIC
+REM development key (bench boards only). URTC_RELEASE=1 refuses that.
+python "%ROOT%\firmware_signing.py" check
+if errorlevel 1 (
+    echo   FAIL signing keys unavailable - see the message above, nothing built
+    set /a FAIL+=1
+    goto :summary
+)
+set "MASTER_KEY_FLAGS="
+set "SLAVE_KEY_FLAGS="
+for /f "usebackq delims=" %%k in (`python "%ROOT%\firmware_signing.py" cflags master`) do set "MASTER_KEY_FLAGS=%%k"
+for /f "usebackq delims=" %%k in (`python "%ROOT%\firmware_signing.py" cflags slave`) do set "SLAVE_KEY_FLAGS=%%k"
 
 REM -----------------------------------------------------------------------
 if "%TARGET%"=="all" set "DO_MASTER=1" & set "DO_SLAVE=1"
@@ -247,7 +265,7 @@ if not defined BOOT_VER (
 set "BOOT_NAME=URTC_MAIN_BOOTLOADER_v!BOOT_VER!"
 set "SECTION_FAIL=0"
 for %%f in ("!SRC!\*.c") do (
-    arm-none-eabi-gcc %CFLAGS% -I"!SRC!" -x c -c "%%f" -o "!OUT!\%%~nf.o"
+    arm-none-eabi-gcc %CFLAGS% !MASTER_KEY_FLAGS! -I"!SRC!" -x c -c "%%f" -o "!OUT!\%%~nf.o"
     if errorlevel 1 (
         echo   FAIL %%~nf.c failed to compile
         set "SECTION_FAIL=1"
@@ -392,7 +410,7 @@ if not defined SLAVE_BOOT_VER (
 set "SLAVE_BOOT_NAME=URTC_SLAVE_BOOTLOADER_v!SLAVE_BOOT_VER!"
 set "SECTION_FAIL=0"
 for %%f in ("!SRC!\*.c") do (
-    arm-none-eabi-gcc %CFLAGS% -I"!SRC!" -x c -c "%%f" -o "!OUT!\%%~nf.o"
+    arm-none-eabi-gcc %CFLAGS% !SLAVE_KEY_FLAGS! -I"!SRC!" -x c -c "%%f" -o "!OUT!\%%~nf.o"
     if errorlevel 1 (echo   FAIL %%~nf.c failed to compile & set "SECTION_FAIL=1")
 )
 if "!SECTION_FAIL!"=="1" (

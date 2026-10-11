@@ -89,6 +89,13 @@ I2C_HandleTypeDef hi2c2;     // Hardware I2C2 for the OLED+F-RAM (PA9/PA10 - AF4
 // No HAL handle needed for a bit-banged bus.
 ADC_HandleTypeDef hadc;
 IWDG_HandleTypeDef hiwdg;
+// Why the CPU last reset, latched once at boot from RCC->CSR (nothing else in
+// this firmware or the bootloaders clears those flags, so they still hold the
+// cause here): bit0 IWDG, bit1 WWDG, bit2 software, bit3 power-on/brown-out,
+// bit4 NRST pin, bit5 low-power, bit6 option-byte load. Reported in 0x111
+// byte 5 so a host can tell "the board was power-cycled" from "the watchdog
+// bit us" - an IWDG reset means the main loop hung somewhere.
+volatile uint8_t last_reset_cause = 0;
 
 volatile LED_RGB_t led_state_pixel;      
 volatile LED_RGB_t ring_pixels[8];        
@@ -224,6 +231,14 @@ int main(void) {
     uint32_t tick_fram_check = 0;
     
     HAL_Init();
+    last_reset_cause = (uint8_t)((__HAL_RCC_GET_FLAG(RCC_FLAG_IWDGRST) ? 0x01 : 0) |
+                                 (__HAL_RCC_GET_FLAG(RCC_FLAG_WWDGRST) ? 0x02 : 0) |
+                                 (__HAL_RCC_GET_FLAG(RCC_FLAG_SFTRST)  ? 0x04 : 0) |
+                                 (__HAL_RCC_GET_FLAG(RCC_FLAG_PORRST)  ? 0x08 : 0) |
+                                 (__HAL_RCC_GET_FLAG(RCC_FLAG_PINRST)  ? 0x10 : 0) |
+                                 (__HAL_RCC_GET_FLAG(RCC_FLAG_LPWRRST) ? 0x20 : 0) |
+                                 (__HAL_RCC_GET_FLAG(RCC_FLAG_OBLRST)  ? 0x40 : 0));
+    __HAL_RCC_CLEAR_RESET_FLAGS(); // so the NEXT reset reports only its own cause
     SystemClock_Config();
 
     MX_GPIO_Init_Early();

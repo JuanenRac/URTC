@@ -12,31 +12,24 @@
 #include "bootloader_common.h"
 #include "bootloader_crypto.h"
 
-// Single definition matching bootloader_common.h's extern declaration.
-// Generated with a CSPRNG (Python's `secrets.token_bytes(32)`) to
-// replace the original human-readable "URTC-HYDRA-UMC-
-// 2026-CHANGE-ME-!!" placeholder - this is a real random key, not a
-// second placeholder, but it is STILL committed to a public GPL-3.0
-// repo, so it cannot be a genuine confidentiality boundary for anyone
-// relying on it as shipped. For real production security: generate
-// your own private key (never committed here), rebuild the bootloader
-// with it, and point URTC-FLASHER at the same value via
-// urtc_config.json's own "hmac_key_hex" override (see
-// flasher_config.py's own comment on that field) instead of relying on
-// this compiled-in default.
-//
-// This is the MASTER board's own key - deliberately different from
-// slaveboot_crypto.c's own key (see that file's comment). The host
-// tools' own HMAC_KEY (flasher_config.py, URTC-WEB-STUDIO's
-// src/lib/flasher.ts) must match this exact value for master-board
-// updates; their own separate SLAVE_HMAC_KEY must match
-// slaveboot_crypto.c's key for slave-board updates instead.
+// SIGNING KEY - injected at build time, never committed (see
+// docs/FIRMWARE_SIGNING.TXT). build_firmware.sh passes -DURTC_HMAC_KEY_BYTES=...
+// from the private key file named by URTC_SIGNING_KEY_FILE; a release build
+// (URTC_RELEASE=1) refuses to run without it. Without that define this
+// falls back to the PUBLIC DEVELOPMENT key below: the historic key that
+// was committed to this public repository, so ANYONE can sign images it
+// accepts - fine on a bench, never for a board in the field.
+#ifdef URTC_HMAC_KEY_BYTES
+const uint8_t HMAC_KEY[32] = { URTC_HMAC_KEY_BYTES };
+#else
+#warning "URTC: building with the PUBLIC development signing key - set URTC_SIGNING_KEY_FILE for real boards"
 const uint8_t HMAC_KEY[32] = {
     0x25, 0x26, 0xCC, 0x3E, 0x90, 0x11, 0xEC, 0x7C,
     0x49, 0xEC, 0xD2, 0xD2, 0xB7, 0xF3, 0x89, 0xE3,
     0x59, 0xAA, 0x24, 0x60, 0x14, 0xFF, 0x51, 0x54,
     0xA0, 0xAF, 0x8A, 0x3C, 0x3B, 0xF9, 0x55, 0x81
 };
+#endif
 
 typedef struct {
     uint32_t state[8];

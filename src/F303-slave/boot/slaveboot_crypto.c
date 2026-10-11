@@ -12,22 +12,24 @@
 #include "slaveboot_common.h"
 #include "slaveboot_crypto.h"
 
-// Single definition matching slaveboot_common.h's extern declaration.
-// Real CSPRNG-generated key (Node's crypto.randomBytes(32)),
-// deliberately DIFFERENT from bootloader_crypto.c's own HMAC_KEY (master)
-// - see slaveboot_common.h's own comment on this field for why the two
-// must never match: a master-signed image must never verify against
-// this chip's key, or vice versa. Same "committed to a public repo,
-// therefore not a real confidentiality boundary as shipped" caveat as
-// the master key - see bootloader_crypto.c's own comment for the full
-// reasoning. The host tools' own SLAVE_HMAC_KEY (flasher_config.py,
-// URTC-WEB-STUDIO's src/lib/flasher.ts) must match this exact value.
+// SIGNING KEY - injected at build time, never committed (see
+// docs/FIRMWARE_SIGNING.TXT). build_firmware.sh passes -DURTC_SLAVE_HMAC_KEY_BYTES=...
+// from the private key file named by URTC_SIGNING_KEY_FILE (its "slave" line); a release build
+// (URTC_RELEASE=1) refuses to run without it. Without that define this
+// falls back to the PUBLIC DEVELOPMENT key below: the historic key that
+// was committed to this public repository, so ANYONE can sign images it
+// accepts - fine on a bench, never for a board in the field.
+#ifdef URTC_SLAVE_HMAC_KEY_BYTES
+const uint8_t HMAC_KEY[32] = { URTC_SLAVE_HMAC_KEY_BYTES };
+#else
+#warning "URTC: building with the PUBLIC development signing key - set URTC_SIGNING_KEY_FILE for real boards"
 const uint8_t HMAC_KEY[32] = {
     0xF6, 0xFC, 0x5E, 0xC3, 0xC7, 0xC0, 0xB8, 0x32,
     0x5F, 0x08, 0x83, 0x85, 0xCD, 0x10, 0x9E, 0x63,
     0x7D, 0x45, 0x58, 0xD4, 0x53, 0x5F, 0x61, 0x9C,
     0xD0, 0x6F, 0x3D, 0xF2, 0xAF, 0xDC, 0x38, 0x1D
 };
+#endif
 
 typedef struct {
     uint32_t state[8];

@@ -5,9 +5,49 @@
 // =============================================================================
 #include "firmware_common.h"
 #include "firmware_control_thermal.h"
+#include "thermal_guard.h"
+
+// Last thermal-guard fault (ThermalGuardFault_t), 0 = none. Reported as the
+// 5th byte of the 0x111 state answer so a host knows WHY the board blocked
+// itself, not just that it did. Latched like system_error_flag itself.
+volatile uint8_t thermal_fault_code = THERMAL_GUARD_OK;
+
+// Thermal runaway limits (see thermal_guard.h). The T12 cartridge heats in
+// seconds, so its heating window is short; the hotend block is slower. The
+// holding-phase hysteresis is generous on purpose - soldering a large pad
+// or a big print move legitimately pulls the temperature down for a while -
+// but no healthy heater stays more than that far below its target for the
+// whole hold period while running flat out.
+// T12 max_temp_c = 449: the thermocouple mapping can never report more
+// than 449 (the ADC rail guard above refuses anything >= 4090), so on this
+// tool the rail guard IS the MAXTEMP and the ceiling here only documents it;
+// a lower value would trip on the normal +2C overshoot of a 445C setpoint.
+static const ThermalGuardLimits_t T12_GUARD_LIMITS = {
+    .max_temp_c = 449, .watch_period_ms = 20000, .watch_min_rise_c = 10, .watch_band_c = 20,
+    .hold_period_ms = 45000, .hold_hysteresis_c = 40,
+};
+static const ThermalGuardLimits_t HOTEND_GUARD_LIMITS = {
+    .max_temp_c = 310, .watch_period_ms = 40000, .watch_min_rise_c = 2, .watch_band_c = 10,
+    .hold_period_ms = 40000, .hold_hysteresis_c = 15,
+};
+static ThermalGuard_t t12_guard;
+static ThermalGuard_t hotend_guard;
+
+// Shared fault path: heater off, board error latched, reason recorded.
+static uint8_t ThermalGuard_Apply(ThermalGuardFault_t fault) {
+    if (fault == THERMAL_GUARD_OK) return 0;
+    thermal_fault_code = (uint8_t)fault;
+    system_error_flag = 1;
+    target_temperature = 0;
+    HAL_GPIO_WritePin(T12_PWM_PORT, T12_PWM_PIN, GPIO_PIN_RESET);
+    return 1;
+}
 
 void Control_SolderingIron_PID(void) {
-    if (active_tool != TOOL_SOLDERING_IRON && active_tool != TOOL_HOTAIR_REWORK) return;
+    if (active_tool != TOOL_SOLDERING_IRON && active_tool != TOOL_HOTAIR_REWORK) {
+        ThermalGuard_Reset(&t12_guard);
+        return;
+    }
 
     // The T12 cartridge routes its heater current and its internal
     // thermocouple through the same two conductors. Force the heater off
@@ -115,6 +155,14 @@ void Control_SolderingIron_PID(void) {
     } else if ((int32_t)current_temperature > (int32_t)target_temperature + 2) {
         heater_on = 0;
     }
+    // Thermal runaway guard (loose thermocouple / tip without contact): see
+    // thermal_guard.h. Checked with this cycle's real decision, before the
+    // pin is driven.
+    if (ThermalGuard_Apply(ThermalGuard_Check(&t12_guard, &T12_GUARD_LIMITS, HAL_GetTick(),
+                                              heater_on, current_temperature, target_temperature))) {
+        heater_on = 0;
+        return;
+    }
     HAL_GPIO_WritePin(T12_PWM_PORT, T12_PWM_PIN, heater_on ? GPIO_PIN_SET : GPIO_PIN_RESET);
 }
 
@@ -161,7 +209,10 @@ static int16_t NTC_Lookup(uint16_t raw_adc) {
 }
 
 void Control_3D_Hotend_PID(void) {
-    if (active_tool != TOOL_3D_PRINTER) return;
+    if (active_tool != TOOL_3D_PRINTER) {
+        ThermalGuard_Reset(&hotend_guard);
+        return;
+    }
     
     HAL_ADC_Start(&hadc);
     // 2ms timeout - see the soldering iron's identical 2ms budget above
@@ -240,6 +291,13 @@ void Control_3D_Hotend_PID(void) {
         hotend_heater_on = 1;
     } else if ((int32_t)current_temperature > (int32_t)target_temperature + 2) {
         hotend_heater_on = 0;
+    }
+    // Thermal runaway guard (thermistor fallen out of the block): see
+    // thermal_guard.h.
+    if (ThermalGuard_Apply(ThermalGuard_Check(&hotend_guard, &HOTEND_GUARD_LIMITS, HAL_GetTick(),
+                                              hotend_heater_on, current_temperature, target_temperature))) {
+        hotend_heater_on = 0;
+        return;
     }
     HAL_GPIO_WritePin(T12_PWM_PORT, T12_PWM_PIN, hotend_heater_on ? GPIO_PIN_SET : GPIO_PIN_RESET);
 }

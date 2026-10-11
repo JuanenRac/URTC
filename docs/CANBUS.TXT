@@ -78,7 +78,8 @@ Effect: answers with 0x111. Read-only, no side effects - answered even
 
 ID: 0x111 [URTC Tool Head -> Master, answers 0x110]
 Active tool + quick state response
-DLC: 4 bytes
+DLC: 6 bytes (firmware 0.3.1+; older firmware answers with the first 4 -
+     a host must treat missing bytes 4-5 as "not reported", not as 0)
 Data:
   - txData[0]: Active tool (matches the ToolMode_t enum in
                firmware_common.h): 0=Soldering Iron, 1=Paste Dispenser,
@@ -109,6 +110,23 @@ Data:
   - txData[2]: can_bus_error_flag (0x01 = a CAN bus fault was seen)
   - txData[3]: boot_sequence_active (0x01 = still inside the ~5s boot
                splash window - movement commands are deferred until this clears)
+  - txData[4]: thermal_fault_code - WHY the heater was cut by the thermal
+               runaway guard (thermal_guard.c), 0 if it never was:
+                 0 = none
+                 1 = MAXTEMP (measured temperature above the hard ceiling:
+                     449 C T12/hot air, 310 C 3D hotend)
+                 2 = HEATING_NO_RISE (heater on, far below target, but the
+                     temperature did not rise - loose sensor/tip, dead heater)
+                 3 = DROPPED_AT_TARGET (target reached, then sagged far
+                     below it with the heater on - sensor fell out)
+               A non-zero code always comes with txData[1] = 0x01. The
+               heater stays off until the board is reset - see
+               firmware_control_thermal.c.
+  - txData[5]: last_reset_cause - RCC reset flags latched at boot:
+               bit0 IWDG (the hardware watchdog fired: the main loop hung),
+               bit1 WWDG, bit2 software reset (also what the bootloader's
+               jump/update path produces), bit3 power-on/brown-out,
+               bit4 NRST pin, bit5 low-power, bit6 option-byte load.
 
 ID: 0x180 [Master -> URTC Tool Head]
 Expansion SPI passthrough (CONN_EXPANSION)
@@ -1285,7 +1303,7 @@ Data:
   0x095 -> Instant impact register (Touch probe - MAXIMUM PRIORITY)
   0x100 -> Status + ring LED control / OLED night mode (DLC:8)
   0x110 -> Query active tool + quick state (DLC:any)
-  0x111 -> Active tool + quick state response (DLC:4)
+  0x111 -> Active tool + quick state response (DLC:6, byte 4 thermal fault, byte 5 reset cause)
   0x180 -> Expansion SPI passthrough request (DLC:2-8)
   0x181 -> Expansion SPI passthrough response (DLC:2-8)
   0x182 -> Query TMC_DIAG0 level (DLC:any)

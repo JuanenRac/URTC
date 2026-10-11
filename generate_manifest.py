@@ -24,7 +24,10 @@ import re
 import glob
 import zlib
 import json
+import hashlib
 from datetime import datetime, timezone
+
+import firmware_signing
 
 
 def read_define(path, name):
@@ -63,7 +66,16 @@ def bin_info(bin_path):
     with open(bin_path, "rb") as f:
         data = f.read()
     crc = zlib.crc32(data) & 0xFFFFFFFF
-    return {"filename": os.path.basename(bin_path), "size_bytes": len(data), "crc32": f"0x{crc:08X}"}
+    return {
+        "filename": os.path.basename(bin_path),
+        "size_bytes": len(data),
+        "crc32": f"0x{crc:08X}",
+        # sha256 over the exact shipped bytes - what URTC-FLASHER and
+        # URTC-WEB-STUDIO verify BEFORE sending a single CAN frame (the
+        # bootloader's own CRC32+HMAC check is the final gate, this is the
+        # early "is this the file that was published" check).
+        "sha256": hashlib.sha256(data).hexdigest(),
+    }
 
 
 def file_info(bin_path, ext):
@@ -197,13 +209,68 @@ def main():
         },
     }
 
+    # Signatures: computed HERE, at build time, by whoever holds the signing
+    # key (see firmware_signing.py / docs/FIRMWARE_SIGNING.TXT). The
+    # flashing tools only transport the published hmac_sha256 - they never
+    # need, and never ship, the key itself.
+    build_date = manifest["generated_at"]
+    signing_info = {}
+    for comp_key, board in (("main_application", "master"), ("slave_application", "slave")):
+        comp = manifest["components"][comp_key]
+        bin_path = os.path.join(fw_dir, comp["files"]["bin"]["filename"])
+        key, kind = firmware_signing.load_key(board)
+        comp["signing"] = {
+            "algorithm": "HMAC-SHA256",
+            "key_kind": kind,
+            "key_id": firmware_signing.key_id(key),
+            "hmac_sha256": firmware_signing.hmac_file(board, bin_path),
+        }
+        signing_info[comp_key] = kind
+    manifest["signing_summary"] = signing_info
+    if "dev" in signing_info.values():
+        manifest["notes"].append(
+            "key_kind \"dev\" means these application images are signed with the PUBLIC "
+            "development key that also lives in this repository: they only install on "
+            "a board whose bootloader was built the same way, and they authenticate "
+            "nothing. A release (URTC_RELEASE=1) is signed with a private key instead - "
+            "see docs/FIRMWARE_SIGNING.TXT."
+        )
+
+    # Per-image sidecars next to every .bin: <bin>.sha256 (sha256sum
+    # format) and <bin>.manifest.json (the format URTC-FLASHER's
+    # _check_manifest and URTC-WEB-STUDIO's parseManifest already read).
+    for comp_key, comp in manifest["components"].items():
+        b = comp["files"]["bin"]
+        bin_path = os.path.join(fw_dir, b["filename"])
+        with open(bin_path + ".sha256", "w", encoding="utf-8") as f:
+            f.write(f"{b['sha256']}  {b['filename']}\n")
+        sidecar = {
+            "component": comp_key,
+            "chip": comp["chip"],
+            "hardware_id": comp["hardware_id"],
+            "version": comp["version_string"],
+            "build_date": build_date,
+            "size_bytes": b["size_bytes"],
+            "crc32": b["crc32"],
+            "sha256": b["sha256"],
+        }
+        if "signing" in comp:
+            sidecar.update({
+                "hmac_sha256": comp["signing"]["hmac_sha256"],
+                "signing_key_kind": comp["signing"]["key_kind"],
+                "signing_key_id": comp["signing"]["key_id"],
+            })
+        with open(bin_path + ".manifest.json", "w", encoding="utf-8") as f:
+            json.dump(sidecar, f, indent=2)
+            f.write("\n")
+
     out_path = os.path.join(fw_dir, "firmware_manifest.json")
     with open(out_path, "w") as f:
         json.dump(manifest, f, indent=2)
         f.write("\n")
     print(f"firmware_manifest.json regenerated at {out_path}")
     for key, comp in manifest["components"].items():
-        print(f"  {key}: v{comp['version_string']}  {comp['files']['bin']['filename']}  crc32={comp['files']['bin']['crc32']}")
+        print(f"  {key}: v{comp['version_string']}  {comp['files']['bin']['filename']}  crc32={comp['files']['bin']['crc32']}  sha256={comp['files']['bin']['sha256'][:16]}...")
 
 
 if __name__ == "__main__":

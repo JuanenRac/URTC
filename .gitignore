@@ -7,3 +7,8 @@ build/
 # Python bytecode (generated locally; never source)
 __pycache__/
 *.py[cod]
+
+# Firmware signing keys (docs/FIRMWARE_SIGNING.TXT) - never commit them
+signing_keys*.txt
+*.signing.key
+*.key

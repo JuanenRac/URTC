@@ -81,7 +81,11 @@ void BlackBox_Sample(void) {
     s->active_tool = (uint8_t)active_tool;
     s->current_temperature = current_temperature;
     s->target_temperature = target_temperature;
-    s->flags = (uint8_t)((endstop_triggered ? 0x01 : 0) | (system_error_flag ? 0x02 : 0));
+    // bit0 endstop, bit1 system error, bits2-3 thermal runaway guard code
+    // (0 none, 1 MAXTEMP, 2 HEATING_NO_RISE, 3 DROPPED_AT_TARGET - see
+    // thermal_guard.h), so a flushed record says WHY the heater was cut.
+    s->flags = (uint8_t)((endstop_triggered ? 0x01 : 0) | (system_error_flag ? 0x02 : 0) |
+                         ((thermal_fault_code & 0x03u) << 2));
 
     write_index = (write_index + 1) % BLACKBOX_SAMPLES;
     if (sample_count < BLACKBOX_SAMPLES) sample_count++;

@@ -1,0 +1,101 @@
+===============================================================================
+ URTC - FIRMWARE SIGNING (keys, signatures and how images are verified)
+ Copyright (C) 2026 JuanenRac (Electro Hobby 3D) - GPL-3.0
+===============================================================================
+
+1. WHAT THE BOOTLOADERS CHECK
+-------------------------------------------------------------------------------
+Before a CAN-OTA update is copied into the application slot, the main board
+bootloader (src/F303-master/boot/) and the expansion slave bootloader
+(src/F303-slave/boot/) verify:
+
+  * CRC32 of the image (catches transfer corruption), and
+  * HMAC-SHA256 of the whole image with the board's 32-byte signing key,
+    sent by the host in 4 CAN chunks (0x7F7 / slave equivalent).
+
+HMAC is symmetric: whoever COMPUTES the signature must hold the same key the
+bootloader holds. So the security of the whole chain is "who holds the key".
+
+2. WHERE THE KEY LIVES (and where it must NOT live)
+-------------------------------------------------------------------------------
+  * NOT in this repository. The bootloader sources only contain the PUBLIC
+    DEVELOPMENT key (the historic key that was published here) inside an
+    #else branch, used when no private key is supplied. Anyone can sign
+    images for a board built with it: bench use only.
+  * NOT in URTC-WEB-STUDIO (no key in its JavaScript) and NOT as a default in
+    URTC-FLASHER. Both only TRANSPORT a signature that was published next to
+    the image (see section 4). For a self-built image on a bench board they
+    accept a key typed in at run time (kept in memory, never saved).
+  * YES in a private key file kept by whoever builds releases, outside any
+    repository, named by the environment variable URTC_SIGNING_KEY_FILE.
+
+3. MAKING A RELEASE KEY AND BUILDING WITH IT
+-------------------------------------------------------------------------------
+Create the key file once (keep a backup somewhere safe - losing it means the
+boards built with it can only be updated over SWD):
+
+    python3 -c "import secrets; print('master=' + secrets.token_hex(32)); print('slave=' + secrets.token_hex(32))" > ~/.urtc/signing_keys.txt
+    chmod 600 ~/.urtc/signing_keys.txt
+
+Build a release (refuses to run with the public development key):
+
+    URTC_SIGNING_KEY_FILE=~/.urtc/signing_keys.txt URTC_RELEASE=1 ./build_firmware.sh
+
+Windows:
+
+    set URTC_SIGNING_KEY_FILE=%USERPROFILE%\.urtc\signing_keys.txt
+    set URTC_RELEASE=1
+    build_firmware.bat
+
+Without URTC_SIGNING_KEY_FILE the build still works but signs with the PUBLIC
+development key and says so (step 3b, and "key_kind": "dev" in the manifest).
+firmware_signing.py also refuses a key file whose key IS the development key.
+
+IMPORTANT: a bootloader and the application images it accepts must be built
+with the SAME key. Boards already flashed (over SWD) with a development-key
+bootloader keep accepting only development-signed images until their
+bootloader is reflashed with a release-key one.
+
+4. WHAT EVERY BUILD PUBLISHES IN firmware/
+-------------------------------------------------------------------------------
+For every URTC_*.bin:
+
+  <bin>.sha256          sha256sum format - the digest of the exact shipped file
+  <bin>.manifest.json   version, build_date, size, crc32, sha256, hardware_id,
+                        and for the two APPLICATION images also:
+                          hmac_sha256       the signature the bootloader expects
+                          signing_key_kind  "release" or "dev"
+                          signing_key_id    a non-secret fingerprint of the key
+
+firmware_manifest.json indexes all four components with the same data.
+
+URTC-FLASHER and URTC-WEB-STUDIO:
+  * refuse an image whose sha256 does not match its published manifest;
+  * send the published hmac_sha256 as the signature (they never sign);
+  * only for an image WITHOUT a published signature (your own build of a
+    branch, on a bench board) ask for a key at run time.
+
+5. WHY NOT Ed25519 (YET) - AND THE PLAN
+-------------------------------------------------------------------------------
+An asymmetric signature (Ed25519) would put only the PUBLIC key in the
+bootloader and remove the shared secret entirely. Measured flash budget of
+the current bootloaders (build 2026-10):
+
+  main bootloader   region 32 KB (0x08000000-0x08007FFF), image ~18 KB -> ~14 KB free
+  slave bootloader  region 20 KB (0x08000000-0x08004FFF), image ~13.6 KB -> ~6.4 KB free
+
+A compact Ed25519 verifier (e.g. Monocypher's crypto_ed25519_check with its
+SHA-512) needs roughly 10-16 KB of Thumb-2 code: it fits the main board, it
+does NOT fit the slave without moving the slave application's start address
+(0x08005000), which changes the flash layout, the slave application linker
+script and every host tool that knows that address. Doing that without a real
+board to validate it on risks bricking hardware that cannot be recovered
+except over SWD, so it is planned for the first hardware bring-up:
+
+  1. measure the real verifier size with -Os on both chips;
+  2. move the slave application to 0x08006000 (or 0x08007000) if needed;
+  3. replace the 4x8-byte HMAC chunks with 8x8-byte signature chunks (new
+     CAN offsets, old ones kept answering "unsupported" for one release);
+  4. sign with the private key at build time exactly where firmware_signing.py
+     computes the HMAC today - the tools already only transport signatures,
+     so they need no new secret.

@@ -122,15 +122,23 @@ void Handle_CAN_GlobalCommands_PreErrorGate(void) {
         if (rxHeader.StdId == 0x110) {
             if (HAL_CAN_GetTxMailboxesFreeLevel(&hcan) > 0) {
                 CAN_TxHeaderTypeDef txH;
-                uint8_t txD[4];
+                uint8_t txD[6];
                 txD[0] = (uint8_t)active_tool; // 0-24 = a real tool head (ToolMode_t), 25 (TOOL_INVALID) = no tool assigned to this jumper setting
                 txD[1] = system_error_flag ? 0x01 : 0x00;
                 txD[2] = can_bus_error_flag ? 0x01 : 0x00;
                 txD[3] = boot_sequence_active ? 0x01 : 0x00;
+                // 5th byte (added with the thermal runaway guard): WHY a
+                // thermal tool latched its error - ThermalGuardFault_t, 0 =
+                // none. A host that only reads the first 4 bytes keeps
+                // working unchanged.
+                txD[4] = thermal_fault_code;
+                // 6th byte: last_reset_cause (RCC flags latched at boot) -
+                // bit0 set = the independent watchdog reset the board.
+                txD[5] = last_reset_cause;
                 txH.StdId = 0x111;
                 txH.IDE = CAN_ID_STD;
                 txH.RTR = CAN_RTR_DATA;
-                txH.DLC = 4;
+                txH.DLC = 6;
                 txH.TransmitGlobalTime = DISABLE;
                 uint32_t mb;
                 HAL_CAN_AddTxMessage(&hcan, &txH, txD, &mb);

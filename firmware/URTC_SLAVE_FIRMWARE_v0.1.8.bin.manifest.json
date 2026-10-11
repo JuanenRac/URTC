@@ -1,0 +1,13 @@
+{
+  "component": "slave_application",
+  "chip": "STM32F303CBT6",
+  "hardware_id": "0x0303CB01",
+  "version": "0.1.8",
+  "build_date": "2026-10-11T11:23:53Z",
+  "size_bytes": 34592,
+  "crc32": "0xB037CDDD",
+  "sha256": "80193cd3ecf1a184d2e614affe0be2de3a16ac53323869383baf220cac3ba697",
+  "hmac_sha256": "7b07c73a04cfd3a407ee6d5f8d3a48580675277a09685fc64c3068554c0e3f4d",
+  "signing_key_kind": "dev",
+  "signing_key_id": "e481a6627e419f34"
+}
