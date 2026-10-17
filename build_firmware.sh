@@ -40,6 +40,11 @@ fi
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUILD="$ROOT/build"
 FIRMWARE_OUT="$ROOT/firmware"
+if [ "$HYDRA_UMC_CI_MODE" = "1" ]; then
+    # CI builds never touch the versioned images, manifest or sidecars in
+    # firmware/ - everything is published under build/ instead.
+    FIRMWARE_OUT="$BUILD/firmware"
+fi
 if [ -t 0 ]; then
     trap 'echo ""; read -r -p "Press Enter to close this window..." _' EXIT
 fi
@@ -112,6 +117,15 @@ if command -v git >/dev/null 2>&1; then
 else
     fail "git not found - needed to fetch ST's own HAL/CMSIS sources. Install it (apt install git) and re-run."
     echo ""; echo "$PASS passed, $WARN warnings, $FAIL failed"; exit 1
+fi
+
+# -----------------------------------------------------------------------
+step "1a. Build tooling tests (version odometer, manifest timestamps)"
+# -----------------------------------------------------------------------
+if command -v python3 >/dev/null 2>&1 && (cd "$ROOT" && python3 -m unittest discover -s tests -p "test_*.py" >/dev/null 2>&1); then
+    pass "build tooling tests passed"
+else
+    fail "build tooling tests failed - run: python3 -m unittest discover -s tests -p \"test_*.py\""
 fi
 
 # -----------------------------------------------------------------------
@@ -503,7 +517,7 @@ fi
 if [ "$TARGET" = "all" ] && [ "$FAIL" = "0" ]; then
 step "8. Firmware manifest (firmware_manifest.json)"
 # -----------------------------------------------------------------------
-if python3 "$ROOT/generate_manifest.py" "$ROOT"; then
+if python3 "$ROOT/generate_manifest.py" "$ROOT" "$FIRMWARE_OUT"; then
     pass "firmware_manifest.json regenerated"
 else
     warn "firmware_manifest.json regeneration failed - see the traceback above"

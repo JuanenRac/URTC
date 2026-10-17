@@ -82,6 +82,24 @@ def set_macro(text, path, prefix, name, value):
     return new_text
 
 
+def next_version(major, minor, patch):
+    """Return the successor of MAJOR.MINOR.PATCH as a (major, minor, patch) tuple.
+
+    Firmware keeps its own three-component odometer: every component rolls
+    over past 9 into the one to its left (0.7.9 -> 0.8.0, 0.9.9 -> 1.0.0,
+    9.9.9 -> 10.0.0). It never grows a fourth component, because the CAN
+    version frames and the bootloader copies of these macros only carry three.
+    """
+    patch += 1
+    if patch > 9:
+        patch = 0
+        minor += 1
+    if minor > 9:
+        minor = 0
+        major += 1
+    return major, minor, patch
+
+
 def main():
     if len(sys.argv) not in (3, 4):
         print("usage: bump_version.py <header_path> <MACRO_PREFIX> [<mirror_header>]", file=sys.stderr)
@@ -96,14 +114,7 @@ def main():
     minor = get_macro(text, path, prefix, "MINOR")
     patch = get_macro(text, path, prefix, "PATCH")
 
-    # The odometer carry rule itself - see this file's own header comment.
-    patch += 1
-    if patch > 9:
-        patch = 0
-        minor += 1
-    if minor > 9:
-        minor = 0
-        major += 1
+    major, minor, patch = next_version(major, minor, patch)
 
     text = set_macro(text, path, prefix, "MAJOR", major)
     text = set_macro(text, path, prefix, "MINOR", minor)
@@ -130,35 +141,6 @@ def main():
 
     print(f"{major}.{minor}.{patch}")
     return 0
-
-
-def _delegate_to_shared_utility():
-    """Hand the bump over to the shared utility once the version has four parts.
-
-    Returns its exit code, or None when this step is an ordinary three-part one.
-    """
-    import importlib.util
-    import json as _json
-    from pathlib import Path as _Path
-
-    here = _Path(__file__).resolve().parent
-    root = here if (here / "bump_manifest_version.py").is_file() else here.parent
-    utility, manifest = root / "bump_manifest_version.py", root / "urtc.project.json"
-    if not utility.is_file() or not manifest.is_file():
-        return None
-    spec = importlib.util.spec_from_file_location("_shared_bump", utility)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    version = _json.loads(manifest.read_text(encoding="utf-8")).get("version", "")
-    if not hasattr(module, "FOUR_PART_FROM") or module.next_version(version).count(".") != 3:
-        return None
-    return module.main()
-
-
-if __name__ == "__main__":
-    _shared_exit = _delegate_to_shared_utility()
-    if _shared_exit is not None:
-        raise SystemExit(_shared_exit)
 
 
 if __name__ == "__main__":

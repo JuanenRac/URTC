@@ -15,8 +15,15 @@
 # logic - keeping exactly one implementation avoids the 2 build scripts
 # silently drifting apart on what a "fresh" manifest actually contains.
 #
-# Usage: python3 generate_manifest.py [repo_root]
-#   repo_root defaults to this script's own parent directory.
+# Usage: python3 generate_manifest.py [repo_root [firmware_dir]]
+#   repo_root     defaults to this script's own parent directory.
+#   firmware_dir  directory holding the built images and receiving the
+#                 manifest and sidecars; defaults to <repo_root>/firmware.
+#                 A CI run points it at build/ so tracked files stay untouched.
+#
+# The timestamp written into the manifest and sidecars is reproducible:
+# SOURCE_DATE_EPOCH if set, else (when HYDRA_UMC_CI=1) the last commit date,
+# else the current time.
 # =============================================================================
 import sys
 import os
@@ -25,9 +32,37 @@ import glob
 import zlib
 import json
 import hashlib
+import subprocess
 from datetime import datetime, timezone
 
 import firmware_signing
+
+
+def build_timestamp(root, environ=None):
+    """UTC timestamp for generated_at / build_date.
+
+    SOURCE_DATE_EPOCH wins. In CI mode (HYDRA_UMC_CI=1) the last commit date
+    is used so repeated runs over the same commit give identical files. A
+    local build falls back to the current time.
+    """
+    environ = os.environ if environ is None else environ
+    epoch = environ.get("SOURCE_DATE_EPOCH", "").strip()
+    if not epoch and environ.get("HYDRA_UMC_CI") == "1":
+        try:
+            epoch = subprocess.run(
+                ["git", "log", "-1", "--format=%ct"], cwd=root,
+                capture_output=True, text=True, check=True,
+            ).stdout.strip()
+        except (OSError, subprocess.CalledProcessError):
+            epoch = ""
+    if epoch:
+        try:
+            moment = datetime.fromtimestamp(int(epoch), timezone.utc)
+        except (ValueError, OverflowError, OSError):
+            raise SystemExit(f"generate_manifest.py: invalid timestamp source {epoch!r}")
+    else:
+        moment = datetime.now(timezone.utc)
+    return moment.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def read_define(path, name):
@@ -99,7 +134,7 @@ def component_files(fw_dir, prefix):
 
 def main():
     root = sys.argv[1] if len(sys.argv) > 1 else os.path.dirname(os.path.abspath(__file__))
-    fw_dir = os.path.join(root, "firmware")
+    fw_dir = sys.argv[2] if len(sys.argv) > 2 else os.path.join(root, "firmware")
 
     mb_h = os.path.join(root, "src", "F303-master", "boot", "bootloader_common.h")
     mb_maj, mb_min, mb_pat = (
@@ -127,7 +162,7 @@ def main():
 
     manifest = {
         "schema_version": 1,
-        "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "generated_at": build_timestamp(root),
         "project": {
             "name": "URTC",
             "full_name": "Universal Robot Tool Controller",

@@ -38,6 +38,8 @@ set "ROOT=%~dp0"
 if "%ROOT:~-1%"=="\" set "ROOT=%ROOT:~0,-1%"
 set "BUILD=%ROOT%\build"
 set "FIRMWARE_OUT=%ROOT%\firmware"
+REM CI builds publish under build\ and never touch the versioned firmware\ files.
+if "%HYDRA_UMC_CI%"=="1" set "FIRMWARE_OUT=%BUILD%\firmware"
 set "HAL_REPO=https://github.com/STMicroelectronics/stm32f3xx_hal_driver.git"
 set "HAL_COMMIT=953955afe65f89e60e556bbcdba752597f5da65d"
 set "CMSIS_DEVICE_REPO=https://github.com/STMicroelectronics/cmsis_device_f3.git"
@@ -523,7 +525,7 @@ REM -----------------------------------------------------------------------
 if "%TARGET%"=="all" if %FAIL% EQU 0 (
 echo.
 echo === 8. Firmware manifest ^(firmware_manifest.json^) ===
-python "%ROOT%\generate_manifest.py" "%ROOT%"
+python "%ROOT%\generate_manifest.py" "%ROOT%" "%FIRMWARE_OUT%"
 if errorlevel 1 (
     echo   WARN firmware_manifest.json regeneration failed - see the traceback above
 ) else (

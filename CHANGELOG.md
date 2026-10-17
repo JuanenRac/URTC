@@ -1,5 +1,14 @@
 # Changelog - URTC (repo-wide index)
 
+## [0.3.4] - Firmware version boundaries and side-effect-free CI builds
+
+Components: main application 0.3.4, main bootloader 0.3.8, slave application 0.1.9, slave bootloader 0.2.2.
+
+- The firmware version scripts keep their own three-component odometer (0.7.9 -> 0.8.0, 0.9.9 -> 1.0.0, 9.9.9 -> 10.0.0) and no longer hand over to the shared manifest utility, which broke the build at the boundary versions; the successor rule is now a pure function covered by boundary tests that run in CI and as a step of the build script.
+- CI builds (HYDRA_UMC_CI=1) publish firmware images under build/firmware instead of firmware/, so a validation build leaves the tracked images untouched.
+- The firmware manifest and the per-image sidecars take their timestamp from SOURCE_DATE_EPOCH or, in CI, from the last commit date, so regenerating them gives identical files; generate_manifest.py accepts an optional output directory. Tests cover the timestamp rules.
+- Verified: unit tests and shell syntax checks only; the ARM firmware build itself was not run.
+
 ## [0.3.3] - Lifetime thermal counters, hardened slave MLX drivers, CAN threat model
 
 Components: main application 0.3.3, main bootloader 0.3.8, slave
