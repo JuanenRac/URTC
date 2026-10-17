@@ -272,7 +272,7 @@ URTC 的闪存被拆分为两个独立部分，因此板卡可以通过它已经
            │                                   │  之前会检查全部这些内容。
 0x08008000 ├─────────────────────────────────┤
            │  主槽（112K）                     │  这是应用固件 /
-           │                                   │  URTC_MAIN_FIRMWARE_v0.3.3.* ——
+           │                                   │  URTC_MAIN_FIRMWARE_v0.3.5.* ——
            │                                   │  日常运行的实际固件，
            │                                   │  本 README 其他部分描述的
            │                                   │  正是它。在一个经过验证的、
@@ -287,12 +287,13 @@ URTC 的闪存被拆分为两个独立部分，因此板卡可以通过它已经
 
 **为什么需要一个备份槽。** 一次 CAN 更新绝不会写入当前正在运行的那个槽。它会先写入备份槽，并在那里被完整验证——大小、CRC32，以及一个证明它确实来自本项目自身构建流程（而不仅仅是完整到达）的 HMAC-SHA256 签名——只有那之后才会被复制到主槽中。在这次复制开始之前的任何时刻发生断电，都会让当前运行的固件完全不受影响，因此不存在一个被中断的下载可能使板卡变砖的窗口期。如果断电恰好发生在复制过程*本身*期间，引导程序会在下一次启动时注意到这一点（备份槽在复制期间从未被触碰，依然完整无损），并简单地从那里恢复复制，直到成功为止。
 
-### 0. 从源码编译（可选——`firmware/` 已附带预构建的二进制文件）
+### 0. 从源码编译（可选——预构建的二进制文件是每个 GitHub 发布的资源，而不是仓库中的文件）
 
 从本仓库的源码得到上述 4 个二进制文件有两种方式：
 
 - **自动化：** 仓库根目录下的 `build_firmware.sh`（Linux）或 `build_firmware.bat`（Windows）。两者都会在 ARM GNU 工具链缺失时安装它，获取固定版本的 ST HAL/CMSIS 提交，并将全部 4 个二进制文件（主板应用 + 引导程序，扩展从属应用 + 引导程序）编译、链接、`objcopy` 直接输出到 `firmware/`，然后重新生成 `firmware/firmware_manifest.json`。不带参数运行进行完整构建，`--clean` 先清空本地 `build/` 缓存，或 `master`/`slave` 只构建某一颗芯片自身的一对文件。`build_firmware.sh` 针对本项目真实的源码树端到端运行；`build_firmware.bat` 在 Windows 上镜像同样的逻辑——如果两者出现分歧，以 `.sh` 脚本的逻辑为准。
 - **手动：** 无论哪个脚本运行的每一条命令，以及每一项工具链/HAL 选择背后的推理，都在 `docs/COMPILE_STM32F303.TXT` 中逐步详细列出——适用于不同的操作系统、不同的 HAL/CMSIS 源，或只是想确切看看这些脚本自动化了什么。
+- **发布资源：** 固件映像（`.bin`、`.hex`、`.elf` 及其校验和与清单文件）不纳入 git 版本管理。`build_firmware.sh`/`.bat` 将它们写入 `firmware/`（已被 git 忽略；CI 模式即 `HYDRA_UMC_CI=1` 时写入 `build/firmware`），`python tools/publish_release_assets.py` 会检查整套文件并输出带有待附加文件的准确 `gh release create` 命令。它们仅作为每个版本的 GitHub 发布资源发布。 谁读取什么：[`docs/FIRMWARE_DISTRIBUTION.md`](docs/FIRMWARE_DISTRIBUTION.md)。
 
 每次固件源码更改之后（或在信任一次版本递增之前），从仓库根目录运行 **`check_version_consistency.sh`**：它以 Track A/E 的版本常量（主板固件、扩展从属应用）作为权威来源，检查 `VERSION_CHECKLIST.txt` 为该版本标签记录的每一处位置，报告任何不匹配之处——它只报告，不会自行修复任何内容。`VERSION_CHECKLIST.txt` 是本项目所携带的全部 5 条独立版本轨道（主固件、硬件/PCB、主引导程序、扩展从属应用、扩展从属引导程序）的完整参考，以及递增其中任意一条时确切需要修改的内容。
 
@@ -302,8 +303,8 @@ URTC 的闪存被拆分为两个独立部分，因此板卡可以通过它已经
 
 1. 在 **STM32CubeIDE** 中打开项目（已针对 STM32F303CC 目标构建和测试），或直接使用 **STM32CubeProgrammer** 配合下方的编译输出。
 2. 通过板载 `STM_JTAG` 接口，经由 SWD（ST-Link）刷写**两个**镜像——每个 `.hex` 文件都已内置目标地址，因此大多数工具（包括 STM32CubeProgrammer）都可以在同一会话中加载两者：
-   * `URTC_MAIN_BOOTLOADER_v0.3.8.hex` → `0x08000000`
-   * `URTC_MAIN_FIRMWARE_v0.3.3.hex` → `0x08008000`
+   * `URTC_MAIN_BOOTLOADER_v0.3.9.hex` → `0x08000000`
+   * `URTC_MAIN_FIRMWARE_v0.3.5.hex` → `0x08008000`
 3. 在通电之前通过 ID 焊接跳线设置工具身份——板卡在开机时读取一次，一如既往。5 个跳线（ID0-ID4），覆盖完整的 32 地址空间（31 个直接工具地址，加上保留的 `11111` 自由配置地址——见上方工具矩阵一节）。
 4. 通电。引导程序监听约 600ms，未发现任何内容，直接跳转进入应用程序——从此刻起，一切行为都与本 README 其余部分所描述的完全一致。
 
@@ -414,6 +415,7 @@ URTC 的闪存被拆分为两个独立部分，因此板卡可以通过它已经
 │   │                            工具链、ST HAL/CMSIS 设置、确切的编译/链接命令；
 │   │                            仓库根目录下的 build_firmware.sh/.bat 端到端
 │   │                            自动化了同一个流程
+│   ├── FIRMWARE_DISTRIBUTION.md 固件文件的发布位置以及各使用方读取的内容
 │   ├── datasheet/               PCB/datasheet/ 下尚未涵盖的 2 份元器件数据手册
 │   │                            （CFM_40.pdf、EFB0424VHD-CP0.pdf）
 │   └── tool_image_generator/    生成 images/TOOL_*.png 的工具包（见下文）——
@@ -475,16 +477,16 @@ URTC 的闪存被拆分为两个独立部分，因此板卡可以通过它已经
 │           ├── slaveboot_*.c/.h   另外 7 个文件（加密学、闪存/元数据、协议）
 │           ├── STM32F303CBTx_SLAVEBOOT.ld  链接脚本（0x08000000 处的 18K 区域）
 │           └── README.md          与应用程序相同的技术参考角色
-├── firmware/
-│   ├── URTC_MAIN_BOOTLOADER_v0.3.8.bin  引导程序编译产物，刷写至 0x08000000
-│   ├── URTC_MAIN_BOOTLOADER_v0.3.8.elf  引导程序编译产物，刷写至 0x08000000
-│   ├── URTC_MAIN_BOOTLOADER_v0.3.8.hex  引导程序编译产物，刷写至 0x08000000（地址已内置）
-│   ├── URTC_MAIN_FIRMWARE_v0.3.3.bin    应用程序 bin 编译产物，刷写至 0x08008000
-│   ├── URTC_MAIN_FIRMWARE_v0.3.3.elf    应用程序 elf 编译产物，刷写至 0x08008000
-│   ├── URTC_MAIN_FIRMWARE_v0.3.3.hex    应用程序 HEX 编译产物，刷写至 0x08008000（地址已内置）
-│   ├── URTC_SLAVE_BOOTLOADER_v0.2.2.{bin,elf,hex}  扩展从属自身的引导程序，
+├── firmware/  （被 git 忽略的构建输出——仅作为发布资源发布）
+│   ├── URTC_MAIN_BOOTLOADER_v0.3.9.bin  引导程序编译产物，刷写至 0x08000000
+│   ├── URTC_MAIN_BOOTLOADER_v0.3.9.elf  引导程序编译产物，刷写至 0x08000000
+│   ├── URTC_MAIN_BOOTLOADER_v0.3.9.hex  引导程序编译产物，刷写至 0x08000000（地址已内置）
+│   ├── URTC_MAIN_FIRMWARE_v0.3.5.bin    应用程序 bin 编译产物，刷写至 0x08008000
+│   ├── URTC_MAIN_FIRMWARE_v0.3.5.elf    应用程序 elf 编译产物，刷写至 0x08008000
+│   ├── URTC_MAIN_FIRMWARE_v0.3.5.hex    应用程序 HEX 编译产物，刷写至 0x08008000（地址已内置）
+│   ├── URTC_SLAVE_BOOTLOADER_v0.2.3.{bin,elf,hex}  扩展从属自身的引导程序，
 │   │                             刷写至 STM32F303CBT6 上的 0x08000000（仅限高级扩展板）
-│   ├── URTC_SLAVE_FIRMWARE_v0.1.9.{bin,elf,hex}  扩展从属自身的应用程序，刷写至 0x08005000
+│   ├── URTC_SLAVE_FIRMWARE_v0.2.0.{bin,elf,hex}  扩展从属自身的应用程序，刷写至 0x08005000
 │   └── firmware_manifest.json    上述全部 4 个组件的机器可读索引——版本、
 │                                 闪存地址，以及每个文件自身的大小/CRC32，
 │                                 供外部工具检查此处有什么以及比它当前所拥有
@@ -511,6 +513,7 @@ URTC 的闪存被拆分为两个独立部分，因此板卡可以通过它已经
 │   └── *_PARLIST/PINLIST/NETLIST.TXT   Eagle 导出的网表（引脚映射的真实来源）
 ├── tools/
 │   ├── build_test.py            不递增版本号的构建/编译检查
+│   ├── publish_release_assets.py  列出要附加的发布资源并输出 gh 命令
 │   └── ci_validate.py           CI 使用的 manifest/CHANGELOG/docs 校验
 ├── VERSION_CHECKLIST.txt        用于正确递增本项目自身 4 个独立版本号中
 │                                任意一个的机械化检查清单

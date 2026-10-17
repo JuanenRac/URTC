@@ -12,7 +12,6 @@
 # cap, so the slave could spin forever on a stuck sensor or a blank EEPROM
 # dump until its IWDG reset it. Run by build_firmware.sh/.bat (step 1c); exits
 # 1 and names every file that differs.
-import filecmp
 import os
 import sys
 
@@ -30,9 +29,16 @@ def shared_files():
             yield os.path.join(folder, name)
 
 
+def same_content(a, b):
+    """Equal byte for byte once line endings are normalised: a checkout may
+    hold the same file with LF on one chip and CRLF on the other."""
+    with open(a, "rb") as fa, open(b, "rb") as fb:
+        return fa.read().replace(b"\r\n", b"\n") == fb.read().replace(b"\r\n", b"\n")
+
+
 def main():
     different = [rel for rel in shared_files()
-                 if not filecmp.cmp(os.path.join(MASTER, rel), os.path.join(SLAVE, rel), shallow=False)]
+                 if not same_content(os.path.join(MASTER, rel), os.path.join(SLAVE, rel))]
     for rel in different:
         print(f"DIFFERS: src/F303-master/{rel} vs src/F303-slave/{rel}")
     if different:

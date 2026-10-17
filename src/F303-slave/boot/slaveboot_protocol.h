@@ -54,4 +54,8 @@ void HandleEndUpdate(uint8_t *data);
 // out one byte at a time as the master's own read continues.
 void BuildVersionQueryResponse(uint8_t out[10]);
 
+// Fills out[4] for REG_QUERY_VERSION_EXT: marker, installed application
+// PATCH, this bootloader's MINOR and PATCH.
+void BuildVersionExtResponse(uint8_t out[4]);
+
 #endif // SLAVEBOOT_PROTOCOL_H

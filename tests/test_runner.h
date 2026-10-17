@@ -30,5 +30,7 @@ void run_can_dispatch_routing_tests(int *failures);
 // thermal_guard.c - thermal runaway protection, pure C (tests/test_thermal_guard.c).
 void run_thermal_guard_tests(int *failures);
 void run_thermal_stats_tests(int *failures);
+// urtc_version_wire.h - PATCH number on the wire, pure C (tests/test_version_wire.c).
+void run_version_wire_tests(int *failures);
 
 #endif // TEST_RUNNER_H

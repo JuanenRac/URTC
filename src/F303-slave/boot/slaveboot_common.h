@@ -66,8 +66,8 @@ extern I2C_HandleTypeDef hi2c1;
 // bump_version.py's mirror-header argument (repo root) every time the
 // application is built - never edit this by hand.
 #define FIRMWARE_VERSION_MAJOR 0
-#define FIRMWARE_VERSION_MINOR 1
-#define FIRMWARE_VERSION_PATCH 9
+#define FIRMWARE_VERSION_MINOR 2
+#define FIRMWARE_VERSION_PATCH 0
 
 // BOOTLOADER_VERSION_* describes THIS bootloader binary itself - separate
 // from FIRMWARE_VERSION_MAJOR/MINOR above, which is the version of
@@ -79,7 +79,7 @@ extern I2C_HandleTypeDef hi2c1;
 // main board's own version history.
 #define BOOTLOADER_VERSION_MAJOR 0
 #define BOOTLOADER_VERSION_MINOR 2
-#define BOOTLOADER_VERSION_PATCH 2
+#define BOOTLOADER_VERSION_PATCH 3
 
 // -----------------------------------------------------------------------
 // HMAC-SHA256 signing key - deliberately different from the main board's
@@ -115,6 +115,7 @@ extern const uint8_t HMAC_KEY[32];
 #define REG_PROGRESS             0x05 // read-only, 1 byte: 0-100, 0xFF if not currently updating
 #define REG_QUERY_VERSION        0x06 // read-only, 10 bytes: byte0 (0=application,1=bootloader) + HardwareID (4) + version major (2) + version minor (2, all big-endian) - mirrors the main board's own 0x7F9 response fields, minus the CAN framing they need and this doesn't
 #define REG_VERIFY_FAIL_REASON   0x07 // read-only, 1 byte: one of the VERIFY_FAIL_REASON_* values below, valid to read once REG_STATUS reports STATUS_VERIFY_FAIL - same reason the main board's own CAN_ID_STATUS frame carries as its 2nd byte, exposed here as its own register instead since I2C reads don't share CAN's fixed-DLC framing
+#define REG_QUERY_VERSION_EXT    0x08 // read-only, 4 bytes: URTC_SLAVE_VERSION_EXT_MARKER (0xE1, never a status code) + installed application PATCH (0xFF = unknown) + this bootloader's MINOR + this bootloader's PATCH. A bootloader that predates it answers this register with its 1-byte status instead, which is how the master tells the two apart.
 
 #define STATUS_LISTENING     0x01 // waiting for REG_START_UPDATE
 #define STATUS_ERASING       0x02 // erasing the backup slot

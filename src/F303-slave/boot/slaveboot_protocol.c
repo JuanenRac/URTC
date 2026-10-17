@@ -22,6 +22,7 @@
 #include "slaveboot_protocol.h"
 #include "slaveboot_crypto.h"
 #include "slaveboot_flash.h"
+#include "urtc_version_wire.h"
 
 // Defined here, read by the I2C1 interrupt handler's REG_STATUS read path.
 volatile uint8_t current_status = STATUS_LISTENING;
@@ -34,7 +35,9 @@ void BuildVersionQueryResponse(uint8_t out[10]) {
     uint8_t have_meta = Metadata_Read(&meta);
     uint32_t hw_id = have_meta ? meta.hardware_id : 0;
     uint16_t ver_major = have_meta ? (uint16_t)meta.version_major : 0;
-    uint16_t ver_minor = have_meta ? (uint16_t)meta.version_minor : 0;
+    // Only the minor number itself: the high byte of the stored field may hold
+    // the patch number, which a legacy host would misread as part of the minor.
+    uint16_t ver_minor = have_meta ? (uint16_t)urtc_minor_field_minor(meta.version_minor) : 0;
 
     out[0] = 0x01; // answering as the bootloader, same convention as the main board's own 0x7F9 byte0
     out[1] = (uint8_t)(hw_id >> 24);
@@ -46,6 +49,14 @@ void BuildVersionQueryResponse(uint8_t out[10]) {
     out[7] = (uint8_t)(ver_minor >> 8);
     out[8] = (uint8_t)(ver_minor);
     out[9] = BOOTLOADER_VERSION_MAJOR; // this bootloader's own version - the main board's equivalent sends this as a separate CAN frame (0x7FA) since 0x7F9's 8 bytes were already full; a register read has no such length ceiling, so it just rides along as one extra byte here
+}
+
+void BuildVersionExtResponse(uint8_t out[4]) {
+    FirmwareMetadata_t meta;
+    uint8_t have_meta = Metadata_Read(&meta);
+    urtc_slave_version_ext_build(out,
+        have_meta ? urtc_minor_field_patch(meta.version_minor) : URTC_PATCH_UNKNOWN,
+        BOOTLOADER_VERSION_MINOR, BOOTLOADER_VERSION_PATCH);
 }
 
 // -----------------------------------------------------------------------
@@ -82,7 +93,7 @@ uint8_t ApplicationIsValid(void) {
         adopted.state = META_STATE_APP_VALID;
         adopted.hardware_id = THIS_HARDWARE_ID;
         adopted.version_major = FIRMWARE_VERSION_MAJOR;
-        adopted.version_minor = FIRMWARE_VERSION_MINOR;
+        adopted.version_minor = urtc_minor_field_pack(FIRMWARE_VERSION_MINOR, FIRMWARE_VERSION_PATCH);
         adopted.size = APP_MAX_SIZE;
         uint32_t crc = 0xFFFFFFFFUL;
         crc = CRC32_Update(crc, (const uint8_t*)MAIN_APP_ADDR, APP_MAX_SIZE);
@@ -333,9 +344,10 @@ void HandleEndUpdate(uint8_t *data) {
     // indefinitely.
     FirmwareMetadata_t current_meta;
     if (Metadata_Read(&current_meta) && current_meta.state == META_STATE_APP_VALID) {
-        uint32_t current_version = (current_meta.version_major << 16) | current_meta.version_minor;
-        uint32_t new_version = ((uint32_t)version_major << 16) | version_minor;
-        if (new_version < current_version) {
+        // The minor field may carry the PATCH number in its high byte (see
+        // urtc_version_wire.h); the patch only takes part when both sides know it.
+        if (urtc_version_is_older(version_major, version_minor,
+                                  current_meta.version_major, current_meta.version_minor)) {
             current_status = STATUS_VERIFY_FAIL;
             verify_fail_reason = VERIFY_FAIL_REASON_ROLLBACK;
             update_in_progress = 0;

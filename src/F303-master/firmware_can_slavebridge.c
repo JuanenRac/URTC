@@ -28,6 +28,7 @@
 #include "firmware_common.h"
 #include "firmware_can_slavebridge.h"
 #include "firmware_expansion_i2c.h"
+#include "urtc_version_wire.h"
 
 // Slave register numbers - duplicated here rather than shared via a
 // common header, since the slave is a genuinely separate chip/project
@@ -44,6 +45,7 @@
 #define REG_BOOT_PROGRESS       0x05
 #define REG_BOOT_QUERY_VERSION  0x06
 #define REG_BOOT_VERIFY_FAIL_REASON 0x07
+#define REG_BOOT_QUERY_VERSION_EXT  0x08
 #define REG_APP_ENTER_BOOTLOADER 0x02
 
 static uint8_t hmac_chunk_buf[32];
@@ -140,7 +142,20 @@ void Handle_CAN_SlaveBridge(void) {
         uint8_t version[10];
         if (ExpansionI2C_SlaveReadRegister(REG_BOOT_QUERY_VERSION, version, 10)) {
             SendCanResponse(0x217, version, 8);
-            SendCanResponse(0x218, &version[8], 2);
+            // Optional PATCH extension: a slave bootloader that has it answers
+            // REG_BOOT_QUERY_VERSION_EXT starting with a marker byte; an older
+            // one answers with its 1-byte status instead, so the first byte is
+            // read on its own before trusting the rest. 0x218 then carries 5
+            // bytes, otherwise exactly the 2 legacy bytes.
+            uint8_t ext[URTC_SLAVE_VERSION_EXT_LEN] = {0};
+            uint8_t have_ext = 0;
+            if (ExpansionI2C_SlaveReadRegister(REG_BOOT_QUERY_VERSION_EXT, ext, 1) &&
+                ext[0] == URTC_SLAVE_VERSION_EXT_MARKER) {
+                have_ext = ExpansionI2C_SlaveReadRegister(REG_BOOT_QUERY_VERSION_EXT, ext, URTC_SLAVE_VERSION_EXT_LEN);
+            }
+            uint8_t part2[5];
+            uint8_t part2_len = urtc_slave_version_part2_build(part2, &version[8], have_ext ? ext : 0);
+            SendCanResponse(0x218, part2, part2_len);
         }
 
     } else if (rxHeader.StdId == 0x219) {

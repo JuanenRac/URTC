@@ -15,6 +15,7 @@
 #include "firmware_expansion_i2c.h"
 #include "firmware_blackbox.h"
 #include "firmware_thermal_stats.h"
+#include "urtc_version_wire.h"
 
 void Handle_CAN_GlobalCommands_PreErrorGate(void) {
 
@@ -82,6 +83,23 @@ void Handle_CAN_GlobalCommands_PreErrorGate(void) {
                 txH.TransmitGlobalTime = DISABLE;
                 uint32_t mb;
                 HAL_CAN_AddTxMessage(&hcan, &txH, txD, &mb);
+
+                // Companion frame with the running application's PATCH number
+                // (0x7F9 above has no spare byte). Additive: a host that does
+                // not know this ID ignores it. Flags are 0: only a bootloader
+                // reads the patch out of an update's end frame.
+                if (HAL_CAN_GetTxMailboxesFreeLevel(&hcan) > 0) {
+                    CAN_TxHeaderTypeDef txHp;
+                    uint8_t txDp[URTC_VERSION_PATCH_FRAME_DLC];
+                    urtc_version_patch_frame_build(txDp, 0x00, (uint8_t)FIRMWARE_VERSION_PATCH, 0x00);
+                    txHp.StdId = URTC_CAN_ID_VERSION_PATCH;
+                    txHp.IDE = CAN_ID_STD;
+                    txHp.RTR = CAN_RTR_DATA;
+                    txHp.DLC = URTC_VERSION_PATCH_FRAME_DLC;
+                    txHp.TransmitGlobalTime = DISABLE;
+                    uint32_t mbp;
+                    HAL_CAN_AddTxMessage(&hcan, &txHp, txDp, &mbp);
+                }
             }
         }
 

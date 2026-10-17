@@ -10,6 +10,7 @@
 #include "bootloader_crypto.h"
 #include "bootloader_flash.h"
 #include "bootloader_oled.h"
+#include "urtc_version_wire.h"
 
 static uint8_t CAN_WaitForFreeMailbox(void) {
     // 50 attempts x 1ms = 50ms max - a small fraction of the ~800ms IWDG
@@ -121,6 +122,25 @@ void HandleVersionQuery(void) {
         HAL_CAN_AddTxMessage(&hcan, &txH, txD, &mb);
     }
 
+    // Companion frame with the installed application PATCH number and this
+    // bootloader's capability flags. Additive: 0x7F9 above is unchanged, so a
+    // host that does not know this ID simply ignores it, and a host that never
+    // sees it knows the board predates the patch extension.
+    if (CAN_WaitForFreeMailbox()) {
+        CAN_TxHeaderTypeDef txH3;
+        uint8_t txD3[URTC_VERSION_PATCH_FRAME_DLC];
+        urtc_version_patch_frame_build(txD3, 0x01,
+            have_meta ? urtc_minor_field_patch(meta.version_minor) : URTC_PATCH_UNKNOWN,
+            URTC_PATCH_FLAG_END_UPDATE_PATCH);
+        txH3.StdId = URTC_CAN_ID_VERSION_PATCH;
+        txH3.IDE = CAN_ID_STD;
+        txH3.RTR = CAN_RTR_DATA;
+        txH3.DLC = URTC_VERSION_PATCH_FRAME_DLC;
+        txH3.TransmitGlobalTime = DISABLE;
+        uint32_t mb3;
+        HAL_CAN_AddTxMessage(&hcan, &txH3, txD3, &mb3);
+    }
+
     // This bootloader's own version, sent right alongside the app
     // metadata above - a separate frame since 0x7F9's 8 bytes were
     // already fully used by the app metadata, and conflating "what
@@ -228,7 +248,7 @@ uint8_t ApplicationIsValid(void) {
         adopted.state = META_STATE_APP_VALID;
         adopted.hardware_id = THIS_HARDWARE_ID;
         adopted.version_major = FIRMWARE_VERSION_MAJOR;
-        adopted.version_minor = FIRMWARE_VERSION_MINOR;
+        adopted.version_minor = urtc_minor_field_pack(FIRMWARE_VERSION_MINOR, FIRMWARE_VERSION_PATCH);
         adopted.size = APP_MAX_SIZE;
         uint32_t crc = 0xFFFFFFFFUL;
         crc = CRC32_Update(crc, (const uint8_t*)MAIN_APP_ADDR, APP_MAX_SIZE);
@@ -704,9 +724,11 @@ void HandleEndUpdate(uint8_t *data) {
     // validly-signed image is accepted as it always was.
     FirmwareMetadata_t current_meta;
     if (Metadata_Read(&current_meta) && current_meta.state == META_STATE_APP_VALID) {
-        uint32_t current_version = (current_meta.version_major << 16) | current_meta.version_minor;
-        uint32_t new_version = ((uint32_t)version_major << 16) | version_minor;
-        if (new_version < current_version && !update_downgrade_authorized) {
+        // The minor field may carry the PATCH number in its high byte (see
+        // urtc_version_wire.h); the patch only takes part when both sides know it.
+        if (urtc_version_is_older(version_major, version_minor,
+                                  current_meta.version_major, current_meta.version_minor)
+            && !update_downgrade_authorized) {
             CAN_SendVerifyFailReason(VERIFY_FAIL_REASON_ROLLBACK);
             update_in_progress = 0;
             update_failed = 1;

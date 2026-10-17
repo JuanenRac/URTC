@@ -38,7 +38,7 @@ set "ROOT=%~dp0"
 if "%ROOT:~-1%"=="\" set "ROOT=%ROOT:~0,-1%"
 set "BUILD=%ROOT%\build"
 set "FIRMWARE_OUT=%ROOT%\firmware"
-REM CI builds publish under build\ and never touch the versioned firmware\ files.
+REM Release mode writes to firmware\ (git-ignored, published only as release assets); CI mode writes to build\firmware.
 if "%HYDRA_UMC_CI%"=="1" set "FIRMWARE_OUT=%BUILD%\firmware"
 set "HAL_REPO=https://github.com/STMicroelectronics/stm32f3xx_hal_driver.git"
 set "HAL_COMMIT=953955afe65f89e60e556bbcdba752597f5da65d"
@@ -184,7 +184,7 @@ REM -----------------------------------------------------------------------
 echo.
 echo === 3. Common compiler flags and shared HAL objects ^(21 modules, shared by all 4 builds^) ===
 REM -----------------------------------------------------------------------
-set "CFLAGS=-mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard -DSTM32F303xC -DUSE_HAL_DRIVER -I%BUILD%\common\CMSIS_Include -I%BUILD%\common\HAL_Include -O2 -Wall -ffunction-sections -fdata-sections"
+set "CFLAGS=-mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard -DSTM32F303xC -DUSE_HAL_DRIVER -I%BUILD%\common\CMSIS_Include -I%BUILD%\common\HAL_Include -I%ROOT%\src\common -O2 -Wall -ffunction-sections -fdata-sections"
 set "CXXFLAGS=-mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard -fno-exceptions -fno-rtti -fno-unwind-tables -fno-threadsafe-statics -specs=nano.specs -specs=nosys.specs -O2 -Wall"
 set "LDCOMMON=-mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard -specs=nano.specs -specs=nosys.specs -Wl,--gc-sections"
 

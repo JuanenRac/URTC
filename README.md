@@ -273,7 +273,7 @@ URTC's flash is split into two independent pieces, so the board can be reflashed
            │                                   │  before ever jumping to the app.
 0x08008000 ├─────────────────────────────────┤
            │  Main slot (112K)                 │  This is the application firmware /
-           │                                   │  URTC_MAIN_FIRMWARE_v0.3.3.* — the actual
+           │                                   │  URTC_MAIN_FIRMWARE_v0.3.5.* — the actual
            │                                   │  firmware that runs day to day,
            │                                   │  described everywhere else in
            │                                   │  this README. Never touched by
@@ -289,12 +289,13 @@ URTC's flash is split into two independent pieces, so the board can be reflashed
 
 **Why a backup slot.** A CAN update is never written into the slot that's currently running. It goes into backup first, gets fully verified there — size, CRC32, and an HMAC-SHA256 signature proving it actually came from this project's own build process, not just that it arrived intact — and only then gets copied into the main slot. A power loss at any point before that copy starts leaves the currently running firmware completely untouched, so there's no window where an interrupted download can brick the board. If the power loss happens *during* the copy itself, the bootloader notices on the next boot (backup, never touched during the copy, is still fully intact) and simply resumes copying from it until it succeeds.
 
-### 0. Compiling from source (optional — `firmware/` already ships pre-built binaries)
+### 0. Compiling from source (optional — the pre-built binaries are assets of each GitHub release, not files in the repository)
 
 Two ways to get from this repository's source to the 4 binaries above:
 
 - **Automated:** `build_firmware.sh` (Linux) or `build_firmware.bat` (Windows), at the repo root. Either installs the ARM GNU toolchain if it's missing, fetches the pinned ST HAL/CMSIS commit, and compiles, links, and `objcopy`s all 4 binaries (main board app + bootloader, expansion slave app + bootloader) straight into `firmware/`, then regenerates `firmware/firmware_manifest.json`. Run with no arguments for a full build, `--clean` to wipe the local `build/` cache first, or `master`/`slave` to build only one chip's own pair. `build_firmware.sh` runs end to end against this project's real source tree; `build_firmware.bat` mirrors that same logic for Windows — if the two ever disagree, trust the `.sh` script's logic as the reference.
 - **Manual:** every command either script runs, plus the reasoning behind each toolchain/HAL choice, is spelled out step by step in `docs/COMPILE_STM32F303.TXT` — useful on a different OS, with a different HAL/CMSIS source, or just to see exactly what the scripts automate.
+- **Release assets:** the firmware images (`.bin`, `.hex`, `.elf` and their checksum/manifest files) are not versioned in git. `build_firmware.sh`/`.bat` write them to `firmware/` (git-ignored; `build/firmware` in CI mode, `HYDRA_UMC_CI=1`), and `python tools/publish_release_assets.py` checks the set and prints the exact `gh release create` command with the files to attach. They are published only as assets of the GitHub release of each version. Who reads what: [`docs/FIRMWARE_DISTRIBUTION.md`](docs/FIRMWARE_DISTRIBUTION.md).
 
 After any firmware source change (or before trusting a version bump), run **`check_version_consistency.sh`** from the repo root: it reads the Track A/E version constants (main board firmware, expansion slave application) as source of truth and checks every location `VERSION_CHECKLIST.txt` documents for that version tag, reporting any mismatch — it only reports, it doesn't fix anything itself. `VERSION_CHECKLIST.txt` is the full reference for all 5 independent version tracks this project carries (main firmware, hardware/PCB, main bootloader, expansion slave application, expansion slave bootloader) and exactly what needs touching when bumping any one of them.
 
@@ -304,8 +305,8 @@ The bootloader can only get onto the chip via physical programming — there's n
 
 1. Open the project in **STM32CubeIDE** (built and tested against the STM32F303CC target), or use **STM32CubeProgrammer** directly with the compiled outputs below.
 2. Flash **both** images over SWD (ST-Link) via the onboard `STM_JTAG` header — each `.hex` file has its target address baked in, so most tools (including STM32CubeProgrammer) can load both in the same session:
-   * `URTC_MAIN_BOOTLOADER_v0.3.8.hex` → `0x08000000`
-   * `URTC_MAIN_FIRMWARE_v0.3.3.hex` → `0x08008000`
+   * `URTC_MAIN_BOOTLOADER_v0.3.9.hex` → `0x08000000`
+   * `URTC_MAIN_FIRMWARE_v0.3.5.hex` → `0x08008000`
 3. Set the tool identity via the ID solder jumpers before powering up — the board reads them once at boot, same as always. Five jumpers (ID0-ID4), covering the full 32-address space (31 direct tool addresses, plus the reserved `11111` free-configuration address - see the Tool Matrix section above).
 4. Power up. The bootloader listens for ~600ms, sees nothing, and jumps straight into the application — from here on, everything behaves exactly as described in the rest of this README.
 
@@ -428,6 +429,7 @@ If anyone in the community is working on custom end-effectors, smart tool-change
 │   │                            toolchain, ST HAL/CMSIS setup, exact compile/link commands;
 │   │                            build_firmware.sh/.bat at the repo root automate this same
 │   │                            process end to end
+│   ├── FIRMWARE_DISTRIBUTION.md Where the firmware files are published and what each consumer reads
 │   ├── datasheet/               2 component datasheets not already covered under
 │   │                            PCB/datasheet/ (CFM_40.pdf, EFB0424VHD-CP0.pdf)
 │   └── tool_image_generator/    Toolkit that generates images/TOOL_*.png (see below) -
@@ -489,16 +491,16 @@ If anyone in the community is working on custom end-effectors, smart tool-change
 │           ├── slaveboot_*.c/.h   7 more files (crypto, flash/metadata, protocol)
 │           ├── STM32F303CBTx_SLAVEBOOT.ld  Linker script (18K region at 0x08000000)
 │           └── README.md          Same technical-reference role as the application's
-├── firmware/
-│   ├── URTC_MAIN_BOOTLOADER_v0.3.8.bin  Bootloader compiled, flash to 0x08000000
-│   ├── URTC_MAIN_BOOTLOADER_v0.3.8.elf  Bootloader compiled, flash to 0x08000000
-│   ├── URTC_MAIN_BOOTLOADER_v0.3.8.hex  Bootloader compiled, flash to 0x08000000 (address baked in)
-│   ├── URTC_MAIN_FIRMWARE_v0.3.3.bin    Application bin compiled, flash to 0x08008000
-│   ├── URTC_MAIN_FIRMWARE_v0.3.3.elf    Application elf compiled, flash to 0x08008000
-│   ├── URTC_MAIN_FIRMWARE_v0.3.3.hex    Application HEX compiled, flash to 0x08008000 (address baked in)
-│   ├── URTC_SLAVE_BOOTLOADER_v0.2.2.{bin,elf,hex}  Expansion slave's own bootloader, flash to 0x08000000
+├── firmware/  (git-ignored build output - published only as release assets)
+│   ├── URTC_MAIN_BOOTLOADER_v0.3.9.bin  Bootloader compiled, flash to 0x08000000
+│   ├── URTC_MAIN_BOOTLOADER_v0.3.9.elf  Bootloader compiled, flash to 0x08000000
+│   ├── URTC_MAIN_BOOTLOADER_v0.3.9.hex  Bootloader compiled, flash to 0x08000000 (address baked in)
+│   ├── URTC_MAIN_FIRMWARE_v0.3.5.bin    Application bin compiled, flash to 0x08008000
+│   ├── URTC_MAIN_FIRMWARE_v0.3.5.elf    Application elf compiled, flash to 0x08008000
+│   ├── URTC_MAIN_FIRMWARE_v0.3.5.hex    Application HEX compiled, flash to 0x08008000 (address baked in)
+│   ├── URTC_SLAVE_BOOTLOADER_v0.2.3.{bin,elf,hex}  Expansion slave's own bootloader, flash to 0x08000000
 │   │                             on the STM32F303CBT6 (advanced expansion boards only)
-│   ├── URTC_SLAVE_FIRMWARE_v0.1.9.{bin,elf,hex}  Expansion slave's own application, flash to 0x08005000
+│   ├── URTC_SLAVE_FIRMWARE_v0.2.0.{bin,elf,hex}  Expansion slave's own application, flash to 0x08005000
 │   └── firmware_manifest.json    Machine-readable index of all 4 components above - version,
 │                                 flash address, and each file's own size/CRC32, for an
 │                                 external tool to check what's here and what's newer than
@@ -525,6 +527,7 @@ If anyone in the community is working on custom end-effectors, smart tool-change
 │   └── *_PARLIST/PINLIST/NETLIST.TXT   Eagle-exported netlists (ground truth for pin mapping)
 ├── tools/
 │   ├── build_test.py            Non-versioning build/compile check
+│   ├── publish_release_assets.py  Lists the release assets to attach and prints the gh command
 │   └── ci_validate.py           Manifest/CHANGELOG/docs validation used by CI
 ├── VERSION_CHECKLIST.txt        Mechanical checklist for bumping any of this project's own
 │                                4 independent version numbers correctly

@@ -21,6 +21,7 @@
 #include "slaveboot_common.h"
 #include "slaveboot_protocol.h"
 #include "slaveboot_flash.h"
+#include "urtc_version_wire.h"
 
 IWDG_HandleTypeDef hiwdg;
 I2C_HandleTypeDef hi2c1;
@@ -152,6 +153,10 @@ void HAL_I2C_AddrCallback(I2C_HandleTypeDef *hi2c, uint8_t TransferDirection, ui
             case REG_QUERY_VERSION:
                 BuildVersionQueryResponse(tx_buffer);
                 len = 10;
+                break;
+            case REG_QUERY_VERSION_EXT:
+                BuildVersionExtResponse(tx_buffer);
+                len = URTC_SLAVE_VERSION_EXT_LEN;
                 break;
             case REG_VERIFY_FAIL_REASON:
                 tx_buffer[0] = verify_fail_reason;

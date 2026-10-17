@@ -274,7 +274,7 @@ La flash de URTC está dividida en 2 piezas independientes, para que la placa pu
            │                                   │  de saltar a la app.
 0x08008000 ├─────────────────────────────────┤
            │  Slot principal (112K)            │  Este es el firmware de aplicación /
-           │                                   │  URTC_MAIN_FIRMWARE_v0.3.3.* — el firmware
+           │                                   │  URTC_MAIN_FIRMWARE_v0.3.5.* — el firmware
            │                                   │  real que se ejecuta día a día,
            │                                   │  descrito en el resto de este
            │                                   │  README. Nunca se toca en una
@@ -291,12 +291,13 @@ La flash de URTC está dividida en 2 piezas independientes, para que la placa pu
 
 **Por qué un slot de respaldo.** Una actualización CAN nunca se escribe en el slot que está corriendo actualmente. Va al respaldo primero, se verifica completamente ahí — tamaño, CRC32, y una firma HMAC-SHA256 que prueba que realmente vino del propio proceso de build de este proyecto, no solo que llegó intacta — y solo entonces se copia al slot principal. Una pérdida de energía en cualquier punto antes de que empiece esa copia deja el firmware actualmente en ejecución completamente intacto, así que no hay ninguna ventana en la que una descarga interrumpida pueda inutilizar la placa. Si la pérdida de energía ocurre *durante* la propia copia, el bootloader se da cuenta en el siguiente arranque (el respaldo, nunca tocado durante la copia, sigue completamente intacto) y simplemente retoma la copia desde ahí hasta que tiene éxito.
 
-### 0. Compilar desde el código fuente (opcional — `firmware/` ya viene con binarios precompilados)
+### 0. Compilar desde el código fuente (opcional — los binarios precompilados son assets de cada release de GitHub, no ficheros del repositorio)
 
 Dos formas de ir desde el código fuente de este repositorio hasta los 4 binarios de arriba:
 
 - **Automatizada:** `build_firmware.sh` (Linux) o `build_firmware.bat` (Windows), en la raíz del repositorio. Cualquiera de los 2 instala la toolchain ARM GNU si falta, descarga el commit fijado de ST HAL/CMSIS, y compila, enlaza, y aplica `objcopy` a los 4 binarios (app + bootloader de la placa principal, app + bootloader del esclavo de expansión) directamente en `firmware/`, y luego regenera `firmware/firmware_manifest.json`. Ejecútalo sin argumentos para una build completa, `--clean` para vaciar primero la caché local `build/`, o `master`/`slave` para compilar solo el par propio de un chip. `build_firmware.sh` corre de principio a fin contra el árbol de código fuente real de este proyecto; `build_firmware.bat` refleja esa misma lógica para Windows — si alguna vez discrepan, confía en la lógica del script `.sh` como referencia.
 - **Manual:** cada comando que cualquiera de los 2 scripts ejecuta, más el razonamiento detrás de cada elección de toolchain/HAL, está detallado paso a paso en `docs/COMPILE_STM32F303.TXT` — útil en un sistema operativo distinto, con una fuente HAL/CMSIS distinta, o simplemente para ver exactamente qué automatizan los scripts.
+- **Assets de la release:** las imágenes de firmware (`.bin`, `.hex`, `.elf` y sus ficheros de suma y manifiesto) no se versionan en git. `build_firmware.sh`/`.bat` las escriben en `firmware/` (ignorado por git; `build/firmware` en modo CI, `HYDRA_UMC_CI=1`), y `python tools/publish_release_assets.py` comprueba el conjunto e imprime el comando `gh release create` exacto con los ficheros a adjuntar. Se publican solo como assets de la release de GitHub de cada versión. Quién lee qué: [`docs/FIRMWARE_DISTRIBUTION.md`](docs/FIRMWARE_DISTRIBUTION.md).
 
 Después de cualquier cambio en el código fuente del firmware (o antes de confiar en un incremento de versión), ejecuta **`check_version_consistency.sh`** desde la raíz del repositorio: lee las constantes de versión de las Pistas A/E (firmware de la placa principal, aplicación del esclavo de expansión) como fuente de verdad y comprueba cada ubicación que documenta `VERSION_CHECKLIST.txt` para esa etiqueta de versión, reportando cualquier discrepancia — solo reporta, no arregla nada por sí mismo. `VERSION_CHECKLIST.txt` es la referencia completa para las 5 pistas de versión independientes que lleva este proyecto (firmware principal, hardware/PCB, bootloader principal, aplicación del esclavo de expansión, bootloader del esclavo de expansión) y exactamente qué hay que tocar al incrementar cualquiera de ellas.
 
@@ -306,8 +307,8 @@ El bootloader solo puede entrar al chip mediante programación física — no ha
 
 1. Abre el proyecto en **STM32CubeIDE** (construido y probado contra el target STM32F303CC), o usa **STM32CubeProgrammer** directamente con los binarios compilados de abajo.
 2. Flashea **ambas** imágenes por SWD (ST-Link) mediante el header `STM_JTAG` integrado — cada archivo `.hex` tiene su dirección de destino incrustada, así que la mayoría de las herramientas (incluyendo STM32CubeProgrammer) pueden cargar ambas en la misma sesión:
-   * `URTC_MAIN_BOOTLOADER_v0.3.8.hex` → `0x08000000`
-   * `URTC_MAIN_FIRMWARE_v0.3.3.hex` → `0x08008000`
+   * `URTC_MAIN_BOOTLOADER_v0.3.9.hex` → `0x08000000`
+   * `URTC_MAIN_FIRMWARE_v0.3.5.hex` → `0x08008000`
 3. Establece la identidad de la herramienta mediante los jumpers de soldadura de ID antes de encender - la placa los lee una vez al arrancar, como siempre. Cinco jumpers (ID0-ID4), cubriendo el espacio completo de 32 direcciones (31 direcciones de herramienta directas, más la dirección reservada `11111` de configuración libre - ver la sección de Matriz de Herramientas de arriba).
 4. Enciende. El bootloader escucha durante ~600ms, no ve nada, y salta directamente a la aplicación — desde aquí en adelante, todo se comporta exactamente como se describe en el resto de este README.
 
@@ -433,6 +434,7 @@ Si alguien de la comunidad está trabajando en efectores finales personalizados,
 │   │                            toolchain, configuración de ST HAL/CMSIS, comandos exactos de
 │   │                            compilación/enlazado; build_firmware.sh/.bat en la raíz del
 │   │                            repositorio automatizan este mismo proceso de principio a fin
+│   ├── FIRMWARE_DISTRIBUTION.md Dónde se publican los ficheros de firmware y qué lee cada consumidor
 │   ├── datasheet/               2 datasheets de componentes no cubiertos ya bajo
 │   │                            PCB/datasheet/ (CFM_40.pdf, EFB0424VHD-CP0.pdf)
 │   └── tool_image_generator/    Toolkit que genera images/TOOL_*.png (ver abajo) -
@@ -499,16 +501,16 @@ Si alguien de la comunidad está trabajando en efectores finales personalizados,
 │           ├── slaveboot_*.c/.h   7 archivos más (criptografía, flash/metadatos, protocolo)
 │           ├── STM32F303CBTx_SLAVEBOOT.ld  Script de enlazado (región de 18K en 0x08000000)
 │           └── README.md          Mismo rol de referencia técnica que el de la aplicación
-├── firmware/
-│   ├── URTC_MAIN_BOOTLOADER_v0.3.8.bin  Bootloader compilado, flashear en 0x08000000
-│   ├── URTC_MAIN_BOOTLOADER_v0.3.8.elf  Bootloader compilado, flashear en 0x08000000
-│   ├── URTC_MAIN_BOOTLOADER_v0.3.8.hex  Bootloader compilado, flashear en 0x08000000 (dirección incrustada)
-│   ├── URTC_MAIN_FIRMWARE_v0.3.3.bin    Bin de aplicación compilado, flashear en 0x08008000
-│   ├── URTC_MAIN_FIRMWARE_v0.3.3.elf    Elf de aplicación compilado, flashear en 0x08008000
-│   ├── URTC_MAIN_FIRMWARE_v0.3.3.hex    HEX de aplicación compilado, flashear en 0x08008000 (dirección incrustada)
-│   ├── URTC_SLAVE_BOOTLOADER_v0.2.2.{bin,elf,hex}  Bootloader propio del esclavo de expansión, flashear en 0x08000000
+├── firmware/  (salida de compilación ignorada por git - se publica solo como assets de la release)
+│   ├── URTC_MAIN_BOOTLOADER_v0.3.9.bin  Bootloader compilado, flashear en 0x08000000
+│   ├── URTC_MAIN_BOOTLOADER_v0.3.9.elf  Bootloader compilado, flashear en 0x08000000
+│   ├── URTC_MAIN_BOOTLOADER_v0.3.9.hex  Bootloader compilado, flashear en 0x08000000 (dirección incrustada)
+│   ├── URTC_MAIN_FIRMWARE_v0.3.5.bin    Bin de aplicación compilado, flashear en 0x08008000
+│   ├── URTC_MAIN_FIRMWARE_v0.3.5.elf    Elf de aplicación compilado, flashear en 0x08008000
+│   ├── URTC_MAIN_FIRMWARE_v0.3.5.hex    HEX de aplicación compilado, flashear en 0x08008000 (dirección incrustada)
+│   ├── URTC_SLAVE_BOOTLOADER_v0.2.3.{bin,elf,hex}  Bootloader propio del esclavo de expansión, flashear en 0x08000000
 │   │                             en el STM32F303CBT6 (solo placas de expansión avanzadas)
-│   ├── URTC_SLAVE_FIRMWARE_v0.1.9.{bin,elf,hex}  Aplicación propia del esclavo de expansión, flashear en 0x08005000
+│   ├── URTC_SLAVE_FIRMWARE_v0.2.0.{bin,elf,hex}  Aplicación propia del esclavo de expansión, flashear en 0x08005000
 │   └── firmware_manifest.json    Índice legible por máquina de los 4 componentes de arriba - versión,
 │                                 dirección de flash, y el tamaño/CRC32 propio de cada archivo, para
 │                                 que una herramienta externa compruebe qué hay aquí y qué es más
@@ -535,6 +537,7 @@ Si alguien de la comunidad está trabajando en efectores finales personalizados,
 │   └── *_PARLIST/PINLIST/NETLIST.TXT   Netlists exportadas de Eagle (referencia para el mapeo de pines)
 ├── tools/
 │   ├── build_test.py            Comprobación de build/compilación sin subir versión
+│   ├── publish_release_assets.py  Lista los assets de la release y imprime el comando gh
 │   └── ci_validate.py           Validación de manifest/CHANGELOG/docs usada por la CI
 ├── VERSION_CHECKLIST.txt        Checklist mecánico para incrementar correctamente cualquiera de los
 │                                propios 4 números de versión independientes de este proyecto

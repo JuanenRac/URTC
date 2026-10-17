@@ -825,7 +825,9 @@ End slave update / verify
 DLC: 8 bytes
 Data: Same layout as this board's own CAN_ID_END_UPDATE (0x7F4) -
       big-endian CRC32 (4 bytes) + big-endian version major (2) + minor
-      (2). Relayed to the slave's own bootloader-mode REG_END_UPDATE,
+      (2). The high byte of the minor may carry 0x80 | PATCH exactly as for
+      0x7F4, towards a slave bootloader that announced support (0x218
+      below). Relayed to the slave's own bootloader-mode REG_END_UPDATE,
       which triggers its own size/CRC32/HMAC/anti-rollback verification
       and, if all pass, the copy into its own main slot.
 
@@ -864,6 +866,17 @@ DLC: 2 bytes
 Data:
   - txData[0]: Installed slave firmware's own version minor, low byte
   - txData[1]: The slave BOOTLOADER's own version (not the application's)
+  Optional PATCH extension: when the slave bootloader supports it the
+        frame is DLC 5 instead of 2:
+  - txData[2]: PATCH number of the installed slave application, 0xFF if
+               not known
+  - txData[3]: slave BOOTLOADER minor
+  - txData[4]: slave BOOTLOADER patch
+        (txData[1] is the bootloader major.) DLC 5 also tells the host that
+        this slave bootloader accepts the patch in the minor field of
+        0x214. A slave bootloader without the extension, and a board whose
+        master does not know it, answer exactly the legacy DLC 2. Released
+        flashers read only the first 2 bytes of this frame.
   Note: Same 2-response-ID split as this board's own 0x7F9/0x7FA, for
         the same reason - the slave's 10-byte answer doesn't fit one
         CAN frame.
@@ -1131,7 +1144,12 @@ Data:
     [BIG-ENDIAN] - standard CRC-32 (reflected, polynomial 0xEDB88320,
     final XOR 0xFFFFFFFF), the same variant Python's zlib.crc32() computes.
   - rxData[4..5]: Firmware version major (uint16_t) [BIG-ENDIAN]
-  - rxData[6..7]: Firmware version minor (uint16_t) [BIG-ENDIAN]
+  - rxData[6..7]: Firmware version minor (uint16_t) [BIG-ENDIAN]. Optional
+    PATCH extension (see "FIRMWARE PATCH NUMBER" below): the high byte,
+    rxData[6], is always 0 in a legacy frame. A host MAY set it to
+    0x80 | PATCH (PATCH 0-127) - but only towards a bootloader that
+    announced support in the flags of 0x7E9. The minor itself stays in
+    rxData[7].
 Effect: the bootloader checks the backup slot's size, CRC32, and
         HMAC-SHA256 against what was declared. Only if everything matches
         does it copy the backup slot into the main slot (page by page, with
@@ -1165,7 +1183,10 @@ Data:
                version older than what's already installed - only
                enforced when a currently-valid version exists to compare
                against, never on a blank board or one recovering from
-               corrupted metadata)
+               corrupted metadata. major and minor decide; the patch only
+               takes part when BOTH the installed and the incoming version
+               carry one, so an image declared without a patch is never
+               rejected against the same major.minor)
 
 ID: 0x7F6 [URTC Tool Head -> Master, sent by the BOOTLOADER, every ~1s
 while listening or mid-update]
@@ -1178,6 +1199,10 @@ Data:
     a reason code)
   - txData[1]: progress percent, 0-100, or 0xFF where not applicable (e.g.
     while listening)
+Note: the heartbeat stays at DLC 2 on purpose. Released flashers read it only
+        when the length is exactly 2, so a longer heartbeat would blind them
+        (no progress, no page-ack retry check). The PATCH number does not
+        travel here; see 0x7E9.
 Effect: none - purely informational. Lets the master distinguish "node is
         alive but hasn't started listening yet" from "node is completely
         unresponsive," and gives visibility into a stuck bootloader without
@@ -1235,6 +1260,31 @@ Notes: this is bootloader_common.h's own version (BOOTLOADER_VERSION_MAJOR/MINOR
        needs the board sitting in the bootloader when it asks (e.g. right
        after 0x7F0, or on a fresh boot before the application has been
        jumped to).
+
+ID: 0x7E9 [URTC Tool Head -> Master, sent by whichever side answered 0x7F8,
+right after 0x7F9]
+Version patch response (optional companion of 0x7F9)
+DLC: 3 bytes
+Data:
+  - txData[0]: answering side, same values as 0x7F9 byte 0 (0x00 =
+               application, 0x01 = bootloader)
+  - txData[1]: PATCH number of the installed application (what the
+               application reports about itself, or what the bootloader
+               recorded for the image installed in the main slot), or 0xFF
+               when it is not known (blank board, image installed by a
+               bootloader or a flasher that predates the patch extension)
+  - txData[2]: flags. bit 0 = this bootloader reads the PATCH number from the
+               high byte of the minor field of 0x7F4 / 0x214 (always 0 when
+               the application answers). Other bits are 0 and reserved.
+Notes: 0x7F9 and 0x7FA are unchanged - 0x7F9 already uses all 8 bytes of a
+       classic CAN frame and released flashers read 0x7FA only at length 3 -
+       so this ID carries the patch instead. It is TX-only (nothing listens
+       for it on the board). A board that predates the extension never
+       sends it: a host that gets 0x7F9 and no 0x7E9 within a short grace
+       window (300 ms) must treat the patch as unknown and must keep using
+       the legacy two-component version and the legacy 0x7F4 / 0x214 payload.
+       The application's own major.minor.patch is therefore
+       (0x7F9 major, 0x7F9 minor, 0x7E9 txData[1]).
 
 ID: 0x7FB [Master -> URTC Tool Head, handled by BOTH the application AND
 the bootloader, whichever is currently running]
@@ -1319,6 +1369,77 @@ Data:
         received and stored a page the bootloader sent, not the
         bootloader confirming a page the host sent.
 
+-----------------------------------------------------------------------------
+FIRMWARE PATCH NUMBER (major.minor.patch over CAN) - backwards compatible
+-----------------------------------------------------------------------------
+Until firmware 0.3.5 only major and minor travelled. The patch now travels in
+three additive places; nothing a released flasher reads changes:
+
+  1. 0x7E9 (new, DLC 3): installed application patch + capability flags, sent
+     by the application and by the main bootloader right after 0x7F9.
+  2. The high byte of the 16-bit minor field of 0x7F4 / 0x214 (always 0 in a
+     legacy frame): 0x80 | PATCH.
+  3. Slave version answer 0x218: DLC 5 instead of 2 (see above).
+
+Frames that could NOT be extended, and why: 0x7F9 and 0x7F4 are already 8
+bytes (the classic CAN maximum); 0x7F6 (heartbeat) and 0x7FA are read by
+released flashers only at exactly DLC 2 and DLC 3, so lengthening them would
+make those flashers ignore them.
+
+Stored form. The bootloaders keep the minor field exactly as received in
+their metadata page, so the page layout is unchanged. Anywhere a minor is
+reported to the host as a number (0x7F9 byte 7, the slave 0x217/0x218 minor)
+only the low byte is used.
+
+Anti-rollback. Compared as major, then minor, then patch - the patch only
+when both versions carry one. A legacy flasher (no patch) can keep
+re-installing the same major.minor over a board that knows its patch.
+
+HOST CONTRACT (for URTC-FLASHER / URTC-WEB-STUDIO; reference behaviour, in
+Python; URTC-FLASHER and URTC-WEB-STUDIO are not changed by this document)
+
+    PATCH_UNKNOWN = 0xFF
+    PATCH_FLAG = 0x80
+
+    def query_version(can, timeout=1.5, patch_grace=0.3):
+        can.send(0x7F8, b"\x00")
+        # ... collect 0x7F9 (len 8) and, for a bootloader, 0x7FA (len 3) as
+        # today. Additionally collect 0x7E9 (len >= 3, ignore extra bytes):
+        #     side, app_patch, flags = data[0], data[1], data[2]
+        # After 0x7F9 arrives wait at most patch_grace for 0x7E9 (the
+        # bootloader case already waits for 0x7FA; wait for both together).
+        return {
+            ...,                                   # existing keys unchanged
+            "version_patch": None if app_patch == PATCH_UNKNOWN else app_patch,
+            "patch_aware": seen_7e9,               # False = board predates it
+            "accepts_patch_in_end_update": bool(flags & 1),
+        }
+
+    def end_update_payload(crc32, major, minor, patch, board):
+        # Send the patch only to a bootloader that announced bit 0 of the
+        # flags in ITS OWN answer (query again once the bootloader is
+        # listening, not the application's answer).
+        if board["accepts_patch_in_end_update"] and patch is not None:
+            minor_field = ((PATCH_FLAG | (patch & 0x7F)) << 8) | (minor & 0xFF)
+        else:
+            minor_field = minor
+        return struct.pack(">IHH", crc32, major, minor_field)
+
+    def compare(installed, candidate):             # (major, minor, patch|None)
+        # decide on major and minor; use the patch only when both have one
+        ...
+
+    def slave_version(can):
+        # 0x217 as today (>= 8 bytes); 0x218: len >= 2 as today, and when
+        # len >= 5: app_patch = d[2] (0xFF = unknown), boot_minor = d[3],
+        # boot_patch = d[4], and the slave bootloader accepts the patch in
+        # the minor field of 0x214.
+
+A new flasher with an old board: no 0x7E9 -> patch unknown, legacy 0x7F4 -
+works as before. An old flasher with a new board: ignores 0x7E9, reads 0x7F9,
+0x7FA, 0x7F6 and 0x217/0x218 exactly as before, and its legacy 0x7F4 is
+accepted.
+
 =============================================================================
   0x095 -> Instant impact register (Touch probe - MAXIMUM PRIORITY)
   0x100 -> Status + ring LED control / OLED night mode (DLC:8)
@@ -1373,7 +1494,7 @@ Data:
   0x215 -> Slave bootloader status (DLC:any, or 1 response)
   0x216 -> Slave update progress (DLC:any, or 1 response)
   0x217 -> Slave bootloader version, part 1 (DLC:any, or 8 response)
-  0x218 -> Slave bootloader version, part 2 (response only, DLC:2)
+  0x218 -> Slave bootloader version, part 2 (response only, DLC:2, or 5 with the patch extension)
   0x219 -> Slave bootloader verify-fail-reason (DLC:any, or 1 response)
   0x220 -> Write slave application register, generic (DLC:2-8)
   0x221 -> Read slave application register, generic (DLC:2, or up to 8 response)
@@ -1400,6 +1521,7 @@ Data:
   0x7F7 -> HMAC-SHA256 signature chunk, x4 (Bootloader - DLC:8)
   0x7F8 -> Query version (App or Bootloader, whichever's running - DLC:any)
   0x7F9 -> Version response (App or Bootloader - DLC:8)
+  0x7E9 -> Version patch response, App or Bootloader, right after 0x7F9 (DLC:3, optional)
   0x7FA -> Bootloader's own version, Bootloader-only, alongside 0x7F9 (DLC:3)
   0x7FB -> Query CAN error counters (App or Bootloader, whichever's running - DLC:any)
   0x7FC -> CAN error counter response, TEC + REC (App or Bootloader - DLC:2)

@@ -39,10 +39,12 @@ fi
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUILD="$ROOT/build"
+# Release mode writes the images, hex, elf, sidecars and manifests to
+# firmware/ (git-ignored: they are published only as assets of the GitHub
+# release, see docs/FIRMWARE_DISTRIBUTION.md). CI mode writes them under
+# build/firmware and never touches tracked files.
 FIRMWARE_OUT="$ROOT/firmware"
 if [ "$HYDRA_UMC_CI_MODE" = "1" ]; then
-    # CI builds never touch the versioned images, manifest or sidecars in
-    # firmware/ - everything is published under build/ instead.
     FIRMWARE_OUT="$BUILD/firmware"
 fi
 if [ -t 0 ]; then
@@ -203,6 +205,17 @@ else
         echo ""; echo "$PASS passed, $WARN warnings, $FAIL failed"; exit 1
     fi
 
+    # urtc_version_wire.h (firmware PATCH number on the wire) is header-only
+    # pure C; its test also runs under the address and undefined-behaviour
+    # sanitizers.
+    VERSION_WIRE_BIN="$BUILD/host_tests_version_wire"
+    if "$HOST_CC" -std=c11 -Wall -Wextra -Wno-unused-parameter         -fsanitize=address,undefined -fno-sanitize-recover=all         -I"$ROOT/tests" -I"$ROOT/src/common" -o "$VERSION_WIRE_BIN"         "$ROOT/tests/test_version_wire.c" && "$VERSION_WIRE_BIN"; then
+        pass "version wire host logic tests passed (address + undefined sanitizers)"
+    else
+        fail "version wire host logic tests FAILED"
+        echo ""; echo "$PASS passed, $WARN warnings, $FAIL failed"; exit 1
+    fi
+
     # thermal_stats.c (lifetime heater-on time and thermal fault counters).
     STATS_HOST_BIN="$BUILD/host_tests_thermal_stats"
     if "$HOST_CC" -std=c11 -Wall -Wextra -Wno-unused-parameter \
@@ -276,7 +289,7 @@ fi
 # -----------------------------------------------------------------------
 step "3. Common compiler flags and shared HAL objects (21 modules, shared by all 4 builds)"
 # -----------------------------------------------------------------------
-CFLAGS="-mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard -DSTM32F303xC -DUSE_HAL_DRIVER -I$BUILD/common/CMSIS_Include -I$BUILD/common/HAL_Include -O2 -Wall -ffunction-sections -fdata-sections"
+CFLAGS="-mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard -DSTM32F303xC -DUSE_HAL_DRIVER -I$BUILD/common/CMSIS_Include -I$BUILD/common/HAL_Include -I$ROOT/src/common -O2 -Wall -ffunction-sections -fdata-sections"
 CXXFLAGS="-mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard -fno-exceptions -fno-rtti -fno-unwind-tables -fno-threadsafe-statics -specs=nano.specs -specs=nosys.specs -O2 -Wall"
 LDCOMMON="-mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard -specs=nano.specs -specs=nosys.specs -Wl,--gc-sections"
 
