@@ -17,7 +17,7 @@ class BuildTimestampTests(unittest.TestCase):
         self.assertEqual(gm.build_timestamp(ROOT, env), "2023-11-14T22:13:20Z")
 
     def test_source_date_epoch_wins_over_ci_mode(self):
-        env = {"SOURCE_DATE_EPOCH": "0", "HYDRA_UMC_CI": "1"}
+        env = {"SOURCE_DATE_EPOCH": "0", "URTC_CI": "1"}
         self.assertEqual(gm.build_timestamp(ROOT, env), "1970-01-01T00:00:00Z")
 
     def test_ci_mode_uses_last_commit_date_and_is_repeatable(self):
@@ -28,7 +28,7 @@ class BuildTimestampTests(unittest.TestCase):
             ).stdout.strip()
         except (OSError, subprocess.CalledProcessError):
             self.skipTest("not a git checkout")
-        env = {"HYDRA_UMC_CI": "1"}
+        env = {"URTC_CI": "1"}
         first = gm.build_timestamp(ROOT, env)
         self.assertEqual(first, gm.build_timestamp(ROOT, env))
         self.assertEqual(

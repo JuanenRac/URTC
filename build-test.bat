@@ -29,10 +29,10 @@ REM HYDRA_UMC_SCRIPT_STANDARD_BANNER_END
 REM URTC - build-test.bat
 REM Runs the non-versioning build check. It does not update the manifest or CHANGELOG.
 setlocal
-rem Keep the window open for people, never in automation (CI / HYDRA_UMC_CI).
+rem Keep the window open for people, never in automation (CI / URTC_CI).
 set "KEEP_OPEN=pause"
 if defined CI set "KEEP_OPEN=ver >nul"
-if "%HYDRA_UMC_CI%"=="1" set "KEEP_OPEN=ver >nul"
+if "%URTC_CI%"=="1" set "KEEP_OPEN=ver >nul"
 cd /d "%~dp0"
 where py >nul 2>&1
 if errorlevel 1 (

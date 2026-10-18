@@ -20,7 +20,7 @@ ID: 0x095 [URTC Tool Head -> Master] (INSTANT SEND VIA EXTI INTERRUPT)
 DLC: 1 byte
 Data:
   - txData[0]: Collision event / surface contact register
-               0x01 = IMPACT DETECTED! (Edge on PB3 - Pin 24)
+               0x01 = IMPACT DETECTED! (Edge on PB3)
   Note: Critically low ID so it always wins hardware arbitration on the CAN
         bus. This frame bypasses schedulers entirely; it is injected with
         absolute priority straight from the EXTI3 interrupt callback (PB3
@@ -429,6 +429,47 @@ Data:
   - txData[0]: the currently-set mlx_sensor_variant value (see 0x1A6
                above)
 
+ID: 0x1A8 [Master -> URTC Tool Head]
+Request one chunk of the fault recorder (the "black box")
+DLC: 1 byte or more (only the first byte is used)
+Data:
+  - rxData[0]: chunk index, 0 to 21. The record is 678 bytes, read in 22
+               chunks of 32 bytes (the last chunk holds 6 real bytes; the
+               rest of its 32 bytes are zero).
+  Note: Answered whatever the active tool is, like 0x110. The firmware
+        keeps the last 10 seconds before a fault in RAM and writes them to
+        the F-RAM once, on the rising edge of the critical-error flag (see
+        EEPROM.TXT section 7 for where). A chunk index out of range, or an
+        F-RAM read that fails, gets no answer at all: silence cannot
+        distinguish "no fault was ever recorded" from "the F-RAM is not
+        answering". The export is raw, byte for byte: the firmware does not
+        check the record before sending it, so the host checks the magic
+        and the checksum itself.
+
+ID: 0x1A9 [URTC Tool Head -> Master, answering 0x1A8]
+One chunk of the fault recorder
+DLC: 8 bytes, sent as four consecutive frames
+Data:
+  - the 32 bytes of the chunk in the order sent: frame 0 holds bytes 0-7,
+    frame 1 bytes 8-15, frame 2 bytes 16-23, frame 3 bytes 24-31. If the
+    transmit mailboxes run out in the middle, fewer than four frames
+    arrive: treat that chunk as incomplete and ask again.
+  Record layout (BlackBoxRecord_t, packed, little-endian, 678 bytes in all;
+  version 2 of the record):
+    offset 0     4 bytes   magic 0x424C4B42 ('BLKB' as bytes)
+    offset 4     1 byte    struct_version (2)
+    offset 5     1 byte    sample_count (how many of the 67 samples are real)
+    offset 6     1 byte    write_index (where the ring was when it was flushed)
+    offset 7     670 bytes 67 samples of 10 bytes, in ring order (the oldest
+                           sample is at write_index when sample_count is 67)
+    offset 677   1 byte    checksum: CRC-8/SMBUS (polynomial 0x07, initial
+                           value 0) over bytes 0 to 676
+  Sample (10 bytes): tick_ms uint32 (milliseconds since boot), active_tool
+  uint8, current_temperature uint16 (degrees C), target_temperature uint16
+  (degrees C), flags uint8 (bit 0 endstop triggered, bit 1 critical error
+  flag - the first sample with it set is the fault itself, bits 2-3 thermal
+  fault code). Samples are about 150 ms apart.
+
 -----------------------------------------------------------------------------
 3. MOTION TOOLS (Standard Stepper - Extended Range)
    Associated with: TOOL_PASTE_DISPENSER (1), TOOL_LIQUID_DISPENSER (2),
@@ -541,7 +582,7 @@ Data:
   - rxData[0]: Motor speed per PWM cycle towards PA8 (0 to 255)
                0x00 = Full stop (0% duty cycle + active brake on PB6)
                > 0  = Active speed modulation via TIM1_CH1 (releases brake)
-  - rxData[1]: Rotation direction (FRIN on pin PA4 - Pin 10)
+  - rxData[1]: Rotation direction (FRIN on pin PA4)
                0x01 = Counter-clockwise (High level)
                0x00 = Clockwise (Low level)
 
@@ -565,7 +606,7 @@ DLC: 3 bytes
 Data:
   - txData[0]: 12-bit analog ADC reading (PB0/Channel 11) - High byte (MSB) [BIG-ENDIAN]
   - txData[1]: 12-bit analog ADC reading (PB0/Channel 11) - Low byte (LSB)
-  - txData[2]: LM393 digital output state (PB3 - Pin 24)
+  - txData[2]: LM393 digital output state (PB3)
                0x01 = Object detected / Part picked up
                0x00 = Empty / No reading
 
@@ -1197,6 +1238,13 @@ Data:
                takes part when BOTH the installed and the incoming version
                carry one, so an image declared without a patch is never
                rejected against the same major.minor)
+  Note: the listening status 0x01 is sent when the listening window (about
+        600 ms after power-up or reset) ends without a jump - because
+        there is no valid application, or an update was requested - and
+        again each time an aborted transfer returns to listening. It is
+        NOT sent at the start of the window, which begins only after the
+        bootloader has checked the stored application: a tool that wants
+        to update sends its start-update frame (0x7F1) inside the window.
 
 ID: 0x7F6 [URTC Tool Head -> Master, sent by the BOOTLOADER, every ~1s
 while listening or mid-update]
@@ -1470,30 +1518,34 @@ accepted.
   0x1A5 -> Query/response: peripheral type + device serial number (DLC:any/2)
   0x1A6 -> Set MLX9064x sensor variant (DLC:1+)
   0x1A7 -> Query/response: MLX9064x sensor variant (DLC:any/1)
+  0x1A8 -> Request one 32-byte chunk of the fault recorder (DLC:1+)
+  0x1A9 -> Fault recorder chunk, four frames of 8 bytes (response only)
   0x1AA -> Query lifetime thermal counters (DLC:any)
   0x1AB -> Lifetime thermal counters response (DLC:8)
   --- Per-tool commands (see dedicated sections above) ---
-  0x120 -> Stepper motor control (Dispensers, Screwdriver, Grippers - DLC:5)
-  0x130 -> T12 setpoint temperature (Soldering iron - DLC:2)
+  0x120 -> Stepper motor control (Dispensers, Screwdriver, Grippers - DLC:5 - no watchdog)
+  0x130 -> T12 setpoint temperature (Soldering iron - DLC:2 - 250ms watchdog)
+  0x131 -> Reset solder wire feeder position, magic payload 'RSP0' (Soldering iron - DLC:4)
+  0x132 -> Query/response: solder wire feeder position (Soldering iron - DLC:any/4)
   0x135 -> T12 thermal telemetry (Soldering iron - DLC:2)
-  0x140 -> BL4260 speed and direction control (Smart drill - DLC:2)
+  0x140 -> BL4260 speed and direction control (Smart drill - DLC:2 - 250ms watchdog)
   0x145 -> ADC telemetry / Digital input (Vacuum pickup - DLC:3)
   0x147 -> Actual RPM telemetry + endstop, uint16_t (Drill - DLC:3)
   0x150 -> Ring off/strobe/continuous control (AOI tool head - DLC:3)
   0x155 -> Endstop telemetry, (AOI tool head - DLC:1)
   0x160 -> Laser power and interlock (Laser engraver - DLC:2 - 250ms watchdog)
   0x165 -> Endstop telemetry, (Laser engraver - DLC:1)
-  0x170 -> Unified thermal setpoint and extruder motion (3D printer - DLC:6)
-  0x173 -> Delta layer fan PWM power control (3D printer - DLC:1)
+  0x170 -> Unified thermal setpoint and extruder motion (3D printer - DLC:6 - 250ms watchdog on the heater)
+  0x173 -> Delta layer fan PWM power control (3D printer - DLC:1 - 1000ms watchdog)
   0x175 -> Hotend thermal telemetry (3D printer - DLC:2)
   0x177 -> Layer fan actual RPM telemetry, uint16_t (3D printer - DLC:2)
-  0x178 -> Hotend fan PWM power control, (3D printer - DLC:1)
+  0x178 -> Hotend fan PWM power control, (3D printer - DLC:1 - no watchdog, on purpose)
   0x179 -> Hotend fan actual RPM telemetry, uint16_t, (3D printer - DLC:2)
-  0x1B0 -> Coil on/off (Electromagnet - DLC:1)
+  0x1B0 -> Coil on/off (Electromagnet - DLC:1 - no watchdog, on purpose)
   0x1C0 -> Timed pulse + contact-sensor gate (Spot Welder - DLC:3)
-  0x1D0 -> LED driver duty cycle (UV Curing - DLC:1)
-  0x1E0 -> Heater setpoint + blower duty (Hot Air Rework - DLC:3)
-  0x1F0 -> Expansion driver STEP/DIR/EN (Crimping Actuator - DLC:5)
+  0x1D0 -> LED driver duty cycle (UV Curing - DLC:1 - 250ms watchdog)
+  0x1E0 -> Heater setpoint + blower duty (Hot Air Rework - DLC:3 - 250ms watchdog on the heater, 1000ms on the blower)
+  0x1F0 -> Expansion driver STEP/DIR/EN (Crimping Actuator - DLC:5 - no watchdog)
   0x200 -> Timed pulse, no sensor gate (Ultrasonic Welder - DLC:3)
   --- Expansion slave bridge (advanced boards only, see dedicated section above) ---
   0x210 -> Enter slave bootloader, magic payload (DLC:4)

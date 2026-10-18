@@ -1,5 +1,5 @@
 // =============================================================================
-// URTC Firmware - System clock configuration (HSE->PLL->64MHz)
+// URTC Firmware - System clock configuration (HSI->PLL->64MHz)
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
 // GPL-3.0 - see LICENSE
 // =============================================================================
@@ -8,7 +8,7 @@
 
 
 // =============================================================================
-// 11. BASE CLOCK SUBSYSTEM (48 MHz INTERNAL, HARDWARE-SYNCED)
+// 11. BASE CLOCK SUBSYSTEM (64 MHz FROM THE INTERNAL HSI THROUGH THE PLL)
 // =============================================================================
 void SystemClock_Config(void) {
     RCC_OscInitTypeDef RCC_OscInitStruct = {0};

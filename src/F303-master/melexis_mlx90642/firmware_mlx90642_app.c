@@ -56,9 +56,10 @@ void MLX90642_Direct_TriggerCapture(void) {
         mlx90642_capture_status = MLX_CAPTURE_ERROR;
         return;
     }
-    // Deliberately not polling IsDataReady() to completion here - same
-    // non-blocking reasoning as this project's own other 2 sensors'
-    // TriggerCapture: the actual frame read happens in
+    // Deliberately not polling IsDataReady() to completion here, unlike the
+    // TriggerCapture of this project's other 2 sensors (which block until
+    // the frame is read, bounded by their API's data-ready timeout): the
+    // actual frame read happens in
     // MLX90642_Direct_GetCaptureStatus() below, on whichever later poll
     // first finds the sensor's own data-ready flag set.
 }

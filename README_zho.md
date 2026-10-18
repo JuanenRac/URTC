@@ -110,7 +110,7 @@ URTC 的核心优势在于其极强的多功能性。板卡采用可扩展矩阵
 
 通过其动态切换逻辑，固件原生管理以下工具头：
 
-1. **焊接工作站（T12）：** 使用直接 ADC 反馈实现精确 PID 温度控制，处理标准 T12 烙铁头，加上一个将焊丝送入焊点的电动送丝器（与下方纯运动类工具共享 `CONN_MOT` 及其步进协议——为腾出空间，牺牲了本工具自身的通用限位输入）。[跳线/接线配置 →](images/TOOL_SOLDERING_IRON.png)
+1. **焊接工作站（T12）：** 使用直接 ADC 反馈实现带滞回的开关式温度控制（不是 PID），处理标准 T12 烙铁头，加上一个将焊丝送入焊点的电动送丝器（与下方纯运动类工具共享 `CONN_MOT` 及其步进协议——为腾出空间，牺牲了本工具自身的通用限位输入）。[跳线/接线配置 →](images/TOOL_SOLDERING_IRON.png)
 2. **SMT 焊膏点胶器：** 用于 PCB 上精确焊膏沉积的毫米级送料控制。[跳线/接线配置 →](images/TOOL_PASTE_DISPENSER.png)
 3. **导热膏/液体点胶器：** 针对高粘度膏体或液态胶粘剂的流动性管理。[跳线/接线配置 →](images/TOOL_LIQUID_DISPENSER.png)
 4. **智能电动螺丝刀：** 通过步进接口进行旋转和停止控制。计划中：基于扭矩限制的停止（目前还没有扭矩检测）。[跳线/接线配置 →](images/TOOL_SCREWDRIVER.png)
@@ -120,7 +120,7 @@ URTC 的核心优势在于其极强的多功能性。板卡采用可扩展矩阵
 8. **NEMA 夹爪：** 通过重型步进电机控制的稳固夹紧力。[跳线/接线配置 →](images/TOOL_GRIPPER_NEMA.png)
 9. **AOI（自动光学检测）系统：** 面向机器视觉相机拍摄的 LED 照明阵列的同步频闪控制。提供通用限位输入。[跳线/接线配置 →](images/TOOL_AOI_INSPECTION.png)
 10. **雕刻激光二极管（10W 光学）：** 带软件 CAN 看门狗的 PWM 光束功率调制，主机通信丢失时锁定激光输出（仅完成构建，从未在真实板卡上运行，也不能代替独立的硬件联锁）。提供通用限位输入。[跳线/接线配置 →](images/TOOL_LASER_ENGRAVER.png)
-11. **3D 打印热端：** 加热管的 PID 控制、NTC 热敏电阻读数、挤出机控制，以及一个专用的 25kHz PWM 控制层冷却风扇（4 线，转速计反馈，自身的通信看门狗）——全部集成于一个模块中。[跳线/接线配置 →](images/TOOL_3D_PRINTER.png)
+11. **3D 打印热端：** 加热管的带滞回开关式控制、NTC 热敏电阻读数、挤出机控制，以及一个专用的 25kHz PWM 控制层冷却风扇（4 线，转速计反馈，自身的通信看门狗）——全部集成于一个模块中。[跳线/接线配置 →](images/TOOL_3D_PRINTER.png)
 12. **3D 扫描探针：** 超快的硬件中断输入（EXTI），具有绝对优先级，用于无延迟的实时表面数字化和碰撞感应。也涵盖计量接触式探测——同一硬件路径，同一工具头上的不同物理探针。[跳线/接线配置 →](images/TOOL_SCAN_PROBE.png)
 13. **SMT 拾取放置头：** 旋转 A 轴用于正确的焊盘对齐，与上方膏体/液体点胶器及两款夹爪共用同一步进接口。[跳线/接线配置 →](images/TOOL_SMT_PICKPLACE.png)
 14. **重型电磁铁：** 针对铁磁性零件的通/断吸附控制，复用 T12 加热器输出作为通用 GPIO 驱动器。[跳线/接线配置 →](images/TOOL_ELECTROMAGNET.png)
@@ -305,7 +305,7 @@ URTC 的闪存被拆分为两个独立部分，因此板卡可以通过它已经
 
 - **自动化：** 仓库根目录下的 `build_firmware.sh`（Linux）或 `build_firmware.bat`（Windows）。两者都会在 ARM GNU 工具链缺失时安装它，获取固定版本的 ST HAL/CMSIS 提交，并将全部 4 个二进制文件（主板应用 + 引导程序，扩展从属应用 + 引导程序）编译、链接、`objcopy` 直接输出到 `firmware/`，然后重新生成 `firmware/firmware_manifest.json`。不带参数运行进行完整构建，`--clean` 先清空本地 `build/` 缓存，或 `master`/`slave` 只构建某一颗芯片自身的一对文件。`build_firmware.sh` 针对本项目真实的源码树端到端运行；`build_firmware.bat` 在 Windows 上镜像同样的逻辑——如果两者出现分歧，以 `.sh` 脚本的逻辑为准。
 - **手动：** 无论哪个脚本运行的每一条命令，以及每一项工具链/HAL 选择背后的推理，都在 `docs/COMPILE_STM32F303.TXT` 中逐步详细列出——适用于不同的操作系统、不同的 HAL/CMSIS 源，或只是想确切看看这些脚本自动化了什么。
-- **发布资源：** 固件映像（`.bin`、`.hex`、`.elf` 及其校验和与清单文件）不纳入 git 版本管理。`build_firmware.sh`/`.bat` 将它们写入 `firmware/`（已被 git 忽略；CI 模式即 `HYDRA_UMC_CI=1` 时写入 `build/firmware`），`python tools/publish_release_assets.py` 会检查整套文件并输出带有待附加文件的准确 `gh release create` 命令。它们仅作为每个版本的 GitHub 发布资源发布。 谁读取什么：[`docs/FIRMWARE_DISTRIBUTION.md`](docs/FIRMWARE_DISTRIBUTION.md)。
+- **发布资源：** 固件映像（`.bin`、`.hex`、`.elf` 及其校验和与清单文件）不纳入 git 版本管理。`build_firmware.sh`/`.bat` 将它们写入 `firmware/`（已被 git 忽略；CI 模式即 `URTC_CI=1` 时写入 `build/firmware`），`python tools/publish_release_assets.py` 会检查整套文件并输出带有待附加文件的准确 `gh release create` 命令。它们仅作为每个版本的 GitHub 发布资源发布。 谁读取什么：[`docs/FIRMWARE_DISTRIBUTION.md`](docs/FIRMWARE_DISTRIBUTION.md)。
 
 每次固件源码更改之后（或在信任一次版本递增之前），从仓库根目录运行 **`check_version_consistency.sh`**：它以 Track A/E 的版本常量（主板固件、扩展从属应用）作为权威来源，检查 `VERSION_CHECKLIST.txt` 为该版本标签记录的每一处位置，报告任何不匹配之处——它只报告，不会自行修复任何内容。`VERSION_CHECKLIST.txt` 是本项目所携带的全部 5 条独立版本轨道（主固件、硬件/PCB、主引导程序、扩展从属应用、扩展从属引导程序）的完整参考，以及递增其中任意一条时确切需要修改的内容。
 
@@ -318,7 +318,7 @@ URTC 的闪存被拆分为两个独立部分，因此板卡可以通过它已经
    * `URTC_MAIN_BOOTLOADER_v0.3.9.hex` → `0x08000000`
    * `URTC_MAIN_FIRMWARE_v0.3.5.hex` → `0x08008000`
 3. 在通电之前通过 ID 焊接跳线设置工具身份——板卡在开机时读取一次，一如既往。5 个跳线（ID0-ID4），覆盖完整的 32 地址空间（31 个直接工具地址，加上保留的 `11111` 自由配置地址——见上方工具矩阵一节）。
-4. 通电。引导程序监听约 600ms，未发现任何内容，直接跳转进入应用程序——从此刻起，一切行为都与本 README 其余部分所描述的完全一致。
+4. 通电。引导程序监听约 600ms，未发现任何内容，直接跳转进入应用程序——从此刻起，一切行为都与本 README 其余部分所描述的完全一致。该窗口在引导程序检查完已存储的应用之后才开始，想要更新的工具必须在窗口内发送开始更新帧（0x7F1）；监听状态（0x7F5 = 0x01）在窗口结束且未跳转时发送，而不是在窗口开始时发送。
 
 **JTAG 接口从不会被移除或禁用。** 它始终作为后备手段存在——如果某次 CAN 更新出了问题，或者你只是更喜欢这种方式，随时都可以通过 SWD 重新刷写任意一个镜像。
 
@@ -357,7 +357,7 @@ URTC 的闪存被拆分为两个独立部分，因此板卡可以通过它已经
 
 - **热失控保护**（`thermal_guard.c`，自应用 0.3.2 起）用于烙铁／热风和 3D 热端：对*实测*温度的 MAXTEMP（T12 449 °C，热端 310 °C）、加热监视（加热器开启时温度必须真正上升——可检测松脱的热敏电阻或烙铁头）以及保温检查（达到目标后，加热器开启时不得长时间下降）。一旦故障即切断加热器、锁定板卡错误，并通过 `0x111` 的第 4 字节报告原因。已在主机上用模拟加热器测试（`tests/test_thermal_guard.c`）。 这些限值从未在真实加热器上测量过，这一切也从未在真实板卡上运行过。
 - **诊断：** `0x111` 的第 5 字节报告上次复位原因（bit0 = 硬件看门狗触发）；`0x1AA`/`0x1AB` 返回保存在 F-RAM 中的累计计数——热故障次数、最后一次故障代码和加热器总开启时间（自 0.3.3 起）；黑匣子采样也会记录热故障代码。
-- **固件签名：** 引导程序的 HMAC 密钥在构建时从私有文件（`URTC_SIGNING_KEY_FILE`）注入；没有该文件时构建使用*公开开发密钥*并给出提示，`URTC_RELEASE=1` 会拒绝该密钥。`firmware/` 中每个镜像都附带 `<bin>.sha256` 和 `<bin>.manifest.json`（含预先计算的签名），因此 URTC Flasher 和 URTC Web Studio 不包含任何密钥。参见 [`docs/FIRMWARE_SIGNING.TXT`](docs/FIRMWARE_SIGNING.TXT)。 HMAC 使用共享的对称密钥：已发布的应用镜像使用公开的开发密钥签名，因此任何人都可以为使用该密钥构建的板卡签出它会接受的镜像；非对称签名（Ed25519）仍在计划中。
+- **固件签名：** 引导程序的 HMAC 密钥在构建时从私有文件（`URTC_SIGNING_KEY_FILE`）注入；没有该文件时构建使用*公开开发密钥*并给出提示，`URTC_RELEASE=1` 会拒绝该密钥。`firmware/` 中每个镜像都附带 `<bin>.sha256` 和 `<bin>.manifest.json`（含预先计算的签名），因此 URTC Flasher 和 URTC Web Studio 不包含任何密钥。参见 [`docs/FIRMWARE_SIGNING.TXT`](docs/FIRMWARE_SIGNING.TXT)。 HMAC 使用共享的对称密钥：已发布的应用镜像使用公开的开发密钥签名，因此任何人都可以为使用该密钥构建的板卡签出它会接受的镜像；非对称签名（Ed25519）仍在计划中。 正式发布的每个文件还带有分离式 Ed25519 发布签名（`<文件>.sig`，公钥见 [`docs/RELEASE_SIGNING.md`](docs/RELEASE_SIGNING.md)）；刷写器和 Web Studio 在签名存在时会进行验证。
 - **CAN 总线：** 不验证发送方——任何节点都可以控制工具。使用激光、加热器或焊接设备的安装**必须**配备独立于 MCU 的硬件联锁和封闭总线：[`docs/CAN_THREAT_MODEL.TXT`](docs/CAN_THREAT_MODEL.TXT)。
 
 ## 📋 更新日志
@@ -373,7 +373,7 @@ URTC 的闪存被拆分为两个独立部分，因此板卡可以通过它已经
 
 ## 🔍 当前状态
 
-**固件（`src/F303-master/`）：** 全部 25 种工具配置文件功能完整——热 PID 控制、逐工具遥测、通信看门狗、失速/故障检测，以及 OLED 自身的实时诊断，此外还有一对当前工具查询命令（`0x110`/`0x111`）、面向扩展接口的通用 SPI 透传（`0x180`/`0x181`）、一块在断电时保留设定值的板载 F-RAM（`0x190`/`0x191`）、`11111` 跳线自由工具配置机制（`0x1A2`/`0x1A3`）、外设类型 + 设备序列号报告（`0x1A4`/`0x1A5`，用于在共享总线上区分多块原本相同的板卡），以及一条到达高级扩展板上从属芯片的 CAN 转 I2C 桥（`0x210`-`0x221`）。独立于引导程序进行版本管理（见下方更新日志）。 这一切都从未在真实板卡上运行过，热保护仅在主机上用模拟加热器测试过。
+**固件（`src/F303-master/`）：** 全部 25 种工具配置文件功能完整——带滞回的热开关式控制、逐工具遥测、通信看门狗、失速/故障检测，以及 OLED 自身的实时诊断，此外还有一对当前工具查询命令（`0x110`/`0x111`）、面向扩展接口的通用 SPI 透传（`0x180`/`0x181`）、一块在断电时保留设定值的板载 F-RAM（`0x190`/`0x191`）、`11111` 跳线自由工具配置机制（`0x1A2`/`0x1A3`）、外设类型 + 设备序列号报告（`0x1A4`/`0x1A5`，用于在共享总线上区分多块原本相同的板卡），以及一条到达高级扩展板上从属芯片的 CAN 转 I2C 桥（`0x210`-`0x221`）。独立于引导程序进行版本管理（见下方更新日志）。 这一切都从未在真实板卡上运行过，热保护仅在主机上用模拟加热器测试过。
 
 **引导程序（`src/F303-master/boot/`）：** 功能完整的黄金镜像 A/B 更新系统——通过 CAN 进行、以 CRC32 和共享密钥 HMAC-SHA256 校验的 OTA 更新（并非非对称签名），一个确保失败的更新绝不会使板卡变砖的备份槽，以及独立于应用程序的自身版本报告（`0x7FA`）。编译和链接干净；在无人值守、连接真实执行器的场景中信任它之前，请先参见上方的实验台测试注意事项。
 
@@ -563,7 +563,7 @@ URTC 的闪存被拆分为两个独立部分，因此板卡可以通过它已经
 - **[HYDRA-UMC](https://github.com/JuanenRac/HYDRA-UMC)** —— 机器人手臂主板设计——CM5 主机 + 双核 STM32H745,目标是通过 CAN-OTA/SPI-OTA 协调最多 8 条工具臂(固件处于早期阶段,尚无已组装的电路板);其自身真实的 FDCAN2 中继隧道正是本固件工具头所依托的线路。
 - **[HYDRA-UMC-SDK](https://github.com/JuanenRac/HYDRA-UMC-SDK)** —— 每个桥接都据此校验自身指令的共享 JSON-Schema 契约与软件作业门限边界(并非经认证的安全功能);同样覆盖服务、界面、CM5 适配器以及本固件。
 - **[HYDRA-UMC-CONNECTOR-HUB](https://github.com/JuanenRac/HYDRA-UMC-CONNECTOR-HUB)** — 面向外部机器连接器的声明式适配器清单注册与校验工具；把 SDK 自身的契约理念扩展到外部机器，而不取代工业网关类项目。
-- **[URTC-SMART-RACK](https://github.com/JuanenRac/URTC-SMART-RACK)** —— 面向板卡安装机架的固件,具备真实的工具 ID 解码与 Smart Idle 预热逻辑;与本固件共享同一工具生态与 CAN 总线。
+- **[URTC-SMART-RACK](https://github.com/JuanenRac/URTC-SMART-RACK)** —— 面向工具头智能存储架的固件,具备真实的工具 ID 解码与 Smart Idle 预热逻辑;与本固件共享同一工具生态与 CAN 总线。
 - **[URTC-VISION-TOOL](https://github.com/JuanenRac/URTC-VISION-TOOL)** —— 面向热成像/RGB 检测工具头的固件及真实 Python 视觉伴侣程序;与本固件共享同一工具生态与 CAN 总线。
 - **[HYDRA-UMC-DETECTION-HEF](https://github.com/JuanenRac/HYDRA-UMC-DETECTION-HEF)** —— 具备 Hailo 架构/校验和安全加载验证的真实编译模型注册表;为本固件自身的工具提供背后的视觉识别能力。
 

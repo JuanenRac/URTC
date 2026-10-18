@@ -27,10 +27,10 @@ echo ***************************************************************************
 echo.
 REM HYDRA_UMC_SCRIPT_STANDARD_BANNER_END
 setlocal enabledelayedexpansion
-rem Keep the window open for people, never in automation (CI / HYDRA_UMC_CI).
+rem Keep the window open for people, never in automation (CI / URTC_CI).
 set "KEEP_OPEN=pause"
 if defined CI set "KEEP_OPEN=ver >nul"
-if "%HYDRA_UMC_CI%"=="1" set "KEEP_OPEN=ver >nul"
+if "%URTC_CI%"=="1" set "KEEP_OPEN=ver >nul"
 REM HYDRA_UMC_SCRIPT_STANDARD_VERSION_STEP
 echo [1/3] Incrementing project version and synchronising its manifest...
 REM HYDRA_UMC_SCRIPT_STANDARD_VERSION_CAPTURE_BEFORE
@@ -43,7 +43,7 @@ if "%ROOT:~-1%"=="\" set "ROOT=%ROOT:~0,-1%"
 set "BUILD=%ROOT%\build"
 set "FIRMWARE_OUT=%ROOT%\firmware"
 REM Release mode writes to firmware\ (git-ignored, published only as release assets); CI mode writes to build\firmware.
-if "%HYDRA_UMC_CI%"=="1" set "FIRMWARE_OUT=%BUILD%\firmware"
+if "%URTC_CI%"=="1" set "FIRMWARE_OUT=%BUILD%\firmware"
 set "HAL_REPO=https://github.com/STMicroelectronics/stm32f3xx_hal_driver.git"
 set "HAL_COMMIT=953955afe65f89e60e556bbcdba752597f5da65d"
 set "CMSIS_DEVICE_REPO=https://github.com/STMicroelectronics/cmsis_device_f3.git"
@@ -105,6 +105,22 @@ if errorlevel 1 (
     goto :summary
 ) else (
     for /f "delims=" %%v in ('git --version') do echo   OK   git found: %%v
+    set /a PASS+=1
+)
+
+REM -----------------------------------------------------------------------
+echo.
+echo === 1b. Host logic tests (same suites as build_firmware.sh) ===
+python "%ROOT%\tools\run_host_tests.py" --build-dir "%BUILD%"
+if errorlevel 2 (
+    echo   WARN host logic tests were not run: they need WSL or a Linux host
+    set /a WARN+=1
+) else if errorlevel 1 (
+    echo   FAIL host logic tests FAILED
+    set /a FAIL+=1
+    goto :summary
+) else (
+    echo   OK   host logic tests passed
     set /a PASS+=1
 )
 

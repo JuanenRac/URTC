@@ -20,7 +20,7 @@ void MX_GPIO_Init_Early(void) {
     __HAL_RCC_GPIOB_CLK_ENABLE();
     __HAL_RCC_GPIOF_CLK_ENABLE();
 
-    // Heartbeat / local diagnostic LED configuration (PA15 - Pin 25)
+    // Heartbeat / local diagnostic LED configuration (PA15)
     HAL_GPIO_WritePin(LED_DIAG_PORT, LED_DIAG_PIN, GPIO_PIN_RESET);
     GPIO_InitStruct.Pin = LED_DIAG_PIN;
     GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;

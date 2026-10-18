@@ -12,8 +12,8 @@ consumer has to change to read them.
   repository, so they are not on `raw.githubusercontent.com` and not in the
   GitHub contents API listing of `firmware/`.
 - `build_firmware.sh` / `build_firmware.bat` in release mode (no
-  `HYDRA_UMC_CI`) write the images to `firmware/` locally. In CI mode
-  (`HYDRA_UMC_CI=1`) they write to `build/firmware` and touch no tracked file.
+  `URTC_CI`) write the images to `firmware/` locally. In CI mode
+  (`URTC_CI=1`) they write to `build/firmware` and touch no tracked file.
 - `python tools/publish_release_assets.py` checks the local set (digests,
   versions, signatures present) and prints the exact `gh release create`
   command with every file to attach. It never runs `gh`.
@@ -38,6 +38,9 @@ carries `sha256`, `crc32`, `size_bytes` and `hardware_id`.
 URTC-SMART-RACK and URTC-VISION-TOOL: `URTC_SMART_RACK_FIRMWARE_v<ver>.bin`,
 `.hex`, `.bin.sha256` (and `.elf` with `--with-elf`); likewise
 `URTC_VISION_TOOL_FIRMWARE_v<ver>...`.
+
+Every asset of an official release also has a `<asset>.sig` (Ed25519, see
+`docs/RELEASE_SIGNING.md`).
 
 The file names carry their own version, so a name never changes meaning
 between releases. `firmware_manifest.json` is the fixed-name entry point.
@@ -80,7 +83,7 @@ must allow it after the redirect.
 - Anything that links to `.../blob/main/firmware/...` or to a
   `raw.githubusercontent.com/.../firmware/...` URL must use the release asset
   URLs instead. `check_version_consistency.sh` checks the local `firmware/`
-  folder (or `build/firmware`) of a built tree and is not part of the CI.
+  folder (or `build/firmware`) of a built tree; the CI runs it after the firmware compile.
 
 ## Bench pre-releases and the "latest" release
 
@@ -94,14 +97,30 @@ key exists, the clients reach the bench images by tag
 (`sync_firmware.py --release v0.3.5`, `sync-firmware.mjs --tag <tag>`), and the
 bundled copies keep serving offline use.
 
+## Refreshing the copies bundled with the flasher and the web studio
+
+After a release build (`firmware/` holds the four images), from the folder that contains the repositories:
+
+```
+cd URTC
+python tools/publish_release_assets.py --allow-dev-key --sign     # signs every asset and checks the set
+python ../URTC-FLASHER/tools/sync_firmware.py firmware             # copies images, sidecars and signatures
+cd ../URTC-WEB-STUDIO
+node scripts/sync-firmware.mjs ../URTC/firmware                    # copies them and rewrites src/lib/bundledFirmware.ts
+```
+
+Leave out `--allow-dev-key` once the images are signed with the production key. Without `--sign` the set has no
+signatures and the web studio needs `--allow-unsigned`. Commit the refreshed copies in each repository.
+
 ## Publishing a release
 
 1. `bash build_firmware.sh` (release mode, with `URTC_SIGNING_KEY_FILE` and
    `URTC_RELEASE=1` for a release signed with the private key; see
    `docs/FIRMWARE_SIGNING.TXT`).
-2. `python tools/publish_release_assets.py` and check that it ends with
+2. `python tools/publish_release_assets.py --sign` and check that it ends with
    `RELEASE_ASSETS=PASS` (a development-key set fails; use `--allow-dev-key`
-   only for a bench pre-release).
+   only for a bench pre-release). `--sign` writes the `<asset>.sig` of every
+   asset with the key of the releases; see `docs/RELEASE_SIGNING.md`.
 3. Run the printed `gh release create ...` command (write the notes file it
    names first, or replace `--notes-file` with `--notes`).
 4. Keep only the newest release's assets; older tags can stay as tags.

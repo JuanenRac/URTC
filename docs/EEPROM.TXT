@@ -6,10 +6,12 @@ LICENSE: This document is licensed under CC BY-SA 4.0 (https://creativecommons.o
          Firmware source is GPL-3.0; hardware design files are CERN-OHL-S v2 - see the repo README.
 =============================================================================
 Everything URTC stores in its onboard FM24CL64B F-RAM (U8, I2C2, shares
-that bus with the OLED - see ../BOM/BOM.TXT and PINOUT.TXT's I2C2 block). One
-single packed struct, SavedState_t, written starting at address 0 - the
-chip holds 8192 bytes (64Kbit) total, and this struct currently uses 34
-bytes, leaving 8158 bytes of headroom for whatever gets added later.
+that bus with the OLED - see ../BOM/BOM.TXT and PINOUT.TXT's I2C2 block). The
+chip holds 8192 bytes (64Kbit) and three regions of it are in use: the
+settings struct SavedState_t at address 0 (34 bytes, described in section 1),
+the lifetime thermal counters at address 192 (13 bytes) and the fault
+recorder at address 256 (678 bytes); section 7 has the whole map. Everything
+from address 934 up to 8191 is free.
 
 For the load/save logic itself (when it reads, when it writes, what gets
 restored automatically vs. left for the host to decide) see
@@ -358,17 +360,44 @@ simultaneously under the same CAN ID, which is a genuine bus-level
 collision, not just an inconvenience. Assigning each board a distinct
 serial number (via 0x1A4, from the Flasher - typically done with one
 board connected at a time before wiring them all onto a shared bus)
-gives a host a way to tell them apart once queried, even though this
-firmware itself never reads its own serial number for any decision -
-it's purely a label answered on request. This is the identification
-mechanism the boards need to be distinguishable at all; it does not by
-itself change how the rest of this protocol addresses commands (every
-existing CAN ID in this document is still answered by every board that
-receives it, regardless of serial number) - a future addressed-command
-scheme, if one gets added, would build on top of these serial numbers
-rather than needing new hardware.
+is the label a future
+addressing scheme would build on, but today it does not let a host tell the
+boards apart on a shared bus. This firmware never reads its own serial number
+for any decision - it is purely a label answered on request - and every
+existing CAN ID in this document is answered by EVERY board that receives it,
+with the same response ID, regardless of serial number. So a host cannot ask
+one particular board for its serial: it can only read it when exactly one
+board is on the bus (which is how the Flasher writes it, one board at a time)
+or when it already knows from the wiring which board it is talking to.
+Distinguishing several boards on one bus needs an addressed-command scheme
+that does not exist yet.
 
 Set via CAN (0x1A4, see CANBUS.TXT) - the Flasher is the only tool that
 writes it; the Tester can read it (0x1A4 with no payload, or 0x1A5
 directly) but doesn't offer a way to change it, same asymmetry as
 free_tool_selection above.
+
+-----------------------------------------------------------------------------
+7. Map of the whole F-RAM
+-----------------------------------------------------------------------------
+Address | Size  | What                                  | Defined in
+--------|-------|---------------------------------------|------------------------
+0       | 34    | SavedState_t (section 1)              | firmware_common.h
+34      | 158   | free                                  |
+192     | 13    | lifetime thermal counters: thermal    | thermal_stats.h,
+        |       | faults ever latched, the last fault   | firmware_thermal_stats.c
+        |       | code and the total heater-on time,    | (own CRC-8 record, so
+        |       | read over CAN with 0x1AA / 0x1AB      | SavedState_t's version
+        |       |                                       | does not change)
+205     | 51    | free                                  |
+256     | 678   | fault recorder (the last 10 seconds   | firmware_blackbox.c,
+        |       | before a critical error, written once | firmware_common.h
+        |       | on the rising edge of the error flag; | (BlackBoxRecord_t);
+        |       | read over CAN with 0x1A8 / 0x1A9;     | layout in CANBUS.TXT
+        |       | record version 2)                     | at 0x1A9
+934     | 7258  | free                                  |
+8191    |       | last byte of the chip                 |
+
+A region may only grow into the free space that follows it; a change of any
+region's layout needs a new version number in that region and an update of
+this table.

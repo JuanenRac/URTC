@@ -11,8 +11,13 @@ can put a frame on the wires - a robot controller, a laptop with a USB-CAN
 adapter, or another node that has gone wrong - is obeyed as "the master".
 
 The firmware protects against ACCIDENTS, not against a hostile node:
-  * every actuator has a communication watchdog (250 ms for the laser,
-    drill, heaters, fans, UV...): if the commands stop, the output stops;
+  * the laser, the drill, the heaters, the UV lamp, the layer fan and the
+    hot-air blower have a communication watchdog (250 ms; 1000 ms for the
+    layer fan and the blower): if the commands stop, the output stops.
+    NOT covered: the electromagnet (0x1B0) and the hotend fan (0x178) keep
+    their last state on purpose, a stepper runs the step count it was given
+    (up to 2^32 steps) whatever the bus does, and the continuous PWM of the
+    expansion slave depends on the I2C link to the master;
   * a declared critical error blocks every command except lighting (0x100)
     until the board is reset (firmware_can_dispatch.c);
   * destructive one-shot commands need a 4-byte magic payload, so a
@@ -35,6 +40,13 @@ The firmware protects against ACCIDENTS, not against a hostile node:
   0x7FE            read back the installed application (the firmware is
                    not secret: it is published in this repository)
   0x192 + magic    erase the recovered persisted state
+  0x7F4 / 0x214    declare the version of the image being installed: the
+                   version travels in this frame and the signature covers
+                   the image only, so a validly signed OLD image can be
+                   installed by declaring a newer version (the anti-rollback
+                   check compares the declared version)
+  0x1A0 / 0x1A6    change the expansion board type or the sensor variant
+                   (both are persisted)
   0x1A2            change the free tool configuration of an 11111-jumper board
 
 So a malicious or broken node CAN fire the laser or start a tool. That is a

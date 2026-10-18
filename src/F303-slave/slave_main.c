@@ -65,7 +65,7 @@ static void MX_GPIO_Init(void) {
 
 static uint8_t MX_I2C1_Init_Slave(void) {
     hi2c1.Instance = I2C1;
-    hi2c1.Init.Timing = 0x2000090E; // same computed value as the bootloader's own I2C1 init - identical PCLK1 (32MHz), identical target (100kHz standard mode)
+    hi2c1.Init.Timing = 0x2000090E; // same value as the bootloader's own I2C1 init. The I2C kernel clock is the default one, the 8 MHz HSI (RCC_CFGR3 is not changed), not PCLK1: at 8 MHz this value gives about 100 kHz (standard mode)
     hi2c1.Init.OwnAddress1 = (I2C_SLAVE_ADDRESS << 1);
     hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
     hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
@@ -84,7 +84,7 @@ static uint8_t MX_I2C1_Init_Slave(void) {
 
 static void MX_I2C2_Init_Master(void) {
     hi2c2.Instance = I2C2;
-    hi2c2.Init.Timing = 0x2000090E; // same 100kHz-at-32MHz timing as I2C1 - both ADS1115 and MLX90640 are comfortably within standard mode's own 100kHz ceiling (MLX90640 supports up to 1MHz Fast Mode+, but nothing here currently needs that speed)
+    hi2c2.Init.Timing = 0x2000090E; // same timing as I2C1 (about 100 kHz from the 8 MHz HSI kernel clock) - both ADS1115 and MLX90640 are comfortably within standard mode's own 100kHz ceiling (MLX90640 supports up to 1MHz Fast Mode+, but nothing here currently needs that speed)
     hi2c2.Init.OwnAddress1 = 0; // master-only role on this bus - no slave address of its own needed
     hi2c2.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
     hi2c2.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;

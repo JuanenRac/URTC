@@ -26,8 +26,8 @@ printf '%s\n' "* 3. Report the result and keep an interactive terminal open."
 printf '%s\n' "*******************************************************************************"
 printf '\n'
 # HYDRA_UMC_SCRIPT_STANDARD_BANNER_END
-HYDRA_UMC_CI_MODE="${HYDRA_UMC_CI:-0}"
-if [ "$HYDRA_UMC_CI_MODE" = "1" ]; then
+URTC_CI_MODE="${URTC_CI:-0}"
+if [ "$URTC_CI_MODE" = "1" ]; then
     echo "URTC CI: version sources are read-only."
 else
     # HYDRA_UMC_SCRIPT_STANDARD_VERSION_STEP
@@ -45,7 +45,7 @@ BUILD="$ROOT/build"
 # release, see docs/FIRMWARE_DISTRIBUTION.md). CI mode writes them under
 # build/firmware and never touches tracked files.
 FIRMWARE_OUT="$ROOT/firmware"
-if [ "$HYDRA_UMC_CI_MODE" = "1" ]; then
+if [ "$URTC_CI_MODE" = "1" ]; then
     FIRMWARE_OUT="$BUILD/firmware"
 fi
 if [ -t 0 ]; then
@@ -146,154 +146,15 @@ if [ "${HYDRA_UMC_SKIP_HOST_TESTS:-0}" = "1" ]; then
 elif ! command -v "${HOST_CC:-cc}" >/dev/null 2>&1 && ! command -v gcc >/dev/null 2>&1; then
     warn "no host C compiler (cc/gcc) found - skipping host logic tests"
 else
-    HOST_CC="${HOST_CC:-$(command -v cc || command -v gcc)}"
-    MEL_DIR="$ROOT/src/F303-master/melexis_mlx90640"
-    HOST_BIN="$BUILD/host_tests"
+    # The suites and their compiler flags live in one list (tools/run_host_tests.py),
+    # shared with build_firmware.bat, so both entry points run the same tests.
     mkdir -p "$BUILD"
-    if "$HOST_CC" -std=c11 -Wall -Wextra -Wno-unused-parameter \
-        -I"$ROOT/tests" -I"$MEL_DIR" -o "$HOST_BIN" \
-        "$ROOT/tests/test_mlx90640_api.c" "$ROOT/tests/fake_mlx90640_i2c.c" \
-        "$MEL_DIR/MLX90640_API.c" -lm; then
-        pass "host test suite compiled ($HOST_CC -std=c11 -Wall -Wextra)"
+    if python3 "$ROOT/tools/run_host_tests.py" --build-dir "$BUILD"; then
+        pass "host logic tests passed (12 suites)"
     else
-        fail "host test suite failed to compile"
+        fail "host logic tests FAILED"
         echo ""; echo "$PASS passed, $WARN warnings, $FAIL failed"; exit 1
     fi
-    if "$HOST_BIN"; then
-        pass "MLX90640_API host logic tests passed"
-    else
-        fail "MLX90640_API host logic tests FAILED"
-        echo ""; echo "$PASS passed, $WARN warnings, $FAIL failed"; exit 1
-    fi
-
-    # firmware_can_dispatch_routing.c is likewise pure C, no STM32 HAL -
-    # see that file's own header comment and tests/test_can_dispatch_routing.c.
-    DISPATCH_SRC="$ROOT/src/F303-master"
-    DISPATCH_HOST_BIN="$BUILD/host_tests_can_dispatch_routing"
-    if "$HOST_CC" -std=c11 -Wall -Wextra -Wno-unused-parameter \
-        -I"$ROOT/tests" -I"$DISPATCH_SRC" -o "$DISPATCH_HOST_BIN" \
-        "$ROOT/tests/test_can_dispatch_routing.c" \
-        "$DISPATCH_SRC/firmware_can_dispatch_routing.c"; then
-        pass "CAN dispatch routing host test suite compiled ($HOST_CC -std=c11 -Wall -Wextra)"
-    else
-        fail "CAN dispatch routing host test suite failed to compile"
-        echo ""; echo "$PASS passed, $WARN warnings, $FAIL failed"; exit 1
-    fi
-    if "$DISPATCH_HOST_BIN"; then
-        pass "CAN dispatch routing host logic tests passed"
-    else
-        fail "CAN dispatch routing host logic tests FAILED"
-        echo ""; echo "$PASS passed, $WARN warnings, $FAIL failed"; exit 1
-    fi
-
-    # thermal_guard.c (thermal runaway protection for the T12 and the 3D
-    # hotend) is pure C too - tests/test_thermal_guard.c drives it with a
-    # simulated heater, block and loose sensor.
-    THERMAL_HOST_BIN="$BUILD/host_tests_thermal_guard"
-    if "$HOST_CC" -std=c11 -Wall -Wextra -Wno-unused-parameter \
-        -I"$ROOT/tests" -I"$DISPATCH_SRC" -o "$THERMAL_HOST_BIN" \
-        "$ROOT/tests/test_thermal_guard.c" \
-        "$DISPATCH_SRC/thermal_guard.c"; then
-        pass "thermal guard host test suite compiled ($HOST_CC -std=c11 -Wall -Wextra)"
-    else
-        fail "thermal guard host test suite failed to compile"
-        echo ""; echo "$PASS passed, $WARN warnings, $FAIL failed"; exit 1
-    fi
-    if "$THERMAL_HOST_BIN"; then
-        pass "thermal guard host logic tests passed"
-    else
-        fail "thermal guard host logic tests FAILED"
-        echo ""; echo "$PASS passed, $WARN warnings, $FAIL failed"; exit 1
-    fi
-
-    # urtc_version_wire.h (firmware PATCH number on the wire) is header-only
-    # pure C; its test also runs under the address and undefined-behaviour
-    # sanitizers.
-    VERSION_WIRE_BIN="$BUILD/host_tests_version_wire"
-    if "$HOST_CC" -std=c11 -Wall -Wextra -Wno-unused-parameter         -fsanitize=address,undefined -fno-sanitize-recover=all         -I"$ROOT/tests" -I"$ROOT/src/common" -o "$VERSION_WIRE_BIN"         "$ROOT/tests/test_version_wire.c" && "$VERSION_WIRE_BIN"; then
-        pass "version wire host logic tests passed (address + undefined sanitizers)"
-    else
-        fail "version wire host logic tests FAILED"
-        echo ""; echo "$PASS passed, $WARN warnings, $FAIL failed"; exit 1
-    fi
-
-    # thermal_stats.c (lifetime heater-on time and thermal fault counters).
-    STATS_HOST_BIN="$BUILD/host_tests_thermal_stats"
-    if "$HOST_CC" -std=c11 -Wall -Wextra -Wno-unused-parameter \
-        -I"$ROOT/tests" -I"$DISPATCH_SRC" -o "$STATS_HOST_BIN" \
-        "$ROOT/tests/test_thermal_stats.c" \
-        "$DISPATCH_SRC/thermal_stats.c" && "$STATS_HOST_BIN"; then
-        pass "thermal stats host logic tests passed"
-    else
-        fail "thermal stats host logic tests FAILED"
-        echo ""; echo "$PASS passed, $WARN warnings, $FAIL failed"; exit 1
-    fi
-
-    # The bootloader's HMAC-SHA256 and the pre-error-gate CAN commands
-    # (bootloader entry, version query with the 0x7E9 patch frame, tool and
-    # configuration registers) are compiled unchanged against the fake HAL in
-    # tests/host_hal/ and run under the address and undefined-behaviour
-    # sanitizers. The flash is an anonymous mapping in the low 2 GiB, which
-    # needs a 64-bit Linux host.
-    FAKE_HAL_INC="$ROOT/tests/host_hal"
-    SANITIZE="-fsanitize=address,undefined -fno-sanitize-recover=all"
-    CRYPTO_HOST_BIN="$BUILD/host_tests_bootloader_crypto"
-    if "$HOST_CC" -std=gnu11 -Wall -Wextra -Wno-unused-parameter -Wno-cpp -Wno-int-to-pointer-cast $SANITIZE \
-        -I"$ROOT/tests" -I"$FAKE_HAL_INC" -I"$DISPATCH_SRC/boot" -o "$CRYPTO_HOST_BIN" \
-        "$ROOT/tests/test_bootloader_crypto.c" "$FAKE_HAL_INC/fake_hal.c" \
-        "$DISPATCH_SRC/boot/bootloader_crypto.c" && "$CRYPTO_HOST_BIN"; then
-        pass "bootloader HMAC-SHA256 host logic tests passed (address + undefined sanitizers)"
-    else
-        fail "bootloader HMAC-SHA256 host logic tests FAILED"
-        echo ""; echo "$PASS passed, $WARN warnings, $FAIL failed"; exit 1
-    fi
-    # The whole bootloader update flow (start / signature chunks / data / end,
-    # CRC32, HMAC, anti-rollback, flash errors, resume after power loss and the
-    # 0x7F8 / 0x7FB / 0x7FE queries) against a fake 256 KiB flash mapped at
-    # 0x08000000.
-    UPDATE_HOST_BIN="$BUILD/host_tests_bootloader_update"
-    BOOT_SRC="$DISPATCH_SRC/boot"
-    if "$HOST_CC" -std=gnu11 -Wall -Wextra -Wno-unused-parameter -Wno-cpp -Wno-int-to-pointer-cast $SANITIZE \
-        -I"$ROOT/tests" -I"$FAKE_HAL_INC" -I"$BOOT_SRC" -I"$ROOT/src/common" -o "$UPDATE_HOST_BIN" \
-        "$ROOT/tests/test_bootloader_update.c" "$FAKE_HAL_INC/fake_hal.c" \
-        "$BOOT_SRC/bootloader_protocol.c" "$BOOT_SRC/bootloader_flash.c" "$BOOT_SRC/bootloader_crypto.c" \
-        && "$UPDATE_HOST_BIN"; then
-        pass "bootloader update flow host logic tests passed (address + undefined sanitizers)"
-    else
-        fail "bootloader update flow host logic tests FAILED"
-        echo ""; echo "$PASS passed, $WARN warnings, $FAIL failed"; exit 1
-    fi
-    GLOBAL_PRE_HOST_BIN="$BUILD/host_tests_can_global_pre"
-    if "$HOST_CC" -std=gnu11 -Wall -Wextra -Wno-unused-parameter $SANITIZE \
-        -I"$ROOT/tests" -I"$FAKE_HAL_INC" -I"$DISPATCH_SRC" -I"$ROOT/src/common" -o "$GLOBAL_PRE_HOST_BIN" \
-        "$ROOT/tests/test_can_global_pre.c" "$FAKE_HAL_INC/fake_hal.c" \
-        "$DISPATCH_SRC/firmware_can_global_pre.c" && "$GLOBAL_PRE_HOST_BIN"; then
-        pass "CAN global (pre-error-gate) host logic tests passed (address + undefined sanitizers)"
-    else
-        fail "CAN global (pre-error-gate) host logic tests FAILED"
-        echo ""; echo "$PASS passed, $WARN warnings, $FAIL failed"; exit 1
-    fi
-
-    # Further suites on the same fake HAL: the communication watchdogs and the
-    # RPM telemetry, the CAN <-> I2C slave bridge (0x210-0x221), the receive
-    # callback with its critical-error gate (every tool handler is a
-    # recorder), and the saved state with its F-RAM driver.
-    run_fake_hal_suite() {
-        suite_name="$1"; suite_test="$2"; shift 2
-        suite_bin="$BUILD/host_tests_$suite_name"
-        if "$HOST_CC" -std=gnu11 -Wall -Wextra -Wno-unused-parameter $SANITIZE \
-            -I"$ROOT/tests" -I"$FAKE_HAL_INC" -I"$DISPATCH_SRC" -I"$ROOT/src/common" -o "$suite_bin" \
-            "$ROOT/tests/$suite_test" "$FAKE_HAL_INC/fake_hal.c" "$@" && "$suite_bin"; then
-            pass "$suite_name host logic tests passed (address + undefined sanitizers)"
-        else
-            fail "$suite_name host logic tests FAILED"
-            echo ""; echo "$PASS passed, $WARN warnings, $FAIL failed"; exit 1
-        fi
-    }
-    run_fake_hal_suite telemetry_watchdog test_telemetry_watchdog.c "$DISPATCH_SRC/firmware_telemetry_watchdog.c"
-    run_fake_hal_suite can_slavebridge test_can_slavebridge.c "$DISPATCH_SRC/firmware_can_slavebridge.c"
-    run_fake_hal_suite can_dispatch test_can_dispatch.c "$DISPATCH_SRC/firmware_can_dispatch.c" "$DISPATCH_SRC/firmware_can_dispatch_routing.c"
-    run_fake_hal_suite persistence test_persistence.c "$DISPATCH_SRC/firmware_persistence.c" "$DISPATCH_SRC/firmware_fram.c"
 fi
 
 # -----------------------------------------------------------------------
@@ -411,7 +272,7 @@ build_bin_hex() {
 version_or_bump() {
     local header="$1" prefix="$2"
     shift 2
-    if [ "$HYDRA_UMC_CI_MODE" = "1" ]; then
+    if [ "$URTC_CI_MODE" = "1" ]; then
         local major minor patch
         major="$(grep -oE "define[[:space:]]+${prefix}_MAJOR[[:space:]]+[0-9]+" "$header" | grep -oE '[0-9]+$')"
         minor="$(grep -oE "define[[:space:]]+${prefix}_MINOR[[:space:]]+[0-9]+" "$header" | grep -oE '[0-9]+$')"
@@ -500,7 +361,7 @@ SRC="$ROOT/src/F303-master"
 # URTC_MAIN_FIRMWARE_v{MAJOR}.{MINOR}.{PATCH} replaces the old
 # URTC_V{MAJOR}.{MINOR}_F303CC (no PATCH) name.
 APP_VER=$(version_or_bump "$SRC/firmware_common.h" FIRMWARE_VERSION "$SRC/boot/bootloader_common.h")
-if [ "$HYDRA_UMC_CI_MODE" != "1" ]; then
+if [ "$URTC_CI_MODE" != "1" ]; then
     python3 "$ROOT/bump_manifest_version.py" --sync || exit 1
     # HYDRA_UMC_SCRIPT_STANDARD_VERSION_CAPTURE_AFTER
     HYDRA_UMC_VERSION_AFTER="$(python3 -c 'import json, pathlib, sys; print(json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))["version"])' "$ROOT/urtc.project.json")"
@@ -588,7 +449,7 @@ fi
 # -----------------------------------------------------------------------
 # Real bug fixed here: the cleanup step above unconditionally deletes
 # firmware_manifest.json for every run (CI included), but regeneration
-# used to be skipped whenever HYDRA_UMC_CI=1 - a CI/build-test run left
+# used to be skipped whenever URTC_CI=1 - a CI/build-test run left
 # a previously-committed real file permanently missing from the working
 # tree. Describing the artifacts THIS run just built is not a versioning
 # or changelog mutation (this script's own read-only contract in CI mode

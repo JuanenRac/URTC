@@ -93,12 +93,15 @@ An asymmetric signature (Ed25519) would put only the PUBLIC key in the
 bootloader and remove the shared secret entirely. Measured flash budget of
 the current bootloaders (build 2026-10):
 
-  main bootloader   region 32 KB (0x08000000-0x08007FFF), image ~18 KB -> ~14 KB free
-  slave bootloader  region 20 KB (0x08000000-0x08004FFF), image ~13.6 KB -> ~6.4 KB free
+  main bootloader   code region 30 KB (0x08000000-0x080077FF; the 2 KB page at
+                    0x08007800 holds the metadata), image ~18 KB -> ~12 KB free
+  slave bootloader  code region 18 KB (0x08000000-0x080047FF; the metadata page
+                    is at 0x08004800), image ~13.6 KB -> ~4.4 KB free
 
 A compact Ed25519 verifier (e.g. Monocypher's crypto_ed25519_check with its
-SHA-512) needs roughly 10-16 KB of Thumb-2 code: it fits the main board, it
-does NOT fit the slave without moving the slave application's start address
+SHA-512) needs roughly 10-16 KB of Thumb-2 code: it fits the main board only
+at the small end of that range (about 12 KB are free), and it does NOT fit
+the slave without moving the slave application's start address
 (0x08005000), which changes the flash layout, the slave application linker
 script and every host tool that knows that address. Doing that without a real
 board to validate it on risks bricking hardware that cannot be recovered

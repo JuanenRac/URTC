@@ -53,15 +53,14 @@ static uint8_t ExpansionI2C_ReadSCL(void) {
     return (HAL_GPIO_ReadPin(EXP_I2C2_SCL_PORT, EXP_I2C2_SCL_PIN) == GPIO_PIN_SET) ? 1 : 0;
 }
 // Set by ExpansionI2C_SetSCL_WaitHigh() whenever it times out, cleared at
-// the start of every transaction - not yet consumed by any caller (this
-// whole API isn't wired to a CAN command yet, unlike the expansion SPI's
-// own 0x180/0x181 passthrough), but every high-level function below was
-// silently ignoring this function's own return value, meaning a stuck-low
-// SCL (a shorted bus, or a slave stretching indefinitely) would have gone
-// completely unnoticed - the master would sample/drive SDA as if the
-// clock edge had genuinely happened, on a bus that was never actually
-// ready. Whenever this API is wired to something, check this flag after
-// the transaction completes rather than trusting the data unconditionally.
+// the start of every transaction. The slave-register functions below return
+// failure when it is set; the lower-level callers (the ADS1115 and the
+// sensor paths) do not check it yet. A stuck-low SCL (a shorted bus, or a
+// slave stretching indefinitely) would otherwise go completely unnoticed -
+// the master would sample/drive SDA as if the clock edge had genuinely
+// happened, on a bus that was never actually ready. A caller of the
+// low-level functions should check this flag after the transaction
+// completes rather than trusting the data unconditionally.
 static uint8_t expansion_i2c_scl_timeout = 0;
 uint8_t ExpansionI2C_HadTimeout(void) {
     return expansion_i2c_scl_timeout;

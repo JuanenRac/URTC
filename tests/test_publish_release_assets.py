@@ -27,8 +27,21 @@ def make_component(fw: Path, stem: str, version: str, data: bytes, application: 
     return {"version_string": version, "files": {"bin": {"filename": image.name, "sha256": digest}}}
 
 
+try:
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+except ImportError:  # the signing half of the tests needs it
+    Ed25519PrivateKey = None
+
+
+@unittest.skipIf(Ed25519PrivateKey is None, "cryptography is not installed")
 class PublishPlanTests(unittest.TestCase):
     def setUp(self):
+        # a throwaway key stands in for the key of the releases, which is never read by the tests
+        self.test_key = Ed25519PrivateKey.generate()
+        sign = pra.release_sign
+        self._saved = (sign.PUBLIC_KEY_HEX, sign._private_key)
+        sign.PUBLIC_KEY_HEX = sign.public_hex_of(self.test_key)
+        sign._private_key = lambda: self.test_key
         self.tmp = tempfile.TemporaryDirectory()
         self.root = Path(self.tmp.name)
         self.fw = self.root / "firmware"
@@ -36,6 +49,7 @@ class PublishPlanTests(unittest.TestCase):
         (self.root / "urtc.project.json").write_text(json.dumps({"name": "URTC", "version": "1.2.3"}))
 
     def tearDown(self):
+        pra.release_sign.PUBLIC_KEY_HEX, pra.release_sign._private_key = self._saved
         self.tmp.cleanup()
 
     def write_index(self, components):
@@ -47,7 +61,7 @@ class PublishPlanTests(unittest.TestCase):
             "main_application": make_component(self.fw, "URTC_MAIN_FIRMWARE", "1.2.3", b"app", True),
         }
         self.write_index(comp)
-        plan = pra.build_plan(self.root, self.fw, False, "o/r")
+        plan = pra.build_plan(self.root, self.fw, False, "o/r", sign=True)
         self.assertEqual(plan["problems"], [])
         names = sorted(Path(p).name for p in plan["files"])
         self.assertIn("firmware_manifest.json", names)
@@ -55,7 +69,7 @@ class PublishPlanTests(unittest.TestCase):
         self.assertIn("URTC_MAIN_FIRMWARE_v1.2.3.hex", names)
         self.assertFalse(any(n.endswith(".elf") for n in names))
         self.assertEqual(plan["tag"], "v1.2.3")
-        with_elf = pra.build_plan(self.root, self.fw, True, "o/r")
+        with_elf = pra.build_plan(self.root, self.fw, True, "o/r", sign=True)
         self.assertTrue(any(p.endswith(".elf") for p in with_elf["files"]))
         self.assertIn("gh release create v1.2.3 --repo o/r", pra.gh_command(plan))
 
@@ -95,13 +109,39 @@ class PublishPlanTests(unittest.TestCase):
     def test_single_image_layout_writes_missing_sidecar_and_checks_version(self):
         (self.fw / "URTC_SMART_RACK_FIRMWARE_v1.2.3.bin").write_bytes(b"x")
         (self.fw / "URTC_SMART_RACK_FIRMWARE_v1.2.3.hex").write_text(":00000001FF\n")
-        plan = pra.build_plan(self.root, self.fw, False, "o/r")
+        plan = pra.build_plan(self.root, self.fw, False, "o/r", sign=True)
         self.assertEqual(plan["problems"], [])
         self.assertTrue((self.fw / "URTC_SMART_RACK_FIRMWARE_v1.2.3.bin.sha256").is_file())
-        self.assertEqual(len(plan["files"]), 3)
+        self.assertEqual(len(plan["files"]), 6)  # bin, hex, sidecar and the three signatures
         (self.root / "urtc.project.json").write_text(json.dumps({"name": "URTC", "version": "9.9.9"}))
         plan = pra.build_plan(self.root, self.fw, False, "o/r")
         self.assertTrue(plan["problems"])
+
+    def test_an_official_release_needs_every_signature_and_a_prerelease_does_not(self):
+        comp = {"main_application": make_component(self.fw, "URTC_MAIN_FIRMWARE", "1.2.3", b"app", True)}
+        self.write_index(comp)
+        unsigned = pra.build_plan(self.root, self.fw, False, "o/r")
+        self.assertTrue(any(".sig" in p for p in unsigned["problems"]))
+        comp = {"main_application": make_component(self.fw, "URTC_MAIN_FIRMWARE", "1.2.3", b"app", True, "dev")}
+        self.write_index(comp)
+        bench = pra.build_plan(self.root, self.fw, False, "o/r", allow_dev_key=True)
+        self.assertEqual(bench["problems"], [])
+        self.assertFalse(any(p.endswith(".sig") for p in bench["files"]))
+
+    def test_a_signature_that_does_not_verify_is_refused(self):
+        comp = {"main_application": make_component(self.fw, "URTC_MAIN_FIRMWARE", "1.2.3", b"app", True)}
+        self.write_index(comp)
+        pra.build_plan(self.root, self.fw, False, "o/r", sign=True)
+        image = self.fw / "URTC_MAIN_FIRMWARE_v1.2.3.bin"
+        other = self.fw / "URTC_MAIN_FIRMWARE_v1.2.3.hex"
+        Path(str(image) + ".sig").write_text(Path(str(other) + ".sig").read_text())  # the signature of another file
+        plan = pra.build_plan(self.root, self.fw, False, "o/r")
+        self.assertTrue(any("not a valid release signature" in p for p in plan["problems"]))
+
+    def test_the_release_key_is_never_taken_from_a_foreign_key(self):
+        pra.release_sign.PUBLIC_KEY_HEX = "00" * 32
+        with self.assertRaises(SystemExit):
+            pra.release_sign.sign_file(self.fw / "x.bin", self.test_key)
 
     def test_missing_folder_is_a_problem(self):
         plan = pra.build_plan(self.root, self.root / "nowhere", False, "o/r")

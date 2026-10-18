@@ -22,7 +22,7 @@
 #                 A CI run points it at build/ so tracked files stay untouched.
 #
 # The timestamp written into the manifest and sidecars is reproducible:
-# SOURCE_DATE_EPOCH if set, else (when HYDRA_UMC_CI=1) the last commit date,
+# SOURCE_DATE_EPOCH if set, else (when URTC_CI=1) the last commit date,
 # else the current time.
 # =============================================================================
 import sys
@@ -41,13 +41,13 @@ import firmware_signing
 def build_timestamp(root, environ=None):
     """UTC timestamp for generated_at / build_date.
 
-    SOURCE_DATE_EPOCH wins. In CI mode (HYDRA_UMC_CI=1) the last commit date
+    SOURCE_DATE_EPOCH wins. In CI mode (URTC_CI=1) the last commit date
     is used so repeated runs over the same commit give identical files. A
     local build falls back to the current time.
     """
     environ = os.environ if environ is None else environ
     epoch = environ.get("SOURCE_DATE_EPOCH", "").strip()
-    if not epoch and environ.get("HYDRA_UMC_CI") == "1":
+    if not epoch and environ.get("URTC_CI") == "1":
         try:
             epoch = subprocess.run(
                 ["git", "log", "-1", "--format=%ct"], cwd=root,

@@ -3,10 +3,8 @@
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
 // GPL-3.0 - see LICENSE
 //
-// This is the entry point of the partitioned build of the firmware -
-// same behavior as the single-file STM32F303CC.C, split across
-// several dozen .c/.h files for readability. Both are maintained side
-// by side.
+// This is the entry point of the firmware, which is split across several
+// dozen .c/.h files by responsibility.
 // =============================================================================
 #include "firmware_common.h"
 #include "firmware_thermal_stats.h"

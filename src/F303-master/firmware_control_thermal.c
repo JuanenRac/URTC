@@ -169,10 +169,9 @@ void Control_SolderingIron_PID(void) {
 }
 
 // FLASH OPTIMIZATION: replaces the float/logf() Beta-equation calculation.
-// Cortex-M0 has no hardware FPU, so every float operation needs a software
-// library routine - the log() call alone plus the float add/sub/mul/div it
-// needs pulled in several KB of C library code for a calculation that only
-// ever needed to run 33 times' worth of precision. This table was generated
+// The Cortex-M4F has a single-precision FPU, but the log() call still pulls
+// in several KB of C library code (logf and its helpers) for a calculation
+// that only ever needed to run 33 times' worth of precision. This table was generated
 // from the exact same formula (R_PULLUP=4.7k, Beta=3950, R0=100k, T0=25C),
 // sampled every 10C from 0 to 320C (deliberately uniform in TEMPERATURE, not
 // ADC counts, since the curve is steep enough that uniform-ADC spacing gave

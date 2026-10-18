@@ -66,9 +66,9 @@ void MX_TIM1_DrillLaserFan_Init(uint32_t period) {
 }
 
 // Hotend fan PWM (CONN_FAN1, PA5). Same 25kHz target as the layer fan, on its
-// own timer (TIM2, confirmed free - AF2 on PA5, verified against ST's official
-// datasheet Table 14) so it doesn't interfere with TIM3's stepper tick or the
-// layer fan's TIM17.
+// own timer (TIM2, confirmed free - GPIO_AF1_TIM2 on PA5, verified against ST's
+// official datasheet Table 14) so it doesn't interfere with TIM3's stepper tick
+// or TIM1, which carries the layer fan together with the drill and the laser.
 void MX_TIM2_HotendFan_Init(void) {
     TIM_OC_InitTypeDef sConfigOC = {0};
     __HAL_RCC_TIM2_CLK_ENABLE();

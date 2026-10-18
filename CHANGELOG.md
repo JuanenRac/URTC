@@ -2,10 +2,16 @@
 
 ## [Unreleased]
 
+- The three scale-search loops of the MLX90641 parameter extraction (master and slave copies) are bounded like the MLX90640 ones (MLX90641_SCALE_ITER_MAX), so a blank EEPROM dump no longer hangs the chip until the watchdog resets it at every start.
+- The fault recorder record (version 2) now ends with its checksum, which covers every byte before it: the old layout put the checksum in the middle of the record and computed it over a field that was not yet set and without the last byte, so no host could validate it. The record layout, the 0x1A8 / 0x1A9 readback, the memory map of the F-RAM, the watchdog of every actuator (and the actuators that have none), the start of the bootloader listening window and the real flash regions of the bootloaders are documented in docs/CANBUS.TXT, docs/EEPROM.TXT, docs/CAN_THREAT_MODEL.TXT and docs/FIRMWARE_SIGNING.TXT.
+- tools/run_host_tests.py is the single list of host C suites (12 today, 8 of them under the address and undefined-behaviour sanitizers); build_firmware.sh and build_firmware.bat both call it, the .bat through WSL on Windows, and a test fails when a tests/test_*.c suite is missing from the list.
+- Comments that contradicted the code were corrected (clock source and I2C timing, pin numbers, FPU, timer alternate function, removed files) and the READMEs describe the thermal control as on/off with hysteresis, not PID, and SMART-RACK as a storage rack for tool heads.
 - The master's CAN bridge to the expansion slave (0x220 write, 0x221 read) now relays only a closed list of application registers with their exact payload lengths (src/common/urtc_slave_regs.h, documented in docs/CANBUS.TXT); REG_ENTER_BOOTLOADER and every unlisted register are dropped. Covered by tests/test_can_slavebridge.c under the sanitizers. This is source only: no firmware image was rebuilt and no firmware version changed, so it takes effect with the next firmware build.
 - tools/publish_release_assets.py refuses a set whose application images are signed with the public development key as an official release; with --allow-dev-key it prints the command with --prerelease. The existing 0.3.5 release is now marked as a pre-release because it carries that key.
 - docs/FIRMWARE_DISTRIBUTION.md describes how the flasher and the web studio read the release assets today and how bench pre-releases are reached by tag.
-- The CI workflow and the issue and pull request templates carry the URTC name.
+- The CI workflow and the issue and pull request templates carry the URTC name, and the variable that switches the build and run scripts to their non-interactive mode is URTC_CI.
+- Release signatures: tools/release_sign.py signs and verifies the assets of a release with an Ed25519 key (`<asset>.sig`, the signature of `urtc-rel/1|<file name>|<sha256>`), tools/publish_release_assets.py --sign writes them, and an official release needs the signature of every asset while a pre-release may go out without. The public key and the plan for leaving the shared development key are in docs/RELEASE_SIGNING.md; the flasher and the web studio verify the signatures they find.
+- docs/FIRMWARE_DISTRIBUTION.md says how to refresh the firmware copies bundled with the flasher and the web studio from a local build.
 
 ## [0.3.5] - Firmware PATCH number over CAN and release-asset firmware distribution
 
@@ -24,7 +30,7 @@
 - Components: main application 0.3.4, main bootloader 0.3.8, slave application 0.1.9, slave bootloader 0.2.2.
 
 - The firmware version scripts keep their own three-component odometer (0.7.9 -> 0.8.0, 0.9.9 -> 1.0.0, 9.9.9 -> 10.0.0) and no longer hand over to the shared manifest utility, which broke the build at the boundary versions; the successor rule is now a pure function covered by boundary tests that run in CI and as a step of the build script.
-- CI builds (HYDRA_UMC_CI=1) publish firmware images under build/firmware instead of firmware/, so a validation build leaves the tracked images untouched.
+- CI builds (URTC_CI=1) publish firmware images under build/firmware instead of firmware/, so a validation build leaves the tracked images untouched.
 - The firmware manifest and the per-image sidecars take their timestamp from SOURCE_DATE_EPOCH or, in CI, from the last commit date, so regenerating them gives identical files; generate_manifest.py accepts an optional output directory. Tests cover the timestamp rules.
 - Verified: unit tests and shell syntax checks only; the ARM firmware build itself was not run.
 
@@ -42,7 +48,8 @@ application 0.1.9, slave bootloader 0.2.2.
   `tests/test_thermal_stats.c` (new) runs in `build_firmware.sh` step 1b.
 - **Slave MLX9064x drivers hardened**: the expansion slave's copies of
   `MLX90640_API.c/.h` and `MLX90641_API.cpp` lacked the bounded data-ready
-  wait and the scale-loop iteration cap the main board's copies have, so a
+  wait the main board's copies have (and, for the MLX90640, the scale-loop
+  iteration cap; the MLX90641 loops only got it later), so a
   stuck sensor or a blank EEPROM dump could hang the slave until its IWDG
   reset it. Both chips now compile the same files, and
   `check_shared_drivers.py` (new, build step 1c) fails the build if they
@@ -67,7 +74,8 @@ application 0.1.9, slave bootloader 0.2.2.
   simulated heater/block/loose sensor: healthy heat-up and hold, setpoint
   changes, a heavy soldering load and a HAL tick wrap never trip it; a loose
   sensor while heating or while holding is always caught within its window.
-  Wired into `build_firmware.sh`/`.bat` step 1b.
+  Wired into `build_firmware.sh` step 1b (`build_firmware.bat` runs the host
+  suites only since the shared runner of the next release).
 - **`0x111` grows to DLC 6** (backward compatible): byte 4 =
   `thermal_fault_code`, byte 5 = `last_reset_cause` (RCC reset flags latched
   at boot, bit0 = the IWDG fired). See `docs/CANBUS.TXT`.
@@ -156,7 +164,7 @@ application 0.1.9, slave bootloader 0.2.2.
   still pending hardware, but the maths for a valid dump is unchanged by
   construction (the cap is never reached).
 - **`build_firmware.sh`** - the manifest regeneration step (step 8,
-  `firmware_manifest.json`) was skipped whenever `HYDRA_UMC_CI=1` (the
+  `firmware_manifest.json`) was skipped whenever `URTC_CI=1` (the
   mode `tools/build_test.py` always runs under), but the earlier cleanup
   step deletes that same file unconditionally on every run. A CI/
   build-test run therefore left a previously-committed real
@@ -164,7 +172,7 @@ application 0.1.9, slave bootloader 0.2.2.
   Regenerating it just describes the artifacts the run itself built -
   not a versioning or CHANGELOG mutation, so it now runs regardless of
   CI mode. Verified with 2 real WSL/arm-none-eabi-gcc builds: the
-  manifest now regenerates correctly under `HYDRA_UMC_CI=1`, and the
+  manifest now regenerates correctly under `URTC_CI=1`, and the
   4 real firmware/bootloader binaries rebuild with consistent, plausible
   sizes (no corruption reproduced in this pass).
 - README (all 7 languages) still titled itself "(v0.2)" and referenced

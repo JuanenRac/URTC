@@ -15,6 +15,14 @@
  *
  */
 #ifndef _MLX90641_API_H_
+// Upper bound of the scale-search loops of the parameter extraction. A real
+// sensor converges in under 20 steps, but a degenerate EEPROM dump (all zeros,
+// for example a shorted data line that always reads as acknowledged) leaves
+// the value at 0, and 0*2 stays below the limit forever. With the cap a bad
+// dump falls through with zeroed parameters instead of hanging the chip until
+// the watchdog resets it, as the MLX90640 driver already does.
+#define MLX90641_SCALE_ITER_MAX 64
+
 #define _MLX90641_API_H_
 
 // --- Start of this project's own addition, not part of Melexis's original file ---

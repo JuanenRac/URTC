@@ -95,7 +95,7 @@ static void MX_IWDG_Init(void) {
 
 static void MX_I2C1_Init_Slave(void) {
     hi2c1.Instance = I2C1;
-    hi2c1.Init.Timing = 0x2000090E; // 100kHz standard mode at 32MHz APB1 clock - computed with STM32CubeMX's own I2C timing calculator for this exact PCLK1, not hand-derived, since this register's bitfields don't map to a simple formula on this I2C peripheral generation
+    hi2c1.Init.Timing = 0x2000090E; // About 100 kHz standard mode from the I2C kernel clock, which is the default 8 MHz HSI here (RCC_CFGR3 is not changed), not PCLK1 - this register's bitfields don't map to a simple formula on this I2C peripheral generation, so recompute it with STM32CubeMX's I2C timing calculator if the kernel clock ever changes
     hi2c1.Init.OwnAddress1 = (I2C_SLAVE_ADDRESS << 1); // HAL expects the 7-bit address pre-shifted into bits [7:1]
     hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
     hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
@@ -125,10 +125,13 @@ void I2C1_ER_IRQHandler(void) {
 // writes here range from a 1-byte read-pointer-only write up to
 // REG_HMAC_EXPECTED/REG_DATA's own 33-byte ceiling). Always request the
 // buffer's own full size on every receive regardless of what the master
-// actually intends to send - HAL_I2C_SlaveRxCpltCallback fires on the
-// master's own STOP/repeated-START regardless of whether the requested
-// count was fully reached, and XferCount's remaining-bytes value at that
-// point is what tells this code how many bytes actually arrived.
+// actually intends to send.
+// To be confirmed on a board: in the STM32F3 HAL a STOP that arrives before
+// the requested count is reached is reported through the error path (the
+// acknowledge-failure flag), and HAL_I2C_SlaveRxCpltCallback is not called
+// for it, so the handler below sees only writes that fill the buffer; the
+// HAL also clears XferCount on that path, so a short write cannot be
+// recovered from the error callback by reading it.
 // -----------------------------------------------------------------------
 void HAL_I2C_AddrCallback(I2C_HandleTypeDef *hi2c, uint8_t TransferDirection, uint16_t AddrMatchCode) {
     (void)AddrMatchCode;

@@ -27,6 +27,13 @@ A release whose application images are signed with the public development key
 is refused as an official release: it can only be published as a pre-release
 ("bench") with --allow-dev-key, and the printed command then carries
 --prerelease. Exit status 1 when anything is missing or inconsistent.
+
+Every asset of an official release also carries its release signature
+(<asset>.sig, an Ed25519 signature by the key of the releases, see
+tools/release_sign.py and docs/RELEASE_SIGNING.md). --sign writes the missing
+ones with the private key of the releases (never read by this script's output);
+without it the .sig files already next to the assets are checked and attached.
+A pre-release may go out without signatures.
 """
 from __future__ import annotations
 
@@ -41,6 +48,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_OWNER = "JuanenRac"
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import release_sign
 
 
 def sha256_of(path: Path) -> str:
@@ -110,7 +120,7 @@ def collect_with_index(fw_dir: Path, with_elf: bool, problems: list[str], dev_ke
 def collect_single(fw_dir: Path, version: str, with_elf: bool, problems: list[str]) -> list[Path]:
     images = sorted(fw_dir.glob(f"URTC_*_FIRMWARE_v{version}.bin"))
     if not images:
-        problems.append(f"no URTC_*_FIRMWARE_v{version}.bin in {fw_dir} (run build_firmware.sh without HYDRA_UMC_CI)")
+        problems.append(f"no URTC_*_FIRMWARE_v{version}.bin in {fw_dir} (run build_firmware.sh without URTC_CI)")
         return []
     files: list[Path] = []
     for image in images:
@@ -130,12 +140,32 @@ def collect_single(fw_dir: Path, version: str, with_elf: bool, problems: list[st
     return files
 
 
-def build_plan(root: Path, fw_dir: Path, with_elf: bool, repo: str | None, allow_dev_key: bool = False) -> dict:
+def attach_signatures(files: list[Path], sign: bool, official: bool, problems: list[str]) -> list[Path]:
+    """Adds the <asset>.sig of every asset: written first when `sign`, checked against the pinned release key when there. An official release needs all of them."""
+    result: list[Path] = []
+    key = None
+    for path in files:
+        result.append(path)
+        signature = Path(str(path) + ".sig")
+        if sign:
+            key = key or release_sign._private_key()
+            release_sign.sign_file(path, key)
+        if signature.is_file():
+            if release_sign.verify_file(path):
+                result.append(signature)
+            else:
+                problems.append(f"{signature.name} is not a valid release signature of {path.name}")
+        elif official:
+            problems.append(f"{path.name} has no {signature.name} (run with --sign, or sign it with tools/release_sign.py)")
+    return result
+
+
+def build_plan(root: Path, fw_dir: Path, with_elf: bool, repo: str | None, allow_dev_key: bool = False, sign: bool = False) -> dict:
     name, version = project_info(root)
     problems: list[str] = []
     dev_keys: list[str] = []
     if not fw_dir.is_dir():
-        problems.append(f"{fw_dir} does not exist (run build_firmware.sh without HYDRA_UMC_CI)")
+        problems.append(f"{fw_dir} does not exist (run build_firmware.sh without URTC_CI)")
         files: list[Path] = []
     elif (fw_dir / "firmware_manifest.json").is_file():
         files = collect_with_index(fw_dir, with_elf, problems, dev_keys)
@@ -146,6 +176,7 @@ def build_plan(root: Path, fw_dir: Path, with_elf: bool, repo: str | None, allow
         for item in dev_keys:
             problems.append(f"{item}; an official release needs production-signed images "
                             "(use --allow-dev-key to publish a bench pre-release)")
+    files = attach_signatures(files, sign, not prerelease, problems)
     slug = repo or repo_slug(root, name)
     tag = f"v{version}"
     return {
@@ -173,10 +204,11 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--repo", default=None, help="OWNER/NAME of the GitHub repository (default: from the origin remote)")
     parser.add_argument("--allow-dev-key", action="store_true",
                         help="allow images signed with the public development key, as a pre-release only")
+    parser.add_argument("--sign", action="store_true", help="write the release signature (<asset>.sig) of every asset with the key of the releases")
     parser.add_argument("--json", action="store_true", help="print the plan as JSON instead of text")
     args = parser.parse_args(argv)
     fw_dir = Path(args.firmware_dir) if args.firmware_dir else ROOT / "firmware"
-    plan = build_plan(ROOT, fw_dir, args.with_elf, args.repo, args.allow_dev_key)
+    plan = build_plan(ROOT, fw_dir, args.with_elf, args.repo, args.allow_dev_key, args.sign)
     if args.json:
         print(json.dumps(plan, indent=2))
     else:

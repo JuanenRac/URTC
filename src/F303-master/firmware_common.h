@@ -7,6 +7,7 @@
 #define FIRMWARE_COMMON_H
 
 #include "stm32f3xx_hal.h"
+#include <stddef.h>
 #include <string.h>
 #include <math.h>
 
@@ -44,8 +45,8 @@
 #define ID4_PORT        GPIOC
 
 // Dedicated OLED interface via hardware I2C2 (PA9/PA10, AF4)
-#define OLED_SCL_PIN    GPIO_PIN_9   // PA9  (Pin 19) -> I2C2_SCL (AF4) - confirmed against DS9118 Table 14
-#define OLED_SDA_PIN    GPIO_PIN_10  // PA10 (Pin 20) -> I2C2_SDA (AF4) - confirmed against DS9118 Table 14
+#define OLED_SCL_PIN    GPIO_PIN_9   // PA9 -> I2C2_SCL (AF4) - confirmed against DS9118 Table 14
+#define OLED_SDA_PIN    GPIO_PIN_10  // PA10 -> I2C2_SDA (AF4) - confirmed against DS9118 Table 14
 #define OLED_PORT       GPIOA
 #define OLED_I2C_ADDR   0x78        // (0x3C << 1)
 // FM24CL64B parameter-persistence F-RAM (64Kbit/8KB), sharing the OLED's
@@ -83,15 +84,15 @@
 #define FRAM_SIZE_BYTES 8192        // 64Kbit
 
 // CAN BUS physical pin assignment (AF9)
-#define CAN_RX_PIN      GPIO_PIN_11 // PA11 (Pin 21) -> CAN_RX (AF9)
-#define CAN_TX_PIN      GPIO_PIN_12 // PA12 (Pin 22) -> CAN_TX (AF9)
+#define CAN_RX_PIN      GPIO_PIN_11 // PA11 -> CAN_RX (AF9)
+#define CAN_TX_PIN      GPIO_PIN_12 // PA12 -> CAN_TX (AF9)
 #define CAN_GPIO_PORT   GPIOA
 
 // Coexisting illumination channels: status LED on PA7/SPI1+DMA, ring on
 // PB1/bit-banged - kept on two independent pins so CONN_LED1 and CONN_LED2
 // don't need a PCB trace joining them in series.
-// PA2 (Pin 8): free - not used by the status LED, which lives on PA7/SPI1 instead.
-#define LED_RING_PIN     GPIO_PIN_1  // PB1 (Pin 15) -> Bit-Banging Asm NOPs (Camera Ring)
+// PA2: free - not used by the status LED, which lives on PA7/SPI1 instead.
+#define LED_RING_PIN     GPIO_PIN_1  // PB1 -> Bit-Banging Asm NOPs (Camera Ring)
 #define LED_RING_PORT    GPIOB
 
 // Expansion connector's SPI bus (CONN_EXPANSION pins 8/9/12/13) - bit-banged,
@@ -177,21 +178,21 @@
 #define TMC_DIAG0_PORT GPIOC
 
 // DIAGNOSTIC PIN (Visual indicator / Heartbeat)
-#define LED_DIAG_PIN    GPIO_PIN_15 // PA15 (Pin 25) -> Diagnostic digital output
+#define LED_DIAG_PIN    GPIO_PIN_15 // PA15 -> Diagnostic digital output
 #define LED_DIAG_PORT   GPIOA
 
 // Fixed dedicated peripherals (T12 soldering / 3D hotend block)
-#define T12_PWM_PIN     GPIO_PIN_1  // PA1 (Pin 7) -> Soldering iron PWM / Extruder heater
+#define T12_PWM_PIN     GPIO_PIN_1  // PA1 -> Soldering iron PWM / Extruder heater
 #define T12_PWM_PORT    GPIOA
-#define T12_ADC_PIN     GPIO_PIN_0  // PA0 (Pin 6) -> ADC Channel 0 (T12 thermocouple / NTC 100k)
+#define T12_ADC_PIN     GPIO_PIN_0  // PA0 -> ADC Channel 0 (T12 thermocouple / NTC 100k)
 
 // DYNAMIC CENTRAL PIN SWITCHING MATRIX (PORT B)
-#define STEP_PIN         GPIO_PIN_3  // PB3 (Pin 26) - Motor mode: Pulse output
+#define STEP_PIN         GPIO_PIN_3  // PB3 - Motor mode: Pulse output
 #define STEP_PORT        GPIOB
-#define TCRT_D0_DIG_PIN  GPIO_PIN_3  // PB3 (Pin 26) - Vacuum pickup sensor mode: LM393 digital input
-#define TOUCH_IN_PIN     GPIO_PIN_3  // PB3 (Pin 26) - Probe mode: EXTI3 impact input
+#define TCRT_D0_DIG_PIN  GPIO_PIN_3  // PB3 - Vacuum pickup sensor mode: LM393 digital input
+#define TOUCH_IN_PIN     GPIO_PIN_3  // PB3 - Probe mode: EXTI3 impact input
 
-#define DIR_PIN          GPIO_PIN_5  // PB5 (Pin 28) - Motor mode: Direction output
+#define DIR_PIN          GPIO_PIN_5  // PB5 - Motor mode: Direction output
 #define DIR_PORT         GPIOB
 // NOTE: PB5 is not used in AOI Inspection mode. That tool's light is the LED
 // ring on CONN_LED2 (see ring_pixels[] and Update_AllLEDs_SPI_DMA).
@@ -200,28 +201,28 @@
 #define TMC_ENN_PORT     GPIOB
 #define DRILL_BRAKE_PIN GPIO_PIN_9 // PB9 - Drill's own BrakeIN line on CONN_DRILL, independent from the stepper tools' enable
 #define DRILL_BRAKE_PORT GPIOB
-#define LASER_SAFETY_PIN GPIO_PIN_6  // PB6 (Pin 29) - Laser mode: Physical safety interlock
+#define LASER_SAFETY_PIN GPIO_PIN_6  // PB6 - Laser mode: Physical safety interlock
 
 // SPECIAL REASSIGNED PERIPHERALS 
-#define LED_SPI_MOSI_PIN  GPIO_PIN_7  // PA7 (Pin 13) -> SPI1_MOSI (AF5) for the status/ring LED chain (see MX_SPI1_Init) - not drill or laser PWM, despite the pin's original silkscreen/net intent; that PWM moved to PA8/TIM1_CH1 once this pin took over SPI1_MOSI duty
+#define LED_SPI_MOSI_PIN  GPIO_PIN_7  // PA7 -> SPI1_MOSI (AF5) for the status/ring LED chain (see MX_SPI1_Init) - not drill or laser PWM, despite the pin's original silkscreen/net intent; that PWM moved to PA8/TIM1_CH1 once this pin took over SPI1_MOSI duty
 #define DRILL_PWM_PORT GPIOA
 #define LASER_PWM_PORT   GPIOA
 
-#define TCRT_A0_ADC_PIN  GPIO_PIN_0  // PB0 (Pin 14) -> Sensor mode: Analog ADC Channel 11 input
+#define TCRT_A0_ADC_PIN  GPIO_PIN_0  // PB0 -> Sensor mode: Analog ADC Channel 11 input
 #define TCRT_A0_ADC_PORT GPIOB
 
 // Smart drill tool-head auxiliary wiring
-#define DRILL_FGIN_PIN   GPIO_PIN_3  // PA3 (Pin 9)  -> Tachometer input (EXTI3)
+#define DRILL_FGIN_PIN   GPIO_PIN_3  // PA3  -> Tachometer input (EXTI3)
 
 // Hotend cooling fan (3D printer mode only) - CONN_FAN1, uses 2
 // free pins PA5/PA6. Distinct from the layer fan (PA7/PA3): this one cools the
 // hotend/heatsink itself, the layer fan cools the printed part.
-#define HOTEND_FAN_PWM_PIN   GPIO_PIN_5  // PA5 (Pin 11) -> TIM2_CH1 (AF1)
+#define HOTEND_FAN_PWM_PIN   GPIO_PIN_5  // PA5 -> TIM2_CH1 (AF1)
 #define HOTEND_FAN_PWM_PORT  GPIOA
-#define HOTEND_FAN_FG_PIN    GPIO_PIN_6  // PA6 (Pin 12) -> Tachometer input (EXTI6)
+#define HOTEND_FAN_FG_PIN    GPIO_PIN_6  // PA6 -> Tachometer input (EXTI6)
 #define HOTEND_FAN_FG_PORT   GPIOA
 #define DRILL_FGIN_PORT  GPIOA
-#define DRILL_FRIN_PIN   GPIO_PIN_4  // PA4 (Pin 10) -> BL4260 rotation direction output
+#define DRILL_FRIN_PIN   GPIO_PIN_4  // PA4 -> BL4260 rotation direction output
 #define DRILL_FRIN_PORT  GPIOA
 
 // =============================================================================
@@ -408,11 +409,13 @@ typedef struct __attribute__((packed)) {
     uint8_t  struct_version;
     uint8_t  sample_count;   // how many of `samples` are real (ramps 0..BLACKBOX_SAMPLES once at boot, then stays there - same pattern as OLED_DrawTempSparkline's own history buffer)
     uint8_t  write_index;    // circular position at the moment of the flush that produced this record
-    uint8_t  checksum;       // CRC-8/SMBUS, same algorithm as SavedState_Checksum - proportionate for "was this corrupted", not a security boundary
     BlackBoxSample_t samples[BLACKBOX_SAMPLES];
+    uint8_t  checksum;       // CRC-8/SMBUS over every byte above (last in the record, like SavedState_t) - proportionate for "was this corrupted", not a security boundary
 } BlackBoxRecord_t;
+_Static_assert(sizeof(BlackBoxRecord_t) == 678, "BlackBoxRecord_t is exported over CAN as 678 bytes; a change of layout needs a new BLACKBOX_VERSION and docs/CANBUS.TXT");
+_Static_assert(offsetof(BlackBoxRecord_t, checksum) == sizeof(BlackBoxRecord_t) - 1, "the checksum is the last byte of the record");
 #define BLACKBOX_MAGIC 0x424C4B42UL // 'BLKB' as bytes - distinct from SAVEDSTATE_MAGIC so a reader can't confuse the two regions even if addresses were ever misconfigured
-#define BLACKBOX_VERSION 1
+#define BLACKBOX_VERSION 2
 #define BLACKBOX_FRAM_ADDR 256 // well past SavedState_t's own ~34 bytes at address 0, generous margin for that struct to grow; ends well under FRAM_SIZE_BYTES (8192) even with BLACKBOX_SAMPLES x 10 bytes added
 #define THERMAL_STATS_FRAM_ADDR 192 // lifetime thermal counters (thermal_stats.h, 13 bytes) - between SavedState_t (address 0) and the black box (256)
 
@@ -529,7 +532,7 @@ extern uint8_t animation_frame; // toggles the tool icon's animation frame - wri
 uint8_t append_str(char *dest, const char *src);
 uint8_t fmt_uint(char *dest, uint32_t value, uint8_t width);
 
-// Defined in firmware_init.c - called from firmware_oled_driver.c's
+// Defined in firmware_init_buses.c - called from firmware_oled_driver.c's
 // OLED_Init(), which needs I2C2 configured before it can probe the display.
 void MX_I2C2_Init(void);
 

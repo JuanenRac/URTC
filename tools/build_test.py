@@ -83,7 +83,7 @@ def main() -> int:
         if os.name != "nt":
             (ROOT / "gradlew").chmod((ROOT / "gradlew").stat().st_mode | 0o111)
         environment = dict(os.environ)
-        environment["HYDRA_UMC_CI"] = "1"
+        environment["URTC_CI"] = "1"
         run(
             str(wrapper_path), "assembleDebug", "-PhydraUmcReadOnly=true",
             env=environment,
@@ -105,13 +105,13 @@ def main() -> int:
         if not script.is_file():
             fail("firmware project is missing build_firmware.sh")
         environment = dict(os.environ)
-        environment["HYDRA_UMC_CI"] = "1"
+        environment["URTC_CI"] = "1"
         if os.name == "nt":
             # WSL does not reliably inherit a Python child environment;
             # pass the read-only CI flag as an explicit WSL command argument.
             run(
                 "wsl.exe", "--distribution", "Ubuntu-24.04", "--",
-                "env", "HYDRA_UMC_CI=1", "bash", "build_firmware.sh",
+                "env", "URTC_CI=1", "bash", "build_firmware.sh",
             )
         else:
             run("bash", "build_firmware.sh", env=environment)
