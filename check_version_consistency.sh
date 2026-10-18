@@ -146,6 +146,11 @@ echo "   find_versioned_bin() - this script has no reliable way to read"
 echo "   PATCH for all 4 components from here without duplicating that"
 echo "   script's own header-parsing logic."
 echo "============================================================"
+# Images are not kept in git (they are build outputs published as release
+# assets), so a clean checkout has none: nothing to compare there.
+if [ -z "$(find "$ROOT/firmware" -maxdepth 1 -iname 'URTC_*_v*.bin' 2>/dev/null | head -1)" ]; then
+    echo "  SKIP no built images in firmware/ (clean checkout); build_firmware.sh produces them"
+else
 for prefix in "URTC_MAIN_BOOTLOADER" "URTC_MAIN_FIRMWARE" "URTC_SLAVE_BOOTLOADER" "URTC_SLAVE_FIRMWARE"; do
     for ext in bin hex elf; do
         MATCH=$(find "$ROOT/firmware" -maxdepth 1 -iname "${prefix}_v*.${ext}" 2>/dev/null | head -1)
@@ -156,6 +161,7 @@ for prefix in "URTC_MAIN_BOOTLOADER" "URTC_MAIN_FIRMWARE" "URTC_SLAVE_BOOTLOADER
         fi
     done
 done
+fi
 STALE_OLDNAME=$(find "$ROOT/firmware" -maxdepth 1 \( -iname "URTC_BOOTLOADER.*" -o -iname "URTC_SLAVE_APP.*" -o -iname "URTC_SLAVE_BOOTLOADER.bin" -o -iname "URTC_SLAVE_BOOTLOADER.hex" -o -iname "URTC_SLAVE_BOOTLOADER.elf" -o -iname "URTC_V[0-9]*_F303CC.*" \) 2>/dev/null)
 [ -n "$STALE_OLDNAME" ] && warn "old pre-unification binary name(s) still present (unversioned bootloaders/slave app, or the old URTC_V<MAJOR>.<MINOR>_F303CC main app name) - once confirmed superseded by a fresh build under the new names, archive these rather than deleting them permanently: $STALE_OLDNAME"
 STALE_SUFFIXED=$(find "$ROOT/firmware" -maxdepth 1 \( -iname "*_partitioned.*" -o -iname "*_monolithic.*" \) 2>/dev/null)
