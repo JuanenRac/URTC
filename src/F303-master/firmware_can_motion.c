@@ -1,7 +1,7 @@
 // =============================================================================
 // URTC Firmware - CAN command handler: shared motion tools (0x120)
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 //
 // Covers Paste Dispenser, Liquid Dispenser, Screwdriver, Gripper (Gimbal),
 // Gripper (NEMA), SMT Pick&Place (rotary A-axis), Large-Format Vacuum

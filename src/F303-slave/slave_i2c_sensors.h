@@ -2,7 +2,7 @@
 // URTC Expansion Slave Application Firmware - Local sensor bus (I2C2,
 // master mode): ADS1115 and the MLX9064x family declarations
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 // =============================================================================
 #ifndef SLAVE_I2C_SENSORS_H
 #define SLAVE_I2C_SENSORS_H

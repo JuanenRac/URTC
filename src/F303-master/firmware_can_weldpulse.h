@@ -2,7 +2,7 @@
 // URTC Firmware - CAN command handler: timed weld pulse (Spot Welder
 // 0x1C0, Ultrasonic Welder 0x200)
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 // =============================================================================
 #ifndef FIRMWARE_CAN_WELDPULSE_H
 #define FIRMWARE_CAN_WELDPULSE_H

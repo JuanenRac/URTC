@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+
+## [0.3.7] - Explicit version bump and manifest schema 1.1
+
+- Compiling no longer changes any version: build_firmware.sh and build_firmware.bat only read the component versions. Raising one is the explicit command `python bump.py` (all four components, or the named ones; `--dry-run` and `--list` available), which also mirrors an application version into its bootloader and keeps urtc.project.json in step. bump_version.py gained a read-only `--current` mode.
+- urtc.project.json uses manifest schema 1.1: it declares the deployment target `mcu` and the four independently versioned components (main and slave, application and bootloader) with their MCU target and the header that carries each version; tools/ci_validate.py checks that every declared version matches its header.
+- Every licence statement and source header says GPL-3.0-or-later.
 - The three scale-search loops of the MLX90641 parameter extraction (master and slave copies) are bounded like the MLX90640 ones (MLX90641_SCALE_ITER_MAX), so a blank EEPROM dump no longer hangs the chip until the watchdog resets it at every start.
 - The fault recorder record (version 2) now ends with its checksum, which covers every byte before it: the old layout put the checksum in the middle of the record and computed it over a field that was not yet set and without the last byte, so no host could validate it. The record layout, the 0x1A8 / 0x1A9 readback, the memory map of the F-RAM, the watchdog of every actuator (and the actuators that have none), the start of the bootloader listening window and the real flash regions of the bootloaders are documented in docs/CANBUS.TXT, docs/EEPROM.TXT, docs/CAN_THREAT_MODEL.TXT and docs/FIRMWARE_SIGNING.TXT.
 - tools/run_host_tests.py is the single list of host C suites (12 today, 8 of them under the address and undefined-behaviour sanitizers); build_firmware.sh and build_firmware.bat both call it, the .bat through WSL on Windows, and a test fails when a tests/test_*.c suite is missing from the list.

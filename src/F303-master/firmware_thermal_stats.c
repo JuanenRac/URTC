@@ -1,7 +1,7 @@
 // =============================================================================
 // URTC Firmware - Lifetime thermal counters, F-RAM and CAN side
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 // =============================================================================
 // thermal_stats.c holds the logic; this file loads/saves the record at
 // THERMAL_STATS_FRAM_ADDR and answers CAN 0x1AA with 0x1AB (docs/CANBUS.TXT).

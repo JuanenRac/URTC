@@ -1,7 +1,7 @@
 // =============================================================================
 // URTC Firmware - OLED screen rendering declarations
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 // =============================================================================
 #ifndef FIRMWARE_RENDER_H
 #define FIRMWARE_RENDER_H

@@ -1,7 +1,7 @@
 // =============================================================================
 // URTC Firmware - Host test double for the MLX9064x I2C driver: header
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 // =============================================================================
 // Backs the five MLX90640_I2C* symbols MLX90640_API.c expects (declared in
 // MLX90640_I2C_Driver.h) with an in-memory 16-bit word map plus a few knobs

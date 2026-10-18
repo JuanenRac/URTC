@@ -1,7 +1,7 @@
 // =============================================================================
 // URTC Firmware - Lifetime thermal counters (pure C, no STM32 HAL): thermal_stats.c
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 // =============================================================================
 // See thermal_stats.h.
 #include <stddef.h>

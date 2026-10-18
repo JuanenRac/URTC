@@ -2,7 +2,7 @@
 // URTC Expansion Slave Application Firmware - Entry point and
 // clock/peripheral init
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 // =============================================================================
 #include "stm32f3xx_hal.h"
 #include "slave_common.h"

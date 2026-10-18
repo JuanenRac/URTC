@@ -2,7 +2,7 @@
 # =============================================================================
 # URTC - Firmware signing keys and per-image signature/digest sidecars
 # Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-# GPL-3.0 - see LICENSE
+# GPL-3.0-or-later - see LICENSE
 # =============================================================================
 # The bootloaders authenticate an application image with HMAC-SHA256 over the
 # whole .bin (sent in 4 CAN chunks before END_UPDATE). Whoever computes that

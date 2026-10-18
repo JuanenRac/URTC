@@ -1,7 +1,7 @@
 // =============================================================================
 // URTC Firmware - Host test double for the MLX9064x I2C driver
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 // =============================================================================
 #include <string.h>
 #include <stdint.h>

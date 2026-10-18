@@ -390,7 +390,7 @@ combiné qui laisserait croire qu'ils avancent toujours ensemble :
 - Application de l'esclave d'extension (`src/F303-slave/`, STM32F303CBT6) : [`src/F303-slave/CHANGELOG.md`](src/F303-slave/CHANGELOG.md)
 - Bootloader de l'esclave d'extension (`src/F303-slave/boot/`) : [`src/F303-slave/boot/CHANGELOG.md`](src/F303-slave/boot/CHANGELOG.md)
 
-**Politique de versionnage :** les 4 composants (2 firmwares applicatifs, 2 bootloaders - `FIRMWARE_VERSION_MAJOR`/`MINOR`/`PATCH` et `BOOTLOADER_VERSION_MAJOR`/`MINOR`/`PATCH`) sont **incrémentaux** - chaque build réel incrémente automatiquement le `PATCH` propre à ce composant de 1 (`bump_version.py` à la racine du dépôt, appelé par `build_firmware.sh`/`.bat` juste avant de compiler chaque composant), avec report vers `MINOR` (puis `MAJOR`) dès que `PATCH` dépasserait 9, la même règle en base 10 qu'un compteur kilométrique - ex. `0.1.7` → `0.1.8` → `0.1.9` → `0.2.0`, jamais `0.1.10`. Chaque bootloader conserve aussi sa propre copie du `FIRMWARE_VERSION_*` de l'application correspondante, synchronisée automatiquement par le même bump. Voir [`CHANGELOG.md`](CHANGELOG.md) à la racine du dépôt pour l'état actuel des 4 composants en un coup d'œil, et [`VERSION_CHECKLIST.txt`](VERSION_CHECKLIST.txt) pour la mécanique complète par piste.
+**Politique de versionnage :** les 4 composants (2 firmwares applicatifs, 2 bootloaders - `FIRMWARE_VERSION_MAJOR`/`MINOR`/`PATCH` et `BOOTLOADER_VERSION_MAJOR`/`MINOR`/`PATCH`) sont **incrémentaux** - le `PATCH` propre à chaque composant n'augmente de 1 que par l'étape explicite `python bump.py` (qui utilise `bump_version.py` à la racine du dépôt) ; compiler ne change jamais une version, avec report vers `MINOR` (puis `MAJOR`) dès que `PATCH` dépasserait 9, la même règle en base 10 qu'un compteur kilométrique - ex. `0.1.7` → `0.1.8` → `0.1.9` → `0.2.0`, jamais `0.1.10`. Chaque bootloader conserve aussi sa propre copie du `FIRMWARE_VERSION_*` de l'application correspondante, synchronisée automatiquement par le même bump. Voir [`CHANGELOG.md`](CHANGELOG.md) à la racine du dépôt pour l'état actuel des 4 composants en un coup d'œil, et [`VERSION_CHECKLIST.txt`](VERSION_CHECKLIST.txt) pour la mécanique complète par piste.
 
 ## 🔍 Statut actuel
 
@@ -566,7 +566,8 @@ Si quelqu'un dans la communauté travaille sur des effecteurs terminaux personna
 │                                le processus manuel complet que chaque script automatise
 ├── build-test.sh / build-test.bat  Contrôle build/compilation sans gestion de version
 │                                (enveloppes légères autour de tools/build_test.py)
-├── bump_version.py              Incrément de version type compteur kilométrique, exécuté par build_firmware.sh/.bat
+├── bump.py                      Commande explicite pour monter la version (compiler ne la monte jamais)
+├── bump_version.py              Incrément type compteur kilométrique d'un en-tête, appelé par bump.py
 ├── bump_manifest_version.py     Synchronise la version de urtc.project.json avec la version native (--sync)
 ├── generate_manifest.py         Régénère firmware/firmware_manifest.json - appelé
 │                                automatiquement comme dernière étape d'une exécution complète
@@ -688,12 +689,12 @@ URTC est (c) 2026 JuanenRac (Electro Hobby 3D). Cet avis doit être inclus dans 
 
 Comme ce projet est constitué de plusieurs types de contenu différents, les différentes parties sont mises à disposition sous des licences différentes - chacune adaptée à ce qu'elle couvre réellement, plutôt que de forcer une seule licence à convenir à tout :
 
-1. Le **firmware** situé dans `./firmware` (application et bootloader CAN inclus) est disponible sous la **GNU General Public License v3.0 (GPL-3.0)**. Texte complet sur https://www.gnu.org/licenses/gpl-3.0.html.
+1. Le **firmware** situé dans `./firmware` (application et bootloader CAN inclus) est disponible sous la **GNU General Public License v3.0 (GPL-3.0-or-later)**. Texte complet sur https://www.gnu.org/licenses/gpl-3.0.html.
 
 2. Les **conceptions matérielles** (fichiers schéma/carte Eagle, gerbers, et les pièces imprimables en 3D sous `./PCB` et `./3D`) sont disponibles sous la **CERN Open Hardware Licence v2 - Strongly Reciprocal (CERN-OHL-S v2)**. Texte complet sur https://cern-ohl.web.cern.ch/.
 
 3. La **documentation** (ce README et ses propres traductions - `README_spa.md`, `README_ita.md`, `README_fra.md`, `README_deu.md`, `README_zho.md`, `README_jpn.md` - plus les fichiers de référence sous `./docs`) est disponible sous **Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)**. Texte complet sur https://creativecommons.org/licenses/by-sa/4.0/.
 
-Si vous construisez sur ce projet, gardez à l'esprit la séparation des licences : les modifications de code au firmware devraient rester GPL-3.0, les modifications matérielles devraient rester CERN-OHL-S, et les dérivés de documentation devraient rester CC BY-SA - chacun avec attribution à ce projet.
+Si vous construisez sur ce projet, gardez à l'esprit la séparation des licences : les modifications de code au firmware devraient rester GPL-3.0-or-later, les modifications matérielles devraient rester CERN-OHL-S, et les dérivés de documentation devraient rester CC BY-SA - chacun avec attribution à ce projet.
 
 Ce dépôt couvre uniquement le propre firmware et matériel de la carte URTC - les outils PC (URTC Flasher, URTC Tester) qui vivaient auparavant ici sont désormais des projets indépendants avec leur propre licence, voir « Outils PC » ci-dessus.

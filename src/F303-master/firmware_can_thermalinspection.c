@@ -4,7 +4,7 @@
 // or via the expansion slave bridge, depending on which board variant
 // and sensor variant is configured)
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 //
 // This tool's own thermal imaging spots PCB shorts by temperature
 // signature. Ring-LED illumination isn't handled here - it's the same

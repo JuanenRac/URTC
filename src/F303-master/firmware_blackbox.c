@@ -1,7 +1,7 @@
 // =============================================================================
 // URTC Firmware - "Black box" fault recorder
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 //
 // Planned feature: "Implementar un sistema de Black Box en la F-RAM para
 // registrar los últimos 10s antes de un error". A continuously-updated RAM

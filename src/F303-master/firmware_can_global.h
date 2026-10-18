@@ -1,7 +1,7 @@
 // =============================================================================
 // URTC Firmware - CAN dispatch declarations - global commands shared across all tools
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 // =============================================================================
 #ifndef FIRMWARE_CAN_GLOBAL_H
 #define FIRMWARE_CAN_GLOBAL_H

@@ -2,7 +2,7 @@
 // URTC Expansion Slave Application Firmware - Local PWM generation
 // declarations
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 //
 // TIM1 (this chip's own advanced control timer, 4 usable channels here)
 // generating PWM right at the expansion board itself - see

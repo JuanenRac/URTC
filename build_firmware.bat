@@ -7,20 +7,20 @@ REM Purpose   : Incremental firmware build and versioned artifact packaging work
 REM Author    : JuanenRac (Electro Hobby 3D)
 REM Email     : electrohobby3d@gmail.com
 REM Copyright : (C) 2026 JuanenRac
-REM License   : GPL-3.0 - see LICENSE
+REM License   : GPL-3.0-or-later - see LICENSE
 REM *****************************************************************************
 REM HYDRA_UMC_SCRIPT_STANDARD_HEADER_END
 REM HYDRA_UMC_SCRIPT_STANDARD_BANNER_BEGIN
 echo.
 echo *****************************************************************************
 echo * URTC - build_firmware.bat
-echo * Mode      : INCREMENTAL BUILD
+echo * Mode      : BUILD (no version change)
 echo * Author    : JuanenRac (Electro Hobby 3D)
 echo * Email     : electrohobby3d@gmail.com
 echo * Copyright : (C) 2026 JuanenRac
-echo * License   : GPL-3.0 - see LICENSE
+echo * License   : GPL-3.0-or-later - see LICENSE
 echo * ------------------------------------------------------------------------- *
-echo * 1. Increment the project version and synchronise its manifest.
+echo * 1. Read the project version (compiling never changes it; run bump.py to raise it).
 echo * 2. Run this project's declared build, verification and packaging commands.
 echo * 3. Report the result and keep an interactive terminal open.
 echo *****************************************************************************
@@ -32,11 +32,9 @@ set "KEEP_OPEN=pause"
 if defined CI set "KEEP_OPEN=ver >nul"
 if "%URTC_CI%"=="1" set "KEEP_OPEN=ver >nul"
 REM HYDRA_UMC_SCRIPT_STANDARD_VERSION_STEP
-echo [1/3] Incrementing project version and synchronising its manifest...
+echo [1/3] Reading the component versions - compiling never changes them, run bump.py first...
 REM HYDRA_UMC_SCRIPT_STANDARD_VERSION_CAPTURE_BEFORE
 for /f "usebackq delims=" %%V in (`python -c "import json; print(json.load(open(r'%~dp0urtc.project.json', encoding='utf-8'))['version'])"`) do set "HYDRA_UMC_VERSION_BEFORE=%%V"
-REM The registry tracks the main-board application version. It is bumped
-REM later, then --sync records that single authoritative native bump.
 echo.
 set "ROOT=%~dp0"
 if "%ROOT:~-1%"=="\" set "ROOT=%ROOT:~0,-1%"
@@ -280,10 +278,8 @@ set "OUT=%BUILD%\master_boot"
 rmdir /s /q "!OUT!" 2>nul
 mkdir "!OUT!"
 set "SRC=%ROOT%\src\F303-master\boot"
-REM Bootloader version is INCREMENTAL - bump PATCH (odometer-carry into
-REM MINOR/MAJOR) before the compiler reads this header, so the .bin built
-REM below already embeds the new version - see bump_version.py.
-REM bump_version.py's own stdout IS the freshly-bumped "MAJOR.MINOR.PATCH" -
+REM The bootloader version is read from its header (raise it first with
+REM bump.py). The command's own stdout IS the current "MAJOR.MINOR.PATCH" -
 REM captured below via a for /f on its own stdout, directly into the
 REM output filename, so the header is never re-read a second time just to
 REM get the same number back. Filename convention
@@ -291,9 +287,9 @@ REM URTC_MAIN_BOOTLOADER_v{MAJOR}.{MINOR}.{PATCH} matches HYDRA-UMC's own
 REM <PREFIX>_v<MAJOR>.<MINOR>.<PATCH> pattern - see CHANGELOG.md for why
 REM this replaced the old unversioned URTC_BOOTLOADER name.
 set "BOOT_VER="
-for /f "usebackq delims=" %%v in (`python "%ROOT%\bump_version.py" "!SRC!\bootloader_common.h" BOOTLOADER_VERSION`) do set "BOOT_VER=%%v"
+for /f "usebackq delims=" %%v in (`python "%ROOT%\bump_version.py" --current "!SRC!\bootloader_common.h" BOOTLOADER_VERSION`) do set "BOOT_VER=%%v"
 if not defined BOOT_VER (
-    echo   FAIL bootloader version bump script failed - see traceback above
+    echo   FAIL bootloader version lookup failed - see traceback above
     set /a FAIL+=1
     goto :summary
 )
@@ -341,33 +337,18 @@ set "OUT=%BUILD%\master_app"
 rmdir /s /q "!OUT!" 2>nul
 mkdir "!OUT!"
 set "SRC=%ROOT%\src\F303-master"
-REM Application firmware is INCREMENTAL too - same odometer-carry bump as
-REM the bootloader above, plus mirroring the new version into
-REM bootloader_common.h's own FIRMWARE_VERSION_* copy so the two can never
-REM drift apart (see bump_version.py's own header). Same stdout-capture
+REM The application version is read from its header (bump.py also mirrors a
+REM new one into the bootloader copy). Same stdout-capture
 REM pattern as the bootloader above - filename convention
 REM URTC_MAIN_FIRMWARE_v{MAJOR}.{MINOR}.{PATCH} replaces the old
 REM URTC_V{MAJOR}.{MINOR}_F303CC (no PATCH) name.
 set "APP_VER="
-for /f "usebackq delims=" %%v in (`python "%ROOT%\bump_version.py" "!SRC!\firmware_common.h" FIRMWARE_VERSION "!SRC!\boot\bootloader_common.h"`) do set "APP_VER=%%v"
+for /f "usebackq delims=" %%v in (`python "%ROOT%\bump_version.py" --current "!SRC!\firmware_common.h" FIRMWARE_VERSION`) do set "APP_VER=%%v"
 if not defined APP_VER (
-    echo   FAIL application version bump script failed - see traceback above
+    echo   FAIL application version lookup failed - see traceback above
     set /a FAIL+=1
     goto :summary
 )
-python "%ROOT%\bump_manifest_version.py" --sync
-if errorlevel 1 ( echo VERSION SYNCHRONISATION FAILED. & %KEEP_OPEN% & exit /b 1 )
-REM HYDRA_UMC_SCRIPT_STANDARD_VERSION_CAPTURE_AFTER
-for /f "usebackq delims=" %%V in (`python -c "import json; print(json.load(open(r'%ROOT%\urtc.project.json', encoding='utf-8'))['version'])"`) do set "HYDRA_UMC_VERSION_AFTER=%%V"
-if not defined HYDRA_UMC_VERSION_BEFORE set "HYDRA_UMC_VERSION_BEFORE=unknown"
-if not defined HYDRA_UMC_VERSION_AFTER set "HYDRA_UMC_VERSION_AFTER=unknown"
-echo.
-echo *****************************************************************************
-echo * VERSION INCREMENT COMPLETED
-echo * v%HYDRA_UMC_VERSION_BEFORE% ^> v%HYDRA_UMC_VERSION_AFTER%
-echo * Project manifest synchronized with the main-board application version.
-echo *****************************************************************************
-echo.
 set "APP_NAME=URTC_MAIN_FIRMWARE_v!APP_VER!"
 set "MASTER_INC=-I!SRC!\melexis_mlx90640 -I!SRC!\melexis_mlx90641 -I!SRC!\melexis_mlx90642"
 set "SECTION_FAIL=0"
@@ -431,14 +412,13 @@ set "OUT=%BUILD%\slave_boot"
 rmdir /s /q "!OUT!" 2>nul
 mkdir "!OUT!"
 set "SRC=%ROOT%\src\F303-slave\boot"
-REM Same incremental-version bump as the main board bootloader above - see
-REM bump_version.py's own header for the full policy. Same stdout-capture
+REM Same read-only version lookup as the main board bootloader above. Same stdout-capture
 REM pattern too - filename convention URTC_SLAVE_BOOTLOADER_v{MAJOR}.
 REM {MINOR}.{PATCH} replaces the old unversioned URTC_SLAVE_BOOTLOADER name.
 set "SLAVE_BOOT_VER="
-for /f "usebackq delims=" %%v in (`python "%ROOT%\bump_version.py" "!SRC!\slaveboot_common.h" BOOTLOADER_VERSION`) do set "SLAVE_BOOT_VER=%%v"
+for /f "usebackq delims=" %%v in (`python "%ROOT%\bump_version.py" --current "!SRC!\slaveboot_common.h" BOOTLOADER_VERSION`) do set "SLAVE_BOOT_VER=%%v"
 if not defined SLAVE_BOOT_VER (
-    echo   FAIL bootloader version bump script failed - see traceback above
+    echo   FAIL bootloader version lookup failed - see traceback above
     set /a FAIL+=1
     goto :summary
 )
@@ -483,14 +463,13 @@ set "OUT=%BUILD%\slave_app"
 rmdir /s /q "!OUT!" 2>nul
 mkdir "!OUT!"
 set "SRC=%ROOT%\src\F303-slave"
-REM Same incremental bump + bootloader-mirror as the main board application
-REM above. Same stdout-capture pattern - filename convention
+REM Same read-only version lookup as the main board application above. Same stdout-capture pattern - filename convention
 REM URTC_SLAVE_FIRMWARE_v{MAJOR}.{MINOR}.{PATCH} replaces the old
 REM unversioned URTC_SLAVE_APP name.
 set "SLAVE_APP_VER="
-for /f "usebackq delims=" %%v in (`python "%ROOT%\bump_version.py" "!SRC!\slave_common.h" FIRMWARE_VERSION "!SRC!\boot\slaveboot_common.h"`) do set "SLAVE_APP_VER=%%v"
+for /f "usebackq delims=" %%v in (`python "%ROOT%\bump_version.py" --current "!SRC!\slave_common.h" FIRMWARE_VERSION`) do set "SLAVE_APP_VER=%%v"
 if not defined SLAVE_APP_VER (
-    echo   FAIL application version bump script failed - see traceback above
+    echo   FAIL application version lookup failed - see traceback above
     set /a FAIL+=1
     goto :summary
 )
@@ -574,13 +553,10 @@ echo is expected and not a sign anything is wrong ^(see
 echo docs\COMPILE_STM32F303.TXT for the full reasoning^). A DIFFERENT file
 echo size, or a build failure, is the real thing worth investigating.
 echo.
-echo Versioning: all 4 components built above ^(2 applications, 2
-echo bootloaders^) are incremental - each had its own PATCH auto-bumped
-echo ^(odometer-carry into MINOR/MAJOR^) by bump_version.py before
-echo compiling, since every real build increments it automatically now.
-echo Each application's own bump also mirrored the new version into its
-echo bootloader's FIRMWARE_VERSION_* copy - see VERSION_CHECKLIST.txt
-echo and CHANGELOG.md.
+echo Versioning: this build did not change any version. Raise the version of
+echo a component explicitly with 'python bump.py' BEFORE building ^(an
+echo application bump also mirrors the new version into its bootloader's
+echo FIRMWARE_VERSION_* copy^) - see VERSION_CHECKLIST.txt and CHANGELOG.md.
 
 REM Keeps the window open when this script is double-clicked from Explorer,
 REM on success AND on failure - every FAIL path above reaches this same

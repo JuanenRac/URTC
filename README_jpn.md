@@ -376,7 +376,7 @@ URTC のフラッシュは 2 つの独立した部分に分割されているた
 - 拡張スレーブアプリケーション（`src/F303-slave/`、STM32F303CBT6）：[`src/F303-slave/CHANGELOG.md`](src/F303-slave/CHANGELOG.md)
 - 拡張スレーブブートローダー（`src/F303-slave/boot/`）：[`src/F303-slave/boot/CHANGELOG.md`](src/F303-slave/boot/CHANGELOG.md)
 
-**バージョン管理ポリシー：** 4 つのコンポーネントすべて（2 つのアプリケーションファームウェア、2 つのブートローダー——`FIRMWARE_VERSION_MAJOR`/`MINOR`/`PATCH` および `BOOTLOADER_VERSION_MAJOR`/`MINOR`/`PATCH`）は**インクリメンタル**です——実際のビルドのたびに、そのコンポーネント自身の `PATCH` が自動的に 1 つ加算され（リポジトリルートの `bump_version.py`、各コンポーネントをコンパイルする直前に `build_firmware.sh`/`.bat` から呼び出されます）、`PATCH` が 9 を超えると `MINOR`（その後 `MAJOR`）へ繰り上がります。これは、車自身のオドメーターが使用するのと同じ 10 進法の「オドメーター」ルールです——例：`0.1.7` → `0.1.8` → `0.1.9` → `0.2.0`、決して `0.1.10` にはなりません。各ブートローダーも、対応するアプリケーションの `FIRMWARE_VERSION_*` の自身のコピーを保持し、同じ加算によって自動的に同期が保たれます。4 つのコンポーネントすべての現在のバージョンを一目で確認するには、リポジトリルートの [`CHANGELOG.md`](CHANGELOG.md) を、トラックごとの完全なメカニズムは [`VERSION_CHECKLIST.txt`](VERSION_CHECKLIST.txt) を参照してください。
+**バージョン管理ポリシー：** 4 つのコンポーネントすべて（2 つのアプリケーションファームウェア、2 つのブートローダー——`FIRMWARE_VERSION_MAJOR`/`MINOR`/`PATCH` および `BOOTLOADER_VERSION_MAJOR`/`MINOR`/`PATCH`）は**インクリメンタル**です——そのコンポーネント自身の `PATCH` は、明示的な `python bump.py` の手順（リポジトリルートの `bump_version.py` を使用）でのみ 1 つ加算されます——コンパイルでバージョンが変わることはありません、`PATCH` が 9 を超えると `MINOR`（その後 `MAJOR`）へ繰り上がります。これは、車自身のオドメーターが使用するのと同じ 10 進法の「オドメーター」ルールです——例：`0.1.7` → `0.1.8` → `0.1.9` → `0.2.0`、決して `0.1.10` にはなりません。各ブートローダーも、対応するアプリケーションの `FIRMWARE_VERSION_*` の自身のコピーを保持し、同じ加算によって自動的に同期が保たれます。4 つのコンポーネントすべての現在のバージョンを一目で確認するには、リポジトリルートの [`CHANGELOG.md`](CHANGELOG.md) を、トラックごとの完全なメカニズムは [`VERSION_CHECKLIST.txt`](VERSION_CHECKLIST.txt) を参照してください。
 
 ## 🔍 現在の状態
 
@@ -553,7 +553,8 @@ URTC のフラッシュは 2 つの独立した部分に分割されているた
 │                                完全な手動プロセスは docs/COMPILE_STM32F303.TXT を参照
 ├── build-test.sh / build-test.bat  バージョンを更新しないビルド/コンパイル確認
 │                                （tools/build_test.py の薄いラッパー）
-├── bump_version.py              オドメーター式バージョンインクリメント、build_firmware.sh/.bat が実行
+├── bump.py                      明示的なバージョン加算コマンド（コンパイルでは加算されない）
+├── bump_version.py              ヘッダー 1 つのオドメーター式加算、bump.py から呼び出される
 ├── bump_manifest_version.py     urtc.project.json のバージョンをネイティブ側と同期（--sync）
 ├── generate_manifest.py         firmware/firmware_manifest.json を再生成——
 │                                完全な build_firmware.sh/.bat 実行の最終ステップとして
@@ -675,12 +676,12 @@ URTC の著作権は (c) 2026 JuanenRac（Electro Hobby 3D）に帰属します�
 
 本プロジェクトはいくつかの異なる種類のコンテンツで構成されているため、すべてを 1 つのライセンスで無理に統一するのではなく、各部分が実際にカバーする内容に適したライセンスの下で個別に提供されています：
 
-1. `./firmware` にある**ファームウェア**（アプリケーションと CAN ブートローダーの両方）は、**GNU General Public License v3.0（GPL-3.0）** の下で提供されます。全文は https://www.gnu.org/licenses/gpl-3.0.html を参照してください。
+1. `./firmware` にある**ファームウェア**（アプリケーションと CAN ブートローダーの両方）は、**GNU General Public License v3.0（GPL-3.0-or-later）** の下で提供されます。全文は https://www.gnu.org/licenses/gpl-3.0.html を参照してください。
 
 2. **ハードウェア設計**（Eagle 回路図/ボードファイル、Gerber、そして `./PCB` および `./3D` 下の 3D 印刷可能パーツ）は、**CERN Open Hardware Licence v2 - Strongly Reciprocal（CERN-OHL-S v2）** の下で提供されます。全文は https://cern-ohl.web.cern.ch/ を参照してください。
 
 3. **ドキュメント**（本 README およびその自身の翻訳版——`README_spa.md`、`README_ita.md`、`README_fra.md`、`README_deu.md`、`README_zho.md`、`README_jpn.md`——に加えて `./docs` 下のリファレンスファイル）は、**クリエイティブ・コモンズ 表示-継承 4.0 国際（CC BY-SA 4.0）** の下で提供されます。全文は https://creativecommons.org/licenses/by-sa/4.0/ を参照してください。
 
-本プロジェクトを基に開発を行う際は、このライセンス区分を念頭に置いてください：ファームウェアへのコード変更は GPL-3.0 を維持し、ハードウェアの改変は CERN-OHL-S を維持し、ドキュメントの派生物は CC BY-SA を維持してください——いずれも本プロジェクトへの帰属表示を伴う必要があります。
+本プロジェクトを基に開発を行う際は、このライセンス区分を念頭に置いてください：ファームウェアへのコード変更は GPL-3.0-or-later を維持し、ハードウェアの改変は CERN-OHL-S を維持し、ドキュメントの派生物は CC BY-SA を維持してください——いずれも本プロジェクトへの帰属表示を伴う必要があります。
 
 本リポジトリは URTC ボード自身のファームウェアとハードウェアのみを対象としています——かつてここにあった PC ツール（URTC Flasher、URTC Tester）は、今では独自のライセンスを持つ独立したプロジェクトです。上記「PC ツール」を参照してください。

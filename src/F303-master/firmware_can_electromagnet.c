@@ -1,7 +1,7 @@
 // =============================================================================
 // URTC Firmware - CAN command handler: Heavy-Duty Electromagnet (0x1B0)
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 //
 // doc #3 - picks up ferromagnetic parts/scrap.
 // CONN_T12 drives this the same way it drives the soldering iron's own

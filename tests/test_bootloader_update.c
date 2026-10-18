@@ -1,7 +1,7 @@
 // =============================================================================
 // URTC Firmware - Host logic tests for the bootloader update flow
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 // =============================================================================
 // boot/bootloader_protocol.c, boot/bootloader_flash.c and boot/bootloader_crypto.c
 // are compiled unchanged against the fake HAL in tests/host_hal/. The fake

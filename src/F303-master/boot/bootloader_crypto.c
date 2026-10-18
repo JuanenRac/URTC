@@ -1,7 +1,7 @@
 // =============================================================================
 // URTC Bootloader - SHA-256 / HMAC-SHA256
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 //
 // A from-scratch SHA-256/HMAC implementation (not a library) - verified
 // against the official RFC 4231 HMAC-SHA256 test case 2 before this was

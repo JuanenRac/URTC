@@ -1,7 +1,7 @@
 // =============================================================================
 // URTC Bootloader - Shared types, defines, and cross-module externs
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 // =============================================================================
 #ifndef BOOTLOADER_COMMON_H
 #define BOOTLOADER_COMMON_H
@@ -44,7 +44,7 @@ extern I2C_HandleTypeDef hi2c2;
 // non-OTA flash).
 #define FIRMWARE_VERSION_MAJOR 0
 #define FIRMWARE_VERSION_MINOR 3
-#define FIRMWARE_VERSION_PATCH 6
+#define FIRMWARE_VERSION_PATCH 7
 
 // BOOTLOADER_VERSION_* describes THIS bootloader binary itself - separate
 // from FIRMWARE_VERSION_MAJOR/MINOR above, which is the version of

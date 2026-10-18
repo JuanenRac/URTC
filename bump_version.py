@@ -7,7 +7,10 @@
 #
 # PROJECT: URTC (Universal Robot Tool Controller)
 # AUTHOR: JuanenRac (Electro Hobby 3D) - electrohobby3d@gmail.com
-# LICENSE: GPL-3.0 (same as the firmware this versions - see LICENSE at repo root)
+# LICENSE: GPL-3.0-or-later (same as the firmware this versions - see LICENSE at repo root)
+#
+# NOTE: compiling never runs this script any more; raising a version is the
+# explicit step done by bump.py (repo root), which calls this script.
 #
 # POLICY: all 4 components (2 application firmwares, 2 bootloaders) are
 # incremental - every real build of a component (a compile+link that
@@ -101,8 +104,16 @@ def next_version(major, minor, patch):
 
 
 def main():
+    if len(sys.argv) == 4 and sys.argv[1] == "--current":
+        # Read-only: print the version the header carries now. Builds use this
+        # so that compiling never changes a version.
+        with open(sys.argv[2]) as f:
+            text = f.read()
+        print(".".join(str(get_macro(text, sys.argv[2], sys.argv[3], part)) for part in ("MAJOR", "MINOR", "PATCH")))
+        return 0
     if len(sys.argv) not in (3, 4):
-        print("usage: bump_version.py <header_path> <MACRO_PREFIX> [<mirror_header>]", file=sys.stderr)
+        print("usage: bump_version.py <header_path> <MACRO_PREFIX> [<mirror_header>]\n"
+              "       bump_version.py --current <header_path> <MACRO_PREFIX>", file=sys.stderr)
         return 1
     path, prefix = sys.argv[1], sys.argv[2]
     mirror_path = sys.argv[3] if len(sys.argv) == 4 else None

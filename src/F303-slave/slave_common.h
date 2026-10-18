@@ -2,7 +2,7 @@
 // URTC Expansion Slave Application Firmware - Shared types, register map,
 // and cross-module externs
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 //
 // Runs on the STM32F303CBT6 populating the ADVANCED expansion board
 // variants, once slaveboot_protocol.c's JumpToApplication() hands control
@@ -39,7 +39,7 @@
 // PATCH+1 on every real build, odometer-carry into MINOR/MAJOR.
 #define FIRMWARE_VERSION_MAJOR 0
 #define FIRMWARE_VERSION_MINOR 2
-#define FIRMWARE_VERSION_PATCH 1
+#define FIRMWARE_VERSION_PATCH 2
 
 // -----------------------------------------------------------------------
 // Shared peripheral handles - defined once in slave_main.c, declared

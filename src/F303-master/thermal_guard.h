@@ -1,7 +1,7 @@
 // =============================================================================
 // URTC Firmware - Thermal runaway guard (pure C, no STM32 HAL): thermal_guard.h
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 // =============================================================================
 // The two bang-bang loops in firmware_control_thermal.c already catch a
 // sensor pinned to a rail (open/shorted), an out-of-range setpoint and a

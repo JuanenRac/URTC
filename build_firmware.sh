@@ -4,39 +4,29 @@ set -e
 # *****************************************************************************
 # Project   : URTC
 # Script    : build_firmware.sh
-# Purpose   : Incremental firmware build and versioned artifact packaging workflow.
+# Purpose   : Firmware build and versioned artifact packaging workflow (never changes a version).
 # Author    : JuanenRac (Electro Hobby 3D)
 # Email     : electrohobby3d@gmail.com
 # Copyright : (C) 2026 JuanenRac
-# License   : GPL-3.0 - see LICENSE
+# License   : GPL-3.0-or-later - see LICENSE
 # *****************************************************************************
 # HYDRA_UMC_SCRIPT_STANDARD_HEADER_END
 # HYDRA_UMC_SCRIPT_STANDARD_BANNER_BEGIN
 printf '\n*******************************************************************************\n'
 printf '%s\n' "* URTC - build_firmware.sh"
-printf '%s\n' "* Mode      : INCREMENTAL BUILD"
+printf '%s\n' "* Mode      : BUILD (no version change)"
 printf '%s\n' "* Author    : JuanenRac (Electro Hobby 3D)"
 printf '%s\n' "* Email     : electrohobby3d@gmail.com"
 printf '%s\n' "* Copyright : (C) 2026 JuanenRac"
-printf '%s\n' "* License   : GPL-3.0 - see LICENSE"
+printf '%s\n' "* License   : GPL-3.0-or-later - see LICENSE"
 printf '%s\n' "* ------------------------------------------------------------------------- *"
-printf '%s\n' "* 1. Increment the project version and synchronise its manifest."
+printf '%s\n' "* 1. Read the project version (compiling never changes it; run bump.py to raise it)."
 printf '%s\n' "* 2. Run this project's declared build, verification and packaging commands."
 printf '%s\n' "* 3. Report the result and keep an interactive terminal open."
 printf '%s\n' "*******************************************************************************"
 printf '\n'
 # HYDRA_UMC_SCRIPT_STANDARD_BANNER_END
 URTC_CI_MODE="${URTC_CI:-0}"
-if [ "$URTC_CI_MODE" = "1" ]; then
-    echo "URTC CI: version sources are read-only."
-else
-    # HYDRA_UMC_SCRIPT_STANDARD_VERSION_STEP
-    printf '%s\n' "[1/3] Incrementing project version and synchronising its manifest..."
-    # HYDRA_UMC_SCRIPT_STANDARD_VERSION_CAPTURE_BEFORE
-    HYDRA_UMC_VERSION_BEFORE="$(python3 -c 'import json, pathlib, sys; print(json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))["version"])' "$(dirname "$0")/urtc.project.json")"
-    # The registry tracks the main-board application version. It is bumped
-    # later, then --sync records that single authoritative native bump.
-fi
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUILD="$ROOT/build"
@@ -267,21 +257,11 @@ build_bin_hex() {
     arm-none-eabi-objcopy -O ihex "$elf" "${elf%.elf}.hex"
 }
 
-# Returns the present source version in CI. Normal local builds keep the
-# established odometer bump and any required bootloader mirror update.
+# Returns the version a header carries now. Compiling never changes a version:
+# raise one explicitly first with "python3 bump.py" (see VERSION_CHECKLIST.txt).
 version_or_bump() {
     local header="$1" prefix="$2"
-    shift 2
-    if [ "$URTC_CI_MODE" = "1" ]; then
-        local major minor patch
-        major="$(grep -oE "define[[:space:]]+${prefix}_MAJOR[[:space:]]+[0-9]+" "$header" | grep -oE '[0-9]+$')"
-        minor="$(grep -oE "define[[:space:]]+${prefix}_MINOR[[:space:]]+[0-9]+" "$header" | grep -oE '[0-9]+$')"
-        patch="$(grep -oE "define[[:space:]]+${prefix}_PATCH[[:space:]]+[0-9]+" "$header" | grep -oE '[0-9]+$')"
-        test -n "$major" && test -n "$minor" && test -n "$patch"
-        echo "$major.$minor.$patch"
-    else
-        python3 "$ROOT/bump_version.py" "$header" "$prefix" "$@"
-    fi
+    python3 "$ROOT/bump_version.py" --current "$header" "$prefix"
 }
 
 mkdir -p "$FIRMWARE_OUT"
@@ -328,10 +308,8 @@ step "4. Main board bootloader (src/F303-master/boot/)"
 # -----------------------------------------------------------------------
 OUT="$BUILD/master_boot"; prepare_output_dir "$OUT"
 SRC="$ROOT/src/F303-master/boot"
-# Bootloader version is INCREMENTAL - bump PATCH (odometer-carry into MINOR/
-# MAJOR) before the compiler reads this header, so the .bin built below
-# already embeds the new version - see bump_version.py's own header.
-# bump_version.py's own stdout IS the freshly-bumped "MAJOR.MINOR.PATCH" -
+# The bootloader version is read from its header (raise it first with bump.py).
+# The command's own stdout IS the current "MAJOR.MINOR.PATCH" -
 # captured directly into the output filename below (same pattern as sibling
 # repo HYDRA-UMC's own build_firmware.sh) so the header is never re-read a
 # second time just to get the same number back. Filename convention
@@ -353,25 +331,13 @@ step "5. Main board application (src/F303-master/)"
 # -----------------------------------------------------------------------
 OUT="$BUILD/master_app"; prepare_output_dir "$OUT"
 SRC="$ROOT/src/F303-master"
-# Application firmware is INCREMENTAL too - same odometer-carry bump as the
-# bootloader above, plus mirroring the new version into bootloader_common.h's
-# own FIRMWARE_VERSION_* copy so the two can never drift apart (see
-# bump_version.py's own header for why that copy exists and how it's used).
+# The application version is read from its header; bump.py (run before the
+# build) also mirrors a new application version into the bootloader's own
+# FIRMWARE_VERSION_* copy so the two never drift apart.
 # Same stdout-capture pattern as the bootloader above - filename convention
 # URTC_MAIN_FIRMWARE_v{MAJOR}.{MINOR}.{PATCH} replaces the old
 # URTC_V{MAJOR}.{MINOR}_F303CC (no PATCH) name.
 APP_VER=$(version_or_bump "$SRC/firmware_common.h" FIRMWARE_VERSION "$SRC/boot/bootloader_common.h")
-if [ "$URTC_CI_MODE" != "1" ]; then
-    python3 "$ROOT/bump_manifest_version.py" --sync || exit 1
-    # HYDRA_UMC_SCRIPT_STANDARD_VERSION_CAPTURE_AFTER
-    HYDRA_UMC_VERSION_AFTER="$(python3 -c 'import json, pathlib, sys; print(json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))["version"])' "$ROOT/urtc.project.json")"
-    printf '\n*******************************************************************************\n'
-    printf '%s\n' '* VERSION INCREMENT COMPLETED'
-    printf '%s\n' "* v${HYDRA_UMC_VERSION_BEFORE:-unknown} -> v${HYDRA_UMC_VERSION_AFTER:-unknown}"
-    printf '%s\n' '* Project manifest synchronized with the main-board application version.'
-    printf '%s\n' '*******************************************************************************'
-    printf '\n'
-fi
 compile_dir "$SRC" "$OUT" "-I$SRC/melexis_mlx90640 -I$SRC/melexis_mlx90641 -I$SRC/melexis_mlx90642"
 compile_dir "$SRC/melexis_mlx90640" "$OUT" "-I$SRC -I$SRC/melexis_mlx90640"
 compile_dir "$SRC/melexis_mlx90641" "$OUT" "-I$SRC -I$SRC/melexis_mlx90641"
@@ -402,8 +368,7 @@ step "6. Expansion slave bootloader (src/F303-slave/boot/)"
 # -----------------------------------------------------------------------
 OUT="$BUILD/slave_boot"; prepare_output_dir "$OUT"
 SRC="$ROOT/src/F303-slave/boot"
-# Same incremental-version bump as the main board bootloader above - see
-# bump_version.py's own header for the full policy. Same stdout-capture
+# Same read-only version lookup as the main board bootloader above. Same stdout-capture
 # pattern too - filename convention URTC_SLAVE_BOOTLOADER_v{MAJOR}.{MINOR}.
 # {PATCH} replaces the old unversioned URTC_SLAVE_BOOTLOADER name.
 SLAVE_BOOT_VER=$(version_or_bump "$SRC/slaveboot_common.h" BOOTLOADER_VERSION)
@@ -421,8 +386,7 @@ step "7. Expansion slave application (src/F303-slave/)"
 # -----------------------------------------------------------------------
 OUT="$BUILD/slave_app"; prepare_output_dir "$OUT"
 SRC="$ROOT/src/F303-slave"
-# Same incremental bump + bootloader-mirror as the main board application
-# above. Same stdout-capture pattern - filename convention
+# Same read-only version lookup as the main board application above. Same stdout-capture pattern - filename convention
 # URTC_SLAVE_FIRMWARE_v{MAJOR}.{MINOR}.{PATCH} replaces the old unversioned
 # URTC_SLAVE_APP name.
 SLAVE_APP_VER=$(version_or_bump "$SRC/slave_common.h" FIRMWARE_VERSION "$SRC/boot/slaveboot_common.h")
@@ -485,12 +449,9 @@ echo "is expected and not a sign anything is wrong (see"
 echo "docs/COMPILE_STM32F303.TXT for the full reasoning). A DIFFERENT file"
 echo "size, or a build failure, is the real thing worth investigating."
 echo ""
-echo "Versioning: all 4 components built above (2 applications, 2"
-echo "bootloaders) are incremental - each had its own PATCH auto-bumped"
-echo "(odometer-carry into MINOR/MAJOR) by bump_version.py before"
-echo "compiling, since every real build increments it automatically now."
-echo "Each application's own bump also mirrored the new version into its"
-echo "bootloader's FIRMWARE_VERSION_* copy - see VERSION_CHECKLIST.txt"
-echo "and CHANGELOG.md."
+echo "Versioning: this build did not change any version. Raise the version of"
+echo "a component explicitly with 'python3 bump.py' BEFORE building (an"
+echo "application bump also mirrors the new version into its bootloader's"
+echo "FIRMWARE_VERSION_* copy) - see VERSION_CHECKLIST.txt and CHANGELOG.md."
 
 if [ "$FAIL" -gt 0 ]; then exit 1; fi

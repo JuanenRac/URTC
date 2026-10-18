@@ -1,7 +1,7 @@
 // =============================================================================
 // URTC Bootloader - Flash erase/write/verify and metadata I/O declarations
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 // =============================================================================
 #ifndef BOOTLOADER_FLASH_H
 #define BOOTLOADER_FLASH_H

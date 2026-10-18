@@ -1,7 +1,7 @@
 // =============================================================================
 // URTC Firmware - Main CAN receive dispatcher
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 //
 // The HAL callback fired for every received CAN frame. Structure (exactly
 // matching the single-file build): populate rxHeader/rxData, then global

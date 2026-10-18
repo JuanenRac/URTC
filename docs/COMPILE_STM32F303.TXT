@@ -22,9 +22,10 @@ another):
   Main board (STM32F303CCT6, 256KB flash / 40KB SRAM):
     - Bootloader: src/F303-master/boot/  -> URTC_MAIN_BOOTLOADER_v{MAJOR}.{MINOR}.{PATCH}.bin/.hex/.elf
     - Application: src/F303-master/      -> URTC_MAIN_FIRMWARE_v{MAJOR}.{MINOR}.{PATCH}.bin/.hex/.elf
-      (version number in this filename changes on every real build - all
-      4 components are incremental, auto-bumped by bump_version.py before
-      compiling - see the root README's own changelog for the current one)
+      (the version number in this filename changes when a component is
+      raised with the explicit `python bump.py` step - compiling never
+      changes a version; see the root README's own changelog for the
+      current one)
 
   Expansion slave (STM32F303CBT6, 128KB flash / 40KB SRAM, only
   populated on Advanced expansion board variants):
@@ -386,13 +387,14 @@ investigating; a same-size mismatch is very likely just link order.
 -----------------------------------------------------------------------------
 Per this project's own standing conventions (see VERSION_CHECKLIST.txt
 and the root README's own changelog sections):
-  - Any edit to a bootloader's own source requires bumping its own
-    BOOTLOADER_VERSION_MAJOR/MINOR/PATCH in bootloader_common.h /
-    slaveboot_common.h before this rebuild - PATCH+1 normally, rolling
-    to MINOR+1/PATCH=0 past 9.
-  - An application firmware version bump is explicit-request-only, not
-    automatic on every edit - only bump FIRMWARE_VERSION_MAJOR/MINOR in
-    firmware_common.h / slave_common.h when actually asked to.
+  - Compiling NEVER changes a version. Raising one is an explicit step
+    done BEFORE the build: `python bump.py` (all four components) or
+    `python bump.py main-app slave-boot` (only those; `--dry-run` shows
+    the result, `--list` the current versions). It rolls PATCH+1, past 9
+    into MINOR+1/PATCH=0, mirrors an application version into its
+    bootloader's FIRMWARE_VERSION_* copy and keeps urtc.project.json
+    (version and components[]) in step. Any edit to a bootloader's own
+    source calls for raising its BOOTLOADER_VERSION_* this way.
   - Compiled binary FILENAMES DO change with every version bump for all
     4 components now: each carries its own
     <PREFIX>_v{MAJOR}.{MINOR}.{PATCH}.{bin,hex,elf} name (URTC_MAIN_
@@ -402,8 +404,8 @@ and the root README's own changelog sections):
     replaced the older policy (only the main application's filename
     encoded its own version; the 2 bootloaders and the slave application
     were unversioned filenames) - see CHANGELOG.md for when and why.
-    build_firmware.sh/.bat compute each new name directly from
-    bump_version.py's own freshly-bumped MAJOR.MINOR.PATCH output, and
+    build_firmware.sh/.bat compute each name from the header's current
+    MAJOR.MINOR.PATCH (bump_version.py --current, read-only), and
     generate_manifest.py globs for <PREFIX>_v*.bin in firmware/ rather
     than reconstructing the exact name, so it can never drift out of
     sync with what the build scripts actually produced.

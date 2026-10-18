@@ -1,7 +1,7 @@
 // =============================================================================
 // URTC Firmware - main() and boot sequence
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 //
 // This is the entry point of the firmware, which is split across several
 // dozen .c/.h files by responsibility.

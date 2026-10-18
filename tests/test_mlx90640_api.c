@@ -1,7 +1,7 @@
 // =============================================================================
 // URTC Firmware - Host logic tests for MLX90640_API.c
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 // =============================================================================
 // Covers this project's own additions to the vendor sensor API (bounded
 // data-ready polling instead of an unbounded while loop) plus that the

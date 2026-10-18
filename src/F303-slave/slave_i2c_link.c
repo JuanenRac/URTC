@@ -2,7 +2,7 @@
 // URTC Expansion Slave Application Firmware - I2C1 link-bus protocol
 // (application mode)
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 //
 // Same HAL "listen mode" pattern already verified working in this
 // chip's own bootloader (slaveboot_main.c) - variable-length register

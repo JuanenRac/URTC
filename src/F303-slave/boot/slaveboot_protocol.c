@@ -2,7 +2,7 @@
 // URTC Expansion Slave Bootloader - I2C-link protocol handlers, application
 // validation, and jump
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 //
 // The security-critical logic here (CRC32/HMAC/HardwareID verification,
 // anti-rollback, the backup-then-copy A/B sequence, resuming an

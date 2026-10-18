@@ -61,7 +61,7 @@ echo " stale version tags, missing binaries, and leftover retired-scheme files."
 echo " Reports only - never edits anything itself."
 echo ""
 echo " Author:  JuanenRac (Electro Hobby 3D) - electrohobby3d@gmail.com"
-echo " License: GPL-3.0 - source tooling, same category as build_firmware.sh"
+echo " License: GPL-3.0-or-later - source tooling, same category as build_firmware.sh"
 echo "          (see LICENSE at repo root for the full per-content-type split)"
 echo "============================================================================="
 

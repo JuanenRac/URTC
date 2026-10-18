@@ -1,7 +1,7 @@
 // =============================================================================
 // URTC Firmware - Host logic tests for boot/bootloader_crypto.c
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 // =============================================================================
 // The bootloader's HMAC-SHA256 (the image signature check) is compiled
 // unchanged against the fake HAL in tests/host_hal/ and compared with

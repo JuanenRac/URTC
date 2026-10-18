@@ -1,7 +1,7 @@
 // =============================================================================
 // URTC Firmware - FM24CL64B F-RAM parameter-persistence declarations
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 // =============================================================================
 #ifndef FIRMWARE_FRAM_H
 #define FIRMWARE_FRAM_H

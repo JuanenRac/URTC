@@ -1,7 +1,7 @@
 // =============================================================================
 // URTC Firmware - CAN telemetry and communication-watchdog declarations
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 // =============================================================================
 #ifndef FIRMWARE_TELEMETRY_WATCHDOG_H
 #define FIRMWARE_TELEMETRY_WATCHDOG_H

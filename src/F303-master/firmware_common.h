@@ -1,7 +1,7 @@
 // =============================================================================
 // URTC Firmware - Shared types, defines, and cross-module externs
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 // =============================================================================
 #ifndef FIRMWARE_COMMON_H
 #define FIRMWARE_COMMON_H
@@ -29,7 +29,7 @@
 // PATCH+1 on every real build, odometer-carry into MINOR/MAJOR.
 #define FIRMWARE_VERSION_MAJOR 0
 #define FIRMWARE_VERSION_MINOR 3
-#define FIRMWARE_VERSION_PATCH 6
+#define FIRMWARE_VERSION_PATCH 7
 #define FIRMWARE_VERSION_BUILD 0
 
 // ID configuration matrix (physical tool-head address readout)

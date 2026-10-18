@@ -1,7 +1,7 @@
 // =============================================================================
 // URTC Firmware - CONN_EXPANSION bit-banged I2C
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 //
 // Bit-banged I2C master for CONN_EXPANSION's own bus (PB10=SCL, PB11=SDA).
 // Not a hardware I2C peripheral: confirmed against DS9118 Tables 14/15

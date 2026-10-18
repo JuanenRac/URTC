@@ -2,7 +2,7 @@
 # =============================================================================
 # URTC - ci_validate.py
 # Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-# GPL-3.0 - see LICENSE
+# GPL-3.0-or-later - see LICENSE
 # =============================================================================
 """Run the dependency-free, non-destructive CI baseline for one repository."""
 
@@ -196,6 +196,43 @@ def validate_local_markdown_links() -> None:
         preview = "; ".join(broken[:10])
         suffix = "" if len(broken) <= 10 else f" (+{len(broken) - 10} more)"
         fail(f"broken local Markdown link(s): {preview}{suffix}")
+def validate_components(manifest: dict) -> None:
+    """Schema 1.1: components[] must be well formed and each version must equal the one in its source header."""
+    if "components" not in manifest:
+        return
+    if manifest["schema_version"] != "1.1":
+        fail("components[] needs schema_version 1.1")
+    components = manifest["components"]
+    if not isinstance(components, list) or not components:
+        fail("components must be a non-empty list")
+    names: set[str] = set()
+    for index, component in enumerate(components):
+        if not isinstance(component, dict) or not {"name", "kind", "version", "target"} <= set(component):
+            fail(f"components[{index}] needs name, kind, version and target")
+        if component["kind"] not in ("app", "bootloader"):
+            fail(f"components[{index}].kind must be app or bootloader")
+        if not isinstance(component["version"], str) or not SEMVER.fullmatch(component["version"]):
+            fail(f"components[{index}].version must be MAJOR.MINOR.PATCH")
+        if component["name"] in names:
+            fail(f"component name {component['name']!r} is repeated")
+        names.add(component["name"])
+        source = component.get("source")
+        if source is None:
+            continue
+        header = ROOT / str(source.get("file", ""))
+        if not header.is_file():
+            fail(f"components[{index}].source.file {source.get('file')!r} does not exist")
+        text = header.read_text(encoding="utf-8", errors="replace")
+        found = []
+        for part in ("MAJOR", "MINOR", "PATCH"):
+            match = re.search(rf"#define\s+{re.escape(source['prefix'])}_{part}\s+(\d+)", text)
+            if match is None:
+                fail(f"components[{index}]: {source['prefix']}_{part} not found in {source['file']}")
+            found.append(match.group(1))
+        if ".".join(found) != component["version"]:
+            fail(f"component {component['name']} declares {component['version']} but {source['file']} says {'.'.join(found)}")
+
+
 def main() -> int:
     try:
         manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
@@ -215,6 +252,9 @@ def main() -> int:
         fail("manifest technologies must be a non-empty list")
     if not isinstance(manifest["native_version"], dict):
         fail("manifest native_version must be an object")
+    if manifest["schema_version"] not in ("1.0", "1.1"):
+        fail("manifest schema_version must be 1.0 or 1.1")
+    validate_components(manifest)
 
     missing_documents = [name for name in REQUIRED_DOCUMENTS if not (ROOT / name).is_file()]
     if missing_documents:

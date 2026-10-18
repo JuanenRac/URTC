@@ -4,7 +4,7 @@ FINAL PINOUT ASSIGNMENT -  URTC/HYDRA-UMC (JUANENBOT/PAROL6)
 MICROCONTROLLER: STM32F303CCT6 (LQFP48-7x7 Package - 48 Pins, 256KB Flash)
 AUTHOR: JuanenRac (Electro Hobby 3D) - electrohobby3d@gmail.com
 LICENSE: This document is licensed under CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/).
-         Firmware source is GPL-3.0; hardware design files are CERN-OHL-S v2 - see the repo README.
+         Firmware source is GPL-3.0-or-later; hardware design files are CERN-OHL-S v2 - see the repo README.
 NOTE ON PHYSICAL PIN NUMBERS: this document identifies pins by their GPIO
                    signal name (PA0, PB5, etc.) - that's what the firmware
                    actually cares about, and what's verified against the

@@ -1,7 +1,7 @@
 // =============================================================================
 // URTC Firmware - Host logic tests for firmware_can_dispatch.c
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 // =============================================================================
 // The receive callback that every CAN frame goes through: which handlers run,
 // in which order, and above all what the critical-error gate lets through. The

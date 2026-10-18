@@ -1,7 +1,7 @@
 // =============================================================================
 // URTC Bootloader - clock config, CAN init, main loop, and interrupt handlers
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 //
 // This is the entry point of the partitioned build of the bootloader -
 // same behavior as the single-file BOOTLOADER.C, split across several

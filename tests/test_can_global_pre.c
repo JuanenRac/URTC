@@ -1,7 +1,7 @@
 // =============================================================================
 // URTC Firmware - Host logic tests for firmware_can_global_pre.c
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 // =============================================================================
 // The read-only / configuration CAN commands that are answered before the
 // error gate: bootloader entry (0x7F0, magic payload + inline actuator

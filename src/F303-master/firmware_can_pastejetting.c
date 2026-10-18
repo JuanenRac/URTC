@@ -2,7 +2,7 @@
 // URTC Firmware - CAN command handler: Solder Paste Jetting Valve
 // (0x230/0x231, thin wrapper over the expansion slave bridge)
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 //
 // doc #14 - the only one of the 13 new tools
 // requiring the ADVANCED expansion board purely for its own local PWM

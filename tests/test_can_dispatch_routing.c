@@ -1,7 +1,7 @@
 // =============================================================================
 // URTC Firmware - Host logic tests for firmware_can_dispatch_routing.c
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 // =============================================================================
 // Real gap this closes: tests/ covered the MLX90640 sensor API but never
 // the general CAN tool-ID -> handler routing table in

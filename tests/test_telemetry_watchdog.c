@@ -1,7 +1,7 @@
 // =============================================================================
 // URTC Firmware - Host logic tests for firmware_telemetry_watchdog.c
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 // =============================================================================
 // The communication watchdogs (a command that has to be refreshed or the
 // output is cut) and the RPM telemetry. firmware_telemetry_watchdog.c is

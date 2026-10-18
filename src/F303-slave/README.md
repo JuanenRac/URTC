@@ -3,7 +3,7 @@
 **Project:** URTC (Universal Robot Tool Controller) - Expansion Ecosystem
 **Author:** JuanenRac (Electro Hobby 3D) — electrohobby3d@gmail.com
 **License:** This document is CC BY-SA 4.0; the source it describes
-(`src/F303-slave/`) is GPL-3.0. The 3 Melexis MLX9064x-family
+(`src/F303-slave/`) is GPL-3.0-or-later. The 3 Melexis MLX9064x-family
 libraries this firmware links against (`melexis_mlx90640/`,
 `melexis_mlx90641/`, `melexis_mlx90642/`) are all Apache-2.0 - see each
 folder's own `LICENSE_MELEXIS_APACHE2.0` and the repo root README's

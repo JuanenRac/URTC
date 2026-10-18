@@ -1,7 +1,7 @@
 // =============================================================================
 // URTC Firmware - Thermal runaway guard (pure C, no STM32 HAL): thermal_guard.c
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 // =============================================================================
 // See thermal_guard.h for what this adds on top of the existing checks in
 // firmware_control_thermal.c, and tests/test_thermal_guard.c for the

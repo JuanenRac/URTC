@@ -1,7 +1,7 @@
 // =============================================================================
 // URTC Firmware - Global CAN commands, part 1 (answered regardless of active_tool)
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 //
 // Covers 0x7F0 (bootloader entry), 0x7F8 (version query), 0x110 (active
 // tool query), 0x190/191 (F-RAM query), 0x1A0/1A1 (expansion board type) -

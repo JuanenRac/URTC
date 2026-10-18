@@ -1,7 +1,7 @@
 // =============================================================================
 // URTC Firmware - CAN command handler: 3D Printer (0x170-0x178)
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 // =============================================================================
 #include "firmware_common.h"
 #include "firmware_can_printer3d.h"

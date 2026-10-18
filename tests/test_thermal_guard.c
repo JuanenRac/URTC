@@ -1,7 +1,7 @@
 // =============================================================================
 // URTC Firmware - Host logic tests for thermal_guard.c (thermal runaway)
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 // =============================================================================
 // Drives ThermalGuard_Check() with a small simulated plant - a heater, a
 // block with thermal mass losing heat to ambient, and a sensor that can

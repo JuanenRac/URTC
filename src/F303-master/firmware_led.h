@@ -1,7 +1,7 @@
 // =============================================================================
 // URTC Firmware - WS2812B ring LED bit-bang driver declarations
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 // =============================================================================
 #ifndef FIRMWARE_LED_H
 #define FIRMWARE_LED_H

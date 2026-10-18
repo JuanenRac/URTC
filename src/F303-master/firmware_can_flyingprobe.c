@@ -3,7 +3,7 @@
 // (0x240-0x242, ADS1115 access - either direct or via the expansion
 // slave bridge, depending on which board variant is populated)
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 //
 // doc #7 - the only tool with TWO distinct reading paths, not an
 // either/or choice this board makes for the tool head: this tool's own

@@ -1,7 +1,7 @@
 // =============================================================================
 // URTC Firmware - Host logic tests for firmware_can_slavebridge.c
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 // =============================================================================
 // The CAN <-> I2C bridge that lets the host update and query the expansion
 // slave chip through the main board (0x210-0x219, 0x220/0x221). The module is

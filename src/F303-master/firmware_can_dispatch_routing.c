@@ -1,7 +1,7 @@
 // =============================================================================
 // URTC Firmware - Pure, host-testable CAN dispatch routing table
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 //
 // See firmware_can_dispatch_routing.h for the full rationale. The
 // numeric literals below are the real ToolMode_t values from

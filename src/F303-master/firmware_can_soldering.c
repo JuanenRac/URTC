@@ -1,7 +1,7 @@
 // =============================================================================
 // URTC Firmware - CAN command handler: Soldering Iron (0x130)
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 //
 // The wire feeder's own move command (0x120, forward/reverse + step count)
 // is NOT handled here - it's Handle_CAN_MotionTools()'s own shared

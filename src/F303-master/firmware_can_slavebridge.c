@@ -2,7 +2,7 @@
 // URTC Firmware - CAN-to-I2C bridge to the expansion slave chip
 // (0x210-0x219 OTA relay, 0x220-0x221 application register access)
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 //
 // The expansion slave chip (STM32F303CBT6, advanced boards only) has no
 // CAN peripheral of its own - every byte the Flasher's OTA protocol

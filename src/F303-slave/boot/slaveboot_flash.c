@@ -2,7 +2,7 @@
 // URTC Expansion Slave Bootloader - CRC32, flash program/erase, and
 // metadata persistence
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 //
 // CRC32/flash/metadata logic here is intentionally near-identical to the
 // main board's own bootloader_flash.c - same algorithms, same endurance

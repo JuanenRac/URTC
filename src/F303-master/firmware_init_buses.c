@@ -1,7 +1,7 @@
 // =============================================================================
 // URTC Firmware - Peripheral bus init: I2C2, DMA, SPI1
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 // =============================================================================
 #include "firmware_common.h"
 #include "firmware_init_buses.h"

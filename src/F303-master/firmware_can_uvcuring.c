@@ -1,7 +1,7 @@
 // =============================================================================
 // URTC Firmware - CAN command handler: UV Curing Head (0x1D0)
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 //
 // doc #8 - high-power UV LED driver for instant
 // glue/mask curing. TIM1_CH1 (PA8/DRILL_PWM_PORT) is a real hardware PWM

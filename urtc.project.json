@@ -1,8 +1,8 @@
 {
-  "schema_version": "1.0",
+  "schema_version": "1.1",
   "ecosystem": "URTC",
   "name": "URTC",
-  "version": "0.3.6",
+  "version": "0.3.7",
   "role": "firmware",
   "stack": "firmware-c",
   "technologies": [
@@ -10,7 +10,7 @@
     "bxCAN",
     "25 tool profiles"
   ],
-  "deployment_target": "user-pc",
+  "deployment_target": "mcu",
   "maturity": "functional",
   "family": "URTC Tool Platform",
   "parent": null,
@@ -24,5 +24,47 @@
       "patch": "#define\\s+FIRMWARE_VERSION_PATCH\\s+(\\d+)",
       "build": "#define\\s+FIRMWARE_VERSION_BUILD\\s+(\\d+)"
     }
-  }
+  },
+  "components": [
+    {
+      "name": "URTC_MAIN_FIRMWARE",
+      "kind": "app",
+      "version": "0.3.7",
+      "target": "stm32f303cc",
+      "source": {
+        "file": "src/F303-master/firmware_common.h",
+        "prefix": "FIRMWARE_VERSION"
+      }
+    },
+    {
+      "name": "URTC_MAIN_BOOTLOADER",
+      "kind": "bootloader",
+      "version": "0.4.0",
+      "target": "stm32f303cc",
+      "source": {
+        "file": "src/F303-master/boot/bootloader_common.h",
+        "prefix": "BOOTLOADER_VERSION"
+      }
+    },
+    {
+      "name": "URTC_SLAVE_FIRMWARE",
+      "kind": "app",
+      "version": "0.2.2",
+      "target": "stm32f303cb",
+      "source": {
+        "file": "src/F303-slave/slave_common.h",
+        "prefix": "FIRMWARE_VERSION"
+      }
+    },
+    {
+      "name": "URTC_SLAVE_BOOTLOADER",
+      "kind": "bootloader",
+      "version": "0.2.4",
+      "target": "stm32f303cb",
+      "source": {
+        "file": "src/F303-slave/boot/slaveboot_common.h",
+        "prefix": "BOOTLOADER_VERSION"
+      }
+    }
+  ]
 }

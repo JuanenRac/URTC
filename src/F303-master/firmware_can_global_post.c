@@ -1,7 +1,7 @@
 // =============================================================================
 // URTC Firmware - Global CAN commands, part 2 (blocked during a critical error)
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 //
 // Covers 0x180/181 (expansion SPI passthrough), 0x182/183 (DIAG0 query),
 // 0x192 (F-RAM erase), 0x100 (lighting/OLED mode) - everything between

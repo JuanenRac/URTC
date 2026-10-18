@@ -1,7 +1,7 @@
 // =============================================================================
 // URTC Firmware - Host logic tests for firmware_persistence.c and firmware_fram.c
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 // =============================================================================
 // The saved state that survives a power cycle: the record checksum against an
 // independent CRC-8/SMBUS, what a load accepts and rejects (blank chip, other

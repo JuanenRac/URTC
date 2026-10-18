@@ -2,7 +2,7 @@
 // URTC Expansion Slave Bootloader - Entry point, clock/peripheral init, and
 // I2C1 slave-mode interrupt handling
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 //
 // DESIGN NOTE this file commits to, flagged for confirmation same as any
 // other hardware assumption in this project: this chip runs entirely from

@@ -369,7 +369,7 @@ URTC 的闪存被拆分为两个独立部分，因此板卡可以通过它已经
 - 扩展从属应用（`src/F303-slave/`，STM32F303CBT6）：[`src/F303-slave/CHANGELOG.md`](src/F303-slave/CHANGELOG.md)
 - 扩展从属引导程序（`src/F303-slave/boot/`）：[`src/F303-slave/boot/CHANGELOG.md`](src/F303-slave/boot/CHANGELOG.md)
 
-**版本管理策略：** 全部 4 个组件（2 个应用固件、2 个引导程序——`FIRMWARE_VERSION_MAJOR`/`MINOR`/`PATCH` 和 `BOOTLOADER_VERSION_MAJOR`/`MINOR`/`PATCH`）都是**递增式**的——每次真正的构建都会自动将该组件自身的 `PATCH` 加 1（仓库根目录下的 `bump_version.py`，在编译每个组件之前由 `build_firmware.sh`/`.bat` 调用），一旦 `PATCH` 会超过 9，就进位到 `MINOR`（然后是 `MAJOR`），与汽车自身里程表使用的相同十进制“里程表”规则一致——例如 `0.1.7` → `0.1.8` → `0.1.9` → `0.2.0`，绝不会是 `0.1.10`。每个引导程序还保留一份对应应用程序 `FIRMWARE_VERSION_*` 的自身副本，由同一次递增自动保持同步。全部 4 个组件当前版本的一览见仓库根目录下的 [`CHANGELOG.md`](CHANGELOG.md)，每条轨道完整的运作机制见 [`VERSION_CHECKLIST.txt`](VERSION_CHECKLIST.txt)。
+**版本管理策略：** 全部 4 个组件（2 个应用固件、2 个引导程序——`FIRMWARE_VERSION_MAJOR`/`MINOR`/`PATCH` 和 `BOOTLOADER_VERSION_MAJOR`/`MINOR`/`PATCH`）都是**递增式**的——该组件自身的 `PATCH` 只会通过显式的 `python bump.py` 步骤加 1（由它调用仓库根目录下的 `bump_version.py`），编译从不改变版本，一旦 `PATCH` 会超过 9，就进位到 `MINOR`（然后是 `MAJOR`），与汽车自身里程表使用的相同十进制“里程表”规则一致——例如 `0.1.7` → `0.1.8` → `0.1.9` → `0.2.0`，绝不会是 `0.1.10`。每个引导程序还保留一份对应应用程序 `FIRMWARE_VERSION_*` 的自身副本，由同一次递增自动保持同步。全部 4 个组件当前版本的一览见仓库根目录下的 [`CHANGELOG.md`](CHANGELOG.md)，每条轨道完整的运作机制见 [`VERSION_CHECKLIST.txt`](VERSION_CHECKLIST.txt)。
 
 ## 🔍 当前状态
 
@@ -537,7 +537,8 @@ URTC 的闪存被拆分为两个独立部分，因此板卡可以通过它已经
 │                                完整手动流程见 docs/COMPILE_STM32F303.TXT
 ├── build-test.sh / build-test.bat  不递增版本号的构建/编译检查
 │                                （tools/build_test.py 的轻量包装）
-├── bump_version.py              里程表式版本递增，由 build_firmware.sh/.bat 运行
+├── bump.py                      显式的版本递增命令（编译从不递增）
+├── bump_version.py              单个头文件的里程表式递增，由 bump.py 调用
 ├── bump_manifest_version.py     将 urtc.project.json 的版本与原生版本同步（--sync）
 ├── generate_manifest.py         重新生成 firmware/firmware_manifest.json——
 │                                作为完整 build_firmware.sh/.bat 运行的最后
@@ -659,12 +660,12 @@ URTC 版权所有 (c) 2026 JuanenRac（Electro Hobby 3D）。分发本项目或�
 
 由于本项目由几种不同类型的内容组成，各个部分依据不同的许可证提供——各自适合其实际所涵盖的内容，而不是强行用一种许可证套用一切：
 
-1. 位于 `./firmware` 的**固件**（应用程序和 CAN 引导程序均在内）依据 **GNU 通用公共许可证 v3.0（GPL-3.0）** 提供。完整文本见 https://www.gnu.org/licenses/gpl-3.0.html。
+1. 位于 `./firmware` 的**固件**（应用程序和 CAN 引导程序均在内）依据 **GNU 通用公共许可证 v3.0（GPL-3.0-or-later）** 提供。完整文本见 https://www.gnu.org/licenses/gpl-3.0.html。
 
 2. **硬件设计**（Eagle 原理图/板卡文件、Gerber 文件，以及 `./PCB` 和 `./3D` 下可 3D 打印的部件）依据 **CERN 开放硬件许可证 v2 - 强互惠版（CERN-OHL-S v2）** 提供。完整文本见 https://cern-ohl.web.cern.ch/。
 
 3. **文档**（本 README 及其自身的翻译版本——`README_spa.md`、`README_ita.md`、`README_fra.md`、`README_deu.md`、`README_zho.md`、`README_jpn.md`——加上 `./docs` 下的参考文件）依据 **知识共享 署名-相同方式共享 4.0 国际许可协议（CC BY-SA 4.0）** 提供。完整文本见 https://creativecommons.org/licenses/by-sa/4.0/。
 
-如果你基于本项目进行开发，请留意这种许可证划分：对固件的代码更改应保持 GPL-3.0，硬件改动应保持 CERN-OHL-S，文档衍生品应保持 CC BY-SA——每一项都需附带指向本项目的署名。
+如果你基于本项目进行开发，请留意这种许可证划分：对固件的代码更改应保持 GPL-3.0-or-later，硬件改动应保持 CERN-OHL-S，文档衍生品应保持 CC BY-SA——每一项都需附带指向本项目的署名。
 
 本仓库仅涵盖 URTC 板卡自身的固件和硬件——曾经存在于此的 PC 工具（URTC Flasher、URTC Tester）如今是拥有各自许可证的独立项目，见上方“PC 工具”一节。

@@ -3,7 +3,7 @@
 **Project:** URTC (Universal Robot Tool Controller)
 **Author:** JuanenRac (Electro Hobby 3D) — electrohobby3d@gmail.com
 **License:** This document is CC BY-SA 4.0; the source it describes
-(`src/F303-master/`, `src/F303-master/boot/`) is GPL-3.0. See the repo
+(`src/F303-master/`, `src/F303-master/boot/`) is GPL-3.0-or-later. See the repo
 root README's "License and Copyright Notices" section for the full
 breakdown.
 

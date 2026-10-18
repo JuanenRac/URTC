@@ -1,7 +1,7 @@
 // =============================================================================
 // URTC Firmware - Fake STM32F3 HAL for host-side tests: stm32f3xx_hal.h
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 // =============================================================================
 // Just enough of the ST HAL surface for the firmware modules that the host
 // tests compile unchanged (bootloader_crypto.c, firmware_can_global_pre.c).

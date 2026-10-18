@@ -1,7 +1,7 @@
 // =============================================================================
 // URTC Bootloader - OLED status display (SSD1306/SSD1315, I2C1)
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 // =============================================================================
 #include "stm32f3xx_hal.h"
 #include "bootloader_common.h"

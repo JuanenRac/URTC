@@ -1,6 +1,6 @@
 ===============================================================================
  URTC - FIRMWARE SIGNING (keys, signatures and how images are verified)
- Copyright (C) 2026 JuanenRac (Electro Hobby 3D) - GPL-3.0
+ Copyright (C) 2026 JuanenRac (Electro Hobby 3D) - GPL-3.0-or-later
 ===============================================================================
 
 STATUS (read this first)

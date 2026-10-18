@@ -2,7 +2,7 @@
 # =============================================================================
 # URTC - check that the vendored Melexis drivers are identical on both chips
 # Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-# GPL-3.0 - see LICENSE
+# GPL-3.0-or-later - see LICENSE
 # =============================================================================
 # The main board (src/F303-master/) and the expansion slave (src/F303-slave/)
 # each compile their own copy of the Melexis MLX9064x drivers - the two

@@ -12,11 +12,13 @@ either round's mistakes. Read this top-to-bottom before touching
 anything; don't just grep for the old number and replace it blindly -
 several of these entries explain why a match should NOT change.
 
-AMENDMENT: Track A's application-firmware version is no longer "bumped
-only on explicit request" (see that section below) - it's now
-mechanized and incremental, same odometer-carry mechanism as Tracks C/E
-(bump_version.py at the repo root, called by build_firmware.sh/.bat
-before compiling each of the 4 components). Flasher and Tester also no
+AMENDMENT: compiling never changes a version any more. The 4 component
+versions are still mechanized and incremental (same odometer-carry
+mechanism for Tracks A/C/E, bump_version.py at the repo root), but they are
+raised by the explicit command `python bump.py` (all four, or the named
+ones; --dry-run, --list), run BEFORE build_firmware.sh/.bat, which only
+read them. Wherever the text below says a build "bumps" a version, read it
+as "bump.py bumps". Flasher and Tester also no
 longer live in this repo under tools/ - they're the separate
 URTC-FLASHER and URTC-TESTER repos now, each with its own independent
 version. Several path references below (tools/flasher/, tools/tester/)
@@ -317,7 +319,7 @@ recognize and leave alone, not "fix")
   - Changelog entries - historical record by definition, describes
     what a past version WAS, not what the current one is
   - License version numbers that aren't this project's own: "CC BY-SA
-    4.0", "GPL-3.0", "CERN-OHL-S v2", "Apache License, Version 2.0" (the
+    4.0", "GPL-3.0-or-later", "CERN-OHL-S v2", "Apache License, Version 2.0" (the
     3 vendored Melexis sensor libraries' own license header)
   - Binary file metadata embedded by unrelated third-party tools (found
     once: a JPEG's own "CREATOR: gd-jpeg v1.0" EXIF-adjacent string -

@@ -2,7 +2,7 @@
 // URTC Firmware - MLX90642 application-level capture (Basic+MLX9064x
 // expansion board, direct connection, expansion_board_type==6)
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 //
 // Genuinely simpler than this project's own MLX90640/MLX90641 support:
 // this sensor calculates temperature onboard itself rather than

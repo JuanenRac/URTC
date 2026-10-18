@@ -1,7 +1,7 @@
 // =============================================================================
 // URTC Firmware - Minimal host-side test harness: test_runner.h
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 // =============================================================================
 // No external test framework, on purpose: these tests compile and run with
 // the *host's* plain gcc/cc, never arm-none-eabi-gcc. They exercise the

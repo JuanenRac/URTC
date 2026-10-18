@@ -1,7 +1,7 @@
 // =============================================================================
 // URTC Firmware - Direct ADS1115 driver (Basic+ADS1115 expansion board)
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 //
 // doc #7 (Functional Testing Head)'s own "advanced reading" path
 // normally goes through the expansion slave chip's own local sensor bus,

@@ -1,7 +1,7 @@
 // =============================================================================
 // URTC Firmware - Low-level OLED (SSD1306/SSD1315) driver declarations
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 // =============================================================================
 #ifndef FIRMWARE_OLED_DRIVER_H
 #define FIRMWARE_OLED_DRIVER_H

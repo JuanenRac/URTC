@@ -1,7 +1,7 @@
 // =============================================================================
 // URTC Firmware - HardFault handler (all-actuator emergency shutdown)
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 // =============================================================================
 #include "firmware_common.h"
 #include "firmware_interrupts_fault.h"

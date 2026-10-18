@@ -2,7 +2,7 @@
 // URTC Firmware - CAN command handler: Wire Harnessing/Crimping
 // Actuator (0x1F0)
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 //
 // doc #12 - high-torque jaw for stripping wires or
 // crimping terminals, driven off a BASIC expansion board's own driver

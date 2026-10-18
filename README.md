@@ -383,7 +383,7 @@ together:
 - Expansion Slave application (`src/F303-slave/`, STM32F303CBT6): [`src/F303-slave/CHANGELOG.md`](src/F303-slave/CHANGELOG.md)
 - Expansion Slave bootloader (`src/F303-slave/boot/`): [`src/F303-slave/boot/CHANGELOG.md`](src/F303-slave/boot/CHANGELOG.md)
 
-**Versioning policy:** all 4 components (2 application firmwares, 2 bootloaders - `FIRMWARE_VERSION_MAJOR`/`MINOR`/`PATCH` and `BOOTLOADER_VERSION_MAJOR`/`MINOR`/`PATCH`) are **incremental** - every real build automatically bumps that component's own `PATCH` by 1 (`bump_version.py` at the repo root, called by `build_firmware.sh`/`.bat` right before compiling each component), carrying into `MINOR` (then `MAJOR`) once `PATCH` would pass 9, the same base-10 "odometer" rule a car's own odometer uses - e.g. `0.1.7` → `0.1.8` → `0.1.9` → `0.2.0`, never `0.1.10`. Each bootloader also keeps its own copy of the matching application's `FIRMWARE_VERSION_*`, kept in sync automatically by the same bump. See [`CHANGELOG.md`](CHANGELOG.md) at the repo root for the current version of all 4 components at a glance, and [`VERSION_CHECKLIST.txt`](VERSION_CHECKLIST.txt) for the full per-track mechanics.
+**Versioning policy:** all 4 components (2 application firmwares, 2 bootloaders - `FIRMWARE_VERSION_MAJOR`/`MINOR`/`PATCH` and `BOOTLOADER_VERSION_MAJOR`/`MINOR`/`PATCH`) are **incremental** - each component's own `PATCH` is raised by 1 only by the explicit `python bump.py` step (which uses `bump_version.py` at the repo root); compiling never changes a version, carrying into `MINOR` (then `MAJOR`) once `PATCH` would pass 9, the same base-10 "odometer" rule a car's own odometer uses - e.g. `0.1.7` → `0.1.8` → `0.1.9` → `0.2.0`, never `0.1.10`. Each bootloader also keeps its own copy of the matching application's `FIRMWARE_VERSION_*`, kept in sync automatically by the same bump. See [`CHANGELOG.md`](CHANGELOG.md) at the repo root for the current version of all 4 components at a glance, and [`VERSION_CHECKLIST.txt`](VERSION_CHECKLIST.txt) for the full per-track mechanics.
 
 ## 🔍 Current Status
 
@@ -551,7 +551,8 @@ If anyone in the community is working on custom end-effectors, smart tool-change
 │                                the full manual process either script automates
 ├── build-test.sh / build-test.bat  Non-versioning build/compile check (thin wrappers
 │                                around tools/build_test.py)
-├── bump_version.py              Odometer-style version bump, run by build_firmware.sh/.bat
+├── bump.py                      Explicit version bump command (compiling never bumps)
+├── bump_version.py              Odometer-style version bump of one header, called by bump.py
 ├── bump_manifest_version.py     Syncs urtc.project.json's version to the native one (--sync)
 ├── generate_manifest.py         Regenerates firmware/firmware_manifest.json - called
 │                                automatically as the last step of a full
@@ -673,12 +674,12 @@ URTC is (c) 2026 JuanenRac (Electro Hobby 3D). This notice must be included in a
 
 Because this project consists of several different types of content, individual parts are made available under different licenses - each suited to what it actually covers, rather than forcing one license to fit everything:
 
-1. The **firmware** located at `./firmware` (application and CAN bootloader alike) is available under the **GNU General Public License v3.0 (GPL-3.0)**. Full text at https://www.gnu.org/licenses/gpl-3.0.html.
+1. The **firmware** located at `./firmware` (application and CAN bootloader alike) is available under the **GNU General Public License v3.0 (GPL-3.0-or-later)**. Full text at https://www.gnu.org/licenses/gpl-3.0.html.
 
 2. The **hardware designs** (Eagle schematic/board files, gerbers, and the 3D-printable parts under `./PCB` and `./3D`) are available under the **CERN Open Hardware Licence v2 - Strongly Reciprocal (CERN-OHL-S v2)**. Full text at https://cern-ohl.web.cern.ch/.
 
 3. The **documentation** (this README and its own translations - `README_spa.md`, `README_ita.md`, `README_fra.md`, `README_deu.md`, `README_zho.md`, `README_jpn.md` - plus the reference files under `./docs`) is available under **Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)**. Full text at https://creativecommons.org/licenses/by-sa/4.0/.
 
-If you build on this project, keep the licensing split in mind: code changes to the firmware should stay GPL-3.0, hardware modifications should stay CERN-OHL-S, and documentation derivatives should stay CC BY-SA - each with attribution back to this project.
+If you build on this project, keep the licensing split in mind: code changes to the firmware should stay GPL-3.0-or-later, hardware modifications should stay CERN-OHL-S, and documentation derivatives should stay CC BY-SA - each with attribution back to this project.
 
 This repository covers the URTC board's own firmware and hardware only - the PC tools (URTC Flasher, URTC Tester) that used to live here are now independent projects with their own licensing, see "PC Tools" above.

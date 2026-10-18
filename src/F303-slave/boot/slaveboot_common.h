@@ -2,7 +2,7 @@
 // URTC Expansion Slave Bootloader - Shared types, defines, and cross-module
 // externs
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 //
 // Runs on the STM32F303CBT6 populating the ADVANCED expansion board variants
 // (the 2 basic variants carry only a stepper driver, no MCU at all - this
@@ -67,7 +67,7 @@ extern I2C_HandleTypeDef hi2c1;
 // application is built - never edit this by hand.
 #define FIRMWARE_VERSION_MAJOR 0
 #define FIRMWARE_VERSION_MINOR 2
-#define FIRMWARE_VERSION_PATCH 1
+#define FIRMWARE_VERSION_PATCH 2
 
 // BOOTLOADER_VERSION_* describes THIS bootloader binary itself - separate
 // from FIRMWARE_VERSION_MAJOR/MINOR above, which is the version of

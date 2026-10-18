@@ -2,7 +2,7 @@
 // URTC Firmware - MLX90642 platform transport layer (Basic+MLX9064x
 // expansion board, direct connection)
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 //
 // The 3 functions Melexis's own vendored library (melexis_mlx90642/)
 // expects a platform to provide - MLX90642_I2CRead/I2CWrite/Wait_ms, per

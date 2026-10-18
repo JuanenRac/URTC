@@ -1,7 +1,7 @@
 // =============================================================================
 // URTC Firmware - Lifetime thermal counters (pure C, no STM32 HAL): thermal_stats.h
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 // =============================================================================
 // How many thermal runaway faults this board has ever latched, the last one,
 // and the total time its heater output has been ON. The black box

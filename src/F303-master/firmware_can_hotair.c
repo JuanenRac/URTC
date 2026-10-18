@@ -1,7 +1,7 @@
 // =============================================================================
 // URTC Firmware - CAN command handler: Hot Air Rework Nozzle (0x1E0)
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 //
 // doc #10 - heating element, air turbine blower,
 // thermocouple feedback for reflowing misaligned SMD parts.

@@ -2,7 +2,7 @@
 // URTC Firmware - MLX90641 application-level capture (Basic+MLX9064x
 // expansion board, direct connection, expansion_board_type==6)
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 //
 // Same capture/chunk-serving design as the expansion slave chip's own
 // MLX90640 support (slave_i2c_sensors.c) - trigger a measurement, pull

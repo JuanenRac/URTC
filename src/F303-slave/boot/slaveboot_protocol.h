@@ -2,7 +2,7 @@
 // URTC Expansion Slave Bootloader - I2C-link protocol handlers, application
 // validation, and jump declarations
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 // =============================================================================
 #ifndef SLAVEBOOT_PROTOCOL_H
 #define SLAVEBOOT_PROTOCOL_H

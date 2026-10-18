@@ -2,7 +2,7 @@
 // URTC Firmware - MLX90640 platform transport layer (Basic+MLX9064x
 // expansion board, direct connection)
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 //
 // The 5 functions Melexis's own vendored library (melexis_mlx90640/)
 // expects a platform to provide - MLX90640_I2CInit/GeneralReset/Read/

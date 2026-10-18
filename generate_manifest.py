@@ -4,7 +4,7 @@
 #
 # PROJECT: URTC (Universal Robot Tool Controller)
 # AUTHOR: JuanenRac (Electro Hobby 3D) - electrohobby3d@gmail.com
-# LICENSE: GPL-3.0 (same as the firmware this indexes - see LICENSE at repo root)
+# LICENSE: GPL-3.0-or-later (same as the firmware this indexes - see LICENSE at repo root)
 #
 # Reads every component's own real version straight from its own source
 # header (never hardcoded here) and computes a fresh CRC32 over each real

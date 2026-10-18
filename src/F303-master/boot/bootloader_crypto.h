@@ -1,7 +1,7 @@
 // =============================================================================
 // URTC Bootloader - SHA-256 / HMAC-SHA256 declarations
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 // =============================================================================
 #ifndef BOOTLOADER_CRYPTO_H
 #define BOOTLOADER_CRYPTO_H

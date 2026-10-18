@@ -3,7 +3,7 @@ CAN BUS COMMAND MAP - URTC (UNIVERSAL ROBOT TOOL CONTROLLER)
 PROJECTS: URTC/HYDRA-UMC (JUANENBOT/PAROL6)
 AUTHOR: JuanenRac (Electro Hobby 3D) - electrohobby3d@gmail.com
 LICENSE: This document is licensed under CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/).
-         Firmware source is GPL-3.0; hardware design files are CERN-OHL-S v2 - see the repo README.
+         Firmware source is GPL-3.0-or-later; hardware design files are CERN-OHL-S v2 - see the repo README.
 MCU: STM32F303CCT6 (256KB flash: 30KB bootloader / 2KB metadata / 112KB main
      application slot / 112KB backup-staging slot). Tool addressing covers
      32 IDs (ID0-ID4).

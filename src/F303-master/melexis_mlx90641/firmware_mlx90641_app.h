@@ -2,7 +2,7 @@
 // URTC Firmware - MLX90641 application-level capture (Basic+MLX9064x
 // expansion board, direct connection)
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 // =============================================================================
 #ifndef FIRMWARE_MLX90641_APP_H
 #define FIRMWARE_MLX90641_APP_H

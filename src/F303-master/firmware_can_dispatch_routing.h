@@ -1,7 +1,7 @@
 // =============================================================================
 // URTC Firmware - Pure, host-testable CAN dispatch routing table
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
-// GPL-3.0 - see LICENSE
+// GPL-3.0-or-later - see LICENSE
 //
 // Real gap this closes: tests/ covers the MLX90640 sensor API on host, but
 // nothing ever exercised the actual tool-ID -> handler routing table in

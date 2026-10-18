@@ -3,7 +3,7 @@ BILL OF MATERIALS (BOM) - URTC EXPANSION BOARD, BASIC + ADS1115 VARIANT
 ================================================================================
 AUTHOR: JuanenRac (Electro Hobby 3D) - electrohobby3d@gmail.com
 LICENSE: This document is licensed under CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/).
-         Firmware source is GPL-3.0; hardware design files (once drawn)
+         Firmware source is GPL-3.0-or-later; hardware design files (once drawn)
          will be CERN-OHL-S v2, same as the main URTC board - see the
          repo README.
 VARIANT: BASIC, sensor-only - no stepper driver, no MCU. Carries the
