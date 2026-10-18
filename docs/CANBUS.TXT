@@ -907,6 +907,12 @@ Data:
         application-mode register while the slave is still in its own
         bootloader gets no response, same silent-failure convention as
         everywhere else in this bridge.
+  Closed register list: the bridge relays only the registers below with
+        the exact payload length shown (src/common/urtc_slave_regs.h);
+        any other register, any other length, and in particular
+        REG_ENTER_BOOTLOADER (0x02), are dropped without an answer.
+          0x10 (0 bytes) 0x12 (1) 0x13 (1) 0x14 (1) 0x20 (2) 0x21 (0)
+          0x30 (3) 0x31 (3) 0x32 (1)
 
 ID: 0x221 [Master -> URTC Tool Head, or URTC Tool Head -> Master answering 0x221]
 Read slave application register (generic)
@@ -919,6 +925,10 @@ Data (request):
                documented response length)
 Data (response): Whatever the named register returned, exactly as many
                   bytes as requested.
+  Closed register list: only 0x00 (max 1 byte), 0x01 (10), 0x11 (1),
+        0x12 (32), 0x13 (32), 0x14 (1) and 0x22 (2) can be read; a length of
+        0 or above the register's maximum, or any other register, gets no
+        answer. One response frame still carries at most 8 bytes.
 
 ID: 0x230 [Master -> URTC Tool Head]
 Solder Paste Jetting Valve local PWM configuration

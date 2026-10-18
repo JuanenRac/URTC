@@ -12,7 +12,7 @@ pra = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(pra)
 
 
-def make_component(fw: Path, stem: str, version: str, data: bytes, application: bool):
+def make_component(fw: Path, stem: str, version: str, data: bytes, application: bool, kind: str = "production"):
     image = fw / f"{stem}_v{version}.bin"
     image.write_bytes(data)
     (fw / f"{stem}_v{version}.hex").write_text(":00000001FF\n")
@@ -22,6 +22,7 @@ def make_component(fw: Path, stem: str, version: str, data: bytes, application: 
     manifest = {"version": version, "sha256": digest}
     if application:
         manifest["hmac_sha256"] = "ab" * 32
+        manifest["signing_key_kind"] = kind
     (fw / (image.name + ".manifest.json")).write_text(json.dumps(manifest))
     return {"version_string": version, "files": {"bin": {"filename": image.name, "sha256": digest}}}
 
@@ -68,6 +69,21 @@ class PublishPlanTests(unittest.TestCase):
         self.write_index(comp)
         plan = pra.build_plan(self.root, self.fw, False, "o/r")
         self.assertTrue(any("hmac_sha256" in p for p in plan["problems"]))
+
+    def test_development_key_is_refused_as_official_and_allowed_as_prerelease(self):
+        comp = {"main_application": make_component(self.fw, "URTC_MAIN_FIRMWARE", "1.2.3", b"app", True, "dev")}
+        self.write_index(comp)
+        plan = pra.build_plan(self.root, self.fw, False, "o/r")
+        self.assertTrue(any("production" in p for p in plan["problems"]))
+        bench = pra.build_plan(self.root, self.fw, False, "o/r", allow_dev_key=True)
+        self.assertEqual(bench["problems"], [])
+        self.assertTrue(bench["prerelease"])
+        self.assertIn("--prerelease", pra.gh_command(bench))
+        comp = {"main_application": make_component(self.fw, "URTC_MAIN_FIRMWARE", "1.2.3", b"app", True)}
+        self.write_index(comp)
+        official = pra.build_plan(self.root, self.fw, False, "o/r")
+        self.assertFalse(official["prerelease"])
+        self.assertNotIn("--prerelease", pra.gh_command(official))
 
     def test_missing_hex_is_reported(self):
         comp = {"main_bootloader": make_component(self.fw, "URTC_MAIN_BOOTLOADER", "1.0.1", b"boot", False)}

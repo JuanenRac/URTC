@@ -23,7 +23,10 @@ Two layouts are understood:
   * no firmware_manifest.json: URTC_*_FIRMWARE_v<version>.bin and .hex of the
     project version; a missing .sha256 sidecar is written next to the image.
 .elf files are listed only with --with-elf.
-Exit status 1 when anything is missing or inconsistent.
+A release whose application images are signed with the public development key
+is refused as an official release: it can only be published as a pre-release
+("bench") with --allow-dev-key, and the printed command then carries
+--prerelease. Exit status 1 when anything is missing or inconsistent.
 """
 from __future__ import annotations
 
@@ -65,7 +68,7 @@ def repo_slug(root: Path, name: str) -> str:
     return f"{match.group(1)}/{match.group(2)}" if match else f"{DEFAULT_OWNER}/{name}"
 
 
-def collect_with_index(fw_dir: Path, with_elf: bool, problems: list[str]) -> list[Path]:
+def collect_with_index(fw_dir: Path, with_elf: bool, problems: list[str], dev_keys: list[str] | None = None) -> list[Path]:
     index = json.loads((fw_dir / "firmware_manifest.json").read_text(encoding="utf-8"))
     files: list[Path] = []
     for key, component in index.get("components", {}).items():
@@ -95,6 +98,10 @@ def collect_with_index(fw_dir: Path, with_elf: bool, problems: list[str]) -> lis
             problems.append(f"{key}: file name {bin_name} does not carry version {component.get('version_string')}")
         if key.endswith("_application") and not data.get("hmac_sha256"):
             problems.append(f"{key}: application image without a published hmac_sha256")
+        if key.endswith("_application") and dev_keys is not None:
+            kind = data.get("signing_key_kind") or component.get("signing", {}).get("key_kind")
+            if kind != "production":
+                dev_keys.append(f"{key}: signed with key kind {kind!r}, not a production key")
         files.extend(path for path in wanted if path.is_file())
     files.append(fw_dir / "firmware_manifest.json")
     return files
@@ -123,22 +130,29 @@ def collect_single(fw_dir: Path, version: str, with_elf: bool, problems: list[st
     return files
 
 
-def build_plan(root: Path, fw_dir: Path, with_elf: bool, repo: str | None) -> dict:
+def build_plan(root: Path, fw_dir: Path, with_elf: bool, repo: str | None, allow_dev_key: bool = False) -> dict:
     name, version = project_info(root)
     problems: list[str] = []
+    dev_keys: list[str] = []
     if not fw_dir.is_dir():
         problems.append(f"{fw_dir} does not exist (run build_firmware.sh without HYDRA_UMC_CI)")
         files: list[Path] = []
     elif (fw_dir / "firmware_manifest.json").is_file():
-        files = collect_with_index(fw_dir, with_elf, problems)
+        files = collect_with_index(fw_dir, with_elf, problems, dev_keys)
     else:
         files = collect_single(fw_dir, version, with_elf, problems)
+    prerelease = bool(dev_keys)
+    if prerelease and not allow_dev_key:
+        for item in dev_keys:
+            problems.append(f"{item}; an official release needs production-signed images "
+                            "(use --allow-dev-key to publish a bench pre-release)")
     slug = repo or repo_slug(root, name)
     tag = f"v{version}"
     return {
         "repository": slug,
         "tag": tag,
         "title": f"{name} {tag}",
+        "prerelease": prerelease,
         "files": [Path(os.path.relpath(path, root)).as_posix() for path in files],
         "problems": problems,
     }
@@ -146,6 +160,8 @@ def build_plan(root: Path, fw_dir: Path, with_elf: bool, repo: str | None) -> di
 
 def gh_command(plan: dict) -> str:
     head = f'gh release create {plan["tag"]} --repo {plan["repository"]} --title "{plan["title"]}" --notes-file RELEASE_NOTES.md'
+    if plan.get("prerelease"):
+        head += " --prerelease"
     continuation = " " + chr(92) + chr(10)
     return continuation.join([head] + [f'  "{path}"' for path in plan["files"]])
 
@@ -155,10 +171,12 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--firmware-dir", default=None, help="folder with the built images (default: firmware/)")
     parser.add_argument("--with-elf", action="store_true", help="also attach the .elf files")
     parser.add_argument("--repo", default=None, help="OWNER/NAME of the GitHub repository (default: from the origin remote)")
+    parser.add_argument("--allow-dev-key", action="store_true",
+                        help="allow images signed with the public development key, as a pre-release only")
     parser.add_argument("--json", action="store_true", help="print the plan as JSON instead of text")
     args = parser.parse_args(argv)
     fw_dir = Path(args.firmware_dir) if args.firmware_dir else ROOT / "firmware"
-    plan = build_plan(ROOT, fw_dir, args.with_elf, args.repo)
+    plan = build_plan(ROOT, fw_dir, args.with_elf, args.repo, args.allow_dev_key)
     if args.json:
         print(json.dumps(plan, indent=2))
     else:

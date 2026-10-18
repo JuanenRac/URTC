@@ -1,5 +1,5 @@
 # =============================================================================
-# HYDRA-UMC / URTC Ecosystem - Software bug report form
+# URTC Ecosystem - Software bug report form
 # Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
 # GPL-3.0 - see LICENSE.md
 # =============================================================================
@@ -12,8 +12,8 @@ body:
     id: repository
     attributes:
       label: Affected repository
-      description: Exact repository name, for example HYDRA-UMC-SERVER.
-      placeholder: HYDRA-UMC-SERVER
+      description: Exact repository name, for example URTC-TESTER.
+      placeholder: URTC-TESTER
     validations:
       required: true
   - type: dropdown

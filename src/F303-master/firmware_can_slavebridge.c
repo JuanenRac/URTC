@@ -29,6 +29,7 @@
 #include "firmware_can_slavebridge.h"
 #include "firmware_expansion_i2c.h"
 #include "urtc_version_wire.h"
+#include "urtc_slave_regs.h"
 
 // Slave register numbers - duplicated here rather than shared via a
 // common header, since the slave is a genuinely separate chip/project
@@ -173,7 +174,11 @@ void Handle_CAN_SlaveBridge(void) {
         // Write - byte[0] is the slave's own application register
         // number (REG_PWM_*, REG_ADS_*, REG_MLX_* - see slave_common.h),
         // byte[1..] is that register's own payload, relayed as-is.
-        ExpansionI2C_SlaveWriteRegister(rxData[0], &rxData[1], rxHeader.DLC - 1);
+        // Only the registers and payload lengths listed in urtc_slave_regs.h
+        // are relayed; anything else is dropped without an answer.
+        if (urtc_slave_app_write_allowed(rxData[0], (uint8_t)(rxHeader.DLC - 1))) {
+            ExpansionI2C_SlaveWriteRegister(rxData[0], &rxData[1], rxHeader.DLC - 1);
+        }
 
     } else if (rxHeader.StdId == 0x221 && rxHeader.DLC == 2) {
         // Read - byte[0] is the register to read, byte[1] is how many
@@ -183,6 +188,7 @@ void Handle_CAN_SlaveBridge(void) {
         // since the caller already knows this from slave_common.h same
         // as this file does).
         uint8_t len = rxData[1];
+        if (!urtc_slave_app_read_allowed(rxData[0], len)) return; // not in the closed list
         if (len > 8) len = 8; // one CAN response frame's own ceiling
         uint8_t response[8];
         if (ExpansionI2C_SlaveReadRegister(rxData[0], response, len)) {

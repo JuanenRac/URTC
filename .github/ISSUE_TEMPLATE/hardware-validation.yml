@@ -1,5 +1,5 @@
 # =============================================================================
-# HYDRA-UMC / URTC Ecosystem - Hardware validation form
+# URTC Ecosystem - Hardware validation form
 # Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
 # GPL-3.0 - see LICENSE.md
 # =============================================================================
@@ -12,7 +12,7 @@ body:
     id: repository
     attributes:
       label: Affected repository
-      placeholder: HYDRA-UMC-OS
+      placeholder: URTC-FLASHER
     validations:
       required: true
   - type: dropdown

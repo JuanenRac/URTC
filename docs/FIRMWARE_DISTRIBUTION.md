@@ -59,67 +59,40 @@ All of these answer with a redirect to GitHub's asset host
 (`objects.githubusercontent.com`), so a client that restricts download hosts
 must allow it after the redirect.
 
-## What each consumer must change
+## How each consumer reads them
 
-None of these repositories was modified by this change.
+- **URTC-FLASHER**: `flasher_github.py` lists the assets of a release through
+  the Releases API (`/releases/latest`, or `/releases/tags/<tag>`); downloads
+  are accepted only from `github.com` (this project's release paths) and
+  `objects.githubusercontent.com`, checked before the request and after
+  redirects. `tools/sync_firmware.py` downloads a release
+  (`--release <tag>`) into a temporary folder and runs the same checks
+  (sha256 against sidecar and manifest, `hmac_sha256` on application
+  images) before copying. The `firmware/` folder bundled with the flasher
+  keeps working offline.
+- **URTC-WEB-STUDIO**: `scripts/sync-firmware.mjs` downloads the release
+  assets (newest, or a given tag) or reads a local build folder, verifies each
+  sha256 and regenerates `src/lib/bundledFirmware.ts`. Nothing in the browser
+  code reads GitHub at run time.
+- **URTC-UPDATER**: it reads only `urtc.project.json` and the native version
+  file of each repository; if it ever downloads firmware it must use the
+  release assets described above.
+- Anything that links to `.../blob/main/firmware/...` or to a
+  `raw.githubusercontent.com/.../firmware/...` URL must use the release asset
+  URLs instead. `check_version_consistency.sh` checks the local `firmware/`
+  folder (or `build/firmware`) of a built tree and is not part of the CI.
 
-### URTC-FLASHER
+## Bench pre-releases and the "latest" release
 
-- `flasher_github.py`: `GITHUB_API_BASE` points at
-  `.../contents/firmware`, which is now empty. Switch the listing to
-  `.../releases/latest` and build the list from `assets[]` (keep the same
-  `name` / `size` / download URL triple, and the same filter: `.bin`,
-  `.sha256`, `.manifest.json`; `firmware_manifest.json` is useful too).
-- `ALLOWED_DOWNLOAD_HOSTS` is `("raw.githubusercontent.com",)`: add
-  `github.com` and `objects.githubusercontent.com`, keep the check both
-  before the request and after redirects (`response.geturl()`).
-- `tools/sync_firmware.py` and its default source `../URTC/firmware`: a fresh
-  checkout of URTC has no such folder. Either build URTC locally (release
-  mode fills `../URTC/firmware`), or add a mode that downloads the release
-  assets into a temporary folder and then runs the same `check()` (sha256
-  against sidecar and manifest, `hmac_sha256` present on application images)
-  before copying. The bundled `firmware/` of the flasher keeps working as it
-  is.
-- `tests/test_github_download.py` uses
-  `https://raw.githubusercontent.com/JuanenRac/URTC/main/firmware/` as the
-  fixture base and expects the contents-API shape; update it to the release
-  assets shape and add the new hosts to the refusal cases.
-- `tests/test_firmware_signature.py` runs `sync_firmware.py --check` on the
-  bundled folder: unchanged.
-- Version check: with firmware 0.3.5 the flasher can read the PATCH number
-  over CAN as well; the host contract is in `docs/CANBUS.TXT`
-  ("FIRMWARE PATCH NUMBER").
-
-### URTC-WEB-STUDIO
-
-- `scripts/sync-firmware.mjs` (npm script `sync-firmware`) reads
-  `../URTC/firmware` by default, expects `firmware_manifest.json` there and
-  copies `.bin`, `.hex`, `.elf` and the sidecars into `public/firmware`,
-  regenerating `src/lib/bundledFirmware.ts`. Add a second source: download
-  `firmware_manifest.json` and the files it names from
-  `releases/latest/download/` (or from a given tag) into a temporary folder,
-  verify each sha256 against its sidecar, then run the existing copy. Keep the
-  local folder as an explicit argument for bench builds.
-- The comment in `src/components/FlasherStudio.tsx` that says the binaries are
-  byte-for-byte what `URTC/firmware` publishes should say "what the release
-  publishes".
-- The site build / CI must run the sync (or commit the synced `public/firmware`
-  as it does today); nothing in the browser code reads GitHub at run time.
-
-### URTC-UPDATER
-
-- It reads only `urtc.project.json` and the native version file of each
-  repository through `raw.githubusercontent.com` (`registry.py`). Both stay in
-  git, so nothing has to change. If the updater later downloads firmware, it
-  must use the release assets described above and not `firmware/`.
-
-### Other readers
-
-- Anything that links to `.../blob/main/firmware/...` or uses a
-  `raw.githubusercontent.com/.../firmware/...` URL for URTC,
-  URTC-SMART-RACK or URTC-VISION-TOOL must move to the release asset URLs.
-- `check_version_consistency.sh` (URTC) checks the local `firmware/` folder
-  (or `build/firmware`) of a built tree; it is not part of the repository CI.
+GitHub's `releases/latest` endpoint and the `releases/latest/download/` URLs
+never return a pre-release. A release whose application images are signed with
+the public development key (`signing_key_kind: "dev"`) is therefore published
+as a **pre-release** ("bench"): `tools/publish_release_assets.py` refuses it
+as an official release, and with `--allow-dev-key` it adds `--prerelease` to
+the printed command. Until the first release signed with a private production
+key exists, the clients reach the bench images by tag
+(`sync_firmware.py --release v0.3.5`, `sync-firmware.mjs --tag <tag>`), and the
+bundled copies keep serving offline use.
 
 ## Publishing a release
 
@@ -127,7 +100,8 @@ None of these repositories was modified by this change.
    `URTC_RELEASE=1` for a release signed with the private key; see
    `docs/FIRMWARE_SIGNING.TXT`).
 2. `python tools/publish_release_assets.py` and check that it ends with
-   `RELEASE_ASSETS=PASS`.
+   `RELEASE_ASSETS=PASS` (a development-key set fails; use `--allow-dev-key`
+   only for a bench pre-release).
 3. Run the printed `gh release create ...` command (write the notes file it
    names first, or replace `--notes-file` with `--notes`).
 4. Keep only the newest release's assets; older tags can stay as tags.
