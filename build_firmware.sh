@@ -227,6 +227,51 @@ else
         fail "thermal stats host logic tests FAILED"
         echo ""; echo "$PASS passed, $WARN warnings, $FAIL failed"; exit 1
     fi
+
+    # The bootloader's HMAC-SHA256 and the pre-error-gate CAN commands
+    # (bootloader entry, version query with the 0x7E9 patch frame, tool and
+    # configuration registers) are compiled unchanged against the fake HAL in
+    # tests/host_hal/ and run under the address and undefined-behaviour
+    # sanitizers. The flash is an anonymous mapping in the low 2 GiB, which
+    # needs a 64-bit Linux host.
+    FAKE_HAL_INC="$ROOT/tests/host_hal"
+    SANITIZE="-fsanitize=address,undefined -fno-sanitize-recover=all"
+    CRYPTO_HOST_BIN="$BUILD/host_tests_bootloader_crypto"
+    if "$HOST_CC" -std=gnu11 -Wall -Wextra -Wno-unused-parameter -Wno-cpp -Wno-int-to-pointer-cast $SANITIZE \
+        -I"$ROOT/tests" -I"$FAKE_HAL_INC" -I"$DISPATCH_SRC/boot" -o "$CRYPTO_HOST_BIN" \
+        "$ROOT/tests/test_bootloader_crypto.c" "$FAKE_HAL_INC/fake_hal.c" \
+        "$DISPATCH_SRC/boot/bootloader_crypto.c" && "$CRYPTO_HOST_BIN"; then
+        pass "bootloader HMAC-SHA256 host logic tests passed (address + undefined sanitizers)"
+    else
+        fail "bootloader HMAC-SHA256 host logic tests FAILED"
+        echo ""; echo "$PASS passed, $WARN warnings, $FAIL failed"; exit 1
+    fi
+    # The whole bootloader update flow (start / signature chunks / data / end,
+    # CRC32, HMAC, anti-rollback, flash errors, resume after power loss and the
+    # 0x7F8 / 0x7FB / 0x7FE queries) against a fake 256 KiB flash mapped at
+    # 0x08000000.
+    UPDATE_HOST_BIN="$BUILD/host_tests_bootloader_update"
+    BOOT_SRC="$DISPATCH_SRC/boot"
+    if "$HOST_CC" -std=gnu11 -Wall -Wextra -Wno-unused-parameter -Wno-cpp -Wno-int-to-pointer-cast $SANITIZE \
+        -I"$ROOT/tests" -I"$FAKE_HAL_INC" -I"$BOOT_SRC" -I"$ROOT/src/common" -o "$UPDATE_HOST_BIN" \
+        "$ROOT/tests/test_bootloader_update.c" "$FAKE_HAL_INC/fake_hal.c" \
+        "$BOOT_SRC/bootloader_protocol.c" "$BOOT_SRC/bootloader_flash.c" "$BOOT_SRC/bootloader_crypto.c" \
+        && "$UPDATE_HOST_BIN"; then
+        pass "bootloader update flow host logic tests passed (address + undefined sanitizers)"
+    else
+        fail "bootloader update flow host logic tests FAILED"
+        echo ""; echo "$PASS passed, $WARN warnings, $FAIL failed"; exit 1
+    fi
+    GLOBAL_PRE_HOST_BIN="$BUILD/host_tests_can_global_pre"
+    if "$HOST_CC" -std=gnu11 -Wall -Wextra -Wno-unused-parameter $SANITIZE \
+        -I"$ROOT/tests" -I"$FAKE_HAL_INC" -I"$DISPATCH_SRC" -I"$ROOT/src/common" -o "$GLOBAL_PRE_HOST_BIN" \
+        "$ROOT/tests/test_can_global_pre.c" "$FAKE_HAL_INC/fake_hal.c" \
+        "$DISPATCH_SRC/firmware_can_global_pre.c" && "$GLOBAL_PRE_HOST_BIN"; then
+        pass "CAN global (pre-error-gate) host logic tests passed (address + undefined sanitizers)"
+    else
+        fail "CAN global (pre-error-gate) host logic tests FAILED"
+        echo ""; echo "$PASS passed, $WARN warnings, $FAIL failed"; exit 1
+    fi
 fi
 
 # -----------------------------------------------------------------------
