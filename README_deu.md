@@ -37,6 +37,16 @@ Hier ist die vollständige Aufschlüsselung dessen, was es ist, was es tut, und 
 
 ---
 
+## 📋 Auf einen Blick
+
+| | |
+|---|---|
+| Version | `0.3.5` |
+| Reifegrad | Funktionsfähig |
+| Technik | STM32F303 / FDCAN / S-Curve profiles |
+| Ziel | Eine Mikrocontroller-Platine (die Firmware); wird auf einem PC gebaut |
+| Auf echter Hardware | Noch nicht: für diese Version ist kein Lauf auf echter Hardware vermerkt |
+
 ## ⚙️ Was ist URTC?
 
 URTC ist eine All-in-One-, kompakte Steuerplatine, angetrieben von einem STM32-Mikrocontroller (STM32F303CCT6, LQFP48). Sie kommuniziert mit dem Haupt-Robotercontroller über CAN-Bus, was die Echtzeit-Ausführung komplexer Aufgaben mit geringer Latenz direkt am Werkzeugkopf oder an der Achse ermöglicht. Sie verfügt über ein integriertes OLED-Display für sofortige Diagnose — animierter Boot-Splash, animierte Icons pro Werkzeug, Live-Telemetrie auf einem zweifarbigen Panel —, eine Einzelpixel-RGB-Status-LED plus einen adressierbaren RGB-LED-Ring für die Kamerabeleuchtung, einen 20-poligen Erweiterungsstecker für Zusatzplatinen, ein integriertes F-RAM, das die Sollwerte des aktiven Werkzeugs über einen Stromausfall hinweg erhält, sowie dedizierte Analog- und Hochstrom-Leistungsstufen.

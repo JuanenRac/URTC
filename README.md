@@ -37,6 +37,16 @@ Here is the complete breakdown of what it is, what it does, and the hardware eco
 
 ---
 
+## 📋 At a glance
+
+| | |
+|---|---|
+| Version | `0.3.5` |
+| Maturity | Functional |
+| Stack | STM32F303 / FDCAN / S-Curve profiles |
+| Target | A microcontroller board (the firmware); built on a PC |
+| On real hardware | Not yet: no run on real hardware is recorded for this version |
+
 ## ⚙️ What is URTC?
 
 URTC is an all-in-one, compact control board powered by an STM32 microcontroller (STM32F303CCT6, LQFP48). It communicates with the main robot controller via CAN bus, allowing for real-time, low-latency execution of complex tasks right at the tool head or axis. It features an onboard OLED display for instant diagnostics — animated boot splash, per-tool animated icons, live telemetry on a two-tone panel — a single-pixel RGB status LED plus an addressable RGB LED ring for camera illumination, a 20-pin expansion connector for add-on boards, an onboard F-RAM that persists the active tool's setpoints across a power loss, and dedicated analog and high-current power stages.

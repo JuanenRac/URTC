@@ -37,6 +37,16 @@ Voici le détail complet de ce que c'est, ce que ça fait, et l'écosystème mat
 
 ---
 
+## 📋 En un coup d'œil
+
+| | |
+|---|---|
+| Version | `0.3.5` |
+| Maturité | Fonctionnel |
+| Technologie | STM32F303 / FDCAN / S-Curve profiles |
+| Cible | Une carte à microcontrôleur (le firmware) ; compilé sur un PC |
+| Sur matériel réel | Pas encore : aucune exécution sur du matériel réel n'est consignée pour cette version |
+
 ## ⚙️ Qu'est-ce qu'URTC ?
 
 URTC est une carte de contrôle compacte tout-en-un, alimentée par un microcontrôleur STM32 (STM32F303CCT6, LQFP48). Elle communique avec le contrôleur principal du robot via un bus CAN, permettant l'exécution en temps réel et à faible latence de tâches complexes directement au niveau de la tête d'outil ou de l'axe. Elle intègre un écran OLED embarqué pour un diagnostic instantané — écran d'accueil animé, icônes animées par outil, télémétrie en direct sur un panneau bicolore — une LED RVB unique de statut ainsi qu'un anneau de LED RVB adressables pour l'éclairage de caméra, un connecteur d'extension 20 broches pour des cartes complémentaires, une F-RAM embarquée qui conserve les consignes de l'outil actif en cas de coupure de courant, et des étages d'alimentation analogiques et haute intensité dédiés.

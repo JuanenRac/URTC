@@ -37,6 +37,16 @@ Aquí está el desglose completo de qué es, qué hace, y el ecosistema de hardw
 
 ---
 
+## 📋 De un vistazo
+
+| | |
+|---|---|
+| Versión | `0.3.5` |
+| Madurez | Funcional |
+| Tecnología | STM32F303 / FDCAN / S-Curve profiles |
+| Destino | Una placa con microcontrolador (el firmware); se compila en un PC |
+| En hardware real | Todavía no: no consta ninguna ejecución en hardware real para esta versión |
+
 ## ⚙️ ¿Qué es URTC?
 
 URTC es una placa de control todo-en-uno y compacta, impulsada por un microcontrolador STM32 (STM32F303CCT6, LQFP48). Se comunica con el controlador principal del robot vía bus CAN, permitiendo la ejecución en tiempo real y de baja latencia de tareas complejas directamente en el cabezal de la herramienta o en el eje. Cuenta con una pantalla OLED integrada para diagnóstico instantáneo — splash de arranque animado, iconos animados por herramienta, telemetría en vivo en un panel de dos tonos — un LED RGB de estado de un solo píxel más un anillo de LED RGB direccionable para iluminación de cámara, un conector de expansión de 20 pines para placas adicionales, una F-RAM integrada que persiste los setpoints de la herramienta activa a través de un corte de energía, y etapas dedicadas de potencia analógica y de alta corriente.
