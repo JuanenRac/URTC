@@ -34,7 +34,7 @@
 #
 # Exit code 0 = everything consistent. Non-zero = see the printed report.
 # This does not fix anything by itself - it only reports. Fixing still
-# needs a human (or Claude) to apply VERSION_CHECKLIST.txt's guidance,
+# needs a human to apply VERSION_CHECKLIST.txt's guidance,
 # since some hits need judgment rather than a blind substitution.
 
 set -uo pipefail
@@ -212,7 +212,7 @@ echo ""
 echo "============================================================"
 echo "5. Baked-in image/asset version text (Track A5) - can only check"
 echo "   the SVGs (text-based); banners and app screenshots are pixel"
-echo "   data and need a human/Claude visual check, see"
+echo "   data and need a human visual check, see"
 echo "   VERSION_CHECKLIST.txt section A5"
 echo "============================================================"
 if [ "$CURRENT" != "UNKNOWN" ] && [ "$PREV_MINOR" -ge 0 ]; then

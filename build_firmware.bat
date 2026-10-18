@@ -27,6 +27,10 @@ echo ***************************************************************************
 echo.
 REM HYDRA_UMC_SCRIPT_STANDARD_BANNER_END
 setlocal enabledelayedexpansion
+rem Keep the window open for people, never in automation (CI / HYDRA_UMC_CI).
+set "KEEP_OPEN=pause"
+if defined CI set "KEEP_OPEN=ver >nul"
+if "%HYDRA_UMC_CI%"=="1" set "KEEP_OPEN=ver >nul"
 REM HYDRA_UMC_SCRIPT_STANDARD_VERSION_STEP
 echo [1/3] Incrementing project version and synchronising its manifest...
 REM HYDRA_UMC_SCRIPT_STANDARD_VERSION_CAPTURE_BEFORE
@@ -336,7 +340,7 @@ if not defined APP_VER (
     goto :summary
 )
 python "%ROOT%\bump_manifest_version.py" --sync
-if errorlevel 1 ( echo VERSION SYNCHRONISATION FAILED. & pause & exit /b 1 )
+if errorlevel 1 ( echo VERSION SYNCHRONISATION FAILED. & %KEEP_OPEN% & exit /b 1 )
 REM HYDRA_UMC_SCRIPT_STANDARD_VERSION_CAPTURE_AFTER
 for /f "usebackq delims=" %%V in (`python -c "import json; print(json.load(open(r'%ROOT%\urtc.project.json', encoding='utf-8'))['version'])"`) do set "HYDRA_UMC_VERSION_AFTER=%%V"
 if not defined HYDRA_UMC_VERSION_BEFORE set "HYDRA_UMC_VERSION_BEFORE=unknown"
@@ -569,7 +573,7 @@ REM them (same convention as sibling repo HYDRA-UMC's own build_firmware.bat).
 REM `pause` itself already no-ops instead of hanging when stdin isn't a real
 REM console (e.g. redirected from NUL or a pipe).
 echo.
-pause
+%KEEP_OPEN%
 
 endlocal
 if %FAIL% GTR 0 exit /b 1

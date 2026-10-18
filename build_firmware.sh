@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 set -e
 # HYDRA_UMC_SCRIPT_STANDARD_HEADER_BEGIN
 # *****************************************************************************
