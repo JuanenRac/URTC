@@ -7,15 +7,15 @@
   "stack": "firmware-c",
   "technologies": [
     "STM32F303",
-    "FDCAN",
-    "S-Curve profiles"
+    "bxCAN",
+    "25 tool profiles"
   ],
   "deployment_target": "user-pc",
   "maturity": "functional",
   "family": "URTC Tool Platform",
   "parent": null,
   "build": "4 independently-versioned components (main + slave, app + bootloader each). This registry tracks the main application as representative. Real build: bash build_firmware.sh.",
-  "notes": "The real firmware for this ecosystem's physical Universal Robot Tool Controller PCB - 25+ tool profiles, CAN bus.",
+  "notes": "Firmware for the Universal Robot Tool Controller PCB (no populated board exists yet, so it has never run on a real board) - 25+ tool profiles, CAN bus.",
   "native_version": {
     "file": "src/F303-master/firmware_common.h",
     "pattern": {

@@ -25,7 +25,7 @@
 </p>
 
 
-> **⚠️ Safety notice:** this board drives a **10W engraving laser diode** and multiple heater stages (T12 soldering iron cartridge, 3D printer hotend). Building and using it means working with equipment that can cause **burns, fire, or eye damage** if assembled or operated without proper safety measures (laser goggles rated for the diode's wavelength, thermal protection, an accessible power cutoff). This is a hobbyist/maker project shared as-is — build and use at your own risk, and don't skip basic safety practice just because the firmware has watchdogs.
+> **⚠️ Safety notice (design stage, no board has run this firmware yet):** this board drives a **10W engraving laser diode** and multiple heater stages (T12 soldering iron cartridge, 3D printer hotend). Building and using it means working with equipment that can cause **burns, fire, or eye damage** if assembled or operated without proper safety measures (laser goggles rated for the diode's wavelength, thermal protection, an accessible power cutoff). This is a hobbyist/maker project shared as-is — build and use at your own risk, and don't skip basic safety practice just because the firmware has watchdogs (software watchdogs that have never run on a real board).
 
 Hi everyone! I wanted to share a project I've been developing called URTC (Universal Robot Tool Controller). It is a monolithic, highly integrated control board designed specifically to expand the capabilities of robotic arms and automation setups, making it a perfect match for platforms like PAROL6 and Faze4 — two open-source robotic arms designed and developed by [Source-Robotics](https://source-robotics.com/) ([GitHub](https://github.com/Source-Robotics)).
 
@@ -33,9 +33,11 @@ Hi everyone! I wanted to share a project I've been developing called URTC (Unive
 
 Here is the complete breakdown of what it is, what it does, and the hardware ecosystem it currently manages.
 
-**Status: 🚧 Actively evolving project — no Release yet.** URTC is under continuous, active development on both fronts at once: firmware (new tool profiles, the expansion slave ecosystem, protocol changes) and hardware (schematic and BOM still being finalized, no populated board exists yet). Because both sides keep moving together, what's in this repository at any given moment is a snapshot of ongoing work, not a stable, versioned product — file names, folder structure, tool counts, and documentation can all still change as the design settles. Once both firmware and hardware reach a genuinely stable, verified-on-real-hardware state, a proper **Release** will be tagged bundling everything together (firmware, bootloader, PC tools, hardware design files, and documentation) as a coherent, frozen snapshot. Until then, treat `main` as the actively-moving target it is.
+**Status: 🚧 Actively evolving project — releases exist, but nothing has run on a real board.** Tagged releases (v0.3.x) exist, each with the firmware images built from this source, but no populated board exists, so the firmware has never run on a real board. URTC is under continuous, active development on both fronts at once: firmware (new tool profiles, the expansion slave ecosystem, protocol changes) and hardware (schematic and BOM still being finalized, no populated board exists yet). Because both sides keep moving together, what's in this repository at any given moment is a snapshot of ongoing work, not a stable, versioned product — file names, folder structure, tool counts, and documentation can all still change as the design settles. Once both firmware and hardware reach a genuinely stable, verified-on-real-hardware state, a proper **Release** will be tagged bundling everything together (firmware, bootloader, PC tools, hardware design files, and documentation) as a coherent, frozen snapshot. Until then, treat `main` as the actively-moving target it is.
 
 ---
+
+> **Safety and security status:** this ecosystem is not a certified safety system, and no populated URTC board exists yet. The bootloaders check firmware images with CRC32 and a shared-key HMAC-SHA256, not with an asymmetric signature (planned); the published application images are signed with the public development key (`signing_key_kind: dev`), so anyone can produce an image the bootloader accepts; nothing has been transmitted to a real board. Read the [security baseline](https://github.com/JuanenRac/URTC-DOCS/blob/main/docs/SECURITY_BASELINE.md) and the [threat model](https://github.com/JuanenRac/URTC-DOCS/blob/main/docs/THREAT_MODEL.md) before relying on any statement here for the safety of a person.
 
 ## 📋 At a glance
 
@@ -43,13 +45,13 @@ Here is the complete breakdown of what it is, what it does, and the hardware eco
 |---|---|
 | Version | `0.3.5` |
 | Maturity | Functional |
-| Stack | STM32F303 / FDCAN / S-Curve profiles |
+| Stack | STM32F303 / bxCAN / 25 tool profiles |
 | Target | A microcontroller board (the firmware); built on a PC |
 | On real hardware | Not yet: no run on real hardware is recorded for this version |
 
 ## ⚙️ What is URTC?
 
-URTC is an all-in-one, compact control board powered by an STM32 microcontroller (STM32F303CCT6, LQFP48). It communicates with the main robot controller via CAN bus, allowing for real-time, low-latency execution of complex tasks right at the tool head or axis. It features an onboard OLED display for instant diagnostics — animated boot splash, per-tool animated icons, live telemetry on a two-tone panel — a single-pixel RGB status LED plus an addressable RGB LED ring for camera illumination, a 20-pin expansion connector for add-on boards, an onboard F-RAM that persists the active tool's setpoints across a power loss, and dedicated analog and high-current power stages.
+URTC is an all-in-one, compact control board powered by an STM32 microcontroller (STM32F303CCT6, LQFP48). It communicates with the main robot controller via CAN bus, intended for low-latency execution of complex tasks right at the tool head or axis (latency has never been measured on a board, and no hard real-time guarantee is made). It features an onboard OLED display for instant diagnostics — animated boot splash, per-tool animated icons, live telemetry on a two-tone panel — a single-pixel RGB status LED plus an addressable RGB LED ring for camera illumination, a 20-pin expansion connector for add-on boards, an onboard F-RAM that persists the active tool's setpoints across a power loss, and dedicated analog and high-current power stages.
 
 ## 🛠️ Scalable Architecture & Tool Matrix
 
@@ -111,13 +113,13 @@ Through its dynamic switching logic, the firmware natively manages the following
 1. **Soldering Station (T12):** precise PID temperature control using direct ADC feedback to handle standard T12 soldering tips, plus a motorized wire feeder spooling solder wire into the joint (shares `CONN_MOT` and its stepper protocol with the plain-motion tools below - trades away this tool's own generic endstop input to make room for it). [Jumper/wiring config →](images/TOOL_SOLDERING_IRON.png)
 2. **SMT Solder Paste Dispenser:** millimetric feed control for precise solder paste deposition on PCBs. [Jumper/wiring config →](images/TOOL_PASTE_DISPENSER.png)
 3. **Thermal Paste / Liquid Dispenser:** fluidity management for high-viscosity pastes or liquid adhesives. [Jumper/wiring config →](images/TOOL_LIQUID_DISPENSER.png)
-4. **Smart Electric Screwdriver:** rotation and stop control based on torque limits or end-stops. [Jumper/wiring config →](images/TOOL_SCREWDRIVER.png)
+4. **Smart Electric Screwdriver:** rotation and stop control through the stepper interface. Planned: stopping on torque limits (no torque sensing exists yet). [Jumper/wiring config →](images/TOOL_SCREWDRIVER.png)
 5. **Vacuum / Pneumatic Gripper:** vacuum pump control and pressure level reading for safe Pick-and-Place operations. [Jumper/wiring config →](images/TOOL_VACUUM_PICKUP.png)
-6. **Drill (BL4260):** PWM speed control, direction switching, and dynamic electric braking with real-time RPM readings, on its own dedicated enable/brake line, independent from the stepper-tool driver enable. Generic endstop input available. [Jumper/wiring config →](images/TOOL_DRILL.png)
+6. **Drill (BL4260):** PWM speed control, direction switching, and dynamic electric braking with live RPM readings, on its own dedicated enable/brake line, independent from the stepper-tool driver enable. Generic endstop input available. [Jumper/wiring config →](images/TOOL_DRILL.png)
 7. **Gimbal Gripper:** high-sensitivity manipulation using 3-phase brushless gimbal motors. [Jumper/wiring config →](images/TOOL_GRIPPER_GIMBAL.png)
 8. **NEMA Gripper:** robust clamping force controlled via a heavy-duty stepper motor. [Jumper/wiring config →](images/TOOL_GRIPPER_NEMA.png)
 9. **AOI (Automated Optical Inspection) System:** synchronous stroboscopic control of the LED lighting array for machine vision camera capture. Generic endstop input available. [Jumper/wiring config →](images/TOOL_AOI_INSPECTION.png)
-10. **Engraving Laser Diode (10W optical):** PWM beam power modulation with a safety hardware loop (CAN watchdog) that locks down if host communication is lost. Generic endstop input available. [Jumper/wiring config →](images/TOOL_LASER_ENGRAVER.png)
+10. **Engraving Laser Diode (10W optical):** PWM beam power modulation with a CAN watchdog in software that locks the laser output down if host communication is lost (built, never run on a real board, and no substitute for an independent hardware interlock). Generic endstop input available. [Jumper/wiring config →](images/TOOL_LASER_ENGRAVER.png)
 11. **3D Printing Hotend:** PID control of the heater cartridge, NTC thermistor reading, extruder control, and a dedicated 25kHz PWM-controlled layer cooling fan (4-wire, tachometer feedback, own communication watchdog) — all integrated into a single block. [Jumper/wiring config →](images/TOOL_3D_PRINTER.png)
 12. **3D Scanner Probe:** ultra-fast hardware interrupt input (EXTI) with absolute priority for real-time surface digitization and impact sensing without lag. Also covers metrology touch probing - the same hardware path, a different physical probe on the same tool head. [Jumper/wiring config →](images/TOOL_SCAN_PROBE.png)
 13. **SMT Pick & Place Head:** rotary A-axis for correct pad alignment, on the same stepper interface as the paste/liquid dispensers and both grippers above. [Jumper/wiring config →](images/TOOL_SMT_PICKPLACE.png)
@@ -129,7 +131,7 @@ Through its dynamic switching logic, the firmware natively manages the following
 19. **UV Curing Head:** high-power UV LED driver for instant glue/mask curing. [Jumper/wiring config →](images/TOOL_UV_CURING.png)
 20. **Hot Air Rework Nozzle:** heating element, turbine blower, and thermocouple feedback for reflowing misaligned SMD parts - shares the soldering iron's own thermal control loop. [Jumper/wiring config →](images/TOOL_HOTAIR_REWORK.png)
 21. **Pneumatic Press-Fit Inserter:** linear actuator control for pressing connectors into PCBs - the actuator and its own sensor live on the robot's own mainboard, outside this board's own scope. [Jumper/wiring config →](images/TOOL_PRESSFIT_INSERTER.png)
-22. **Wire Harnessing / Crimping Actuator:** high-torque jaw for stripping/crimping terminals, driven off an **expansion board's own driver** rather than the main board's. [Jumper/wiring config →](images/TOOL_CRIMPING_ACTUATOR.png)
+22. **Wire Harnessing / Crimping Actuator:** high-torque jaw for stripping/crimping terminals, driven off an **expansion board's own driver** rather than the main board's. No torque or force sensing exists in the firmware. [Jumper/wiring config →](images/TOOL_CRIMPING_ACTUATOR.png)
 23. **PCB Advanced Inspection:** thermal imaging (MLX9064x-family array - all 3 family members, MLX90640/MLX90641/MLX90642, supported today, either via an **advanced** expansion board's own slave chip or a **basic** MLX9064x expansion board wired directly to the main board) to spot shorts by temperature signature, alongside ring-LED illumination. Also covers micro-spindle depaneling - the same drill hardware path above, a different bit for a different job. [Jumper/wiring config →](images/TOOL_THERMAL_INSPECTION.png)
 24. **Solder Paste Jetting Valve:** piezoelectric micro-droplet dispensing, sub-millisecond pulse precision generated locally on an **advanced** expansion board. [Jumper/wiring config →](images/TOOL_PASTE_JETTING.png)
 25. **Ultrasonic Welder / Packaging Sealer:** high-frequency transducer trigger for plastic enclosure welding. [Jumper/wiring config →](images/TOOL_ULTRASONIC_WELDER.png)
@@ -297,7 +299,7 @@ URTC's flash is split into two independent pieces, so the board can be reflashed
 0x08040000 └─────────────────────────────────┘
 ```
 
-**Why a backup slot.** A CAN update is never written into the slot that's currently running. It goes into backup first, gets fully verified there — size, CRC32, and an HMAC-SHA256 signature proving it actually came from this project's own build process, not just that it arrived intact — and only then gets copied into the main slot. A power loss at any point before that copy starts leaves the currently running firmware completely untouched, so there's no window where an interrupted download can brick the board. If the power loss happens *during* the copy itself, the bootloader notices on the next boot (backup, never touched during the copy, is still fully intact) and simply resumes copying from it until it succeeds.
+**Why a backup slot.** A CAN update is never written into the slot that's currently running. It goes into backup first, gets fully verified there — size, CRC32, and an HMAC-SHA256 check against a shared symmetric key, showing it was made by someone holding that key (the published images use the public development key), not just that it arrived intact — and only then gets copied into the main slot. A power loss at any point before that copy starts leaves the currently running firmware completely untouched, so there's no window where an interrupted download can brick the board. If the power loss happens *during* the copy itself, the bootloader notices on the next boot (backup, never touched during the copy, is still fully intact) and simply resumes copying from it until it succeeds.
 
 ### 0. Compiling from source (optional — the pre-built binaries are assets of each GitHub release, not files in the repository)
 
@@ -332,7 +334,7 @@ Once the bootloader is in place, updating the application no longer needs physic
 
 1. **Trigger.** The master sends `0x7F0` (DLC 4, payload `B0 07 1D 5A`) to the *running application*. It safely cuts power to every actuator inline — motors, heaters, laser — and resets the chip. This magic-payload requirement means a corrupted or malformed frame can't accidentally trigger a reset into update mode.
 2. **Start.** After reset, the bootloader is listening. The master sends `0x7F1` (DLC 8, big-endian total firmware size + big-endian HardwareID). An image built for different hardware is rejected right here, before a single byte of flash gets touched. The bootloader erases exactly as many backup-slot pages as the new image needs and replies with a status frame (`0x7F5`).
-3. **Signature.** The master sends the expected HMAC-SHA256 signature as four `0x7F7` frames (8 bytes each, in order) — computed over the firmware image with a key shared between the bootloader and whatever tool signs the build.
+3. **Signature.** The master sends the expected HMAC-SHA256 signature as four `0x7F7` frames (8 bytes each, in order) — computed over the firmware image with a key shared between the bootloader and whatever tool signs the build. This is a shared symmetric key, so the check proves the image came from someone holding that key, not who they are; the published images use the public development key (see `docs/FIRMWARE_SIGNING.TXT`).
 4. **Data.** The master streams the `.bin` file as a sequence of `0x7F2` frames (up to 8 bytes of raw firmware data each), sent back-to-back — CAN guarantees frames arrive in the order they were sent on a single bus, so no per-frame sequence number is needed. The bootloader buffers incoming bytes into a 2KB page in RAM and writes it to the *backup* slot once full, reading every half-word back and comparing it against what was meant to be written before considering the page done, and sending a `0x7F3` acknowledgement (with the page index) after each verified write. A reasonable master implementation waits for each page's ACK before sending the next page's worth of data, to avoid overrunning the bootloader's receive buffer.
 5. **End & verify.** Once every byte has been sent, the master sends `0x7F4` (DLC 8, big-endian CRC32 + version major/minor). The bootloader checks the backup slot's size, computes its CRC32 and HMAC-SHA256 and compares both against what the master declared. Only if everything matches does it proceed to copy backup into the main slot, page by page, with the same read-back verification as above. Once that copy is complete and confirmed, it saves the new metadata and resets into the updated application. On any mismatch — size, CRC32, HMAC, or HardwareID — the main slot is never touched at all, and the bootloader just goes back to listening for a fresh attempt.
 
@@ -361,11 +363,11 @@ A web-based alternative covering similar ground (live monitoring, CAN
 analysis, OTA flashing, thermal inspection) without installing anything
 locally also exists: [URTC Web Studio](https://github.com/JuanenRac/URTC-WEB-STUDIO).
 
-## 🛡️ Thermal Safety, Firmware Signing & CAN Security
+## 🛡️ Thermal Guard (Host-Tested Only), Firmware Signing (Development Key) & CAN (Unauthenticated)
 
-- **Thermal runaway protection** (`thermal_guard.c`, since application 0.3.2) on the soldering iron / hot air and the 3D hotend: a MAXTEMP on the *measured* temperature (449 °C T12, 310 °C hotend), a heating watch (the temperature must really rise while the heater is on - catches a loose thermistor or tip) and a holding check (once at target, no long sag with the heater on). A fault cuts the heater, latches the board error and reports why in `0x111` byte 4. Host-tested with a simulated heater (`tests/test_thermal_guard.c`).
+- **Thermal runaway protection** (`thermal_guard.c`, since application 0.3.2) on the soldering iron / hot air and the 3D hotend: a MAXTEMP on the *measured* temperature (449 °C T12, 310 °C hotend), a heating watch (the temperature must really rise while the heater is on - catches a loose thermistor or tip) and a holding check (once at target, no long sag with the heater on). A fault cuts the heater, latches the board error and reports why in `0x111` byte 4. Host-tested with a simulated heater (`tests/test_thermal_guard.c`). Its limits were never measured on a real heater, and nothing here has run on a board.
 - **Diagnostics:** `0x111` byte 5 reports the last reset cause (bit0 = the hardware watchdog fired); `0x1AA`/`0x1AB` return lifetime counters kept in F-RAM - thermal faults, last fault code and total heater-on time (since 0.3.3); black-box samples record the thermal fault code.
-- **Firmware signing:** the bootloaders' HMAC key is injected at build time from a private file (`URTC_SIGNING_KEY_FILE`); without it the build uses the *public development key* and says so, and `URTC_RELEASE=1` refuses it. Every image in `firmware/` ships with `<bin>.sha256` and `<bin>.manifest.json` (including the precomputed signature), so URTC Flasher and URTC Web Studio carry no key at all. See [`docs/FIRMWARE_SIGNING.TXT`](docs/FIRMWARE_SIGNING.TXT).
+- **Firmware signing:** the bootloaders' HMAC key is injected at build time from a private file (`URTC_SIGNING_KEY_FILE`); without it the build uses the *public development key* and says so, and `URTC_RELEASE=1` refuses it. Every image in `firmware/` ships with `<bin>.sha256` and `<bin>.manifest.json` (including the precomputed signature), so URTC Flasher and URTC Web Studio carry no key at all. See [`docs/FIRMWARE_SIGNING.TXT`](docs/FIRMWARE_SIGNING.TXT). HMAC is a shared symmetric key: the published application images are signed with the public development key, so anyone can sign an image that a board built with that key accepts; an asymmetric (Ed25519) signature is planned.
 - **CAN bus:** it has no sender authentication - any node can command the tools. Laser, heater and welder installations **must** have a hardware interlock independent of the MCU and a closed bus: [`docs/CAN_THREAT_MODEL.TXT`](docs/CAN_THREAT_MODEL.TXT).
 
 ## 📋 Changelog
@@ -385,9 +387,9 @@ together:
 
 ## 🔍 Current Status
 
-**Firmware (`src/F303-master/`):** feature-complete for all 25 tool profiles — thermal PID control, per-tool telemetry, communication watchdogs, stall/fault detection, and the OLED's own live diagnostics, alongside an active-tool query pair (`0x110`/`0x111`), a generic SPI passthrough (`0x180`/`0x181`) for the expansion connector, an onboard F-RAM that persists setpoints across a power loss (`0x190`/`0x191`), the `11111`-jumper free tool configuration mechanism (`0x1A2`/`0x1A3`), peripheral type + device serial number reporting (`0x1A4`/`0x1A5`) for telling multiple otherwise-identical boards apart on a shared bus, and a CAN-to-I2C bridge (`0x210`-`0x221`) reaching the expansion slave chip on advanced expansion boards. Versioned independently of the bootloader (see the Changelog below).
+**Firmware (`src/F303-master/`):** feature-complete for all 25 tool profiles — thermal PID control, per-tool telemetry, communication watchdogs, stall/fault detection, and the OLED's own live diagnostics, alongside an active-tool query pair (`0x110`/`0x111`), a generic SPI passthrough (`0x180`/`0x181`) for the expansion connector, an onboard F-RAM that persists setpoints across a power loss (`0x190`/`0x191`), the `11111`-jumper free tool configuration mechanism (`0x1A2`/`0x1A3`), peripheral type + device serial number reporting (`0x1A4`/`0x1A5`) for telling multiple otherwise-identical boards apart on a shared bus, and a CAN-to-I2C bridge (`0x210`-`0x221`) reaching the expansion slave chip on advanced expansion boards. Versioned independently of the bootloader (see the Changelog below). None of it has run on a real board, and the thermal guard is only host-tested with a simulated heater.
 
-**Bootloader (`src/F303-master/boot/`):** feature-complete golden-image A/B update system — HMAC-SHA256 signed OTA updates over CAN, a backup slot that guarantees a failed update never bricks the board, and its own version reporting (`0x7FA`) independent of the application. Compiles and links clean; see the bench-test caveat above before trusting it unattended with real actuators connected.
+**Bootloader (`src/F303-master/boot/`):** feature-complete golden-image A/B update system — OTA updates over CAN checked with CRC32 and a shared-key HMAC-SHA256 (not an asymmetric signature), a backup slot that guarantees a failed update never bricks the board, and its own version reporting (`0x7FA`) independent of the application. Compiles and links clean; see the bench-test caveat above before trusting it unattended with real actuators connected.
 
 **PC tools:** both [URTC Flasher](https://github.com/JuanenRac/URTC-FLASHER) (CAN OTA updates + full-chip SWD/JTAG programming) and [URTC Tester](https://github.com/JuanenRac/URTC-TESTER) (live per-tool control/telemetry exerciser) are feature-complete for what they set out to do, each its own independent project now with its own README covering setup and every control in detail.
 
@@ -572,8 +574,8 @@ This project is part of the HYDRA-UMC robotics ecosystem by the same author (Jua
 - **[URTC-WEB-STUDIO](https://github.com/JuanenRac/URTC-WEB-STUDIO)** — browser-based alternative to URTC-TESTER via the Web Serial API, no local install needed; the same CAN protocol as the 2 desktop tools above.
 
 **Directly Related**
-- **[HYDRA-UMC](https://github.com/JuanenRac/HYDRA-UMC)** — the physical robot-arm motherboard: CM5 host + dual-core STM32H745, orchestrating up to 8 tool arms over CAN-OTA/SPI-OTA; its own real FDCAN2 relay tunnel is the wire this firmware's tool head sits on.
-- **[HYDRA-UMC-SDK](https://github.com/JuanenRac/HYDRA-UMC-SDK)** — the shared JSON-Schema contract and safety-gate boundary every bridge validates its commands against; also covers services, UIs, CM5 adapters, and this firmware.
+- **[HYDRA-UMC](https://github.com/JuanenRac/HYDRA-UMC)** — the robot-arm motherboard design: CM5 host + dual-core STM32H745, meant to orchestrate up to 8 tool arms over CAN-OTA/SPI-OTA (firmware at an early stage; no populated board yet); its own real FDCAN2 relay tunnel is the wire this firmware's tool head sits on.
+- **[HYDRA-UMC-SDK](https://github.com/JuanenRac/HYDRA-UMC-SDK)** — the shared JSON-Schema contract and software job-gate boundary every bridge validates its commands against (not a certified safety function); also covers services, UIs, CM5 adapters, and this firmware.
 - **[HYDRA-UMC-CONNECTOR-HUB](https://github.com/JuanenRac/HYDRA-UMC-CONNECTOR-HUB)** — declarative adapter-manifest registry and validator for external-machine connectors; extends the SDK's own contract idea to external machines without replacing the industrial-gateway projects.
 - **[URTC-SMART-RACK](https://github.com/JuanenRac/URTC-SMART-RACK)** — firmware for a board-mounting rack with real tool-ID decoding and Smart Idle pre-heating logic; shares this firmware's own tool ecosystem and CAN bus.
 - **[URTC-VISION-TOOL](https://github.com/JuanenRac/URTC-VISION-TOOL)** — firmware plus a real Python vision companion for a thermal/RGB inspection tool head; shares this firmware's own tool ecosystem and CAN bus.
@@ -593,20 +595,20 @@ This project is part of the HYDRA-UMC robotics ecosystem by the same author (Jua
 - **[HYDRA-UMC-DSI](https://github.com/JuanenRac/HYDRA-UMC-DSI)** — native touch UI for the onboard 7" DSI touchscreen, embedded on the CM5 itself.
 - **[HYDRA-UMC-EDITOR-URDF](https://github.com/JuanenRac/HYDRA-UMC-EDITOR-URDF)** — desktop graphical URDF creator/editor that pushes finished models into STUDIO's own catalog.
 - **[HYDRA-UMC-EDITOR-STL](https://github.com/JuanenRac/HYDRA-UMC-EDITOR-STL)** — desktop STL model editor, transforming/replacing/removing/adding real parts in the same model catalog HYDRA-UMC-EDITOR-URDF also edits.
-- **[HYDRA-UMC-BRIDGE-AMR](https://github.com/JuanenRac/HYDRA-UMC-BRIDGE-AMR)** — coordination boundary for AGV/AMR fleets via a real VDA 5050 MQTT publisher.
-- **[HYDRA-UMC-BRIDGE-CNC](https://github.com/JuanenRac/HYDRA-UMC-BRIDGE-CNC)** — high-level CNC-cell coordinator with real GRBL status/control-byte access.
-- **[HYDRA-UMC-BRIDGE-DROIDS](https://github.com/JuanenRac/HYDRA-UMC-BRIDGE-DROIDS)** — coordination boundary for legged/humanoid droids, with a real Boston Dynamics Spot command sender.
-- **[HYDRA-UMC-BRIDGE-LASER](https://github.com/JuanenRac/HYDRA-UMC-BRIDGE-LASER)** — laser-cell safety coordinator reading 3 real key/enclosure/interlock GPIO safeguards.
+- **[HYDRA-UMC-BRIDGE-AMR](https://github.com/JuanenRac/HYDRA-UMC-BRIDGE-AMR)** — coordination boundary for AGV/AMR fleets via a VDA 5050 MQTT publisher (tested against an emulated fleet only).
+- **[HYDRA-UMC-BRIDGE-CNC](https://github.com/JuanenRac/HYDRA-UMC-BRIDGE-CNC)** — high-level CNC-cell coordinator with GRBL status/control-byte access (tested against an emulator only).
+- **[HYDRA-UMC-BRIDGE-DROIDS](https://github.com/JuanenRac/HYDRA-UMC-BRIDGE-DROIDS)** — coordination boundary for legged/humanoid droids, with a Boston Dynamics Spot command sender (tested against an emulator only).
+- **[HYDRA-UMC-BRIDGE-LASER](https://github.com/JuanenRac/HYDRA-UMC-BRIDGE-LASER)** — laser-cell coordinator reading 3 key/enclosure/interlock GPIO signals (tested against a fake chip only; it cannot arm or fire a laser).
 - **[HYDRA-UMC-BRIDGE-OPENPNP](https://github.com/JuanenRac/HYDRA-UMC-BRIDGE-OPENPNP)** — safe high-level board-flow coordinator for OpenPnP pick-and-place.
 - **[HYDRA-UMC-BRIDGE-PRINTER3D](https://github.com/JuanenRac/HYDRA-UMC-BRIDGE-PRINTER3D)** — safe coordination boundary for Moonraker/Klipper 3D printers, with real gated job commands.
-- **[HYDRA-UMC-BRIDGE-ROS2](https://github.com/JuanenRac/HYDRA-UMC-BRIDGE-ROS2)** — safety coordinator with a real, lazily-imported rclpy ROS 2 transport.
-- **[HYDRA-UMC-BRIDGE-UAV](https://github.com/JuanenRac/HYDRA-UMC-BRIDGE-UAV)** — coordination boundary for camera-equipped UAVs, with a real MAVLink command sender.
+- **[HYDRA-UMC-BRIDGE-ROS2](https://github.com/JuanenRac/HYDRA-UMC-BRIDGE-ROS2)** — coordinator with a lazily imported rclpy ROS 2 transport (not yet run against a ROS 2 installation).
+- **[HYDRA-UMC-BRIDGE-UAV](https://github.com/JuanenRac/HYDRA-UMC-BRIDGE-UAV)** — coordination boundary for camera-equipped UAVs, with a MAVLink command sender (tested against an emulator only).
 
 *Vision AI Node (Hailo-8)*
 - **[HYDRA-UMC-VISION-NODE](https://github.com/JuanenRac/HYDRA-UMC-VISION-NODE)** — integration hub for the Hailo-8 vision pipeline, with a real per-stage hardware-readiness check.
 - **[HYDRA-UMC-VISION-STREAMER](https://github.com/JuanenRac/HYDRA-UMC-VISION-STREAMER)** — real GStreamer pipeline + MediaMTX config generator with a real HailoRT integration boundary.
-- **[HYDRA-UMC-VISUAL-SERVOING-API](https://github.com/JuanenRac/HYDRA-UMC-VISUAL-SERVOING-API)** — real Position-Based Visual Servoing correction law, safety-gated on upstream zone state.
-- **[HYDRA-UMC-SAFETY-ZONES](https://github.com/JuanenRac/HYDRA-UMC-SAFETY-ZONES)** — real zone-breach checking and E-STOP requesting, with calibration-freshness enforcement.
+- **[HYDRA-UMC-VISUAL-SERVOING-API](https://github.com/JuanenRac/HYDRA-UMC-VISUAL-SERVOING-API)** — Position-Based Visual Servoing correction law with authorisation gated on the zone state; no camera pose estimation yet.
+- **[HYDRA-UMC-SAFETY-ZONES](https://github.com/JuanenRac/HYDRA-UMC-SAFETY-ZONES)** — v0 zone-breach, calibration-freshness and E-STOP-request logic that takes object positions from a file; no detector feeds it and no physical E-STOP is wired to it yet.
 
 *Cognitive AI Node (Hailo-10)*
 - **[HYDRA-UMC-COGNITIVE-NODE](https://github.com/JuanenRac/HYDRA-UMC-COGNITIVE-NODE)** — integration hub for the Hailo-10 cognitive pipeline (LLM/VLA/voice orchestration).
@@ -625,7 +627,7 @@ This project is part of the HYDRA-UMC robotics ecosystem by the same author (Jua
 
 *Digital Twin & Simulation*
 - **[HYDRA-UMC-TWIN](https://github.com/JuanenRac/HYDRA-UMC-TWIN)** — integration hub for the digital-twin engine, with a real version-compatibility sync contract.
-- **[HYDRA-UMC-HIL-BRIDGE](https://github.com/JuanenRac/HYDRA-UMC-HIL-BRIDGE)** — real hardware-in-the-loop safety interlock routing commands between simulation and real hardware.
+- **[HYDRA-UMC-HIL-BRIDGE](https://github.com/JuanenRac/HYDRA-UMC-HIL-BRIDGE)** — hardware-in-the-loop router with a software collision interlock between simulation and real hardware (tested without real hardware).
 - **[HYDRA-UMC-PHYSICS-REPLICA](https://github.com/JuanenRac/HYDRA-UMC-PHYSICS-REPLICA)** — real forward kinematics and joint-limit validation over a real URDF subset.
 - **[HYDRA-UMC-SYNTHETIC-DATA-GEN](https://github.com/JuanenRac/HYDRA-UMC-SYNTHETIC-DATA-GEN)** — real procedural 2D scene generator with YOLO/COCO annotation export.
 
@@ -644,7 +646,7 @@ This project is part of the HYDRA-UMC robotics ecosystem by the same author (Jua
 *Complementary Tools & Ecosystem Operations*
 - **[HYDRA-UMC-DASHBOARD-AI](https://github.com/JuanenRac/HYDRA-UMC-DASHBOARD-AI)** — Smart Summaries and Anomaly Highlighting panels over DATALAKE/ANOMALY-DETECTOR, with an honest statistical fallback.
 - **[HYDRA-UMC-TOOL-CLI](https://github.com/JuanenRac/HYDRA-UMC-TOOL-CLI)** — fleet CLI with a real, stable exit-code contract, a genuine live client of HYDRA-UMC-SERVER's own API.
-- **[HYDRA-UMC-WATCH](https://github.com/JuanenRac/HYDRA-UMC-WATCH)** — WearOS companion app with real haptic alerts and a paired-phone voice relay.
+- **[HYDRA-UMC-WATCH](https://github.com/JuanenRac/HYDRA-UMC-WATCH)** — WearOS companion app with haptic alert patterns and a paired-phone voice relay (not yet run on a physical watch).
 - **[HYDRA-UMC-UPDATER](https://github.com/JuanenRac/HYDRA-UMC-UPDATER)** — administrative desktop tool that discovers, clones and updates every repo in this ecosystem.
 - **[HYDRA-UMC-OS-REBUILDER](https://github.com/JuanenRac/HYDRA-UMC-OS-REBUILDER)** — Windows/Linux desktop tool that builds a ready-to-flash CM5 image pre-loaded with the ecosystem's most current versions, with Raspberry-Pi-Imager-style first-boot Wi-Fi/user/SSH configuration.
 - **[HYDRA-UMC-OPS-AGENT](https://github.com/JuanenRac/HYDRA-UMC-OPS-AGENT)** — maintenance-incident coordinator: a low-privilege edge role collects a sanitized inventory/health snapshot, a control-plane role renders it read-only and asks an AI provider to suggest a diagnosis - never applies a patch or deploys anything.

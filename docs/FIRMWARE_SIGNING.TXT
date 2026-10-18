@@ -3,6 +3,18 @@
  Copyright (C) 2026 JuanenRac (Electro Hobby 3D) - GPL-3.0
 ===============================================================================
 
+STATUS (read this first)
+-------------------------------------------------------------------------------
+The bootloaders check CRC32 and an HMAC-SHA256 computed with ONE shared
+symmetric key. HMAC proves only that the image was made by someone who holds
+that key; it does not prove who that person is. The application images
+published as release assets are signed with the PUBLIC DEVELOPMENT KEY
+(`signing_key_kind: dev` in the release manifest), and that key is public, so anyone can sign an image that a board built
+with that key will accept. Release-key signing (URTC_SIGNING_KEY_FILE with
+URTC_RELEASE=1) exists in the build script, but no published release uses it
+yet. Asymmetric signatures (Ed25519) are planned, not implemented. No populated
+board exists, so none of this has run on a real board.
+
 1. WHAT THE BOOTLOADERS CHECK
 -------------------------------------------------------------------------------
 Before a CAN-OTA update is copied into the application slot, the main board

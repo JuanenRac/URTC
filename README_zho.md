@@ -25,7 +25,7 @@
 </p>
 
 
-> **⚠️ 安全提示：** 本板驱动一个**10W 雕刻激光二极管**以及多个加热级（T12 电烙铁头、3D 打印机热端）。制作和使用它意味着要操作在缺乏适当安全措施（针对该激光二极管波长的护目镜、热防护、可及的电源切断装置）时可能造成**烧伤、火灾或眼部伤害**的设备。这是一个按原样分享的爱好者/创客项目——自行承担构建和使用的风险，不要仅仅因为固件带有看门狗机制就跳过基本的安全规范。
+> **⚠️ 安全提示（设计阶段，尚无板卡运行过此固件）：** 本板驱动一个**10W 雕刻激光二极管**以及多个加热级（T12 电烙铁头、3D 打印机热端）。制作和使用它意味着要操作在缺乏适当安全措施（针对该激光二极管波长的护目镜、热防护、可及的电源切断装置）时可能造成**烧伤、火灾或眼部伤害**的设备。这是一个按原样分享的爱好者/创客项目——自行承担构建和使用的风险，不要仅仅因为固件带有看门狗机制就跳过基本的安全规范（这些是软件看门狗，从未在真实板卡上运行过）。
 
 大家好！我想分享一个我一直在开发的项目，叫做 URTC（通用机器人工具控制器）。它是一块单体式、高度集成的控制板，专为扩展机械臂和自动化装置的能力而设计，非常适合像 PAROL6 和 Faze4 这样的平台——这两款开源机械臂由 [Source-Robotics](https://source-robotics.com/)（[GitHub](https://github.com/Source-Robotics)）设计开发。
 
@@ -33,9 +33,11 @@
 
 以下是关于它是什么、能做什么，以及它目前所管理的硬件生态系统的完整分解。
 
-**状态：🚧 积极演进中的项目——尚无正式 Release。** URTC 正同时在两条战线上持续、积极地开发：固件（新的工具配置文件、扩展从属生态系统、协议变更）和硬件（原理图和 BOM 仍在最终确定中，尚不存在已实际组装的板卡）。由于两侧始终同步推进，本仓库中在任何给定时刻的内容都是正在进行中工作的快照，而非一个稳定的、有版本号的产品——文件名、文件夹结构、工具数量和文档在设计稳定下来之前都仍可能变化。一旦固件和硬件都真正达到稳定、在真实硬件上经过验证的状态，就会打上一个正式的 **Release** 标签，将所有内容（固件、引导程序、PC 工具、硬件设计文件和文档）作为一个连贯的、冻结的快照捆绑在一起。在那之前，请将 `main` 视为它本身——一个正在积极移动的目标。
+**状态：🚧 积极演进中的项目——已有发布版本，但没有任何东西在真实板卡上运行过。** 已有带标签的发布版本（v0.3.x），每个都包含由本源码构建的固件镜像，但不存在已组装的板卡，因此固件从未在真实板卡上运行过。 URTC 正同时在两条战线上持续、积极地开发：固件（新的工具配置文件、扩展从属生态系统、协议变更）和硬件（原理图和 BOM 仍在最终确定中，尚不存在已实际组装的板卡）。由于两侧始终同步推进，本仓库中在任何给定时刻的内容都是正在进行中工作的快照，而非一个稳定的、有版本号的产品——文件名、文件夹结构、工具数量和文档在设计稳定下来之前都仍可能变化。一旦固件和硬件都真正达到稳定、在真实硬件上经过验证的状态，就会打上一个正式的 **Release** 标签，将所有内容（固件、引导程序、PC 工具、硬件设计文件和文档）作为一个连贯的、冻结的快照捆绑在一起。在那之前，请将 `main` 视为它本身——一个正在积极移动的目标。
 
 ---
+
+> **安全与安防现状:**本生态系统不是经认证的安全系统,目前也不存在已组装的 URTC 电路板。引导程序使用 CRC32 和共享密钥的 HMAC-SHA256 校验固件映像,而非非对称签名(计划中);已发布的应用映像使用公开的开发密钥签名(`signing_key_kind: dev`),因此任何人都可以生成引导程序接受的映像;尚未向任何真实电路板发送过任何内容。在依赖此处任何说法来保障人身安全之前,请先阅读[安全基线](https://github.com/JuanenRac/URTC-DOCS/blob/main/docs/SECURITY_BASELINE.md)和[威胁模型](https://github.com/JuanenRac/URTC-DOCS/blob/main/docs/THREAT_MODEL.md)。
 
 ## 📋 速览
 
@@ -43,13 +45,13 @@
 |---|---|
 | 版本 | `0.3.5` |
 | 成熟度 | 可用 |
-| 技术栈 | STM32F303 / FDCAN / S-Curve profiles |
+| 技术栈 | STM32F303 / bxCAN / 25 tool profiles |
 | 目标 | 微控制器板（固件）；在电脑上构建 |
 | 真实硬件 | 尚未：此版本没有在真实硬件上运行的记录 |
 
 ## ⚙️ 什么是 URTC？
 
-URTC 是一块由 STM32 微控制器（STM32F303CCT6，LQFP48）驱动的一体化、紧凑型控制板。它通过 CAN 总线与主机器人控制器通信，使得在工具头或轴端就能实时、低延迟地执行复杂任务。它配备了一块板载 OLED 显示屏用于即时诊断——动画开机画面、每个工具的动画图标、双色面板上的实时遥测——一个单像素 RGB 状态 LED，加上一圈可寻址 RGB LED 环用于摄像头照明，一个 20 针扩展接口用于附加板，一块板载 F-RAM 在断电时保留当前工具的设定值，以及专用的模拟和大电流电源级。
+URTC 是一块由 STM32 微控制器（STM32F303CCT6，LQFP48）驱动的一体化、紧凑型控制板。它通过 CAN 总线与主机器人控制器通信，旨在让工具头或轴端以低延迟执行复杂任务（延迟从未在真实板卡上测量过，也不保证硬实时）。它配备了一块板载 OLED 显示屏用于即时诊断——动画开机画面、每个工具的动画图标、双色面板上的实时遥测——一个单像素 RGB 状态 LED，加上一圈可寻址 RGB LED 环用于摄像头照明，一个 20 针扩展接口用于附加板，一块板载 F-RAM 在断电时保留当前工具的设定值，以及专用的模拟和大电流电源级。
 
 ## 🛠️ 可扩展架构与工具矩阵
 
@@ -111,13 +113,13 @@ URTC 的核心优势在于其极强的多功能性。板卡采用可扩展矩阵
 1. **焊接工作站（T12）：** 使用直接 ADC 反馈实现精确 PID 温度控制，处理标准 T12 烙铁头，加上一个将焊丝送入焊点的电动送丝器（与下方纯运动类工具共享 `CONN_MOT` 及其步进协议——为腾出空间，牺牲了本工具自身的通用限位输入）。[跳线/接线配置 →](images/TOOL_SOLDERING_IRON.png)
 2. **SMT 焊膏点胶器：** 用于 PCB 上精确焊膏沉积的毫米级送料控制。[跳线/接线配置 →](images/TOOL_PASTE_DISPENSER.png)
 3. **导热膏/液体点胶器：** 针对高粘度膏体或液态胶粘剂的流动性管理。[跳线/接线配置 →](images/TOOL_LIQUID_DISPENSER.png)
-4. **智能电动螺丝刀：** 基于扭矩限制或限位开关的旋转和停止控制。[跳线/接线配置 →](images/TOOL_SCREWDRIVER.png)
+4. **智能电动螺丝刀：** 通过步进接口进行旋转和停止控制。计划中：基于扭矩限制的停止（目前还没有扭矩检测）。[跳线/接线配置 →](images/TOOL_SCREWDRIVER.png)
 5. **真空/气动夹爪：** 真空泵控制和压力等级读取，用于安全的拾取放置操作。[跳线/接线配置 →](images/TOOL_VACUUM_PICKUP.png)
-6. **钻头（BL4260）：** PWM 转速控制、方向切换，以及带实时转速读数的动态电子制动，配有独立于步进工具驱动器使能线的专用使能/制动线。提供通用限位输入。[跳线/接线配置 →](images/TOOL_DRILL.png)
+6. **钻头（BL4260）：** PWM 转速控制、方向切换，以及带在线转速读数的动态电子制动，配有独立于步进工具驱动器使能线的专用使能/制动线。提供通用限位输入。[跳线/接线配置 →](images/TOOL_DRILL.png)
 7. **云台夹爪：** 使用三相无刷云台电机的高灵敏操控。[跳线/接线配置 →](images/TOOL_GRIPPER_GIMBAL.png)
 8. **NEMA 夹爪：** 通过重型步进电机控制的稳固夹紧力。[跳线/接线配置 →](images/TOOL_GRIPPER_NEMA.png)
 9. **AOI（自动光学检测）系统：** 面向机器视觉相机拍摄的 LED 照明阵列的同步频闪控制。提供通用限位输入。[跳线/接线配置 →](images/TOOL_AOI_INSPECTION.png)
-10. **雕刻激光二极管（10W 光学）：** 带安全硬件回路（CAN 看门狗）的 PWM 光束功率调制，主机通信丢失时锁定。提供通用限位输入。[跳线/接线配置 →](images/TOOL_LASER_ENGRAVER.png)
+10. **雕刻激光二极管（10W 光学）：** 带软件 CAN 看门狗的 PWM 光束功率调制，主机通信丢失时锁定激光输出（仅完成构建，从未在真实板卡上运行，也不能代替独立的硬件联锁）。提供通用限位输入。[跳线/接线配置 →](images/TOOL_LASER_ENGRAVER.png)
 11. **3D 打印热端：** 加热管的 PID 控制、NTC 热敏电阻读数、挤出机控制，以及一个专用的 25kHz PWM 控制层冷却风扇（4 线，转速计反馈，自身的通信看门狗）——全部集成于一个模块中。[跳线/接线配置 →](images/TOOL_3D_PRINTER.png)
 12. **3D 扫描探针：** 超快的硬件中断输入（EXTI），具有绝对优先级，用于无延迟的实时表面数字化和碰撞感应。也涵盖计量接触式探测——同一硬件路径，同一工具头上的不同物理探针。[跳线/接线配置 →](images/TOOL_SCAN_PROBE.png)
 13. **SMT 拾取放置头：** 旋转 A 轴用于正确的焊盘对齐，与上方膏体/液体点胶器及两款夹爪共用同一步进接口。[跳线/接线配置 →](images/TOOL_SMT_PICKPLACE.png)
@@ -129,7 +131,7 @@ URTC 的核心优势在于其极强的多功能性。板卡采用可扩展矩阵
 19. **UV 固化头：** 用于即时胶水/掩膜固化的大功率 UV LED 驱动器。[跳线/接线配置 →](images/TOOL_UV_CURING.png)
 20. **热风返修喷嘴：** 加热元件、涡轮鼓风机和热电偶反馈，用于对偏位的贴片元件进行回流焊——共享电烙铁自身的热控回路。[跳线/接线配置 →](images/TOOL_HOTAIR_REWORK.png)
 21. **气动压装插入器：** 用于将连接器压入 PCB 的线性执行器控制——执行器及其自身传感器位于机器人自身主板上，不在本板范围内。[跳线/接线配置 →](images/TOOL_PRESSFIT_INSERTER.png)
-22. **线束/压接执行器：** 用于剥线/压接端子的高扭矩钳口，由**扩展板自身的驱动器**驱动，而非主板的驱动器。[跳线/接线配置 →](images/TOOL_CRIMPING_ACTUATOR.png)
+22. **线束/压接执行器：** 用于剥线/压接端子的高扭矩钳口，由**扩展板自身的驱动器**驱动，而非主板的驱动器。固件中没有扭矩或力检测。[跳线/接线配置 →](images/TOOL_CRIMPING_ACTUATOR.png)
 23. **PCB 高级检测：** 热成像（MLX9064x 系列阵列——目前支持全部 3 个系列成员，MLX90640/MLX90641/MLX90642，可通过**高级**扩展板自身的从属芯片，或直接接线到主板的**基础型** MLX9064x 扩展板）用于根据温度特征发现短路，配合环形 LED 照明。也涵盖微型主轴分板——同一钻头硬件路径，用于不同工作的不同环节。[跳线/接线配置 →](images/TOOL_THERMAL_INSPECTION.png)
 24. **焊膏喷射阀：** 压电微滴分配，亚毫秒级脉冲精度，在**高级**扩展板上本地生成。[跳线/接线配置 →](images/TOOL_PASTE_JETTING.png)
 25. **超声波焊接/包装封口机：** 用于塑料外壳焊接的高频换能器触发。[跳线/接线配置 →](images/TOOL_ULTRASONIC_WELDER.png)
@@ -295,7 +297,7 @@ URTC 的闪存被拆分为两个独立部分，因此板卡可以通过它已经
 0x08040000 └─────────────────────────────────┘
 ```
 
-**为什么需要一个备份槽。** 一次 CAN 更新绝不会写入当前正在运行的那个槽。它会先写入备份槽，并在那里被完整验证——大小、CRC32，以及一个证明它确实来自本项目自身构建流程（而不仅仅是完整到达）的 HMAC-SHA256 签名——只有那之后才会被复制到主槽中。在这次复制开始之前的任何时刻发生断电，都会让当前运行的固件完全不受影响，因此不存在一个被中断的下载可能使板卡变砖的窗口期。如果断电恰好发生在复制过程*本身*期间，引导程序会在下一次启动时注意到这一点（备份槽在复制期间从未被触碰，依然完整无损），并简单地从那里恢复复制，直到成功为止。
+**为什么需要一个备份槽。** 一次 CAN 更新绝不会写入当前正在运行的那个槽。它会先写入备份槽，并在那里被完整验证——大小、CRC32，以及一个使用共享对称密钥的 HMAC-SHA256 校验，表明它由持有该密钥的人生成（已发布的镜像使用公开的开发密钥），而不仅仅是完整到达——只有那之后才会被复制到主槽中。在这次复制开始之前的任何时刻发生断电，都会让当前运行的固件完全不受影响，因此不存在一个被中断的下载可能使板卡变砖的窗口期。如果断电恰好发生在复制过程*本身*期间，引导程序会在下一次启动时注意到这一点（备份槽在复制期间从未被触碰，依然完整无损），并简单地从那里恢复复制，直到成功为止。
 
 ### 0. 从源码编译（可选——预构建的二进制文件是每个 GitHub 发布的资源，而不是仓库中的文件）
 
@@ -330,7 +332,7 @@ URTC 的闪存被拆分为两个独立部分，因此板卡可以通过它已经
 
 1. **触发。** 主机向*正在运行的应用程序*发送 `0x7F0`（DLC 4，负载 `B0 07 1D 5A`）。它会安全地内联切断每一个执行器的电源——电机、加热器、激光——并复位芯片。这个魔术负载要求意味着一个损坏或畸形的帧不能意外触发进入更新模式的复位。
 2. **开始。** 复位后，引导程序开始监听。主机发送 `0x7F1`（DLC 8，大端序固件总大小 + 大端序硬件 ID）。为不同硬件构建的镜像会在此刻立即被拒绝，甚至还没有触碰一个字节的闪存。引导程序会正好擦除新镜像所需数量的备份槽页面，并回复一个状态帧（`0x7F5`）。
-3. **签名。** 主机以四个 `0x7F7` 帧（每个 8 字节，按顺序）发送预期的 HMAC-SHA256 签名——该签名基于固件镜像和引导程序与签名构建的工具之间共享的密钥计算得出。
+3. **签名。** 主机以四个 `0x7F7` 帧（每个 8 字节，按顺序）发送预期的 HMAC-SHA256 签名——该签名基于固件镜像和引导程序与签名构建的工具之间共享的密钥计算得出。 这是共享的对称密钥，因此该校验只能证明镜像来自持有该密钥的人，而不能证明对方是谁；已发布的镜像使用公开的开发密钥（参见 `docs/FIRMWARE_SIGNING.TXT`）。
 4. **数据。** 主机以一系列 `0x7F2` 帧（每帧至多 8 字节的原始固件数据）连续发送 `.bin` 文件——CAN 保证帧按照在单一总线上发送的顺序到达，因此不需要逐帧序号。引导程序将传入的字节缓冲进 RAM 中的一个 2KB 页面，写满后写入*备份*槽，在认为该页面完成之前逐个半字读回并与本应写入的内容比对，并在每次经过验证的写入后发送一个 `0x7F3` 确认（附带页面索引）。一个合理的主机实现会在发送下一页数据之前等待每一页的 ACK，以避免溢出引导程序的接收缓冲区。
 5. **结束与验证。** 一旦所有字节都已发送完毕，主机发送 `0x7F4`（DLC 8，大端序 CRC32 + 主/次版本号）。引导程序检查备份槽的大小，计算其 CRC32 和 HMAC-SHA256，并将两者都与主机所声明的值进行比对。只有一切都匹配时，它才会逐页将备份复制到主槽中，采用与上文相同的回读验证方式。一旦该复制完成并确认无误，它会保存新的元数据并复位进入更新后的应用程序。任何不匹配——大小、CRC32、HMAC 或硬件 ID——都不会触碰主槽，引导程序只会回到监听状态，等待一次全新的尝试。
 
@@ -351,11 +353,11 @@ URTC 的闪存被拆分为两个独立部分，因此板卡可以通过它已经
 
 还存在一个基于网页的替代方案，覆盖类似的功能范围（实时监控、CAN 分析、OTA 刷写、热成像检测），无需在本地安装任何东西：[URTC Web Studio](https://github.com/JuanenRac/URTC-WEB-STUDIO)。
 
-## 🛡️ 热安全、固件签名与 CAN 安全
+## 🛡️ 热保护（仅在主机上测试）、固件签名（开发密钥）与 CAN（无身份验证）
 
-- **热失控保护**（`thermal_guard.c`，自应用 0.3.2 起）用于烙铁／热风和 3D 热端：对*实测*温度的 MAXTEMP（T12 449 °C，热端 310 °C）、加热监视（加热器开启时温度必须真正上升——可检测松脱的热敏电阻或烙铁头）以及保温检查（达到目标后，加热器开启时不得长时间下降）。一旦故障即切断加热器、锁定板卡错误，并通过 `0x111` 的第 4 字节报告原因。已在主机上用模拟加热器测试（`tests/test_thermal_guard.c`）。
+- **热失控保护**（`thermal_guard.c`，自应用 0.3.2 起）用于烙铁／热风和 3D 热端：对*实测*温度的 MAXTEMP（T12 449 °C，热端 310 °C）、加热监视（加热器开启时温度必须真正上升——可检测松脱的热敏电阻或烙铁头）以及保温检查（达到目标后，加热器开启时不得长时间下降）。一旦故障即切断加热器、锁定板卡错误，并通过 `0x111` 的第 4 字节报告原因。已在主机上用模拟加热器测试（`tests/test_thermal_guard.c`）。 这些限值从未在真实加热器上测量过，这一切也从未在真实板卡上运行过。
 - **诊断：** `0x111` 的第 5 字节报告上次复位原因（bit0 = 硬件看门狗触发）；`0x1AA`/`0x1AB` 返回保存在 F-RAM 中的累计计数——热故障次数、最后一次故障代码和加热器总开启时间（自 0.3.3 起）；黑匣子采样也会记录热故障代码。
-- **固件签名：** 引导程序的 HMAC 密钥在构建时从私有文件（`URTC_SIGNING_KEY_FILE`）注入；没有该文件时构建使用*公开开发密钥*并给出提示，`URTC_RELEASE=1` 会拒绝该密钥。`firmware/` 中每个镜像都附带 `<bin>.sha256` 和 `<bin>.manifest.json`（含预先计算的签名），因此 URTC Flasher 和 URTC Web Studio 不包含任何密钥。参见 [`docs/FIRMWARE_SIGNING.TXT`](docs/FIRMWARE_SIGNING.TXT)。
+- **固件签名：** 引导程序的 HMAC 密钥在构建时从私有文件（`URTC_SIGNING_KEY_FILE`）注入；没有该文件时构建使用*公开开发密钥*并给出提示，`URTC_RELEASE=1` 会拒绝该密钥。`firmware/` 中每个镜像都附带 `<bin>.sha256` 和 `<bin>.manifest.json`（含预先计算的签名），因此 URTC Flasher 和 URTC Web Studio 不包含任何密钥。参见 [`docs/FIRMWARE_SIGNING.TXT`](docs/FIRMWARE_SIGNING.TXT)。 HMAC 使用共享的对称密钥：已发布的应用镜像使用公开的开发密钥签名，因此任何人都可以为使用该密钥构建的板卡签出它会接受的镜像；非对称签名（Ed25519）仍在计划中。
 - **CAN 总线：** 不验证发送方——任何节点都可以控制工具。使用激光、加热器或焊接设备的安装**必须**配备独立于 MCU 的硬件联锁和封闭总线：[`docs/CAN_THREAT_MODEL.TXT`](docs/CAN_THREAT_MODEL.TXT)。
 
 ## 📋 更新日志
@@ -371,9 +373,9 @@ URTC 的闪存被拆分为两个独立部分，因此板卡可以通过它已经
 
 ## 🔍 当前状态
 
-**固件（`src/F303-master/`）：** 全部 25 种工具配置文件功能完整——热 PID 控制、逐工具遥测、通信看门狗、失速/故障检测，以及 OLED 自身的实时诊断，此外还有一对当前工具查询命令（`0x110`/`0x111`）、面向扩展接口的通用 SPI 透传（`0x180`/`0x181`）、一块在断电时保留设定值的板载 F-RAM（`0x190`/`0x191`）、`11111` 跳线自由工具配置机制（`0x1A2`/`0x1A3`）、外设类型 + 设备序列号报告（`0x1A4`/`0x1A5`，用于在共享总线上区分多块原本相同的板卡），以及一条到达高级扩展板上从属芯片的 CAN 转 I2C 桥（`0x210`-`0x221`）。独立于引导程序进行版本管理（见下方更新日志）。
+**固件（`src/F303-master/`）：** 全部 25 种工具配置文件功能完整——热 PID 控制、逐工具遥测、通信看门狗、失速/故障检测，以及 OLED 自身的实时诊断，此外还有一对当前工具查询命令（`0x110`/`0x111`）、面向扩展接口的通用 SPI 透传（`0x180`/`0x181`）、一块在断电时保留设定值的板载 F-RAM（`0x190`/`0x191`）、`11111` 跳线自由工具配置机制（`0x1A2`/`0x1A3`）、外设类型 + 设备序列号报告（`0x1A4`/`0x1A5`，用于在共享总线上区分多块原本相同的板卡），以及一条到达高级扩展板上从属芯片的 CAN 转 I2C 桥（`0x210`-`0x221`）。独立于引导程序进行版本管理（见下方更新日志）。 这一切都从未在真实板卡上运行过，热保护仅在主机上用模拟加热器测试过。
 
-**引导程序（`src/F303-master/boot/`）：** 功能完整的黄金镜像 A/B 更新系统——通过 CAN 进行 HMAC-SHA256 签名的 OTA 更新，一个确保失败的更新绝不会使板卡变砖的备份槽，以及独立于应用程序的自身版本报告（`0x7FA`）。编译和链接干净；在无人值守、连接真实执行器的场景中信任它之前，请先参见上方的实验台测试注意事项。
+**引导程序（`src/F303-master/boot/`）：** 功能完整的黄金镜像 A/B 更新系统——通过 CAN 进行、以 CRC32 和共享密钥 HMAC-SHA256 校验的 OTA 更新（并非非对称签名），一个确保失败的更新绝不会使板卡变砖的备份槽，以及独立于应用程序的自身版本报告（`0x7FA`）。编译和链接干净；在无人值守、连接真实执行器的场景中信任它之前，请先参见上方的实验台测试注意事项。
 
 **PC 工具：** [URTC Flasher](https://github.com/JuanenRac/URTC-FLASHER)（CAN OTA 更新 + 全芯片 SWD/JTAG 编程）和 [URTC Tester](https://github.com/JuanenRac/URTC-TESTER)（实时逐工具控制/遥测测试器）两者对于各自的既定目标而言功能都已完整，如今各自都是独立项目，各自拥有详细覆盖设置和每一项控制的 README。
 
@@ -558,8 +560,8 @@ URTC 的闪存被拆分为两个独立部分，因此板卡可以通过它已经
 - **[URTC-WEB-STUDIO](https://github.com/JuanenRac/URTC-WEB-STUDIO)** —— 通过 Web Serial API 实现的浏览器版 URTC-TESTER 替代方案,无需本地安装;与上述两款桌面工具使用相同的 CAN 协议。
 
 **直接相关**
-- **[HYDRA-UMC](https://github.com/JuanenRac/HYDRA-UMC)** —— 机器人手臂的真实主板——CM5 主机 + 双核 STM32H745,通过 CAN-OTA/SPI-OTA 协调最多 8 条工具臂;其自身真实的 FDCAN2 中继隧道正是本固件工具头所依托的线路。
-- **[HYDRA-UMC-SDK](https://github.com/JuanenRac/HYDRA-UMC-SDK)** —— 每个桥接都据此校验自身指令的共享 JSON-Schema 契约与安全门限边界;同样覆盖服务、界面、CM5 适配器以及本固件。
+- **[HYDRA-UMC](https://github.com/JuanenRac/HYDRA-UMC)** —— 机器人手臂主板设计——CM5 主机 + 双核 STM32H745,目标是通过 CAN-OTA/SPI-OTA 协调最多 8 条工具臂(固件处于早期阶段,尚无已组装的电路板);其自身真实的 FDCAN2 中继隧道正是本固件工具头所依托的线路。
+- **[HYDRA-UMC-SDK](https://github.com/JuanenRac/HYDRA-UMC-SDK)** —— 每个桥接都据此校验自身指令的共享 JSON-Schema 契约与软件作业门限边界(并非经认证的安全功能);同样覆盖服务、界面、CM5 适配器以及本固件。
 - **[HYDRA-UMC-CONNECTOR-HUB](https://github.com/JuanenRac/HYDRA-UMC-CONNECTOR-HUB)** — 面向外部机器连接器的声明式适配器清单注册与校验工具；把 SDK 自身的契约理念扩展到外部机器，而不取代工业网关类项目。
 - **[URTC-SMART-RACK](https://github.com/JuanenRac/URTC-SMART-RACK)** —— 面向板卡安装机架的固件,具备真实的工具 ID 解码与 Smart Idle 预热逻辑;与本固件共享同一工具生态与 CAN 总线。
 - **[URTC-VISION-TOOL](https://github.com/JuanenRac/URTC-VISION-TOOL)** —— 面向热成像/RGB 检测工具头的固件及真实 Python 视觉伴侣程序;与本固件共享同一工具生态与 CAN 总线。
@@ -579,20 +581,20 @@ URTC 的闪存被拆分为两个独立部分，因此板卡可以通过它已经
 - **[HYDRA-UMC-DSI](https://github.com/JuanenRac/HYDRA-UMC-DSI)** —— 面向机载 7 英寸 DSI 触摸屏的原生触控界面,直接嵌入 CM5 本体。
 - **[HYDRA-UMC-EDITOR-URDF](https://github.com/JuanenRac/HYDRA-UMC-EDITOR-URDF)** —— 将完成的模型推送到 STUDIO 自身目录的桌面版图形化 URDF 创建/编辑工具。
 - **[HYDRA-UMC-EDITOR-STL](https://github.com/JuanenRac/HYDRA-UMC-EDITOR-STL)** — 桌面 STL 模型编辑器，在 HYDRA-UMC-EDITOR-URDF 编辑的同一模型目录中变换/替换/移除/添加真实部件。
-- **[HYDRA-UMC-BRIDGE-AMR](https://github.com/JuanenRac/HYDRA-UMC-BRIDGE-AMR)** —— 通过真实的 VDA 5050 MQTT 发布者为 AGV/AMR 车队提供的协调边界。
-- **[HYDRA-UMC-BRIDGE-CNC](https://github.com/JuanenRac/HYDRA-UMC-BRIDGE-CNC)** —— 具备真实 GRBL 状态/控制字节访问能力的高层 CNC 单元协调器。
-- **[HYDRA-UMC-BRIDGE-DROIDS](https://github.com/JuanenRac/HYDRA-UMC-BRIDGE-DROIDS)** —— 面向足式/人形机器人的协调边界,具备真实的 Boston Dynamics Spot 指令发送器。
-- **[HYDRA-UMC-BRIDGE-LASER](https://github.com/JuanenRac/HYDRA-UMC-BRIDGE-LASER)** —— 读取 3 项真实钥匙/外壳/联锁 GPIO 安全信号的激光单元安全协调器。
+- **[HYDRA-UMC-BRIDGE-AMR](https://github.com/JuanenRac/HYDRA-UMC-BRIDGE-AMR)** —— 通过 VDA 5050 MQTT 发布者为 AGV/AMR 车队提供的协调边界(仅针对仿真车队测试)。
+- **[HYDRA-UMC-BRIDGE-CNC](https://github.com/JuanenRac/HYDRA-UMC-BRIDGE-CNC)** —— 具备 GRBL 状态/控制字节访问能力的高层 CNC 单元协调器(仅针对模拟器测试)。
+- **[HYDRA-UMC-BRIDGE-DROIDS](https://github.com/JuanenRac/HYDRA-UMC-BRIDGE-DROIDS)** —— 面向足式/人形机器人的协调边界,带有 Boston Dynamics Spot 指令发送器(仅针对模拟器测试)。
+- **[HYDRA-UMC-BRIDGE-LASER](https://github.com/JuanenRac/HYDRA-UMC-BRIDGE-LASER)** —— 读取 3 路钥匙/外壳/联锁 GPIO 信号的激光单元协调器(仅针对模拟芯片测试;无法使激光器上膛或发射)。
 - **[HYDRA-UMC-BRIDGE-OPENPNP](https://github.com/JuanenRac/HYDRA-UMC-BRIDGE-OPENPNP)** —— 面向 OpenPnP 贴片机板级流程的安全高层协调器。
 - **[HYDRA-UMC-BRIDGE-PRINTER3D](https://github.com/JuanenRac/HYDRA-UMC-BRIDGE-PRINTER3D)** —— 面向 Moonraker/Klipper 3D 打印机的安全协调边界,具备真实的受控作业指令。
-- **[HYDRA-UMC-BRIDGE-ROS2](https://github.com/JuanenRac/HYDRA-UMC-BRIDGE-ROS2)** —— 具备真实的惰性导入 rclpy ROS 2 传输层的安全协调器。
-- **[HYDRA-UMC-BRIDGE-UAV](https://github.com/JuanenRac/HYDRA-UMC-BRIDGE-UAV)** —— 面向搭载摄像头的无人机的协调边界,具备真实的 MAVLink 指令发送器。
+- **[HYDRA-UMC-BRIDGE-ROS2](https://github.com/JuanenRac/HYDRA-UMC-BRIDGE-ROS2)** —— 带有惰性导入 rclpy ROS 2 传输层的协调器(尚未在 ROS 2 环境中运行)。
+- **[HYDRA-UMC-BRIDGE-UAV](https://github.com/JuanenRac/HYDRA-UMC-BRIDGE-UAV)** —— 面向搭载摄像头的无人机的协调边界,带有 MAVLink 指令发送器(仅针对模拟器测试)。
 
 *视觉 AI 节点(Hailo-8)*
 - **[HYDRA-UMC-VISION-NODE](https://github.com/JuanenRac/HYDRA-UMC-VISION-NODE)** —— 面向 Hailo-8 视觉流水线的集成中枢,具备逐阶段的真实硬件就绪检测。
 - **[HYDRA-UMC-VISION-STREAMER](https://github.com/JuanenRac/HYDRA-UMC-VISION-STREAMER)** —— 具备真实 HailoRT 集成边界的真实 GStreamer 流水线 + MediaMTX 配置生成器。
-- **[HYDRA-UMC-VISUAL-SERVOING-API](https://github.com/JuanenRac/HYDRA-UMC-VISUAL-SERVOING-API)** —— 具备真实 Position-Based Visual Servoing 修正律,并依据上游区域状态进行安全门控。
-- **[HYDRA-UMC-SAFETY-ZONES](https://github.com/JuanenRac/HYDRA-UMC-SAFETY-ZONES)** —— 具备校准新鲜度强制检查的真实区域入侵检测与 E-STOP 请求。
+- **[HYDRA-UMC-VISUAL-SERVOING-API](https://github.com/JuanenRac/HYDRA-UMC-VISUAL-SERVOING-API)** —— 以区域状态为授权条件的 Position-Based Visual Servoing 修正律;尚无摄像头位姿估计。
+- **[HYDRA-UMC-SAFETY-ZONES](https://github.com/JuanenRac/HYDRA-UMC-SAFETY-ZONES)** —— 从文件读取物体位置的 v0 区域入侵、校准新鲜度与 E-STOP 请求逻辑;没有检测器为其供数,也尚未连接任何物理 E-STOP。
 
 *认知 AI 节点(Hailo-10)*
 - **[HYDRA-UMC-COGNITIVE-NODE](https://github.com/JuanenRac/HYDRA-UMC-COGNITIVE-NODE)** —— 面向 Hailo-10 认知流水线(LLM/VLA/语音编排)的集成中枢。
@@ -611,7 +613,7 @@ URTC 的闪存被拆分为两个独立部分，因此板卡可以通过它已经
 
 *数字孪生与仿真*
 - **[HYDRA-UMC-TWIN](https://github.com/JuanenRac/HYDRA-UMC-TWIN)** —— 面向数字孪生引擎的集成中枢,具备真实的版本兼容性同步契约。
-- **[HYDRA-UMC-HIL-BRIDGE](https://github.com/JuanenRac/HYDRA-UMC-HIL-BRIDGE)** —— 在仿真与真实硬件之间路由指令的真实硬件在环安全联锁。
+- **[HYDRA-UMC-HIL-BRIDGE](https://github.com/JuanenRac/HYDRA-UMC-HIL-BRIDGE)** —— 在仿真与真实硬件之间带有软件碰撞联锁的硬件在环路由器(未在真实硬件上测试)。
 - **[HYDRA-UMC-PHYSICS-REPLICA](https://github.com/JuanenRac/HYDRA-UMC-PHYSICS-REPLICA)** —— 面向真实 URDF 子集的真实正向运动学与关节限位校验。
 - **[HYDRA-UMC-SYNTHETIC-DATA-GEN](https://github.com/JuanenRac/HYDRA-UMC-SYNTHETIC-DATA-GEN)** —— 具备 YOLO/COCO 标注导出功能的真实程序化 2D 场景生成器。
 
@@ -630,7 +632,7 @@ URTC 的闪存被拆分为两个独立部分，因此板卡可以通过它已经
 *辅助工具与生态系统运维*
 - **[HYDRA-UMC-DASHBOARD-AI](https://github.com/JuanenRac/HYDRA-UMC-DASHBOARD-AI)** —— 基于 DATALAKE/ANOMALY-DETECTOR 的智能摘要与异常高亮面板,具备诚实的统计回退机制。
 - **[HYDRA-UMC-TOOL-CLI](https://github.com/JuanenRac/HYDRA-UMC-TOOL-CLI)** —— 具备真实、稳定退出码契约的车队 CLI,是 HYDRA-UMC-SERVER 自身 API 的真实在线客户端。
-- **[HYDRA-UMC-WATCH](https://github.com/JuanenRac/HYDRA-UMC-WATCH)** —— 具备真实触觉提醒与配对手机语音中继功能的 WearOS 伴侣应用。
+- **[HYDRA-UMC-WATCH](https://github.com/JuanenRac/HYDRA-UMC-WATCH)** —— 带有触觉提醒模式与配对手机语音中继的 WearOS 伴侣应用(尚未在实体手表上运行)。
 - **[HYDRA-UMC-UPDATER](https://github.com/JuanenRac/HYDRA-UMC-UPDATER)** —— 发现、克隆并更新本生态系统中每个仓库的管理类桌面工具。
 - **[HYDRA-UMC-OS-REBUILDER](https://github.com/JuanenRac/HYDRA-UMC-OS-REBUILDER)** —— 构建即刻可烧录、预装生态系统最新版本的 CM5 镜像的 Windows/Linux 桌面工具,具备类似 Raspberry Pi Imager 风格的首次启动 Wi-Fi/用户/SSH 配置。
 - **[HYDRA-UMC-OPS-AGENT](https://github.com/JuanenRac/HYDRA-UMC-OPS-AGENT)** — 维护事件协调器：一个低权限的边缘角色采集经过脱敏的库存/健康快照，一个控制面角色以只读方式渲染它，并请求某个 AI 提供方给出诊断建议——从不应用补丁，也从不部署任何内容。

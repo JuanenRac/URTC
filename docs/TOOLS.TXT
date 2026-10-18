@@ -54,7 +54,8 @@ Expansion board: none needed.
 =============================================================================
 4. Smart Electric Screwdriver - ID 0x03
 =============================================================================
-Rotation and stop control based on torque limits or end-stops.
+Rotation and stop control through the stepper interface. Planned: stopping on
+torque limits (no torque sensing exists yet).
 Main board peripherals: onboard stepper driver (STEP/DIR/EN).
 Expansion board: none needed.
 
