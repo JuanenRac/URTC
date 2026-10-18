@@ -147,3 +147,51 @@ void HAL_CAN_DeInit(CAN_HandleTypeDef *h) { (void)h; }
 void HAL_I2C_DeInit(I2C_HandleTypeDef *h) { (void)h; }
 void HAL_RCC_DeInit(void) {}
 void HAL_DeInit(void) {}
+
+uint8_t fake_fram[FAKE_FRAM_SIZE];
+int fake_fram_fail_reads, fake_fram_fail_writes;
+int fake_fram_write_calls;
+uint16_t fake_fram_write_sizes[64];
+GPIO_PinState fake_pin_state[8];
+static struct { GPIO_TypeDef *port; uint16_t pin; } pin_keys[8];
+static int pin_key_count;
+
+void fake_pin_set(GPIO_TypeDef *port, uint16_t pin, GPIO_PinState state)
+{
+    for (int i = 0; i < pin_key_count; i++) {
+        if (pin_keys[i].port == port && pin_keys[i].pin == pin) { fake_pin_state[i] = state; return; }
+    }
+    if (pin_key_count < 8) {
+        pin_keys[pin_key_count].port = port;
+        pin_keys[pin_key_count].pin = pin;
+        fake_pin_state[pin_key_count++] = state;
+    }
+}
+
+GPIO_PinState HAL_GPIO_ReadPin(GPIO_TypeDef *port, uint16_t pin)
+{
+    for (int i = 0; i < pin_key_count; i++) {
+        if (pin_keys[i].port == port && pin_keys[i].pin == pin) return fake_pin_state[i];
+    }
+    return GPIO_PIN_RESET;
+}
+
+HAL_StatusTypeDef HAL_I2C_Mem_Write(I2C_HandleTypeDef *h, uint16_t dev, uint16_t mem, uint16_t memsize, uint8_t *data, uint16_t size, uint32_t timeout)
+{
+    (void)h; (void)dev; (void)memsize; (void)timeout;
+    if (fake_fram_fail_writes) return HAL_ERROR;
+    if ((uint32_t)mem + size > FAKE_FRAM_SIZE) return HAL_ERROR;
+    if (fake_fram_write_calls < 64) fake_fram_write_sizes[fake_fram_write_calls] = size;
+    fake_fram_write_calls++;
+    memcpy(fake_fram + mem, data, size);
+    return HAL_OK;
+}
+
+HAL_StatusTypeDef HAL_I2C_Mem_Read(I2C_HandleTypeDef *h, uint16_t dev, uint16_t mem, uint16_t memsize, uint8_t *data, uint16_t size, uint32_t timeout)
+{
+    (void)h; (void)dev; (void)memsize; (void)timeout;
+    if (fake_fram_fail_reads) return HAL_ERROR;
+    if ((uint32_t)mem + size > FAKE_FRAM_SIZE) return HAL_ERROR;
+    memcpy(data, fake_fram + mem, size);
+    return HAL_OK;
+}

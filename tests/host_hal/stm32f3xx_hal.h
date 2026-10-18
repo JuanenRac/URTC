@@ -112,6 +112,7 @@ uint32_t HAL_GetTick(void);
 #define __DSB() ((void)0)
 #define __ISB() ((void)0)
 #define __disable_irq() ((void)0)
+#define __enable_irq() ((void)0)
 #define __set_MSP(v) ((void)(v))
 #define SCB_ICSR_PENDSTCLR_Msk 1u
 
@@ -148,5 +149,18 @@ void HAL_CAN_DeInit(CAN_HandleTypeDef *h);
 void HAL_I2C_DeInit(I2C_HandleTypeDef *h);
 void HAL_RCC_DeInit(void);
 void HAL_DeInit(void);
+
+// ---- FRAM on I2C2 and pin reads (firmware_fram.c, firmware_persistence.c) -----------------
+#define I2C_MEMADD_SIZE_16BIT 2u
+#define FAKE_FRAM_SIZE 8192
+extern uint8_t fake_fram[FAKE_FRAM_SIZE];
+extern int fake_fram_fail_reads, fake_fram_fail_writes;
+extern int fake_fram_write_calls;
+extern uint16_t fake_fram_write_sizes[64];
+extern GPIO_PinState fake_pin_state[8];     // value HAL_GPIO_ReadPin returns; keyed by fake_pin_set()
+void fake_pin_set(GPIO_TypeDef *port, uint16_t pin, GPIO_PinState state);
+GPIO_PinState HAL_GPIO_ReadPin(GPIO_TypeDef *port, uint16_t pin);
+HAL_StatusTypeDef HAL_I2C_Mem_Write(I2C_HandleTypeDef *h, uint16_t dev, uint16_t mem, uint16_t memsize, uint8_t *data, uint16_t size, uint32_t timeout);
+HAL_StatusTypeDef HAL_I2C_Mem_Read(I2C_HandleTypeDef *h, uint16_t dev, uint16_t mem, uint16_t memsize, uint8_t *data, uint16_t size, uint32_t timeout);
 
 #endif // HOST_FAKE_STM32F3XX_HAL_H

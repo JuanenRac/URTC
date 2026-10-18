@@ -272,6 +272,27 @@ else
         fail "CAN global (pre-error-gate) host logic tests FAILED"
         echo ""; echo "$PASS passed, $WARN warnings, $FAIL failed"; exit 1
     fi
+
+    # Further suites on the same fake HAL: the communication watchdogs and the
+    # RPM telemetry, the CAN <-> I2C slave bridge (0x210-0x221), the receive
+    # callback with its critical-error gate (every tool handler is a
+    # recorder), and the saved state with its F-RAM driver.
+    run_fake_hal_suite() {
+        suite_name="$1"; suite_test="$2"; shift 2
+        suite_bin="$BUILD/host_tests_$suite_name"
+        if "$HOST_CC" -std=gnu11 -Wall -Wextra -Wno-unused-parameter $SANITIZE \
+            -I"$ROOT/tests" -I"$FAKE_HAL_INC" -I"$DISPATCH_SRC" -I"$ROOT/src/common" -o "$suite_bin" \
+            "$ROOT/tests/$suite_test" "$FAKE_HAL_INC/fake_hal.c" "$@" && "$suite_bin"; then
+            pass "$suite_name host logic tests passed (address + undefined sanitizers)"
+        else
+            fail "$suite_name host logic tests FAILED"
+            echo ""; echo "$PASS passed, $WARN warnings, $FAIL failed"; exit 1
+        fi
+    }
+    run_fake_hal_suite telemetry_watchdog test_telemetry_watchdog.c "$DISPATCH_SRC/firmware_telemetry_watchdog.c"
+    run_fake_hal_suite can_slavebridge test_can_slavebridge.c "$DISPATCH_SRC/firmware_can_slavebridge.c"
+    run_fake_hal_suite can_dispatch test_can_dispatch.c "$DISPATCH_SRC/firmware_can_dispatch.c" "$DISPATCH_SRC/firmware_can_dispatch_routing.c"
+    run_fake_hal_suite persistence test_persistence.c "$DISPATCH_SRC/firmware_persistence.c" "$DISPATCH_SRC/firmware_fram.c"
 fi
 
 # -----------------------------------------------------------------------
