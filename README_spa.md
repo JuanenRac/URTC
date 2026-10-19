@@ -43,7 +43,7 @@ Aquí está el desglose completo de qué es, qué hace, y el ecosistema de hardw
 
 | | |
 |---|---|
-| Versión | `0.3.5` |
+| Versión | `0.3.8` |
 | Madurez | Funcional |
 | Tecnología | STM32F303 / bxCAN / 25 tool profiles |
 | Destino | Una placa con microcontrolador (el firmware); se compila en un PC |
