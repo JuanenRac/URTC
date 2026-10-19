@@ -309,6 +309,35 @@ Data:
                   own CRC-8 record, saved at most once a minute and at
                   once on a fault), 0x00 = F-RAM missing - RAM-only since boot
 
+ID: 0x1AC [Master -> URTC Tool Head]
+Switch the multinode extension on or off (firmware 0.3.8+, firmware_multinode.c)
+DLC: 6 bytes
+Data:
+  - rxData[0..3]: magic payload 0x4D 0x4E 0x4F 0x44 (ASCII 'MNOD')
+  - rxData[4]:    0 = off, 1 = on (any other value: the frame is ignored)
+  - rxData[5]:    instance number announced in NODE_INFO (0 for the first
+                  head of a tool type)
+Effect: stores the setting in its own F-RAM record (address 960, EEPROM.TXT
+        section 8) and answers with 0x1AD. The setting acts after the NEXT
+        power-up, never in the middle of a job. The default is OFF: a board
+        that was never written, with an erased or damaged record, behaves
+        exactly as a single head, as in earlier releases. Blocked during a
+        critical error. While the extension is on, this frame is obeyed only
+        by the selected node (see the appendix at the end of this file).
+        Like every persistent CAN setting it is protected by the magic
+        payload against corrupted frames, not by authentication (see
+        CAN_THREAT_MODEL.TXT): keep the bus closed.
+
+ID: 0x1AD [Master -> URTC Tool Head, or URTC Tool Head -> Master answering 0x1AC]
+Query/response: the multinode switch
+DLC: any as a query (payload ignored) | 4 bytes as a response
+Data:
+  - txData[0]: stored in F-RAM (0 or 1)
+  - txData[1]: in force now (0 or 1); differs from txData[0] until the
+               next power-up
+  - txData[2]: instance number
+  - txData[3]: node address read from the ID jumpers (0-31)
+
 ID: 0x1A2 [Master -> URTC Tool Head]
 Set free tool configuration
 DLC: 1+ bytes (only byte[0] used)
@@ -1522,6 +1551,8 @@ accepted.
   0x1A9 -> Fault recorder chunk, four frames of 8 bytes (response only)
   0x1AA -> Query lifetime thermal counters (DLC:any)
   0x1AB -> Lifetime thermal counters response (DLC:8)
+  0x1AC -> Switch the multinode extension on or off, magic payload 'MNOD' (DLC:6)
+  0x1AD -> Query/response: the multinode switch (DLC:any/4)
   --- Per-tool commands (see dedicated sections above) ---
   0x120 -> Stepper motor control (Dispensers, Screwdriver, Grippers - DLC:5 - no watchdog)
   0x130 -> T12 setpoint temperature (Soldering iron - DLC:2 - 250ms watchdog)
@@ -1591,3 +1622,60 @@ accepted.
   0x7FE -> Read back main slot's current contents, size then raw bytes (Bootloader - DLC:any, 4 first reply, 8 after)
   0x7FF -> Read-back page acknowledgement (Bootloader - DLC:4)
 =============================================================================
+
+-----------------------------------------------------------------------------
+APPENDIX. SEVERAL TOOL HEADS ON ONE BUS (MULTINODE, OFF BY DEFAULT)
+-----------------------------------------------------------------------------
+Implemented in the firmware behind a switch (0x1AC / 0x1AD above) that is OFF
+by default. Tested on the host only; it has not been tried on boards. The
+design, the failure modes and the safety rules are in URTC-COMMON/docs/
+MULTINODE.md; the identifiers are in its spec/can_protocol.json (section
+"multinode"). With the switch off none of the frames below exists for the
+firmware: every identifier of this file keeps its meaning and its behaviour.
+
+With the switch ON, the node address is the value of the five ID jumpers
+(0-31), and the identifiers 0x400-0x49F are used (all multi-byte fields
+big-endian, a lower identifier wins arbitration):
+
+  Frame 0x400          DISCOVER, host to all: mn_version (1), slot_ms (1-50).
+                       Each node answers NODE_INFO after address x slot_ms.
+  Frame 0x401          SELECT, host to all: action (0 deselect all, 1 select),
+                       node (0-31), seq. Only the selected node obeys the
+                       identifiers of this file. A selection lapses after
+                       2 s unless it is repeated.
+  Frame 0x402          SAFE_STOP, host to all: reason. Every node, selected
+                       or not, puts its tool in the safe state (heaters off,
+                       motion stopped, outputs released). It does not latch.
+  Frame 0x420 + node   NODE_INFO: tool, state, instance, mn_version, serial
+                       (u32, from the unique device ID).
+  Frame 0x440 + node   NODE_STATUS every second: state (0x01 selected, 0x02
+                       fault, 0x04 conflict, 0x08 bootloader), error code,
+                       uptime in seconds (u16).
+  Frame 0x460 + node   NODE_CMD, host to one node: func (u16), up to 6 bytes.
+                       The firmware answers only func 0x110 (status), with
+                       NODE_RESP 0x480 + node carrying the six bytes of 0x111.
+                       Anything else is ignored: this form never actuates.
+
+Behaviour of a node with the switch on:
+  - First 1.5 s after start it listens. A node that hears another node starts
+    unselected; one that hears nobody behaves as the one head on the bus
+    (legacy mode), so a host that knows nothing of the extension keeps working
+    with a single head. During the listening window single-head frames are
+    not obeyed.
+  - A node that is not selected ignores every identifier of this file,
+    including 0x7F0 (enter bootloader) and 0x7F8 (version query), sends no
+    single-head telemetry and never actuates. A firmware update therefore
+    begins with SELECT.
+  - Two boards on one address: each hears the other's NODE_INFO or
+    NODE_STATUS on its own address, latches CONFLICT, puts its tool in the
+    safe state and ignores commands until the next power-up. The status keeps
+    reporting CONFLICT.
+  - The microcontroller keeps authority: thermal protection, limits and
+    watchdogs run as always. A lapsed or withdrawn selection does not by
+    itself switch an output off (a held electromagnet stays as it is); each
+    tool's own communication watchdog acts as in single-head mode.
+  - The bootloader does not take part: its frames (0x7F0-0x7FF) reach only the
+    selected application node; once a node is in its bootloader it is the only
+    one that should be on the bus being updated.
+  - The collision frame 0x095 of the scan probe is sent whatever the
+    selection, as an event.

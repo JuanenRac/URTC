@@ -11,6 +11,7 @@
 #include "firmware_common.h"
 #include "firmware_can_global.h"
 #include "firmware_expansion_spi.h"
+#include "firmware_multinode.h"
 
 void Handle_CAN_GlobalCommands_PostErrorGate(void) {
         // Expansion connector SPI passthrough (0x180/0x181) - generic byte
@@ -105,6 +106,10 @@ void Handle_CAN_GlobalCommands_PostErrorGate(void) {
                 HAL_CAN_AddTxMessage(&hcan, &txH, txD, &mb);
             }
         }
+
+        // Query/change the persistent multinode switch (0x1AC, answered with 0x1AD).
+        // A change needs the four-byte magic and acts after the next power-up.
+        MultiNode_HandleConfigCommand();
 
         // Global synchronous command 0x100: Lighting and OLED screen.
         // DLC 8 carries both the status LED color (bytes 0-2) and the ring

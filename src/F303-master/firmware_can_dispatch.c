@@ -36,6 +36,7 @@
 #include "firmware_can_flyingprobe.h"
 #include "firmware_can_thermalinspection.h"
 #include "firmware_can_dispatch_routing.h"
+#include "firmware_multinode.h"
 
 // Keeps firmware_can_dispatch_routing.c's own hardcoded tool-ID literals
 // (deliberately NOT #include-ing this file's ToolMode_t, to stay HAL-free
@@ -75,6 +76,14 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan_m) {
     if (HAL_CAN_GetRxMessage(hcan_m, CAN_RX_FIFO0, &rxHeader, rxData) == HAL_OK) {
 
         can_led_tick = HAL_GetTick();
+
+        // Several tool heads on one bus (off unless the persistent switch is on; see
+        // firmware_multinode.c). Returns 0 at once while the switch is off, so the
+        // single-head path below is exactly what it always was. When the switch is on, a
+        // node that is not selected consumes the frame here and nothing below can actuate.
+        if (MultiNode_FilterRx()) {
+            return;
+        }
 
         Handle_CAN_GlobalCommands_PreErrorGate();
 

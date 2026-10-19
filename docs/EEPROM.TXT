@@ -7,11 +7,11 @@ LICENSE: This document is licensed under CC BY-SA 4.0 (https://creativecommons.o
 =============================================================================
 Everything URTC stores in its onboard FM24CL64B F-RAM (U8, I2C2, shares
 that bus with the OLED - see ../BOM/BOM.TXT and PINOUT.TXT's I2C2 block). The
-chip holds 8192 bytes (64Kbit) and three regions of it are in use: the
+chip holds 8192 bytes (64Kbit) and four regions of it are in use: the
 settings struct SavedState_t at address 0 (34 bytes, described in section 1),
-the lifetime thermal counters at address 192 (13 bytes) and the fault
-recorder at address 256 (678 bytes); section 7 has the whole map. Everything
-from address 934 up to 8191 is free.
+the lifetime thermal counters at address 192 (13 bytes), the fault recorder
+at address 256 (678 bytes) and the multinode switch at address 960 (8 bytes,
+section 8); section 7 has the whole map. Everything else up to 8191 is free.
 
 For the load/save logic itself (when it reads, when it writes, what gets
 restored automatically vs. left for the host to decide) see
@@ -395,9 +395,42 @@ Address | Size  | What                                  | Defined in
         |       | on the rising edge of the error flag; | (BlackBoxRecord_t);
         |       | read over CAN with 0x1A8 / 0x1A9;     | layout in CANBUS.TXT
         |       | record version 2)                     | at 0x1A9
-934     | 7258  | free                                  |
+934     | 26    | free                                  |
+960     | 8     | multinode switch: whether several     | multinode.h,
+        |       | tool heads share the bus (default     | firmware_multinode.c
+        |       | OFF), and the instance number         | (own CRC-8 record, so
+        |       | (section 8)                           | SavedState_t does not
+        |       |                                       | change)
+968     | 7224  | free                                  |
 8191    |       | last byte of the chip                 |
 
 A region may only grow into the free space that follows it; a change of any
 region's layout needs a new version number in that region and an update of
 this table.
+
+-----------------------------------------------------------------------------
+8. Multinode switch (address 960, 8 bytes)
+-----------------------------------------------------------------------------
+Offset | Size | Field          | Type     | Notes
+-------|------|----------------|----------|---------------------------------
+0      | 4    | magic          | uint32_t | 0x4D4E4F44 ('MNOD').
+4      | 1    | struct_version | uint8_t  | 1.
+5      | 1    | enabled        | uint8_t  | 1 = several tool heads share the
+       |      |                |          | bus (multinode on). Anything else
+       |      |                |          | reads as off.
+6      | 1    | instance       | uint8_t  | Announced in NODE_INFO, for a
+       |      |                |          | second head of one tool type.
+7      | 1    | checksum       | uint8_t  | CRC-8/SMBUS over bytes 0-6.
+
+DEFAULT OFF, and safe on a blank chip: the record is only honoured when the
+magic, the version and the checksum are all right and enabled is exactly 1. A
+chip that was never written, an erased chip (all 0xFF), a zeroed chip, a
+damaged record or a missing chip all read as off, and the board then behaves
+exactly as a single head. The record is its own region (like the thermal
+counters), so SavedState_t and its version number do not change and the erase
+command 0x192 does not touch it.
+
+Written by CAN 0x1AC (four-byte magic 'MNOD', enable, instance), read back
+with 0x1AD (stored value, value in force, instance, node address). It is read
+once at boot, so a change acts after the next power-up. See CANBUS.TXT (the
+appendix) for what the extension does.

@@ -2,7 +2,7 @@
   "schema_version": "1.1",
   "ecosystem": "URTC",
   "name": "URTC",
-  "version": "0.3.7",
+  "version": "0.3.8",
   "role": "firmware",
   "stack": "firmware-c",
   "technologies": [
@@ -29,7 +29,7 @@
     {
       "name": "URTC_MAIN_FIRMWARE",
       "kind": "app",
-      "version": "0.3.7",
+      "version": "0.3.8",
       "target": "stm32f303cc",
       "source": {
         "file": "src/F303-master/firmware_common.h",

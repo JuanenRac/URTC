@@ -359,6 +359,7 @@ URTC 的闪存被拆分为两个独立部分，因此板卡可以通过它已经
 - **诊断：** `0x111` 的第 5 字节报告上次复位原因（bit0 = 硬件看门狗触发）；`0x1AA`/`0x1AB` 返回保存在 F-RAM 中的累计计数——热故障次数、最后一次故障代码和加热器总开启时间（自 0.3.3 起）；黑匣子采样也会记录热故障代码。
 - **固件签名：** 引导程序的 HMAC 密钥在构建时从私有文件（`URTC_SIGNING_KEY_FILE`）注入；没有该文件时构建使用*公开开发密钥*并给出提示，`URTC_RELEASE=1` 会拒绝该密钥。`firmware/` 中每个镜像都附带 `<bin>.sha256` 和 `<bin>.manifest.json`（含预先计算的签名），因此 URTC Flasher 和 URTC Web Studio 不包含任何密钥。参见 [`docs/FIRMWARE_SIGNING.TXT`](docs/FIRMWARE_SIGNING.TXT)。 HMAC 使用共享的对称密钥：已发布的应用镜像使用公开的开发密钥签名，因此任何人都可以为使用该密钥构建的板卡签出它会接受的镜像；非对称签名（Ed25519）仍在计划中。 正式发布的每个文件还带有分离式 Ed25519 发布签名（`<文件>.sig`，公钥见 [`docs/RELEASE_SIGNING.md`](docs/RELEASE_SIGNING.md)）；刷写器和 Web Studio 在签名存在时会进行验证。
 - **CAN 总线：** 不验证发送方——任何节点都可以控制工具。使用激光、加热器或焊接设备的安装**必须**配备独立于 MCU 的硬件联锁和封闭总线：[`docs/CAN_THREAT_MODEL.TXT`](docs/CAN_THREAT_MODEL.TXT)。
+- **同一 CAN 总线上的多个工具头（默认关闭）：** 一个持久开关（CAN `0x1AC` 设置，`0x1AD` 读取，F-RAM 记录见 [`docs/EEPROM.TXT`](docs/EEPROM.TXT)）会启用由五个 ID 跳线得到的节点地址、发现机制和选择规则：只有被选中的工具头才执行命令，未被选中的工具头绝不动作。开关关闭时（这是默认值，空白的 F-RAM 读出的也是关闭），电路板的行为与单个工具头完全相同，帧和标识符不变。已在固件中实现，仅在计算机上测试，尚未在电路板上试验。设计和帧见 URTC-COMMON（`docs/MULTINODE.md`）以及 [`docs/CANBUS.TXT`](docs/CANBUS.TXT) 的附录。
 
 ## 📋 更新日志
 

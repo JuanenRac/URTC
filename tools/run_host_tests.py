@@ -65,6 +65,9 @@ SUITES = (
     Suite("can_slavebridge", "tests/test_can_slavebridge.c", (f"{FAKE_HAL}/fake_hal.c", f"{MASTER}/firmware_can_slavebridge.c"), ("tests", FAKE_HAL, MASTER, "src/common")),
     Suite("can_dispatch", "tests/test_can_dispatch.c",
           (f"{FAKE_HAL}/fake_hal.c", f"{MASTER}/firmware_can_dispatch.c", f"{MASTER}/firmware_can_dispatch_routing.c"), ("tests", FAKE_HAL, MASTER, "src/common")),
+    Suite("multinode", "tests/test_multinode.c",
+          (f"{FAKE_HAL}/fake_hal.c", f"{MASTER}/multinode.c", f"{MASTER}/firmware_multinode.c", f"{MASTER}/firmware_fram.c",
+           f"{MASTER}/firmware_can_dispatch.c", f"{MASTER}/firmware_can_dispatch_routing.c"), ("tests", FAKE_HAL, MASTER, "src/common")),
     Suite("persistence", "tests/test_persistence.c",
           (f"{FAKE_HAL}/fake_hal.c", f"{MASTER}/firmware_persistence.c", f"{MASTER}/firmware_fram.c"), ("tests", FAKE_HAL, MASTER, "src/common")),
 )

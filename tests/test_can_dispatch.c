@@ -55,6 +55,12 @@ static void note(const char *name)
 }
 static int make_error_in_post, make_error_in_bridge;
 
+// The multinode filter (firmware_multinode.c) is replaced by a stub: it consumes nothing by default, which is what the
+// real one does while its switch is off, so every trace below is the single-head trace. tests/test_multinode.c runs the
+// real filter against this same dispatcher.
+static uint8_t multinode_consumes;
+uint8_t MultiNode_FilterRx(void) { return multinode_consumes; }
+
 void Handle_CAN_GlobalCommands_PreErrorGate(void) { note("pre"); }
 void Handle_CAN_GlobalCommands_PostErrorGate(void) { note("post"); if (make_error_in_post) system_error_flag = 1; }
 void Handle_CAN_SlaveBridge(void) { note("bridge"); if (make_error_in_bridge) system_error_flag = 1; }
@@ -176,6 +182,14 @@ void run_can_dispatch_tests(int *failures)
     fake_rx_queue_count = 1;
     HAL_CAN_RxFifo0MsgPendingCallback(&hcan);
     TEST_ASSERT(can_led_tick == 777, "a received frame stamps the activity LED tick with the current time");
+
+    // A frame the multinode filter consumes reaches no handler; the activity LED still stamps it.
+    multinode_consumes = 1;
+    deliver(0x120, TOOL_SOLDERING_IRON, 0);
+    TEST_ASSERT(trace_len == 0, "a frame consumed by the multinode filter reaches no handler");
+    multinode_consumes = 0;
+    deliver(0x120, TOOL_SOLDERING_IRON, 0);
+    TEST_ASSERT(strcmp(trace, "pre post bridge solder motion ") == 0, "with the filter passing, the single-head trace is unchanged");
 }
 
 int main(void)

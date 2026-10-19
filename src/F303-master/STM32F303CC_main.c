@@ -28,6 +28,7 @@
 #include "firmware_can_weldpulse.h"
 #include "firmware_persistence.h"
 #include "firmware_blackbox.h"
+#include "firmware_multinode.h"
 
 volatile ToolMode_t active_tool;
 
@@ -254,6 +255,10 @@ int main(void) {
     // configured, before Post_Init - so the laser's safe PB6 default can be
     // set correctly on the very first write; see MX_GPIO_Post_Init.
     Identify_PhysicalTool();
+
+    // Several tool heads on one bus: reads the persistent switch (off unless a valid
+    // record says on) and the node address, before the CAN peripheral starts.
+    MultiNode_Init();
 
     MX_GPIO_Post_Init();
     MX_CAN_Init();
@@ -517,6 +522,9 @@ int main(void) {
             HAL_GPIO_TogglePin(LED_DIAG_PORT, LED_DIAG_PIN);
         }
 
+        // Multinode discovery answer and status frame (does nothing while the switch is off)
+        MultiNode_Service();
+
         // Cyclic safe thermal control loop (every 20ms)
         if (HAL_GetTick() - tick_pid >= 20) {
             tick_pid = HAL_GetTick();
@@ -596,7 +604,11 @@ int main(void) {
             // Control_EndstopTelemetry()'s own tool list to begin with,
             // so this byte was always whatever stale value some earlier
             // tool happened to leave behind, not a real endstop).
-            if (active_tool == TOOL_SOLDERING_IRON || active_tool == TOOL_HOTAIR_REWORK) {
+            // With several heads on the bus (switch on), only the selected one sends
+            // single-head telemetry; with the switch off this is always true.
+            if (!MultiNode_SingleHeadTxAllowed()) {
+                // nothing: this head is not the active one
+            } else if (active_tool == TOOL_SOLDERING_IRON || active_tool == TOOL_HOTAIR_REWORK) {
                 txH.StdId = 0x135;
                 txH.DLC = 2;
                 txD[0] = (uint8_t)((current_temperature >> 8) & 0xFF);
