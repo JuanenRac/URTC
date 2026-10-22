@@ -1,0 +1,311 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 300" width="100%" height="100%">
+  <defs>
+
+    <!-- Dark Cyberpunk Gradients -->
+    <linearGradient id="bgGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#06080C" />
+      <stop offset="50%" stop-color="#0A0E17" />
+      <stop offset="100%" stop-color="#040508" />
+    </linearGradient>
+
+    <!-- Neon Accent Gradients -->
+    <linearGradient id="cyanGlow" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#00E5FF" stop-opacity="0.9" />
+      <stop offset="100%" stop-color="#0088FF" stop-opacity="0.9" />
+    </linearGradient>
+
+    <linearGradient id="goldGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF9900" />
+      <stop offset="100%" stop-color="#FF5500" />
+    </linearGradient>
+
+    <linearGradient id="canBeam" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#00E5FF" stop-opacity="1" />
+      <stop offset="40%" stop-color="#0088FF" stop-opacity="0.8" />
+      <stop offset="100%" stop-color="#FF9900" stop-opacity="0" />
+    </linearGradient>
+
+    <linearGradient id="metalGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1F2430" />
+      <stop offset="50%" stop-color="#11151C" />
+      <stop offset="100%" stop-color="#0A0D12" />
+    </linearGradient>
+
+    <!-- Glow Filters -->
+    <filter id="glowCyan" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="5" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <filter id="glowGold" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="6" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <filter id="glowBeam" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <!-- Cyber Grid Background Pattern -->
+    <pattern id="cyberGrid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#00E5FF" stroke-opacity="0.04" stroke-width="1" />
+      <circle cx="40" cy="40" r="1" fill="#00E5FF" fill-opacity="0.1" />
+    </pattern>
+
+    <!-- PCB Circuit Node Definition -->
+    <g id="pcbNode">
+      <circle cx="0" cy="0" r="3" fill="#00E5FF" filter="url(#glowCyan)" />
+      <circle cx="0" cy="0" r="1.5" fill="#FFFFFF" />
+    </g>
+  </defs>
+
+  <!-- Base Dark Background -->
+  <rect width="1200" height="300" fill="url(#bgGlow)" />
+  <rect width="1200" height="300" fill="url(#cyberGrid)" />
+
+  <!-- Ambient Light Blurs -->
+  <circle cx="210" cy="150" r="180" fill="#00E5FF" fill-opacity="0.03" filter="url(#glowCyan)">
+    <animate attributeName="fill-opacity" values="0.02;0.05;0.02" dur="6s" repeatCount="indefinite" />
+  </circle>
+  <circle cx="980" cy="150" r="180" fill="#FF9900" fill-opacity="0.03" filter="url(#glowGold)">
+    <animate attributeName="fill-opacity" values="0.02;0.05;0.02" dur="6s" repeatCount="indefinite" />
+  </circle>
+
+  <!-- Outer Frame & Cyber Corners -->
+  <rect x="10" y="10" width="1180" height="280" fill="none" stroke="#00E5FF" stroke-opacity="0.2" stroke-width="1" rx="6" />
+  <rect x="16" y="16" width="1168" height="268" fill="none" stroke="#00E5FF" stroke-opacity="0.08" stroke-width="1" rx="4" />
+  
+  <!-- Frame Corner Elements -->
+  <path d="M 10 35 L 10 10 L 35 10" fill="none" stroke="#00E5FF" stroke-width="3">
+    <animate attributeName="stroke-opacity" values="0.6;1;0.6" dur="3s" repeatCount="indefinite" />
+  </path>
+  <path d="M 1190 35 L 1190 10 L 1165 10" fill="none" stroke="#00E5FF" stroke-width="3">
+    <animate attributeName="stroke-opacity" values="0.6;1;0.6" dur="3s" repeatCount="indefinite" />
+  </path>
+  <path d="M 10 265 L 10 290 L 35 290" fill="none" stroke="#00E5FF" stroke-width="3">
+    <animate attributeName="stroke-opacity" values="0.6;1;0.6" dur="3s" repeatCount="indefinite" />
+  </path>
+  <path d="M 1190 265 L 1190 290 L 1165 290" fill="none" stroke="#00E5FF" stroke-width="3">
+    <animate attributeName="stroke-opacity" values="0.6;1;0.6" dur="3s" repeatCount="indefinite" />
+  </path>
+
+  <!-- LEFT SIDE: Trazas base estáticas (FDCAN / SWD / CAN-OTA) -->
+  <g stroke="#00E5FF" stroke-opacity="0.15" stroke-width="1.5" fill="none">
+    <path d="M 30 70 L 100 70 L 140 110 L 180 110" />
+    <path d="M 30 150 L 80 150 L 120 180 L 160 180" />
+    <path d="M 30 230 L 120 230 L 150 200 L 175 200" />
+    <path d="M 80 290 L 80 250 L 110 220" />
+    <path d="M 160 10 L 160 50 L 185 75" stroke="#FF9900" stroke-opacity="0.15" />
+  </g>
+
+  <!-- LEFT SIDE: EFECTO SERPIENTE (Flujo de datos FDCAN) -->
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M 30 70 L 100 70 L 140 110 L 180 110" stroke="#00E5FF" stroke-width="2.5" stroke-dasharray="40, 200" filter="url(#glowCyan)">
+      <animate attributeName="stroke-dashoffset" values="240;0" dur="3s" repeatCount="indefinite" />
+    </path>
+    <path d="M 30 150 L 80 150 L 120 180 L 160 180" stroke="#00E5FF" stroke-width="2.5" stroke-dasharray="40, 180" filter="url(#glowCyan)">
+      <animate attributeName="stroke-dashoffset" values="220;0" dur="3.5s" repeatCount="indefinite" />
+    </path>
+    <path d="M 30 230 L 120 230 L 150 200 L 175 200" stroke="#00E5FF" stroke-width="2.5" stroke-dasharray="40, 190" filter="url(#glowCyan)">
+      <animate attributeName="stroke-dashoffset" values="230;0" dur="3.2s" repeatCount="indefinite" />
+    </path>
+  </g>
+
+  <!-- Left PCB Circuit Nodes -->
+  <use href="#pcbNode" x="100" y="70" />
+  <use href="#pcbNode" x="140" y="110" />
+  <use href="#pcbNode" x="80" y="150" />
+  <use href="#pcbNode" x="120" y="180" />
+  <use href="#pcbNode" x="120" y="230" />
+
+  <!-- RIGHT SIDE: Trazas base estáticas (SMART-RACK / VISION-TOOL) -->
+  <g stroke="#FF9900" stroke-opacity="0.15" stroke-width="1.5" fill="none">
+    <path d="M 1170 80 L 1080 80 L 1040 120 L 960 120" />
+    <path d="M 1170 160 L 1100 160 L 1060 200 L 970 200" />
+    <path d="M 1170 220 L 1050 220 L 1010 180 M 1010 180 L 960 180" />
+  </g>
+
+  <!-- RIGHT SIDE: EFECTO SERPIENTE (Pulso dorado telemetría de herramientas) -->
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M 1170 80 L 1080 80 L 1040 120 L 960 120" stroke="#FF9900" stroke-width="2.5" stroke-dasharray="40, 230" filter="url(#glowGold)">
+      <animate attributeName="stroke-dashoffset" values="0;270" dur="3.5s" repeatCount="indefinite" />
+    </path>
+    <path d="M 1170 160 L 1100 160 L 1060 200 L 970 200" stroke="#FF9900" stroke-width="2.5" stroke-dasharray="40, 240" filter="url(#glowGold)">
+      <animate attributeName="stroke-dashoffset" values="0;280" dur="3.8s" repeatCount="indefinite" />
+    </path>
+    <path d="M 1170 220 L 1050 220 L 1010 180 M 1010 180 L 960 180" stroke="#FF9900" stroke-width="2.5" stroke-dasharray="40, 250" filter="url(#glowGold)">
+      <animate attributeName="stroke-dashoffset" values="0;290" dur="4s" repeatCount="indefinite" />
+    </path>
+  </g>
+
+  <!-- Right Circuit Nodes -->
+  <circle cx="1080" cy="80" r="3" fill="#FF9900" filter="url(#glowGold)" />
+  <circle cx="1040" cy="120" r="3" fill="#FF9900" filter="url(#glowGold)" />
+  <circle cx="1100" cy="160" r="3" fill="#FF9900" filter="url(#glowGold)" />
+  <circle cx="1060" cy="200" r="3" fill="#FF9900" filter="url(#glowGold)" />
+
+  <!-- CENTRAL ICON & EMBLEM: ICONO DE HERRAMIENTA ROBÓTICA RE-DISEÑADO (GRIPPER / END-EFFECTOR TOOL HEAD) -->
+  <g transform="translate(210, 150)">
+
+    <!-- Outer Rotating Target Ring -->
+    <g>
+      <circle cx="0" cy="0" r="92" fill="none" stroke="#00E5FF" stroke-opacity="0.25" stroke-width="1.5" stroke-dasharray="10,6,2,6" />
+      <circle cx="0" cy="0" r="82" fill="none" stroke="#FF9900" stroke-opacity="0.35" stroke-width="1" stroke-dasharray="4,8" />
+      <animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="30s" repeatCount="indefinite" />
+    </g>
+
+    <!-- Base Tool Housing Ring -->
+    <circle cx="0" cy="0" r="70" fill="url(#metalGradient)" stroke="#00E5FF" stroke-width="2" filter="url(#glowCyan)" />
+
+    <!-- Tool Flange Hexagonal Frame (Rotating counter-clockwise) -->
+    <g>
+      <polygon points="0,-60 52,-30 52,30 0,60 -52,30 -52,-30" fill="none" stroke="#FF9900" stroke-width="1.5" stroke-opacity="0.8" />
+      <!-- Mounting Screw Holes -->
+      <circle cx="0" cy="-48" r="3" fill="#FF9900" />
+      <circle cx="41" cy="-24" r="3" fill="#FF9900" />
+      <circle cx="41" cy="24" r="3" fill="#FF9900" />
+      <circle cx="0" cy="48" r="3" fill="#FF9900" />
+      <circle cx="-41" cy="24" r="3" fill="#FF9900" />
+      <circle cx="-41" cy="-24" r="3" fill="#FF9900" />
+      <animateTransform attributeName="transform" type="rotate" from="360 0 0" to="0 0 0" dur="24s" repeatCount="indefinite" />
+    </g>
+
+    <!-- ROBOT TOOL HEAD / END-EFFECTOR ARTWORK (Estilo Herramienta URTC) -->
+    <g transform="scale(0.95)">
+      <!-- Tool Mounting Base Adapter -->
+      <rect x="-22" y="-55" width="44" height="14" rx="3" fill="#161B22" stroke="#00E5FF" stroke-width="1.5" />
+      <line x1="-14" y1="-55" x2="-14" y2="-41" stroke="#00E5FF" stroke-width="1" />
+      <line x1="0" y1="-55" x2="0" y2="-41" stroke="#00E5FF" stroke-width="1" />
+      <line x1="14" y1="-55" x2="14" y2="-41" stroke="#00E5FF" stroke-width="1" />
+
+      <!-- Main Tool Spindle Body -->
+      <path d="M -28 -41 L 28 -41 L 34 -15 L 20 20 L -20 20 L -34 -15 Z" fill="#0D1117" stroke="#00E5FF" stroke-width="2" />
+      
+      <!-- Inner Tool Core Status Ring -->
+      <circle cx="0" cy="-10" r="15" fill="#161B22" stroke="#FF9900" stroke-width="1.5" />
+      <circle cx="0" cy="-10" r="7" fill="#00E5FF" filter="url(#glowCyan)">
+        <animate attributeName="opacity" values="0.4;1;0.4" dur="1.8s" repeatCount="indefinite" />
+      </circle>
+      <circle cx="0" cy="-10" r="3" fill="#FFFFFF" />
+
+      <!-- Left Gripper Arm / Jaw -->
+      <g>
+        <path d="M -20 20 L -26 40 L -12 56 L -6 56 L -12 36 L -8 20 Z" fill="url(#goldGlow)" stroke="#FF9900" stroke-width="1.5" filter="url(#glowGold)" />
+        <path d="M -12 56 L -12 62 L -6 56 Z" fill="#FFFFFF" />
+        <!-- Gripper Motion Animation -->
+        <animateTransform attributeName="transform" type="translate" values="0,0; -2,0; 0,0" dur="2s" repeatCount="indefinite" />
+      </g>
+
+      <!-- Right Gripper Arm / Jaw -->
+      <g>
+        <path d="M 20 20 L 26 40 L 12 56 L 6 56 L 12 36 L 8 20 Z" fill="url(#goldGlow)" stroke="#FF9900" stroke-width="1.5" filter="url(#glowGold)" />
+        <path d="M 12 56 L 12 62 L 6 56 Z" fill="#FFFFFF" />
+        <!-- Gripper Motion Animation -->
+        <animateTransform attributeName="transform" type="translate" values="0,0; 2,0; 0,0" dur="2s" repeatCount="indefinite" />
+      </g>
+
+      <!-- Central Laser / Tool Nozzle Beam Center -->
+      <line x1="0" y1="20" x2="0" y2="52" stroke="#00E5FF" stroke-width="2" stroke-dasharray="3,3" filter="url(#glowCyan)">
+        <animate attributeName="stroke-dashoffset" values="12;0" dur="0.8s" repeatCount="indefinite" />
+      </line>
+
+      <!-- Optical Crosshair Overlay -->
+      <circle cx="0" cy="0" r="38" fill="none" stroke="#00E5FF" stroke-opacity="0.3" stroke-width="1" stroke-dasharray="6,4" />
+      <line x1="-46" y1="0" x2="-38" y2="0" stroke="#00E5FF" stroke-width="1.5" />
+      <line x1="38" y1="0" x2="46" y2="0" stroke="#00E5FF" stroke-width="1.5" />
+      <line x1="0" y1="-46" x2="0" y2="-38" stroke="#00E5FF" stroke-width="1.5" />
+      <line x1="0" y1="38" x2="0" y2="46" stroke="#00E5FF" stroke-width="1.5" />
+    </g>
+  </g>
+
+  <!-- FDCAN / Tool Beam Effect (Proyección hacia abajo) -->
+  <path d="M 210 212 L 204 258 L 216 258 Z" fill="url(#canBeam)" filter="url(#glowBeam)">
+    <animate attributeName="opacity" values="0.3;1;0.3" dur="1.2s" repeatCount="indefinite" />
+  </path>
+  <ellipse cx="210" cy="258" rx="14" ry="4" fill="#00E5FF" filter="url(#glowCyan)">
+    <animate attributeName="rx" values="10;18;10" dur="1.2s" repeatCount="indefinite" />
+    <animate attributeName="opacity" values="0.4;1;0.4" dur="1.2s" repeatCount="indefinite" />
+  </ellipse>
+
+  <!-- MAIN TYPOGRAPHY / TITLE BLOCK -->
+  <g transform="translate(350, 0)">
+    <!-- Ecosystem Tag Header -->
+    <g transform="translate(0, 75)">
+      <rect x="0" y="-18" width="260" height="24" rx="4" fill="#00E5FF" fill-opacity="0.1" stroke="#00E5FF" stroke-opacity="0.4" stroke-width="1">
+        <animate attributeName="stroke-opacity" values="0.3;0.8;0.3" dur="4s" repeatCount="indefinite" />
+      </rect>
+      <text x="12" y="-2" font-family="'Inter', 'Segoe UI', 'Roboto', sans-serif" font-weight="700" font-size="11" fill="#00E5FF" letter-spacing="2.5">UNIVERSAL ROBOT TOOL</text>
+    </g>
+
+    <!-- Main Title: URTC -->
+    <text x="0" y="135" font-family="'Inter', 'Segoe UI', 'Roboto', sans-serif" font-weight="900" font-size="56" fill="#FFFFFF" letter-spacing="4">
+      URTC
+    </text>
+
+    <!-- Main Title: CONTROLLER con brillo dinámico en naranja -->
+    <text x="175" y="135" font-family="'Inter', 'Segoe UI', 'Roboto', sans-serif" font-weight="800" font-size="38" fill="url(#goldGlow)" letter-spacing="3" filter="url(#glowGold)">
+      CONTROLLER
+      <animate attributeName="opacity" values="0.85;1;0.85" dur="3s" repeatCount="indefinite" />
+    </text>
+
+    <!-- ECOSYSTEM Row -->
+    <text x="0" y="175" font-family="'Inter', 'Segoe UI', 'Roboto', sans-serif" font-weight="700" font-size="28" fill="#00E5FF" letter-spacing="6" filter="url(#glowCyan)">
+      ECOSYSTEM
+    </text>
+
+    <!-- Subtitle / Capabilities Line (Perfectamente ubicada debajo de ECOSYSTEM) -->
+    <text x="0" y="206" font-family="'Inter', 'Segoe UI', 'Roboto', sans-serif" font-weight="500" font-size="12.5" fill="#8B949E" letter-spacing="1.5">
+      STM32 FIRMWARE &#183; FDCAN &#183; CAN-OTA &#183; WEB STUDIO &#183; SMART-RACK
+    </text>
+
+    <!-- Tech Badges Bar -->
+    <g transform="translate(0, 228)">
+      <!-- Badge 1: WEB STUDIO -->
+      <rect x="0" y="0" width="115" height="22" rx="11" fill="#161B22" stroke="#30363D" stroke-width="1" />
+      <circle cx="11" cy="11" r="4" fill="#00E5FF">
+        <animate attributeName="opacity" values="0.5;1;0.5" dur="2s" repeatCount="indefinite" />
+      </circle>
+      <text x="22" y="15" font-family="sans-serif" font-weight="600" font-size="10" fill="#C9D1D9" letter-spacing="0.5">WEB STUDIO</text>
+
+      <!-- Badge 2: SMART-RACK -->
+      <rect x="125" y="0" width="115" height="22" rx="11" fill="#161B22" stroke="#30363D" stroke-width="1" />
+      <circle cx="136" cy="11" r="4" fill="#FF9900">
+        <animate attributeName="opacity" values="0.5;1;0.5" dur="2.5s" repeatCount="indefinite" />
+      </circle>
+      <text x="147" y="15" font-family="sans-serif" font-weight="600" font-size="10" fill="#C9D1D9" letter-spacing="0.5">SMART-RACK</text>
+
+      <!-- Badge 3: VISION TOOL -->
+      <rect x="250" y="0" width="115" height="22" rx="11" fill="#161B22" stroke="#30363D" stroke-width="1" />
+      <circle cx="261" cy="11" r="4" fill="#00FF88">
+        <animate attributeName="opacity" values="0.5;1;0.5" dur="1.8s" repeatCount="indefinite" />
+      </circle>
+      <text x="272" y="15" font-family="sans-serif" font-weight="600" font-size="10" fill="#C9D1D9" letter-spacing="0.5">VISION TOOL</text>
+
+      <!-- Badge 4: HYDRA-UMC LINK -->
+      <rect x="375" y="0" width="135" height="22" rx="11" fill="#161B22" stroke="#30363D" stroke-width="1" />
+      <circle cx="386" cy="11" r="4" fill="#FF0055">
+        <animate attributeName="opacity" values="0.5;1;0.5" dur="2.2s" repeatCount="indefinite" />
+      </circle>
+      <text x="397" y="15" font-family="sans-serif" font-weight="600" font-size="10" fill="#C9D1D9" letter-spacing="0.5">HYDRA-UMC LINK</text>
+    </g>
+  </g>
+
+  <!-- Top Right Status / Version Indicator -->
+  <g transform="translate(1060, 42)">
+    <rect x="-10" y="-14" width="105" height="24" rx="12" fill="#0D1117" stroke="#00E5FF" stroke-opacity="0.3" stroke-width="1" />
+    <circle cx="2" cy="-2" r="4" fill="#00FF88" filter="url(#glowCyan)">
+      <animate attributeName="opacity" values="0.3;1;0.3" dur="1.5s" repeatCount="indefinite" />
+    </circle>
+    <text x="14" y="2" font-family="monospace" font-weight="700" font-size="11" fill="#00E5FF" letter-spacing="1">v0.3.7</text>
+  </g>
+</svg>

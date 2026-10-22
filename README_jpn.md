@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="images/URTC_LOGO.svg" alt="URTC Logo" width="100%">
+  <img src="images/URTC_BANNER.svg" alt="URTC banner" width="100%">
 </p>
 
 # 🚀 URTC — Universal Robot Tool Controller（v0.3）
@@ -523,7 +523,7 @@ URTC のフラッシュは 2 つの独立した部分に分割されているた
 ├── images/
 │   ├── OLED_DIRECT_MOUNT.jpg     LCD1/CONN_OLED2——裸の 30 ピン FPC パネル、直接実装オプション
 │   ├── OLED_BREAKOUT_MODULE.jpg  CONN_OLED——外部 I2C ブレークアウトモジュール、代替オプション
-│   ├── URTC_LOGO.svg             プロジェクト全体のロゴ、本 README の先頭に埋め込み
+│   ├── URTC_BANNER.svg             プロジェクト全体のロゴ、本 README の先頭に埋め込み
 │   ├── URTC_BOARD.png           ボード写真
 │   ├── URTC_SCHEMATIC.png       ボード回路図
 │   ├── URTC_PCB_TOP.png         ボード TOP レイヤー（追加時）

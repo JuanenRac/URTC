@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="images/URTC_LOGO.svg" alt="URTC Logo" width="100%">
+  <img src="images/URTC_BANNER.svg" alt="URTC banner" width="100%">
 </p>
 
 # 🚀 URTC — 通用机器人工具控制器（v0.3）
@@ -509,7 +509,7 @@ URTC 的闪存被拆分为两个独立部分，因此板卡可以通过它已经
 ├── images/
 │   ├── OLED_DIRECT_MOUNT.jpg     LCD1/CONN_OLED2——裸 30 针 FPC 面板，直接安装选项
 │   ├── OLED_BREAKOUT_MODULE.jpg  CONN_OLED——外部 I2C 分线模组，替代选项
-│   ├── URTC_LOGO.svg             项目通用 Logo，嵌入本 README 顶部
+│   ├── URTC_BANNER.svg             项目通用 Logo，嵌入本 README 顶部
 │   ├── URTC_BOARD.png           板卡照片
 │   ├── URTC_SCHEMATIC.png       板卡原理图
 │   ├── URTC_PCB_TOP.png         板卡顶层（添加后）

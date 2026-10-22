@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="images/URTC_LOGO.svg" alt="URTC Logo" width="100%">
+  <img src="images/URTC_BANNER.svg" alt="URTC banner" width="100%">
 </p>
 
 # 🚀 URTC — Universal Robot Tool Controller (v0.3)
@@ -529,7 +529,7 @@ Se alguém da comunidade estiver a trabalhar em efetores finais personalizados, 
 ├── images/
 │   ├── OLED_DIRECT_MOUNT.jpg     LCD1/CONN_OLED2 - painel FPC nu de 30 pinos, opção de montagem direta
 │   ├── OLED_BREAKOUT_MODULE.jpg  CONN_OLED - módulo breakout I2C externo, opção alternativa
-│   ├── URTC_LOGO.svg             Logótipo geral do projeto, incorporado no topo deste README
+│   ├── URTC_BANNER.svg             Logótipo geral do projeto, incorporado no topo deste README
 │   ├── URTC_BOARD.png           Fotografia da placa
 │   ├── URTC_SCHEMATIC.png       Esquema da placa
 │   ├── URTC_PCB_TOP.png         Camada TOP da placa (quando adicionada)

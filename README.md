@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="images/URTC_LOGO.svg" alt="URTC Logo" width="100%">
+  <img src="images/URTC_BANNER.svg" alt="URTC banner" width="100%">
 </p>
 
 # 🚀 URTC — Universal Robot Tool Controller (v0.3)
@@ -523,7 +523,7 @@ If anyone in the community is working on custom end-effectors, smart tool-change
 ├── images/
 │   ├── OLED_DIRECT_MOUNT.jpg     LCD1/CONN_OLED2 - bare 30-pin FPC panel, direct-mount option
 │   ├── OLED_BREAKOUT_MODULE.jpg  CONN_OLED - external I2C breakout module, alternate option
-│   ├── URTC_LOGO.svg             General project logo, embedded at the top of this README
+│   ├── URTC_BANNER.svg             General project logo, embedded at the top of this README
 │   ├── URTC_BOARD.png           Board photo
 │   ├── URTC_SCHEMATIC.png       Board schematic
 │   ├── URTC_PCB_TOP.png         Board TOP layer (when added)
