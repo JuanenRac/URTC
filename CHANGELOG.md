@@ -1,5 +1,7 @@
 # Changelog - URTC (repo-wide index)
 
+All notable changes to this project are documented here.
+
 ## [0.3.9] - The first official release: signed images, a protected release job and cleaner host tests
 
 - The host tests started through WSL no longer put their binaries inside the repository: `tools/run_host_tests.py` translates a Windows `--build-dir` for WSL and refuses one on a Linux host; the output folder named like a Windows path that had been versioned by mistake is removed from git, and such names are ignored.
@@ -264,7 +266,6 @@ pre-existing warnings as before this change - missing SVG assets and
 ## [0.2.5]
 
 - Build version synchronized with `urtc.project.json` and the repository-native version source.
-
 
 This project has **4 independent version tracks**, one per compiled
 component - there is no single combined "project version" that moves
