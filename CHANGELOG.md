@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+- **The protected release job** (`.github/workflows/release.yml`): started by hand with the tag, only from `main`, inside the `release` environment (required reviewers; the keys are secrets of that environment and are readable only after the approval). It checks the tag is the version of the commit and not published, runs the baseline, builds the firmware with the production bootloader keys, signs every asset with the key of the releases, publishes an official release with the notes of the CHANGELOG section (`tools/changelog_section.py`), downloads what it published and verifies it, and removes the key files at the end. The keys go only into environment variables of one step and files of mode 600; tests keep the file from echoing a key, from using a trigger other than the manual one and from using an action that is not pinned by commit.
+- **Fixed: an official release could never be published.** The build writes `signing_key_kind: "release"` for a key read from `URTC_SIGNING_KEY_FILE`, but `tools/publish_release_assets.py` accepted only the name `production`, so a set built with a real key was refused as official. Both names are accepted now; `dev` and anything else are still refused. `--list-file` and `--tag-file` write the assets and the kind of release for a job that publishes them.
+- `docs/RELEASE_SIGNING.md` explains how to publish an official release from your own machine (no secret in GitHub) or from the protected job, and the creation of the bootloader keys (`~/.urtc-keys/signing_keys.txt`, next to the key of the releases). The flasher and the web studio no longer keep a copy of the images in git: they read the release and verify it.
+- `docs/CANBUS.TXT` reserves the identifiers `0x260`-`0x26F` for URTC-SMART-RACK (command in eight bytes, big-endian); nothing in this firmware answers them.
+- The `build-test` scripts use the interpreter named by `URTC_PYTHON` (which URTC-UPDATER sets to its own) and, without it, the first `python3` or `py -3` found.
+- The dashboard notice is sent only after the CI of the push finished green (`workflow_run`).
 - The banner of the README is the animated ecosystem banner (`images/URTC_BANNER.svg`).
 - The bootloader linker script and the manifest agree on 30 KB of code (the last 2 KB of its slot hold the boot metadata), and a test compares them with the metadata address.
 - The firmware manifest records the SHA-256 of the `.hex` and `.elf` images as well as the `.bin`, and `.gitattributes` keeps the images binary so a line-ending conversion cannot change a digest.

@@ -71,12 +71,16 @@ must allow it after the redirect.
   redirects. `tools/sync_firmware.py` downloads a release
   (`--release <tag>`) into a temporary folder and runs the same checks
   (sha256 against sidecar and manifest, `hmac_sha256` on application
-  images) before copying. The `firmware/` folder bundled with the flasher
-  keeps working offline.
+  images, the release signature) before copying. The `firmware/` folder is
+  not in git: the window and the sync tool fill it from the newest official
+  release, or, while there is none, from the release named in
+  `firmware_release.json`.
 - **URTC-WEB-STUDIO**: `scripts/sync-firmware.mjs` downloads the release
   assets (newest, or a given tag) or reads a local build folder, verifies each
-  sha256 and regenerates `src/lib/bundledFirmware.ts`. Nothing in the browser
-  code reads GitHub at run time.
+  sha256 and the release signature and regenerates `src/lib/bundledFirmware.ts`.
+  `public/firmware/` is not in git: the CI and the Pages build run the sync
+  (the release named in `firmware-release.json` while there is no official
+  one). Nothing in the browser code reads GitHub at run time.
 - **URTC-UPDATER**: it reads only `urtc.project.json` and the native version
   file of each repository; if it ever downloads firmware it must use the
   release assets described above.
@@ -94,26 +98,29 @@ as a **pre-release** ("bench"): `tools/publish_release_assets.py` refuses it
 as an official release, and with `--allow-dev-key` it adds `--prerelease` to
 the printed command. Until the first release signed with a private production
 key exists, the clients reach the bench images by tag
-(`sync_firmware.py --release v0.3.5`, `sync-firmware.mjs --tag <tag>`), and the
-bundled copies keep serving offline use.
+(`sync_firmware.py --release v0.3.8`, `sync-firmware.mjs --tag <tag>`) or through
+the fallback file described above; they keep no copy of their own.
 
-## Refreshing the copies bundled with the flasher and the web studio
+## The flasher and the web studio keep no copy of the images
 
-After a release build (`firmware/` holds the four images), from the folder that contains the repositories:
+Neither repository carries the binaries any more. A person who needs them offline runs
+`python tools/sync_firmware.py` (flasher) or `npm run sync-firmware` (web studio) once while connected;
+after that the files are in the ignored `firmware/` folder. To use a local build instead of a release:
 
 ```
 cd URTC
 python tools/publish_release_assets.py --allow-dev-key --sign     # signs every asset and checks the set
-python ../URTC-FLASHER/tools/sync_firmware.py firmware             # copies images, sidecars and signatures
+python ../URTC-FLASHER/tools/sync_firmware.py firmware --allow-unsigned
 cd ../URTC-WEB-STUDIO
-node scripts/sync-firmware.mjs ../URTC/firmware                    # copies them and rewrites src/lib/bundledFirmware.ts
+node scripts/sync-firmware.mjs ../URTC/firmware --allow-unsigned
 ```
 
-Leave out `--allow-dev-key` once the images are signed with the production key. Without `--sign` the set has no
-signatures and the web studio needs `--allow-unsigned`. Commit the refreshed copies in each repository.
+Leave out `--allow-dev-key` once the images are signed with the production key.
 
 ## Publishing a release
 
+0. For an official release the protected job `.github/workflows/release.yml` does steps 1 to 3
+   (`docs/RELEASE_SIGNING.md`, "Publishing an official release").
 1. `bash build_firmware.sh` (release mode, with `URTC_SIGNING_KEY_FILE` and
    `URTC_RELEASE=1` for a release signed with the private key; see
    `docs/FIRMWARE_SIGNING.TXT`).

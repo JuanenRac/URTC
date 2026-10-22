@@ -1138,6 +1138,31 @@ Data: 32 bytes total (16 pixels, int16_t each, centi-degrees C - value
       never needs to know which of the 3 MLX9064x family members
       actually answered.
 
+-----------------------------------------------------------------------------
+RESERVED FOR URTC-SMART-RACK (0x260-0x26F) - nothing in this firmware answers them
+-----------------------------------------------------------------------------
+The tool rack (URTC-SMART-RACK) will be a node of this bus. Until a board with
+a CAN transceiver exists it talks over a serial link; the identifiers below are
+reserved so that no tool profile takes them, and the layout is fixed here so the
+byte order is not chosen after the hardware.
+
+ID: 0x260 [Host -> Rack]
+Set the pre-heat target of the tool in one rack slot
+DLC: 8 bytes
+Data:
+  - rxData[0]: tool ID (a plain 5-bit value, see ToolMode_t; 25..31 name no tool)
+  - rxData[1..2]: target temperature in whole degrees Celsius (uint16_t) [BIG-ENDIAN]
+  - rxData[3]: sequence number (anti-replay, per tool)
+  - rxData[4..7]: reserved, sent as 0, ignored on receipt
+  Note: a target of 0 switches the heater off; a target above the limit of the
+        tool (400 C at most) puts that tool in the safe state. The rack ends a
+        pre-heat by itself after 10 minutes without a tool swap (configurable).
+
+ID: 0x261 [Rack -> Host]
+Reserved for the rack status; not defined yet.
+
+0x262-0x26F: free inside this reserved block.
+
 =============================================================================
 CAN BOOTLOADER PROTOCOL - see the README's "Building & Flashing" section
 for the full walkthrough. These IDs are deliberately far from every

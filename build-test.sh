@@ -29,7 +29,12 @@ printf '\n'
 # Runs the non-versioning build check. It does not update the manifest or CHANGELOG.
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-python3 "$ROOT/tools/build_test.py"
+# URTC_PYTHON (set by URTC-UPDATER) names the interpreter to use; without it the first python3, or python, found is used.
+PYTHON_BIN="${URTC_PYTHON:-}"
+if [ -z "$PYTHON_BIN" ]; then
+    if command -v python3 >/dev/null 2>&1; then PYTHON_BIN=python3; else PYTHON_BIN=python; fi
+fi
+"$PYTHON_BIN" "$ROOT/tools/build_test.py"
 status=$?
 echo
 if [ -t 0 ]; then

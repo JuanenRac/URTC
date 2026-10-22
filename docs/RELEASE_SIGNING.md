@@ -12,8 +12,9 @@ board.
 ed25519 4020c46d76c8ebacb64c5c7b9f3e7c62475afeb133d7421591988174e0f5dc90
 ```
 
-The private half lives outside every repository and outside CI, with an
-offline copy. The same public key is pinned in `tools/release_sign.py`, in the
+The private half lives outside every repository, with an offline copy; it is
+read from a file on the machine that publishes, or from the secret of the
+protected release job described below. The same public key is pinned in `tools/release_sign.py`, in the
 flasher (`flasher_release_signature.py`) and in the web studio
 (`scripts/sync-firmware.mjs`); a test in each compares it with this page.
 
@@ -51,16 +52,58 @@ to sign with a key that is not the pinned one.
 | URTC-WEB-STUDIO (`scripts/sync-firmware.mjs`) | same, with `node:crypto` |
 | The bootloader on the board | still the HMAC-SHA256 of the image (see `FIRMWARE_SIGNING.TXT`) |
 
+## Publishing an official release
+
+An official release has two things a bench pre-release does not: its application images are
+built with the **production bootloader keys** (`signing_key_kind: "release"` in their
+manifests; a key that is not the public development key), and **every asset has its `.sig`**.
+`tools/publish_release_assets.py` refuses to call a set official unless both are true.
+There are two ways to make one, with the same result.
+
+**From a machine you control (no secret in GitHub).**
+
+1. Create the bootloader keys once, outside every repository, and keep an offline copy
+   (`docs/FIRMWARE_SIGNING.TXT`, section 3): `~/.urtc-keys/signing_keys.txt` with `master=` and
+   `slave=` lines of 64 hexadecimal digits, readable by you only. They are different from the
+   Ed25519 key of the releases (`~/.urtc-keys/urtc_release_ed25519.pem`).
+2. Raise the versions with `python bump.py` (compiling never does) and write the CHANGELOG
+   section of the new version.
+3. `URTC_SIGNING_KEY_FILE=~/.urtc-keys/signing_keys.txt URTC_RELEASE=1 ./build_firmware.sh`
+4. `python tools/publish_release_assets.py --sign` and run the `gh release create` command it
+   prints (notes: `python tools/changelog_section.py <version> > RELEASE_NOTES.md`).
+
+**From GitHub (the protected job).** `.github/workflows/release.yml` does steps 3 and 4 and
+checks the published files afterwards. It is started by hand (`workflow_dispatch` with the tag,
+which must be `v` plus the version of `urtc.project.json`), runs only from `main`, and its job
+uses the `release` environment: the secrets are readable only after a reviewer approves the run.
+Set it up once (Settings, Environments, `release`: required reviewers, deployment branch `main`)
+and give it the two secrets without ever printing them:
+
+```
+gh secret set URTC_SIGNING_KEYS         --env release --repo JuanenRac/URTC < ~/.urtc-keys/signing_keys.txt
+gh secret set URTC_RELEASE_ED25519_PEM  --env release --repo JuanenRac/URTC < ~/.urtc-keys/urtc_release_ed25519.pem
+```
+
+The job writes the keys to files in the runner's temporary folder (mode 600), passes only the
+file names to the build, and removes the files at the end whatever happened. A version that
+already has a release is never rebuilt. Giving the keys to GitHub is a choice: if the
+repository's settings or the account are compromised, so are they; the first way keeps them on
+your machine.
+
+After the first official release exists, the flasher and the web studio take their images from
+it: delete `firmware_release.json` (flasher) and `firmware-release.json` (web studio), which only
+name the bench pre-release to use while there is no official one.
+
 ## Transition from the development key
 
 Until now the images carry an HMAC made with the public development key, so
 nothing proves who published them. The plan, in order:
 
-1. **Now.** Releases that are signed with the development key are published as
-   pre-releases ("bench") and may have no `.sig`. The tools verify a `.sig`
-   when it is there; a download without signatures is refused unless you say
-   `--allow-unsigned`, which is how the existing pre-release is reached:
-   `sync_firmware.py --release v0.3.5 --allow-unsigned`.
+1. **Until the first official release.** Releases that are signed with the development key are published as
+   pre-releases ("bench"). The tools verify a `.sig` when it is there; a download without signatures is
+   refused unless you say `--allow-unsigned`. The flasher and the web studio keep no copy of the images:
+   they take them from the release, and while GitHub's "latest" answers 404 (it ignores pre-releases) they use
+   the bench release named in `firmware_release.json` / `firmware-release.json`.
 2. **First official release.** Built with the production HMAC key and signed
    with `--sign`. From then on the flasher and the web studio treat an asset
    without a valid `.sig` as an error (`REQUIRE_RELEASE_SIGNATURE = True`), and

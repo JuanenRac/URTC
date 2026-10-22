@@ -46,16 +46,16 @@ bootloader holds. So the security of the whole chain is "who holds the key".
 Create the key file once (keep a backup somewhere safe - losing it means the
 boards built with it can only be updated over SWD):
 
-    python3 -c "import secrets; print('master=' + secrets.token_hex(32)); print('slave=' + secrets.token_hex(32))" > ~/.urtc/signing_keys.txt
-    chmod 600 ~/.urtc/signing_keys.txt
+    python3 -c "import secrets; print('master=' + secrets.token_hex(32)); print('slave=' + secrets.token_hex(32))" > ~/.urtc-keys/signing_keys.txt
+    chmod 600 ~/.urtc-keys/signing_keys.txt
 
 Build a release (refuses to run with the public development key):
 
-    URTC_SIGNING_KEY_FILE=~/.urtc/signing_keys.txt URTC_RELEASE=1 ./build_firmware.sh
+    URTC_SIGNING_KEY_FILE=~/.urtc-keys/signing_keys.txt URTC_RELEASE=1 ./build_firmware.sh
 
 Windows:
 
-    set URTC_SIGNING_KEY_FILE=%USERPROFILE%\.urtc\signing_keys.txt
+    set URTC_SIGNING_KEY_FILE=%USERPROFILE%\.urtc-keys\signing_keys.txt
     set URTC_RELEASE=1
     build_firmware.bat
 

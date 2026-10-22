@@ -24,7 +24,7 @@ Two layouts are understood:
     project version; a missing .sha256 sidecar is written next to the image.
 .elf files are listed only with --with-elf.
 A release whose application images are signed with the public development key
-is refused as an official release: it can only be published as a pre-release
+(signing_key_kind "dev") is refused as an official release: it can only be published as a pre-release
 ("bench") with --allow-dev-key, and the printed command then carries
 --prerelease. Exit status 1 when anything is missing or inconsistent.
 
@@ -48,6 +48,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_OWNER = "JuanenRac"
+#: The values of signing_key_kind that mean "a private key that is not in the repository".
+PRODUCTION_KEY_KINDS = ("release", "production")
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import release_sign
@@ -110,7 +112,9 @@ def collect_with_index(fw_dir: Path, with_elf: bool, problems: list[str], dev_ke
             problems.append(f"{key}: application image without a published hmac_sha256")
         if key.endswith("_application") and dev_keys is not None:
             kind = data.get("signing_key_kind") or component.get("signing", {}).get("key_kind")
-            if kind != "production":
+            # The build writes "release" for a key read from URTC_SIGNING_KEY_FILE and "dev" for the public development key;
+            # "production" is the older name of the first one.
+            if kind not in PRODUCTION_KEY_KINDS:
                 dev_keys.append(f"{key}: signed with key kind {kind!r}, not a production key")
         files.extend(path for path in wanted if path.is_file())
     files.append(fw_dir / "firmware_manifest.json")
@@ -206,6 +210,10 @@ def main(argv: list[str]) -> int:
                         help="allow images signed with the public development key, as a pre-release only")
     parser.add_argument("--sign", action="store_true", help="write the release signature (<asset>.sig) of every asset with the key of the releases")
     parser.add_argument("--json", action="store_true", help="print the plan as JSON instead of text")
+    parser.add_argument("--list-file", default=None, metavar="FILE",
+                        help="when nothing is wrong, write the assets to FILE, one path per line (for a job that publishes them)")
+    parser.add_argument("--tag-file", default=None, metavar="FILE",
+                        help="when nothing is wrong, write the tag, and on a second line 'prerelease' or 'official', to FILE")
     args = parser.parse_args(argv)
     fw_dir = Path(args.firmware_dir) if args.firmware_dir else ROOT / "firmware"
     plan = build_plan(ROOT, fw_dir, args.with_elf, args.repo, args.allow_dev_key, args.sign)
@@ -220,6 +228,11 @@ def main(argv: list[str]) -> int:
         if not plan["problems"]:
             print()
             print(gh_command(plan))
+    if not plan["problems"]:
+        if args.list_file:
+            Path(args.list_file).write_text("".join(path + "\n" for path in plan["files"]), encoding="utf-8")
+        if args.tag_file:
+            Path(args.tag_file).write_text(plan["tag"] + "\n" + ("prerelease" if plan["prerelease"] else "official") + "\n", encoding="utf-8")
     print("RELEASE_ASSETS=PASS" if not plan["problems"] else "RELEASE_ASSETS=FAIL")
     return 0 if not plan["problems"] else 1
 

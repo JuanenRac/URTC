@@ -34,12 +34,18 @@ set "KEEP_OPEN=pause"
 if defined CI set "KEEP_OPEN=ver >nul"
 if "%URTC_CI%"=="1" set "KEEP_OPEN=ver >nul"
 cd /d "%~dp0"
+rem URTC_PYTHON (set by URTC-UPDATER) names the interpreter to use; without it py -3, or python, is used.
+if defined URTC_PYTHON (
+    "%URTC_PYTHON%" tools\build_test.py
+    goto :tested
+)
 where py >nul 2>&1
 if errorlevel 1 (
     python tools\build_test.py
 ) else (
     py -3 tools\build_test.py
 )
+:tested
 if errorlevel 1 (
     set "RESULT=1"
 ) else (

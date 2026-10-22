@@ -1,0 +1,148 @@
+# =============================================================================
+# URTC - Firmware release workflow (protected)
+# Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
+# GPL-3.0-or-later - see LICENSE
+# =============================================================================
+# Builds the firmware with the production bootloader keys, signs every asset with
+# the key of the releases and publishes an official GitHub release. Nothing here
+# runs on its own: it is started by hand, it can only run from main, and the job
+# waits for the approval that the `release` environment requires before it can
+# read a secret. The keys never are in the repository and are never printed; the
+# files they are written to live in the runner's temporary folder and are
+# removed at the end whatever happened.
+#
+# Needs, in the `release` environment of the repository (Settings > Environments):
+#   URTC_SIGNING_KEYS           the file of the bootloader keys: "master=<64 hex>" and "slave=<64 hex>"
+#   URTC_RELEASE_ED25519_PEM    the Ed25519 private key of the releases (PEM)
+# and, in the same place, required reviewers and a deployment branch limited to main.
+# docs/RELEASE_SIGNING.md has the commands, and the way to publish from a machine
+# instead, which needs no secret in GitHub.
+name: URTC firmware release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "The tag to publish; it must be v followed by the version of urtc.project.json (for example v0.3.9)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: firmware-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build, sign and publish the firmware release
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: write
+    env:
+      REQUESTED_TAG: ${{ inputs.tag }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+      - name: Check that the tag is the version of this commit and is not published yet
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(python3 -c "import json; print(json.load(open('urtc.project.json'))['version'])")"
+          if [ "${REQUESTED_TAG}" != "v${version}" ]; then
+            echo "::error::The tag ${REQUESTED_TAG} is not v${version}, the version of urtc.project.json at this commit."
+            exit 1
+          fi
+          if gh release view "${REQUESTED_TAG}" >/dev/null 2>&1; then
+            echo "::error::A release ${REQUESTED_TAG} already exists; a published version is never rebuilt, raise the version first."
+            exit 1
+          fi
+          python3 tools/changelog_section.py "${version}" > "${RUNNER_TEMP}/notes.md"
+          echo "VERSION=${version}" >> "${GITHUB_ENV}"
+      - name: Check the project baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          URTC_CI=1 python3 tools/ci_validate.py
+          python3 -m unittest discover -s tests -p "test_*.py"
+      - name: Install the ARM GNU Toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes gcc-arm-none-eabi binutils-arm-none-eabi libnewlib-arm-none-eabi libstdc++-arm-none-eabi-newlib
+      - name: Put the keys in files that only this job can read
+        shell: bash
+        env:
+          URTC_SIGNING_KEYS: ${{ secrets.URTC_SIGNING_KEYS }}
+          URTC_RELEASE_ED25519_PEM: ${{ secrets.URTC_RELEASE_ED25519_PEM }}
+        run: |
+          set -euo pipefail
+          if [ -z "${URTC_SIGNING_KEYS}" ] || [ -z "${URTC_RELEASE_ED25519_PEM}" ]; then
+            echo "::error::The secrets URTC_SIGNING_KEYS and URTC_RELEASE_ED25519_PEM must be set in the release environment (see docs/RELEASE_SIGNING.md)."
+            exit 1
+          fi
+          umask 077
+          keys="${RUNNER_TEMP}/urtc-keys"
+          mkdir -p "${keys}"
+          printf '%s\n' "${URTC_SIGNING_KEYS}" > "${keys}/signing_keys.txt"
+          printf '%s\n' "${URTC_RELEASE_ED25519_PEM}" > "${keys}/urtc_release_ed25519.pem"
+          echo "URTC_SIGNING_KEY_FILE=${keys}/signing_keys.txt" >> "${GITHUB_ENV}"
+          echo "URTC_RELEASE_KEY=${keys}/urtc_release_ed25519.pem" >> "${GITHUB_ENV}"
+      - name: Install the signing package
+        run: python3 -m pip install "cryptography==44.0.3"
+      - name: Build the firmware with the production keys (host tests first)
+        shell: bash
+        env:
+          URTC_RELEASE: "1"
+        run: |
+          set -euo pipefail
+          chmod +x build_firmware.sh
+          ./build_firmware.sh
+      - name: Check the images, sign every asset and list them
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/publish_release_assets.py --sign --list-file "${RUNNER_TEMP}/assets.txt" --tag-file "${RUNNER_TEMP}/tag.txt"
+          if [ "$(sed -n 2p "${RUNNER_TEMP}/tag.txt")" != "official" ]; then
+            echo "::error::The images are not signed with a production key; nothing is published."
+            exit 1
+          fi
+          python3 tools/release_sign.py verify $(cat "${RUNNER_TEMP}/assets.txt" | grep -v '\.sig$' | tr '\n' ' ')
+      - name: Publish the release
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t assets < "${RUNNER_TEMP}/assets.txt"
+          gh release create "${REQUESTED_TAG}" --target "${GITHUB_SHA}" --title "URTC ${REQUESTED_TAG}" --notes-file "${RUNNER_TEMP}/notes.md" --latest "${assets[@]}"
+      - name: Check what was published
+        shell: bash
+        run: |
+          set -euo pipefail
+          check="${RUNNER_TEMP}/published"
+          mkdir -p "${check}"
+          gh release download "${REQUESTED_TAG}" --dir "${check}"
+          python3 tools/release_sign.py verify $(ls "${check}" | grep -v '\.sig$' | sed "s#^#${check}/#" | tr '\n' ' ')
+          python3 - <<'PY'
+          import json, os, sys
+          folder = os.path.join(os.environ["RUNNER_TEMP"], "published")
+          index = json.load(open(os.path.join(folder, "firmware_manifest.json"), encoding="utf-8"))
+          bad = [k for k, c in index["components"].items() if k.endswith("_application") and c.get("signing", {}).get("key_kind") != "release"]
+          if bad:
+              sys.exit("applications not signed with a release key: " + ", ".join(bad))
+          print("PUBLISHED_RELEASE=PASS")
+          PY
+      - name: Remove the key files
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          rm -rf "${RUNNER_TEMP}/urtc-keys"

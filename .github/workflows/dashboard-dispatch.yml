@@ -3,13 +3,20 @@
 # Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
 # GPL-3.0-or-later - see LICENSE
 # =============================================================================
-# Notifies the central JuanenRac dashboard after a main-branch push. This
-# independent workflow never changes, delays or invalidates the project CI.
+# Notifies the central JuanenRac dashboard only after the project CI finished
+# green on main: a red or cancelled run never reaches the dashboard, and the
+# commit that is announced is the one the CI actually checked. This workflow
+# never changes, delays or invalidates the project CI. The same file is used
+# by every repository of the ecosystem.
 
 name: Notify central ecosystem dashboard
 
 on:
-  push:
+  workflow_run:
+    workflows:
+      - URTC CI baseline
+    types:
+      - completed
     branches:
       - main
 
@@ -18,9 +25,12 @@ permissions: {}
 jobs:
   notify:
     name: Request dashboard refresh
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' }}
     runs-on: ubuntu-latest
     env:
       DASHBOARD_DISPATCH_TOKEN: ${{ secrets.ECOSYSTEM_DASHBOARD_DISPATCH_TOKEN }}
+      CHECKED_REPOSITORY: ${{ github.repository }}
+      CHECKED_SHA: ${{ github.event.workflow_run.head_sha }}
     steps:
       - name: Dispatch public manifest refresh when configured
         shell: bash
@@ -35,9 +45,9 @@ jobs:
           fi
 
           payload="$(jq -nc \
-            --arg repository "${{ github.repository }}" \
-            --arg ref "${{ github.ref }}" \
-            --arg sha "${{ github.sha }}" \
+            --arg repository "${CHECKED_REPOSITORY}" \
+            --arg ref "refs/heads/main" \
+            --arg sha "${CHECKED_SHA}" \
             '{event_type: "ecosystem_project_updated", client_payload: {repository: $repository, ref: $ref, sha: $sha}}')"
 
           curl --fail-with-body --retry 3 --retry-all-errors \
@@ -49,5 +59,4 @@ jobs:
             --url "https://api.github.com/repos/JuanenRac/JuanenRac/dispatches" \
             --data "${payload}"
 
-          echo "Dashboard refresh requested for ${{ github.repository }} at ${{ github.sha }}."
-
+          echo "Dashboard refresh requested for ${CHECKED_REPOSITORY} at ${CHECKED_SHA}."

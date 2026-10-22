@@ -84,6 +84,41 @@ class PublishPlanTests(unittest.TestCase):
         plan = pra.build_plan(self.root, self.fw, False, "o/r")
         self.assertTrue(any("hmac_sha256" in p for p in plan["problems"]))
 
+    def test_the_key_kind_a_real_build_writes_counts_as_a_production_key(self):
+        # build_firmware.sh with URTC_SIGNING_KEY_FILE records "release"; the older name was "production"; only "dev" (or anything else) is refused
+        for kind, official in (("release", True), ("production", True), ("dev", False), ("other", False)):
+            comp = {"main_application": make_component(self.fw, "URTC_MAIN_FIRMWARE", "1.2.3", b"app", True, kind)}
+            self.write_index(comp)
+            plan = pra.build_plan(self.root, self.fw, False, "o/r", sign=True)
+            self.assertEqual(plan["problems"] == [], official, kind)
+            self.assertEqual(plan["prerelease"], not official, kind)
+
+    def test_the_list_and_tag_files_are_written_only_when_nothing_is_wrong(self):
+        import contextlib
+        import io
+        from unittest import mock
+
+        root_patch = mock.patch.object(pra, "ROOT", self.root)
+        root_patch.start()
+        self.addCleanup(root_patch.stop)
+        comp = {"main_application": make_component(self.fw, "URTC_MAIN_FIRMWARE", "1.2.3", b"app", True, "release")}
+        self.write_index(comp)
+        listing, tagfile = self.root / "assets.txt", self.root / "tag.txt"
+        with contextlib.redirect_stdout(io.StringIO()):
+            status = pra.main(["--firmware-dir", str(self.fw), "--repo", "o/r", "--sign", "--list-file", str(listing), "--tag-file", str(tagfile)])
+        self.assertEqual(status, 0)
+        names = listing.read_text(encoding="utf-8").split()
+        self.assertTrue(any(n.endswith("URTC_MAIN_FIRMWARE_v1.2.3.bin") for n in names))
+        self.assertTrue(any(n.endswith("URTC_MAIN_FIRMWARE_v1.2.3.bin.sig") for n in names))
+        self.assertEqual(tagfile.read_text(encoding="utf-8").split(), ["v1.2.3", "official"])
+        listing.unlink()
+        tagfile.unlink()
+        (self.fw / "URTC_MAIN_FIRMWARE_v1.2.3.bin").write_bytes(b"changed")
+        with contextlib.redirect_stdout(io.StringIO()):
+            status = pra.main(["--firmware-dir", str(self.fw), "--repo", "o/r", "--list-file", str(listing), "--tag-file", str(tagfile)])
+        self.assertEqual(status, 1)
+        self.assertFalse(listing.exists() or tagfile.exists())
+
     def test_development_key_is_refused_as_official_and_allowed_as_prerelease(self):
         comp = {"main_application": make_component(self.fw, "URTC_MAIN_FIRMWARE", "1.2.3", b"app", True, "dev")}
         self.write_index(comp)
