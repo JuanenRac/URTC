@@ -117,7 +117,13 @@ def file_info(bin_path, ext):
     path = os.path.splitext(bin_path)[0] + "." + ext
     if not os.path.exists(path):
         return None
-    return {"filename": os.path.basename(path), "size_bytes": os.path.getsize(path)}
+    with open(path, "rb") as handle:
+        data = handle.read()
+    return {
+        "filename": os.path.basename(path),
+        "size_bytes": len(data),
+        "sha256": hashlib.sha256(data).hexdigest(),
+    }
 
 
 def component_files(fw_dir, prefix):
@@ -205,7 +211,7 @@ def main():
                 "version_string": f"{mb_maj}.{mb_min}.{mb_pat}",
                 "version_code": mb_maj * 10000 + mb_min * 100 + mb_pat,
                 "flash_address": "0x08000000",
-                "flash_region_max_bytes": 32768,
+                "flash_region_max_bytes": 30720,
                 "files": component_files(fw_dir, "URTC_MAIN_BOOTLOADER"),
             },
             "main_application": {

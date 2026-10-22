@@ -1,14 +1,15 @@
 /* Linker script for URTC bootloader - STM32F303CCT6
- * Flash region: 0x08000000, 32KB (bootloader slot - see bootloader_common.h's
- * own MAIN_APP_ADDR=0x08008000 / BACKUP_APP_ADDR=0x08024000 constants,
- * which assume exactly this 32KB bootloader region ahead of them).
+ * Flash region: 0x08000000, 30KB of code. The last 2KB of the 32KB slot in
+ * front of MAIN_APP_ADDR=0x08008000 / BACKUP_APP_ADDR=0x08024000 (see
+ * bootloader_common.h) hold the boot metadata at METADATA_ADDR=0x08007800,
+ * so the code must stop before it.
  * RAM: 40KB main SRAM at 0x20000000 (the STM32F303CC's other 8KB, CCM
  * RAM, lives at the unrelated 0x10000000 alias and isn't used here).
  */
 
 MEMORY
 {
-  FLASH (rx)      : ORIGIN = 0x08000000, LENGTH = 32K
+  FLASH (rx)      : ORIGIN = 0x08000000, LENGTH = 30K
   RAM (xrw)       : ORIGIN = 0x20000000, LENGTH = 40K
 }
 

@@ -12,6 +12,7 @@
   ],
   "deployment_target": "mcu",
   "maturity": "functional",
+  "evidence": "host-test",
   "family": "URTC Tool Platform",
   "parent": null,
   "build": "4 independently-versioned components (main + slave, app + bootloader each). This registry tracks the main application as representative. Real build: bash build_firmware.sh.",

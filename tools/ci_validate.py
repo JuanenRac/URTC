@@ -51,6 +51,7 @@ REQUIRED_MANIFEST_KEYS = (
     "technologies",
     "deployment_target",
     "maturity",
+    "evidence",
     "family",
     "parent",
     "build",
@@ -235,6 +236,24 @@ def validate_components(manifest: dict) -> None:
             fail(f"component {component['name']} declares {component['version']} but {source['file']} says {'.'.join(found)}")
 
 
+EVIDENCE_LEVELS = ("host-test", "simulator", "bench", "field")
+
+
+def validate_evidence(manifest: dict) -> None:
+    """The manifest says how far the project has been shown to work: host-test (tests on a PC), simulator
+    (against a simulated board or bus), bench (on a real board) or field. A project of the tool platform
+    can only be called established once it has been seen working on a bench."""
+    level = manifest.get("evidence")
+    if level not in EVIDENCE_LEVELS:
+        fail(f"manifest evidence must be one of {', '.join(EVIDENCE_LEVELS)}, found {level!r}")
+    if (
+        manifest.get("maturity") == "established"
+        and manifest.get("family") == "URTC Tool Platform"
+        and EVIDENCE_LEVELS.index(level) < EVIDENCE_LEVELS.index("bench")
+    ):
+        fail(f"maturity established needs evidence bench or field, found {level}")
+
+
 def main() -> int:
     try:
         manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
@@ -286,6 +305,7 @@ def main() -> int:
         fail(f"latest changelog version {found} differs from manifest {manifest['version']}")
 
     validate_readme_version_prose(manifest)
+    validate_evidence(manifest)
 
     gitignore = ROOT / ".gitignore"
     if not gitignore.is_file():

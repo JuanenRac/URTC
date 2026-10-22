@@ -71,7 +71,7 @@ Effect: answers with 0x111. Read-only, no side effects - answered even
         while a critical error is declared, unlike most commands, since
         this is exactly the kind of diagnostic that matters most when
         something's already wrong. A host has no other way to learn which
-        of the 12 tool profiles a board is jumpered for without this,
+        of the 25 tool profiles a board is jumpered for without this,
         short of probing which tool-specific IDs happen to get a
         response - which takes time and can't distinguish "no response
         yet" from "wrong tool for this command".

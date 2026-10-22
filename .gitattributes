@@ -5,3 +5,8 @@
 *.sh text eol=lf
 *.bat text eol=crlf
 *.cmd text eol=crlf
+
+# Built firmware images are binary: no line-ending conversion, or their digests would change.
+*.bin binary
+*.elf binary
+*.hex -text

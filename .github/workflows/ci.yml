@@ -40,81 +40,11 @@ jobs:
           PY
       - name: Run build tooling tests
         run: python -m unittest discover -s tests -p "test_*.py" -v
-      - name: Validate v1 SDK contract fixtures
-        if: ${{ hashFiles('clients/python/tests/test_validation.py') != '' }}
-        env:
-          PYTHONPATH: clients/python/src
-        run: python -m unittest discover -s clients/python/tests -v
-      - name: Set up Node.js
-        if: ${{ hashFiles('package.json') != '' }}
-        uses: actions/setup-node@v5
-        with:
-          node-version: "20"
-          cache: npm
-      - name: Validate Node.js or TypeScript project
-        if: ${{ hashFiles('package.json') != '' }}
-        run: |
-          npm ci --ignore-scripts
-          npm run typecheck --if-present
-          npm test --if-present
-          npm run lint --if-present
-      - name: Set up Rust
-        if: ${{ hashFiles('Cargo.toml') != '' }}
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
-      - name: Validate Rust project
-        if: ${{ hashFiles('Cargo.toml') != '' }}
-        run: |
-          cargo fmt --check
-          cargo clippy --all-targets -- -D warnings
-          cargo test --all-targets
-      - name: Set up Go
-        if: ${{ hashFiles('go.mod') != '' || hashFiles('src/go.mod') != '' }}
-        uses: actions/setup-go@v5
-        with:
-          go-version: stable
-      - name: Validate Go project
-        if: ${{ hashFiles('go.mod') != '' || hashFiles('src/go.mod') != '' }}
-        shell: bash
-        run: |
-          module_dir="$(dirname "$(find . -name go.mod -not -path '*/.git/*' -print -quit)")"
-          test -n "$module_dir"
-          cd "$module_dir"
-          go vet ./...
-          go test ./...
-          go build ./...
-      - name: Set up Flutter
-        if: ${{ hashFiles('pubspec.yaml') != '' }}
-        uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
-      - name: Validate Flutter project
-        if: ${{ hashFiles('pubspec.yaml') != '' }}
-        run: |
-          flutter pub get
-          flutter analyze
-          flutter test
-      - name: Set up Java for Android or Wear OS
-        if: ${{ hashFiles('gradlew') != '' }}
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "21"
-      - name: Validate Android or Wear OS project without a version bump
-        if: ${{ hashFiles('gradlew') != '' }}
-        env:
-          URTC_CI: "1"
-        shell: bash
-        run: |
-          chmod +x gradlew
-          ./gradlew test
       - name: Install ARM GNU Toolchain for firmware projects
         if: ${{ hashFiles('build_firmware.sh') != '' }}
         run: |
           sudo apt-get update
-          sudo apt-get install --yes gcc-arm-none-eabi binutils-arm-none-eabi
+          sudo apt-get install --yes gcc-arm-none-eabi binutils-arm-none-eabi libnewlib-arm-none-eabi libstdc++-arm-none-eabi-newlib
       - name: Compile firmware without a version bump
         if: ${{ hashFiles('build_firmware.sh') != '' }}
         env:

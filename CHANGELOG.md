@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+- The bootloader linker script and the manifest agree on 30 KB of code (the last 2 KB of its slot hold the boot metadata), and a test compares them with the metadata address.
+- The firmware manifest records the SHA-256 of the `.hex` and `.elf` images as well as the `.bin`, and `.gitattributes` keeps the images binary so a line-ending conversion cannot change a digest.
+- `docs/CANBUS.TXT` says 25 tool profiles, the number the protocol defines.
+- The README of each language lists URTC-UPDATER among the related projects.
+- The CI workflow no longer carries the steps for languages the repository does not use, and installs the newlib packages the firmware build needs.
+- The manifest declares how far the project has been shown to work (`evidence`: host-test) and `tools/ci_validate.py` checks the value.
 
 ## [0.3.8] - Several tool heads on one CAN bus, behind a switch that is off by default
 
