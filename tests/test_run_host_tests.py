@@ -31,6 +31,28 @@ class SuiteListTests(unittest.TestCase):
             self.assertEqual("-fsanitize=address,undefined" in cmd, suite.sanitize, suite.name)
             self.assertIn(f"-std={suite.std}", cmd)
 
+    def test_the_analysis_covers_each_firmware_source_once_and_never_a_test_or_the_fake_hal(self):
+        pairs = runner.analysis_sources(list(runner.SUITES))
+        sources = [source for _, source in pairs]
+        self.assertEqual(len(sources), len(set(sources)))
+        self.assertTrue(sources)
+        for source in sources:
+            self.assertFalse(source.startswith("tests/"), source)
+            self.assertTrue((ROOT / source).is_file(), source)
+        self.assertIn("src/F303-master/multinode.c", sources)
+
+    def test_the_analysis_command_compiles_without_linking_and_keeps_the_suite_flags(self):
+        for suite, source in runner.analysis_sources(list(runner.SUITES)):
+            cmd = runner.analyze_command(suite, "gcc", source)
+            self.assertIn("-fanalyzer", cmd)
+            self.assertIn("-c", cmd)
+            self.assertIn(f"-std={suite.std}", cmd)
+            self.assertEqual(cmd[-1], str(ROOT / source))
+            self.assertNotIn("-fsanitize=address,undefined", cmd)
+
+    def test_only_gcc_ten_or_newer_gets_the_analysis(self):
+        self.assertFalse(runner.is_gcc_with_analyzer("this-compiler-does-not-exist"))
+
     def test_both_build_scripts_call_the_runner(self):
         for script in ("build_firmware.sh", "build_firmware.bat"):
             self.assertIn("run_host_tests.py", (ROOT / script).read_text(encoding="utf-8"), script)

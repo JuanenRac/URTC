@@ -13,6 +13,11 @@ on Windows runs the same suites as a build on Linux.
     python tools/run_host_tests.py --list          the suites and what they compile
     python tools/run_host_tests.py --only NAME     one suite
     python tools/run_host_tests.py --build-dir DIR where the test binaries go (default: build/)
+    python tools/run_host_tests.py --no-analyze    skip the static analysis that follows the suites
+
+After the suites pass, every firmware source they compile (not the tests and not the fake HAL) is compiled once more
+with gcc's -fanalyzer (null dereference, use after free, double free, leaks, out-of-bounds writes and the like). Any
+warning fails the run; it is skipped, with a note, when the host compiler is not gcc 10 or newer.
 
 The suites that use the fake HAL map a fake flash in the low 2 GiB and run under the address and undefined-behaviour
 sanitizers, which needs a 64-bit Linux host: on Windows this tool runs itself inside WSL when it is installed, and
@@ -90,6 +95,52 @@ def command(suite: Suite, compiler: str, binary: Path) -> list[str]:
     return cmd
 
 
+def is_gcc_with_analyzer(compiler: str) -> bool:
+    """True for a gcc that has -fanalyzer (10 or newer); clang and old gcc are skipped."""
+    try:
+        out = subprocess.run([compiler, "-dumpfullversion", "-dumpversion"], capture_output=True, text=True).stdout.strip()
+        banner = subprocess.run([compiler, "--version"], capture_output=True, text=True).stdout
+    except OSError:
+        return False
+    if "clang" in banner.lower() or "gcc" not in banner.lower() and "free software foundation" not in banner.lower():
+        return False
+    try:
+        return int(out.split(".")[0]) >= 10
+    except ValueError:
+        return False
+
+
+def analysis_sources(selected: list[Suite]) -> list[tuple[Suite, str]]:
+    """Each firmware source once, with the suite whose flags compile it; the tests and the fake HAL are not analysed."""
+    seen: dict[str, Suite] = {}
+    for suite in selected:
+        for source in suite.sources:
+            if not source.startswith(("tests/", FAKE_HAL)) and source not in seen:
+                seen[source] = suite
+    return [(suite, source) for source, suite in seen.items()]
+
+
+def analyze_command(suite: Suite, compiler: str, source: str) -> list[str]:
+    cmd = [compiler, f"-std={suite.std}", *WARN, *suite.extra, "-fanalyzer"]
+    cmd += [f"-I{ROOT / include}" for include in suite.includes]
+    return cmd + ["-c", "-o", os.devnull, str(ROOT / source)]
+
+
+def analyze(selected: list[Suite], compiler: str) -> bool:
+    pairs = analysis_sources(selected)
+    failed = []
+    for suite, source in pairs:
+        result = subprocess.run(analyze_command(suite, compiler, source), cwd=ROOT, capture_output=True, text=True)
+        if result.returncode != 0 or "warning:" in result.stderr:
+            failed.append(source)
+            print(f"ANALYZER {source}:\n{result.stderr}")
+    if failed:
+        print(f"FAIL static analysis: {len(failed)} of {len(pairs)} file(s) have warnings: {', '.join(failed)}")
+        return False
+    print(f"PASS static analysis (gcc -fanalyzer) {len(pairs)} source files, no warning")
+    return True
+
+
 def run_suite(suite: Suite, compiler: str, build_dir: Path) -> bool:
     binary = build_dir / f"host_tests_{suite.name}"
     if subprocess.run(command(suite, compiler, binary), cwd=ROOT).returncode != 0:
@@ -115,6 +166,7 @@ def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--list", action="store_true", help="print the suites and exit")
     parser.add_argument("--only", action="append", help="run only this suite (repeatable)")
+    parser.add_argument("--no-analyze", action="store_true", help="do not run the static analysis after the suites")
     parser.add_argument("--build-dir", default=None, help="folder for the test binaries (default: build/)")
     args = parser.parse_args(argv)
     if args.list:
@@ -137,6 +189,13 @@ def main(argv: list[str]) -> int:
     if failed:
         print(f"HOST_TESTS=FAIL {', '.join(failed)}")
         return 1
+    if not args.no_analyze:
+        if is_gcc_with_analyzer(compiler):
+            if not analyze(selected, compiler):
+                print("HOST_TESTS=FAIL static analysis")
+                return 1
+        else:
+            print(f"NOTE static analysis skipped: {compiler} is not gcc 10 or newer")
     print(f"HOST_TESTS=PASS {len(selected)} suites")
     return 0
 

@@ -7,6 +7,7 @@
 - The firmware manifest records the SHA-256 of the `.hex` and `.elf` images as well as the `.bin`, and `.gitattributes` keeps the images binary so a line-ending conversion cannot change a digest.
 - `docs/CANBUS.TXT` says 25 tool profiles, the number the protocol defines.
 - The README of each language lists URTC-UPDATER among the related projects.
+- **Static analysis in the host tests**: after the logic suites pass, `tools/run_host_tests.py` compiles every firmware source they use once more with `gcc -fanalyzer` (null dereference, use after free, double free, leaks, out-of-bounds writes) and fails on any warning; the 15 sources are clean today. It runs in `build_firmware.sh`, `build_firmware.bat` (through WSL) and therefore in CI, is skipped with a note when the host compiler is not gcc 10 or newer, and `--no-analyze` turns it off. Three tests cover which files are analysed and with which flags.
 - The CI workflow no longer carries the steps for languages the repository does not use, and installs the newlib packages the firmware build needs.
 - The manifest declares how far the project has been shown to work (`evidence`: host-test) and `tools/ci_validate.py` checks the value.
 

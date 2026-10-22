@@ -140,7 +140,7 @@ else
     # shared with build_firmware.bat, so both entry points run the same tests.
     mkdir -p "$BUILD"
     if python3 "$ROOT/tools/run_host_tests.py" --build-dir "$BUILD"; then
-        pass "host logic tests passed (12 suites)"
+        pass "host logic tests passed (every suite, then the static analysis)"
     else
         fail "host logic tests FAILED"
         echo ""; echo "$PASS passed, $WARN warnings, $FAIL failed"; exit 1
