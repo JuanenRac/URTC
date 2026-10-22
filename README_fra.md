@@ -43,7 +43,7 @@ Voici le détail complet de ce que c'est, ce que ça fait, et l'écosystème mat
 
 | | |
 |---|---|
-| Version | `0.3.9` |
+| Version | `0.4.0` |
 | Maturité | Fonctionnel |
 | Technologie | STM32F303 / bxCAN / 25 tool profiles |
 | Cible | Une carte à microcontrôleur (le firmware) ; compilé sur un PC |

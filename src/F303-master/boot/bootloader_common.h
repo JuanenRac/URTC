@@ -43,8 +43,8 @@ extern I2C_HandleTypeDef hi2c2;
 // any chip that adopts this as its baseline on first boot / after a
 // non-OTA flash).
 #define FIRMWARE_VERSION_MAJOR 0
-#define FIRMWARE_VERSION_MINOR 3
-#define FIRMWARE_VERSION_PATCH 9
+#define FIRMWARE_VERSION_MINOR 4
+#define FIRMWARE_VERSION_PATCH 0
 
 // BOOTLOADER_VERSION_* describes THIS bootloader binary itself - separate
 // from FIRMWARE_VERSION_MAJOR/MINOR above, which is the version of
@@ -55,7 +55,7 @@ extern I2C_HandleTypeDef hi2c2;
 // of the partitioned bootloader source changes.
 #define BOOTLOADER_VERSION_MAJOR 0
 #define BOOTLOADER_VERSION_MINOR 4
-#define BOOTLOADER_VERSION_PATCH 1
+#define BOOTLOADER_VERSION_PATCH 2
 
 // -----------------------------------------------------------------------
 // HMAC-SHA256 signing key - shared between this bootloader and whatever

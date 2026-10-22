@@ -39,7 +39,7 @@
 // PATCH+1 on every real build, odometer-carry into MINOR/MAJOR.
 #define FIRMWARE_VERSION_MAJOR 0
 #define FIRMWARE_VERSION_MINOR 2
-#define FIRMWARE_VERSION_PATCH 3
+#define FIRMWARE_VERSION_PATCH 4
 
 // -----------------------------------------------------------------------
 // Shared peripheral handles - defined once in slave_main.c, declared

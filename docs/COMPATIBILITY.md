@@ -6,15 +6,15 @@ Protocol version **1** (identifiers, layouts and magic payloads of `spec/can_pro
 
 | Project | Kind | Version | Shared code |
 |---|---|---|---|
-| Tool head firmware (`URTC`) | firmware | 0.3.9 (main firmware 0.3.9, main bootloader 0.4.1, slave firmware 0.2.3, slave bootloader 0.2.5) | 0.0.5 |
-| Flasher (`URTC-FLASHER`) | program | 0.3.8 | 0.0.5 |
-| Gateway in front of the bus (`URTC-GATEWAY`) | program | 0.0.1 | 0.0.5 |
-| Tester (`URTC-TESTER`) | program | 0.3.9 | 0.0.5 |
-| Web studio (`URTC-WEB-STUDIO`) | program | 0.3.4 | 0.0.5 |
+| Tool head firmware (`URTC`) | firmware | 0.4.0 (main firmware 0.4.0, main bootloader 0.4.2, slave firmware 0.2.4, slave bootloader 0.2.6) | 0.0.6 |
+| Flasher (`URTC-FLASHER`) | program | 0.3.9 | 0.0.6 |
+| Gateway in front of the bus (`URTC-GATEWAY`) | program | 0.0.1 | 0.0.6 |
+| Tester (`URTC-TESTER`) | program | 0.4.0 | 0.0.6 |
+| Web studio (`URTC-WEB-STUDIO`) | program | 0.3.5 | 0.0.6 |
 | Updater (`URTC-UPDATER`) | program | 0.1.7 | - |
-| Smart rack (`URTC-SMART-RACK`) | firmware | 0.1.8 | 0.0.5 |
-| Vision tool (`URTC-VISION-TOOL`) | firmware | 0.1.2 | 0.0.5 |
-| Documentation generator (`URTC-DOCS`) | program | 0.0.8 | - |
-| Shared protocol and code (`URTC-COMMON`) | library | 0.0.5 | 0.0.5 |
+| Smart rack (`URTC-SMART-RACK`) | firmware | 0.1.9 | 0.0.6 |
+| Vision tool (`URTC-VISION-TOOL`) | firmware | 0.1.3 | 0.0.6 |
+| Documentation generator (`URTC-DOCS`) | program | 0.0.9 | - |
+| Shared protocol and code (`URTC-COMMON`) | library | 0.0.6 | 0.0.6 |
 
 Every project listed speaks the protocol version above; "Shared code" is the version of URTC-COMMON the project carries a checked copy of.

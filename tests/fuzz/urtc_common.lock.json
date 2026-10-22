@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "urtc_common_version": "0.0.5",
+  "urtc_common_version": "0.0.6",
   "files": {
     "fuzz_corpus.txt": {
       "from": "conformance/fuzz_corpus.txt",
