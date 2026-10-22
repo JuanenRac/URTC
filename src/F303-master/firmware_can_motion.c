@@ -12,6 +12,7 @@
 // =============================================================================
 #include "firmware_common.h"
 #include "firmware_can_motion.h"
+#include "firmware_features.h"
 
 void Handle_CAN_MotionTools(void) {
                 if (rxHeader.StdId == 0x120 && rxHeader.DLC >= 5 && !boot_sequence_active) {
@@ -41,6 +42,7 @@ void Handle_CAN_MotionTools(void) {
                                      rxData[4];
                     if (steps > 0) {
                         total_steps_setpoint = steps;
+                        Features_NoteMove(steps); // plans the ramp when the MOTION_RAMPS switch is on and the frame has eight bytes; the step generator does not use the plan yet
                         steps_remaining = steps;
                         // Open-loop position tracking for the solder-wire
                         // feeder only (doc #16) - this motor has no

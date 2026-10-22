@@ -557,12 +557,15 @@ Falls jemand in der Community an benutzerdefinierten Endeffektoren, intelligente
 
 Hardware-Design-Dateien (Eagle-Schaltplan/Board/Netzlisten) werden hinzugefügt, sobald sich das Layout stabilisiert.
 
+**Optionale Firmware-Funktionen und Prüfungen (nur auf dem Host getestet):** Schrittmotor-Rampen, ein Zustandsframe, eine Oszillator-Trimmung und ein Heizungs-PID, jeweils hinter einem Schalter, der standardmäßig aus ist (`0x1AE` / `0x1AF`, siehe [CANBUS.TXT](docs/CANBUS.TXT)); eine virtuelle Platine mit Sanitizern und ein Fuzzer, der mit aus der Protokollspezifikation erzeugten Frames gespeist wird (`tools/fuzz_virtual_board.py`); und `tools/keys.py verify`, das prüft, ob jeder in einem Programm oder Bootloader eingebettete öffentliche Schlüssel der registrierte ist ([KEYS.md](docs/KEYS.md)). Nichts davon lief auf einer Platine.
+
 ## 🔗 Verwandte Projekte
 
 Dieses Projekt ist Teil des HYDRA-UMC-Robotik-Ökosystems desselben Autors (JuanenRac / Electro Hobby 3D). Gut zu wissen, da eine Anfrage eigentlich eines dieser Projekte betreffen könnte statt dieses Repositorys.
 
 **Untergeordnete Projekte** — jedes davon ist ein Desktop- oder Browser-Tool, das speziell zum Flashen, Testen oder Steuern dieser Firmware gebaut wurde
 - **[URTC-FLASHER](https://github.com/JuanenRac/URTC-FLASHER)** — Desktop-GUI-Flash-Tool für URTC-Platinen, CAN-OTA plus Full-Chip-SWD/JTAG; flasht genau diese Firmware.
+- **[URTC-GATEWAY](https://github.com/JuanenRac/URTC-GATEWAY)** — ein Gateway vor dem CAN-Bus, das nur Kennungen einer Liste durchlässt, ihre Rate begrenzt und einen Sitzungsschlüssel verlangt.
 - **[URTC-TESTER](https://github.com/JuanenRac/URTC-TESTER)** — Desktop-Live-CAN-Bus-Diagnosetool für URTC-Platinen, ein Panel pro Werkzeugprofil; ein Panel pro den eigenen 25 Werkzeugprofilen dieser Firmware.
 - **[URTC-WEB-STUDIO](https://github.com/JuanenRac/URTC-WEB-STUDIO)** — browserbasierte Alternative zu URTC-TESTER über die Web-Serial-API, ohne lokale Installation; dasselbe CAN-Protokoll wie die beiden obigen Desktop-Tools.
 

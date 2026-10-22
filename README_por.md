@@ -572,12 +572,15 @@ Se alguém da comunidade estiver a trabalhar em efetores finais personalizados, 
 
 Os ficheiros de design de hardware (esquema/placa/netlists do Eagle) serão adicionados à medida que o layout estabilizar.
 
+**Funções opcionais do firmware e verificações (testadas apenas no anfitrião):** rampas do motor de passo, uma trama de saúde, um ajuste do oscilador e um PID do aquecedor, cada uma atrás de um interruptor desligado por predefinição (`0x1AE` / `0x1AF`, ver [CANBUS.TXT](docs/CANBUS.TXT)); uma placa virtual compilada com sanitizers e um fuzzer alimentado com tramas feitas a partir da especificação do protocolo (`tools/fuzz_virtual_board.py`); e `tools/keys.py verify`, que verifica se cada chave pública embutida num programa ou num bootloader é a registada ([KEYS.md](docs/KEYS.md)). Nada disto correu numa placa.
+
 ## 🔗 Projetos Relacionados
 
 Este projeto faz parte do ecossistema de robótica HYDRA-UMC do mesmo autor (JuanenRac / Electro Hobby 3D). Vale a pena conhecê-los, uma vez que um pedido pode, na verdade, dizer respeito a um destes e não a este repositório.
 
 **Projetos Filhos** — cada um é uma ferramenta de desktop ou de browser construída especificamente para gravar, testar ou controlar este firmware
 - **[URTC-FLASHER](https://github.com/JuanenRac/URTC-FLASHER)** — ferramenta de gravação GUI de desktop para placas URTC, CAN-OTA mais SWD/JTAG de chip completo; grava este mesmo firmware.
+- **[URTC-GATEWAY](https://github.com/JuanenRac/URTC-GATEWAY)** — uma gateway à frente do barramento CAN que só deixa passar identificadores de uma lista, limita a sua taxa e pede uma chave de sessão.
 - **[URTC-TESTER](https://github.com/JuanenRac/URTC-TESTER)** — ferramenta de diagnóstico de desktop em direto do bus CAN para placas URTC, um painel por perfil de ferramenta; um painel por cada um dos 25 perfis de ferramenta deste firmware.
 - **[URTC-WEB-STUDIO](https://github.com/JuanenRac/URTC-WEB-STUDIO)** — alternativa baseada em browser ao URTC-TESTER através da Web Serial API, sem necessidade de instalação local; o mesmo protocolo CAN das 2 ferramentas de desktop acima.
 

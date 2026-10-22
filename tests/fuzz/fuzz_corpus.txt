@@ -1,0 +1,1043 @@
+# Frames for fuzzing a board, made from spec/can_protocol.json by tools/make_extra_vectors.py: <id> <data hex or -> <kind> <note>
+# transmit_ids: 095 111 132 135 145 147 155 165 175 177 179 181 183 191 1A1 1A3 1A5 1A7 1A9 1AB 1AD 1AF 1B8 1BA 215 216 217 218 219 221 242 243 251 253 255 7E9 7F3 7F5 7F6 7F9 7FA 7FC 7FE
+100 0000000000000000 valid example
+100 FF8000010000FF01 valid example
+100 0000000000000000 valid status_r=0
+100 0100000000000000 valid status_r=1
+100 FF00000000000000 valid status_r=255
+100 0000000000000000 valid status_g=0
+100 0001000000000000 valid status_g=1
+100 00FF000000000000 valid status_g=255
+100 0000000000000000 valid status_b=0
+100 0000010000000000 valid status_b=1
+100 0000FF0000000000 valid status_b=255
+100 0000000000000000 valid display_mode=0
+100 0000000100000000 valid display_mode=1
+100 000000FF00000000 valid display_mode=255
+100 0000000200000000 invalid display_mode=2 not in display_mode
+100 0000000000000000 valid ring_r=0
+100 0000000001000000 valid ring_r=1
+100 00000000FF000000 valid ring_r=255
+100 0000000000000000 valid ring_g=0
+100 0000000000010000 valid ring_g=1
+100 0000000000FF0000 valid ring_g=255
+100 0000000000000000 valid ring_b=0
+100 0000000000000100 valid ring_b=1
+100 000000000000FF00 valid ring_b=255
+100 0000000000000000 valid ring_on=0
+100 0000000000000001 valid ring_on=1
+100 0000000000000002 invalid ring_on=2 outside the range
+100 00000000000000FF invalid ring_on=255 outside the range
+100 - invalid length 0
+100 44 invalid length 1
+100 2082 invalid length 2
+100 3CFDE6 invalid length 3
+100 F1C26B30 invalid length 4
+100 F90EC7DD01 invalid length 5
+100 E4887534A20F invalid length 6
+100 0B0D04C36ED80E invalid length 7
+110 - valid example
+120 01000003E8 valid example
+120 0000000000 valid example
+120 01000003E8032002 valid example
+120 0000000000000000 valid direction=0
+120 0100000000000000 valid direction=1
+120 FF00000000000000 valid direction=255
+120 0200000000000000 invalid direction=2 not in motion_direction
+120 0000000000000000 valid steps=0
+120 0000000001000000 valid steps=1
+120 00FFFFFFFF000000 valid steps=4294967295
+120 0000000000000000 valid speed=0
+120 0000000000000100 valid speed=1
+120 0000000000FFFF00 valid speed=65535
+120 0000000000000000 valid profile=0
+120 0000000000000001 valid profile=1
+120 00000000000000FF valid profile=255
+120 - invalid length 0
+120 71 invalid length 1
+120 E0FD invalid length 2
+120 77B076 invalid length 3
+120 70EB940B invalid length 4
+130 015E valid example
+130 0000 valid example
+130 0000 valid setpoint_c=0
+130 00DE valid setpoint_c=222
+130 01BD valid setpoint_c=445
+130 01BE invalid setpoint_c=446 outside the range
+130 FFFF invalid setpoint_c=65535 outside the range
+130 - invalid length 0
+130 D5 invalid length 1
+130 335F97 invalid length 3
+130 3DAAD861 invalid length 4
+130 9B91FFC911 invalid length 5
+130 F57CCED458BB invalid length 6
+130 BF2CE03753C9BD invalid length 7
+130 FA0FF0169DC95756 invalid length 8
+131 52535030 valid example
+131 - invalid length 0
+131 74 invalid length 1
+131 0666 invalid length 2
+131 76CFB0 invalid length 3
+131 B4EB8902C4 invalid length 5
+131 4269DA1CF6BA invalid length 6
+131 66D3F8B6D4B100 invalid length 7
+131 A9EA0E755A5C2E82 invalid length 8
+132 - valid example
+140 8001 valid example
+140 0000 valid speed=0
+140 0100 valid speed=1
+140 FF00 valid speed=255
+140 0000 valid direction=0
+140 0001 valid direction=1
+140 00FF valid direction=255
+140 0002 invalid direction=2 not in drill_direction
+140 - invalid length 0
+140 10 invalid length 1
+140 242A08 invalid length 3
+140 E7078F7F invalid length 4
+140 89385EB094 invalid length 5
+140 23555182568B invalid length 6
+140 96E8A4FEF23A0C invalid length 7
+140 9FC5AFD760843781 invalid length 8
+150 010064 valid example
+150 000000 valid mode=0
+150 010000 valid mode=1
+150 FF0000 valid mode=255
+150 030000 invalid mode=3 not in aoi_ring_mode
+150 000001 valid strobe_period_ms=1
+150 0000FA valid strobe_period_ms=250
+150 0001F4 valid strobe_period_ms=500
+150 000000 invalid strobe_period_ms=0 outside the range
+150 0001F5 invalid strobe_period_ms=501 outside the range
+150 00FFFF invalid strobe_period_ms=65535 outside the range
+150 - invalid length 0
+150 6B invalid length 1
+150 DD0A invalid length 2
+150 7309CB4A invalid length 4
+150 1252E4DA70 invalid length 5
+150 E6720FCAA4DA invalid length 6
+150 1E98406C189C24 invalid length 7
+150 279E9851D5814204 invalid length 8
+160 6401 valid example
+160 0000 valid example
+160 0000 valid power=0
+160 0100 valid power=1
+160 FF00 valid power=255
+160 0000 valid interlock=0
+160 0001 valid interlock=1
+160 0002 invalid interlock=2 outside the range
+160 00FF invalid interlock=255 outside the range
+160 - invalid length 0
+160 13 invalid length 1
+160 6FEB57 invalid length 3
+160 13C166B1 invalid length 4
+160 3269DD63FC invalid length 5
+160 35C797FF08A6 invalid length 6
+160 CD90095066A745 invalid length 7
+160 ADDB6D8831C2B0F8 invalid length 8
+170 00C801000010 valid example
+170 000001000000 valid example
+170 000000000000 valid nozzle_setpoint_c=0
+170 009600000000 valid nozzle_setpoint_c=150
+170 012C00000000 valid nozzle_setpoint_c=300
+170 012D00000000 invalid nozzle_setpoint_c=301 outside the range
+170 FFFF00000000 invalid nozzle_setpoint_c=65535 outside the range
+170 000000000000 valid extruder_direction=0
+170 000001000000 valid extruder_direction=1
+170 0000FF000000 valid extruder_direction=255
+170 000002000000 invalid extruder_direction=2 not in extruder_direction
+170 000000000000 valid extruder_steps=0
+170 000000000001 valid extruder_steps=1
+170 000000FFFFFF valid extruder_steps=16777215
+170 - invalid length 0
+170 78 invalid length 1
+170 2114 invalid length 2
+170 2B4456 invalid length 3
+170 556D89AA invalid length 4
+170 82BCADAE3A invalid length 5
+170 9578FA4535A414 invalid length 7
+170 D025C24B40AE3AC1 invalid length 8
+173 FF valid example
+173 00 valid power=0
+173 01 valid power=1
+173 FF valid power=255
+173 - invalid length 0
+173 2772 invalid length 2
+173 2988BA invalid length 3
+173 973AEA8D invalid length 4
+173 3717970607 invalid length 5
+173 2ED33A14607A invalid length 6
+173 D7523BE6557B51 invalid length 7
+173 34DEC19681F4A133 invalid length 8
+178 FF valid example
+178 00 valid power=0
+178 01 valid power=1
+178 FF valid power=255
+178 - invalid length 0
+178 6AA2 invalid length 2
+178 140D05 invalid length 3
+178 97A3E6C8 invalid length 4
+178 A0CC2020A2 invalid length 5
+178 E939806EF0B6 invalid length 6
+178 845D6A9D657EB8 invalid length 7
+178 298F2DE52EAD74C7 invalid length 8
+180 03010203 valid example
+180 0100000000000000 valid count=1
+180 0400000000000000 valid count=4
+180 0700000000000000 valid count=7
+180 0000000000000000 invalid count=0 outside the range
+180 0800000000000000 invalid count=8 outside the range
+180 FF00000000000000 invalid count=255 outside the range
+180 - invalid length 0
+180 9D invalid length 1
+182 - valid example
+190 - valid example
+192 E3A5E0FF valid example
+192 - invalid length 0
+192 15 invalid length 1
+192 A75F invalid length 2
+192 A29B7D invalid length 3
+192 AB332F7D70 invalid length 5
+192 0A7CCD258924 invalid length 6
+192 260B0594B7FCF0 invalid length 7
+192 4E33A727585B4C48 invalid length 8
+1A0 04 valid example
+1A0 0000000000000000 valid board_type=0
+1A0 0100000000000000 valid board_type=1
+1A0 FF00000000000000 valid board_type=255
+1A0 0700000000000000 invalid board_type=7 not in expansion_board_type
+1A0 - invalid length 0
+1A1 - valid example
+1A2 17 valid example
+1A2 0000000000000000 valid selection=0
+1A2 0C00000000000000 valid selection=12
+1A2 1900000000000000 valid selection=25
+1A2 1A00000000000000 invalid selection=26 outside the range
+1A2 FF00000000000000 invalid selection=255 outside the range
+1A2 - invalid length 0
+1A3 - valid example
+1A4 07 valid example
+1A4 0000000000000000 valid serial=0
+1A4 0100000000000000 valid serial=1
+1A4 FF00000000000000 valid serial=255
+1A4 - invalid length 0
+1A5 - valid example
+1A6 01 valid example
+1A6 0000000000000000 valid variant=0
+1A6 0100000000000000 valid variant=1
+1A6 FF00000000000000 valid variant=255
+1A6 0400000000000000 invalid variant=4 not in mlx_sensor_variant
+1A6 - invalid length 0
+1A7 - valid example
+1A8 00 valid example
+1A8 0000000000000000 valid chunk_index=0
+1A8 0A00000000000000 valid chunk_index=10
+1A8 1500000000000000 valid chunk_index=21
+1A8 1600000000000000 invalid chunk_index=22 outside the range
+1A8 FF00000000000000 invalid chunk_index=255 outside the range
+1A8 - invalid length 0
+1AA - valid example
+1AC 4D4E4F440100 valid example
+1AC 4D4E4F440000 valid example
+1AC 000000000000 valid enable=0
+1AC 000000000100 valid enable=1
+1AC 000000000200 invalid enable=2 outside the range
+1AC 00000000FF00 invalid enable=255 outside the range
+1AC 000000000000 valid instance=0
+1AC 000000000001 valid instance=1
+1AC 0000000000FF valid instance=255
+1AC - invalid length 0
+1AC A3 invalid length 1
+1AC 9C36 invalid length 2
+1AC 964069 invalid length 3
+1AC 4810A169 invalid length 4
+1AC 5B99DD5018 invalid length 5
+1AC 7E8120E4DC80E0 invalid length 7
+1AC E805CAAD5784F80C invalid length 8
+1AD - valid example
+1AE 4645415400 valid example
+1AE 464541540A valid example
+1AE 0000000000 valid features=0
+1AE 0000000007 valid features=7
+1AE 000000000F valid features=15
+1AE 0000000010 invalid features=16 outside the range
+1AE 00000000FF invalid features=255 outside the range
+1AE - invalid length 0
+1AE D5 invalid length 1
+1AE 091F invalid length 2
+1AE B54640 invalid length 3
+1AE 46848DCB invalid length 4
+1AE CD582D77F803 invalid length 6
+1AE 5AA2E0737AA0FD invalid length 7
+1AE F573D3AC8C701824 invalid length 8
+1AF - valid example
+1B0 01 valid example
+1B0 00 valid coil=0
+1B0 01 valid coil=1
+1B0 02 invalid coil=2 outside the range
+1B0 FF invalid coil=255 outside the range
+1B0 - invalid length 0
+1B0 BC51 invalid length 2
+1B0 689F98 invalid length 3
+1B0 99BE54ED invalid length 4
+1B0 2B3FC15A4F invalid length 5
+1B0 80DA6F1AFDC9 invalid length 6
+1B0 B2C454142E8233 invalid length 7
+1B0 882A4729E37BC3DD invalid length 8
+1B9 03200014009600 valid example
+1B9 00000000000001 valid example
+1B9 00000000000000 valid kp_x100=0
+1B9 00010000000000 valid kp_x100=1
+1B9 FFFF0000000000 valid kp_x100=65535
+1B9 00000000000000 valid ki_x100=0
+1B9 00000001000000 valid ki_x100=1
+1B9 0000FFFF000000 valid ki_x100=65535
+1B9 00000000000000 valid kd_x100=0
+1B9 00000000000100 valid kd_x100=1
+1B9 00000000FFFF00 valid kd_x100=65535
+1B9 00000000000000 valid action=0
+1B9 00000000000001 valid action=1
+1B9 000000000000FF valid action=255
+1B9 00000000000004 invalid action=4 not in pid_action
+1B9 - invalid length 0
+1B9 CB invalid length 1
+1B9 54A6 invalid length 2
+1B9 E040F9 invalid length 3
+1B9 6C3DDCD1 invalid length 4
+1B9 3C978E7FC1 invalid length 5
+1B9 0261E00A0F7C invalid length 6
+1B9 856958914B668B9F invalid length 8
+1BA - valid example
+1C0 010064 valid example
+1C0 010000 valid fire=1
+1C0 000000 invalid fire=0 outside the range
+1C0 020000 invalid fire=2 outside the range
+1C0 FF0000 invalid fire=255 outside the range
+1C0 000001 valid duration_ms=1
+1C0 0003E8 valid duration_ms=1000
+1C0 0007D0 valid duration_ms=2000
+1C0 000000 invalid duration_ms=0 outside the range
+1C0 0007D1 invalid duration_ms=2001 outside the range
+1C0 00FFFF invalid duration_ms=65535 outside the range
+1C0 - invalid length 0
+1C0 80 invalid length 1
+1C0 E456 invalid length 2
+1C0 B6FBD73E invalid length 4
+1C0 6AC4689137 invalid length 5
+1C0 0C3C06974526 invalid length 6
+1C0 BF9FDFB6A5003F invalid length 7
+1C0 E2E6B39CCCADFC39 invalid length 8
+1D0 80 valid example
+1D0 00 valid duty=0
+1D0 01 valid duty=1
+1D0 FF valid duty=255
+1D0 - invalid length 0
+1D0 C1C3 invalid length 2
+1D0 68018E invalid length 3
+1D0 65ECD19C invalid length 4
+1D0 57E665B801 invalid length 5
+1D0 C7DACFAC22FC invalid length 6
+1D0 7E940AD04FCB8A invalid length 7
+1D0 5B2505B287D29B4D invalid length 8
+1E0 012CC8 valid example
+1E0 000000 valid setpoint_c=0
+1E0 00DE00 valid setpoint_c=222
+1E0 01BD00 valid setpoint_c=445
+1E0 01BE00 invalid setpoint_c=446 outside the range
+1E0 FFFF00 invalid setpoint_c=65535 outside the range
+1E0 000000 valid blower_duty=0
+1E0 000001 valid blower_duty=1
+1E0 0000FF valid blower_duty=255
+1E0 - invalid length 0
+1E0 EC invalid length 1
+1E0 84F8 invalid length 2
+1E0 56EF178A invalid length 4
+1E0 32D823B522 invalid length 5
+1E0 E20A54522FCD invalid length 6
+1E0 8D9B6A6A79AA89 invalid length 7
+1E0 2326BCEF1956988A invalid length 8
+1F0 01000001F4 valid example
+1F0 0000000000 valid direction=0
+1F0 0100000000 valid direction=1
+1F0 FF00000000 valid direction=255
+1F0 0200000000 invalid direction=2 not in motion_direction
+1F0 0000000000 valid steps=0
+1F0 0000000001 valid steps=1
+1F0 00FFFFFFFF valid steps=4294967295
+1F0 - invalid length 0
+1F0 B6 invalid length 1
+1F0 76C8 invalid length 2
+1F0 CC58F7 invalid length 3
+1F0 84A87184 invalid length 4
+1F0 7D0FCEA2DD7F invalid length 6
+1F0 89612554E34B86 invalid length 7
+1F0 EB534646E1B89ECD invalid length 8
+200 0100FA valid example
+200 010000 valid fire=1
+200 000000 invalid fire=0 outside the range
+200 020000 invalid fire=2 outside the range
+200 FF0000 invalid fire=255 outside the range
+200 000001 valid duration_ms=1
+200 0003E8 valid duration_ms=1000
+200 0007D0 valid duration_ms=2000
+200 000000 invalid duration_ms=0 outside the range
+200 0007D1 invalid duration_ms=2001 outside the range
+200 00FFFF invalid duration_ms=65535 outside the range
+200 - invalid length 0
+200 7B invalid length 1
+200 3B69 invalid length 2
+200 9C223674 invalid length 4
+200 CBA4FC335F invalid length 5
+200 171C0B6E11FD invalid length 6
+200 E2AF8C3C583071 invalid length 7
+200 CC77FDE6C1567678 invalid length 8
+210 B0071D5A valid example
+210 - invalid length 0
+210 91 invalid length 1
+210 ECC7 invalid length 2
+210 6CE784 invalid length 3
+210 A9FE386D28 invalid length 5
+210 170702F5A3C4 invalid length 6
+210 9364CC514D0F07 invalid length 7
+210 C64A1DC2824228EC invalid length 8
+211 000004000303CB01 valid example
+211 0000000000000000 valid total_size=0
+211 0000000100000000 valid total_size=1
+211 FFFFFFFF00000000 valid total_size=4294967295
+211 0000000000000000 valid hardware_id=0
+211 0000000000000001 valid hardware_id=1
+211 00000000FFFFFFFF valid hardware_id=4294967295
+211 - invalid length 0
+211 9B invalid length 1
+211 0712 invalid length 2
+211 1F4215 invalid length 3
+211 8C3CDD2E invalid length 4
+211 610EFF428E invalid length 5
+211 62E5C7A88985 invalid length 6
+211 7C7D1E59B3DB1F invalid length 7
+212 0001020304050607 valid example
+212 - invalid length 0
+212 B4 invalid length 1
+212 D366 invalid length 2
+212 D92388 invalid length 3
+212 25805A31 invalid length 4
+212 4D1E68DB16 invalid length 5
+212 1B2EF0BD32A0 invalid length 6
+212 144010E241CAE4 invalid length 7
+213 DEADBEEF valid example
+213 - invalid length 0
+214 1234567800000002 valid example
+214 0000000000000000 valid crc32=0
+214 0000000100000000 valid crc32=1
+214 FFFFFFFF00000000 valid crc32=4294967295
+214 0000000000000000 valid version_major=0
+214 0000000000010000 valid version_major=1
+214 00000000FFFF0000 valid version_major=65535
+214 0000000000000000 valid version_minor_field=0
+214 0000000000000001 valid version_minor_field=1
+214 000000000000FFFF valid version_minor_field=65535
+214 - invalid length 0
+214 0C invalid length 1
+214 8A2E invalid length 2
+214 80A62B invalid length 3
+214 9A11C41D invalid length 4
+214 85A04285C2 invalid length 5
+214 3B9B30D97D69 invalid length 6
+214 A9ADC8F63542E5 invalid length 7
+215 - valid example
+216 - valid example
+217 - valid example
+219 - valid example
+220 3201 valid example
+220 0000000000000000 valid register=0
+220 0100000000000000 valid register=1
+220 FF00000000000000 valid register=255
+220 - invalid length 0
+220 0F invalid length 1
+221 2202 valid example
+221 0000 valid register=0
+221 0100 valid register=1
+221 FF00 valid register=255
+221 0001 valid length=1
+221 0004 valid length=4
+221 0008 valid length=8
+221 0000 invalid length=0 outside the range
+221 0009 invalid length=9 outside the range
+221 00FF invalid length=255 outside the range
+221 - invalid length 0
+221 95 invalid length 1
+221 5066BD invalid length 3
+221 C7A631D1 invalid length 4
+221 B040211699 invalid length 5
+221 A0D598A3B48B invalid length 6
+221 A6043E4CA2A6A7 invalid length 7
+221 23E78FF5E8BAC228 invalid length 8
+230 0103E8 valid example
+230 000000 valid channel=0
+230 010000 valid channel=1
+230 030000 valid channel=3
+230 040000 invalid channel=4 outside the range
+230 FF0000 invalid channel=255 outside the range
+230 000001 valid frequency_hz=1
+230 008000 valid frequency_hz=32768
+230 00FFFF valid frequency_hz=65535
+230 000000 invalid frequency_hz=0 outside the range
+230 - invalid length 0
+230 1C invalid length 1
+230 4418 invalid length 2
+230 FB807DAD invalid length 4
+230 B9BDCE9DED invalid length 5
+230 AE550E4B8071 invalid length 6
+230 44395ED2193288 invalid length 7
+230 3668852228256F58 invalid length 8
+231 003214 valid example
+231 000000 valid channel=0
+231 010000 valid channel=1
+231 030000 valid channel=3
+231 040000 invalid channel=4 outside the range
+231 FF0000 invalid channel=255 outside the range
+231 000000 valid duty_percent=0
+231 003200 valid duty_percent=50
+231 006400 valid duty_percent=100
+231 006500 invalid duty_percent=101 outside the range
+231 00FF00 invalid duty_percent=255 outside the range
+231 000001 valid duration_ms=1
+231 000080 valid duration_ms=128
+231 0000FF valid duration_ms=255
+231 000000 invalid duration_ms=0 outside the range
+231 - invalid length 0
+231 DD invalid length 1
+231 0BBC invalid length 2
+231 F9917066 invalid length 4
+231 FC78D9E7BB invalid length 5
+231 60F62583D067 invalid length 6
+231 04C2F927CED914 invalid length 7
+231 B4EA036199023D9A invalid length 8
+240 8583 valid example
+240 0000 valid config=0
+240 0001 valid config=1
+240 FFFF valid config=65535
+240 - invalid length 0
+240 A1 invalid length 1
+240 90D2D1 invalid length 3
+240 9DE79A43 invalid length 4
+240 E347538104 invalid length 5
+240 D912BCD7CD90 invalid length 6
+240 092E2E02C489ED invalid length 7
+240 8BBEF6ACC6E93BF7 invalid length 8
+241 - valid example
+242 - valid example
+250 - valid example
+251 - valid example
+252 05 valid example
+252 00 valid chunk=0
+252 17 valid chunk=23
+252 2F valid chunk=47
+252 30 invalid chunk=48 outside the range
+252 FF invalid chunk=255 outside the range
+252 - invalid length 0
+252 B54A invalid length 2
+252 D44B09 invalid length 3
+252 5885BC41 invalid length 4
+252 93D38493D7 invalid length 5
+252 8CDDABF86EFB invalid length 6
+252 CDD92E2042694C invalid length 7
+252 750D34814FF532CC invalid length 8
+254 00 valid example
+254 00 valid chunk=0
+254 17 valid chunk=23
+254 2F valid chunk=47
+254 30 invalid chunk=48 outside the range
+254 FF invalid chunk=255 outside the range
+254 - invalid length 0
+254 5F01 invalid length 2
+254 2DDA1A invalid length 3
+254 6FD8B118 invalid length 4
+254 34D63C878E invalid length 5
+254 5BF5186D2CC7 invalid length 6
+254 3FE596FEC93BF5 invalid length 7
+254 364CC5675583D593 invalid length 8
+7F0 B0071D5A valid example
+7F0 - invalid length 0
+7F0 FC invalid length 1
+7F0 6DAC invalid length 2
+7F0 F83404 invalid length 3
+7F0 B1881CE199 invalid length 5
+7F0 33758C8A7ED2 invalid length 6
+7F0 4B428363D01D4C invalid length 7
+7F0 D38A8FF59C88FB6D invalid length 8
+7F1 000004000303CC01 valid example
+7F1 0000000000000000 valid total_size=0
+7F1 0000000100000000 valid total_size=1
+7F1 FFFFFFFF00000000 valid total_size=4294967295
+7F1 0000000000000000 valid hardware_id=0
+7F1 0000000000000001 valid hardware_id=1
+7F1 00000000FFFFFFFF valid hardware_id=4294967295
+7F1 - invalid length 0
+7F1 FF invalid length 1
+7F1 BCF0 invalid length 2
+7F1 7BAD5A invalid length 3
+7F1 5CE64C1D invalid length 4
+7F1 A6456DA1FC invalid length 5
+7F1 F5A83C414783 invalid length 6
+7F1 732D19583B7366 invalid length 7
+7F2 0102030405060708 valid example
+7F2 - invalid length 0
+7F4 DEADBEEF00000003 valid example
+7F4 DEADBEEF00008503 valid example
+7F4 0000000000000000 valid crc32=0
+7F4 0000000100000000 valid crc32=1
+7F4 FFFFFFFF00000000 valid crc32=4294967295
+7F4 0000000000000000 valid version_major=0
+7F4 0000000000010000 valid version_major=1
+7F4 00000000FFFF0000 valid version_major=65535
+7F4 0000000000000000 valid version_minor_field=0
+7F4 0000000000000001 valid version_minor_field=1
+7F4 000000000000FFFF valid version_minor_field=65535
+7F4 - invalid length 0
+7F4 9D invalid length 1
+7F4 D8A7 invalid length 2
+7F4 020A9C invalid length 3
+7F4 702B728F invalid length 4
+7F4 AE89C20B3E invalid length 5
+7F4 A8B1473A8049 invalid length 6
+7F4 15B1272F3499A2 invalid length 7
+7F7 0001020304050607 valid example
+7F7 - invalid length 0
+7F7 7F invalid length 1
+7F7 8919 invalid length 2
+7F7 B90F28 invalid length 3
+7F7 47CCBE7B invalid length 4
+7F7 30A88C04A4 invalid length 5
+7F7 39B4408ACF2E invalid length 6
+7F7 F3D6C99A709A44 invalid length 7
+7F8 - valid example
+7FB - valid example
+7FD D09E12AD valid example
+7FD - invalid length 0
+7FD 1B invalid length 1
+7FD 3859 invalid length 2
+7FD 7B6EDE invalid length 3
+7FD 8C0A808A86 invalid length 5
+7FD F240CE35BF23 invalid length 6
+7FD B90F9DE4434F26 invalid length 7
+7FD 486EF7ABBA95514F invalid length 8
+7FE - valid example
+7FF 00000000 valid example
+7FF 00000000 valid page_index=0
+7FF 00000001 valid page_index=1
+7FF FFFFFFFF valid page_index=4294967295
+7FF - invalid length 0
+7FF C3 invalid length 1
+7FF E1CF invalid length 2
+7FF 3C4A8A invalid length 3
+7FF 97040443C2 invalid length 5
+7FF 33EB0FDDD88D invalid length 6
+7FF BDD1CFEC1B32F1 invalid length 7
+7FF 1300153847B68AB6 invalid length 8
+3EC 36B751 random
+132 D8B1811CDE random
+217 AEE17949 random
+190 58F9AE3E0BF56BC4 random
+1A6 74337FABA87D random
+761 BDFC63DDE1CC3D random
+1D0 4C06 random
+182 - random
+1A7 C1934F4E368209 random
+1AF C8027FD8515BAF7A random
+1A4 C00B random
+250 146127 random
+7F1 18 random
+180 177A060A9FEE8E random
+2AA A2E5 random
+6AE 55CAC766FD8EB84D random
+1E0 2AB8 random
+1A2 8281B2C4 random
+7F1 - random
+1A0 73642465 random
+1B0 EBC8 random
+152 4E random
+0EB - random
+61F 4642257BC347 random
+231 5B739849B2 random
+200 99 random
+7F1 - random
+182 E3821D1AA1 random
+1A0 39 random
+3EF CB3E6C random
+624 4482013D67C1F676 random
+1A5 77D28CD7CC8BFC32 random
+1A0 08E8 random
+7D0 C9AC7C random
+132 E2605861C5B8 random
+219 AE random
+755 - random
+2D4 92F0 random
+7FB CA random
+240 9AC989B4F019F408 random
+212 8E21 random
+5C6 C80C3A120733 random
+563 11BD25F82A random
+723 0152A6B86D random
+1A2 CE random
+7FD B8AE85BC1320 random
+3F2 CB912A26 random
+446 2A409086786B random
+7F4 - random
+4D2 26A1AD random
+221 - random
+219 - random
+212 5314D95E6577 random
+1A0 3E88EA641CB8E9AB random
+5AC 0407FA random
+1BA 1404752B5811666B random
+1B9 BEA6C825635C60 random
+210 F2BA0BF90A35 random
+251 AD25D763FD random
+7A4 F154899ACA8482 random
+132 EAB676E36BF3AB random
+1A2 DF1B38B60482 random
+0DD C107A6AD random
+140 29A83D random
+160 96D1 random
+1AF - random
+2ED BB9A96C1D7EC2565 random
+1AF - random
+1AE CAC26B random
+210 009DE3FE57 random
+130 DFAFFAA239 random
+200 8DDB059F2CFB3A70 random
+43C BE761B345342 random
+140 6F random
+150 0A211C0411AD random
+120 - random
+7F2 889780 random
+2EC C81E7A random
+73D - random
+241 08 random
+7FB 5E random
+1A6 321EA04A random
+252 7616 random
+582 - random
+252 745E3D random
+140 2C random
+384 81D87F10 random
+31D B3B6E8C3C5 random
+1B9 AF5B3A7A25DF8D random
+214 D1E9BAB4A1 random
+7F2 08BD419A569A404C random
+1A3 5228 random
+40F B6A157 random
+7F2 27DB4EB4 random
+1B8 A123 random
+7F4 111762B6BBB5BFAF random
+1A7 108A6B1F7E9B random
+240 B81976 random
+01B 314572 random
+1D0 5374 random
+7FD DDE0F35DB664DD25 random
+1AF 446A random
+7F7 5E19B82A79 random
+1AD E1 random
+1AA 54096FA1F5 random
+140 FFB245F922 random
+211 2DF6ADD424 random
+213 - random
+53D A08681 random
+7CD 06965394183B random
+1AD B6FD9083 random
+213 B430 random
+7FE CAE64C random
+3E2 - random
+3F6 24 random
+7FB F7A757FECB06C5 random
+254 BF1A random
+5E4 E0799B2DE2 random
+5B6 5244E2 random
+0B8 AC58FBF404 random
+150 536ACCEE3FA186 random
+1A5 435C9D77DA random
+7FD 9F569E69904F03AE random
+221 5BE1E6E2BA691B2B random
+18E C646E3CB5DF3E512 random
+254 C794B2588B5C0E random
+160 75E4A3E2AB34C61B random
+473 EEA93154CDDA random
+7A4 4CA34AB34663736E random
+27D 34 random
+7F0 BFA4 random
+65E - random
+254 9BC6A094 random
+7F7 E44E random
+192 A3A1FDAEA3ECA5F8 random
+1AD 7B66 random
+3EC - random
+0FC D60FB0B8B9 random
+241 9372A0 random
+230 04C7 random
+216 7721A3 random
+200 DE random
+216 D0 random
+1C8 5BAE49C0DFA68D6A random
+1A5 524B3DE242DC44AA random
+212 0AB7 random
+39E FEFA11 random
+16F F049 random
+1A1 B221C4F3 random
+7F1 7B6902 random
+4DD - random
+7FE 243638 random
+54F E4 random
+7B9 49DCBEB2 random
+623 DFBC6964214A random
+120 C9E9E1 random
+140 0316 random
+1E0 4378BFD4AF18 random
+1A0 BA1EB23C7D3FDF4C random
+5D8 4D93 random
+130 22DC2FF03141C9 random
+241 C2F4A2 random
+160 BD3531 random
+1AA 2C random
+251 2E9DF9 random
+250 98C8140E8DF4E070 random
+213 E21C8958E0E997 random
+1A7 CBD3CBF470 random
+160 FC3B random
+425 9B463646 random
+09B F0A6BE40076789 random
+160 9106880BCD3932 random
+254 FF random
+132 561C3B random
+1E0 9C66524C746F2DB4 random
+6F7 44927F23 random
+43C - random
+059 90F3D8DF225E random
+131 D4B5B54B5B73 random
+150 22E4A46F70 random
+7FE 36F400F19F86 random
+4A8 43C211 random
+61E 0C4376FC3297DF random
+214 7F random
+190 FEB7 random
+6EE D70CCC48D941 random
+230 30678AF5D887 random
+182 4E840C31BD random
+180 472BD0C2 random
+1A0 C8FB770EC01FD22B random
+132 2A9614B1152225 random
+4E8 9D2EF0B7A7 random
+2BC 7FA7777F6F random
+211 A59A02F681754B7B random
+15A CC674654 random
+12F C56C5113E4 random
+190 7094E4AC random
+170 3DEDEA random
+1A5 DD3862077C9D6D random
+200 87B28893 random
+110 156927A1E79B3A random
+190 0F6345 random
+130 0E74F358047246 random
+1A1 2B8563CB04 random
+217 C5CEEE8E random
+7F4 446A0D1AA24A random
+231 - random
+798 211143D2C78B166F random
+221 0B886153 random
+1AC 541ACE90074D32 random
+0A2 F3596FEF37CF random
+103 ADF3 random
+220 7FE285CEB6C5 random
+3A9 365CB0260DD6 random
+7E7 - random
+75D 77 random
+7FD AB random
+1E0 AB4255DC9FE27CFA random
+071 823D92840C2BA65C random
+173 E9BE random
+254 34FA2A111E098E random
+211 F4AC random
+215 73B11D random
+7FD C94E5B random
+231 - random
+100 5313D87183E060 random
+60A CCDA8BE2AC0C random
+242 DC52 random
+2C0 D3F692B1 random
+74E C0927AB77387 random
+170 C7528781 random
+1A4 38704D39C41D58 random
+7F1 EF0C1D8A1AF16AB6 random
+190 A3C3C7942A random
+252 B2DADCDF885F4D1B random
+217 22A25A4A3A68 random
+1AF 5268995746 random
+250 B311260CBC7F4F random
+231 8BDAADF6AE291C random
+784 2E04 random
+1A7 63EBCD8A random
+1C0 C435CAED7B24A044 random
+130 1C94B008E0A2 random
+212 1AE431D8CF3F random
+047 - random
+689 59CF144992 random
+241 F096 random
+1BA - random
+640 D24AA557E8C94028 random
+231 C8FA1194 random
+1D0 8C3F82043D36 random
+1A3 7B791573283731 random
+1D3 - random
+1A2 3A19C77251 random
+7F7 B4CB random
+2BD 2419079832 random
+100 - random
+4E1 EAC43C72 random
+1A0 0CBBE430DC4F8C3A random
+1AD 48720375F7 random
+1A0 AFDAE139801B random
+7FD 656A757BC0 random
+100 47DAF72E8D3370 random
+240 3AE1 random
+376 6E8B random
+213 804C0F7183 random
+041 0859668475 random
+220 613602C8AD random
+241 83CE8DB426 random
+6FF F1B190 random
+1B2 1B5773E096D8CC02 random
+1A3 F2C9FC random
+1A5 6E9E1298964780 random
+4DC 44DFAAA46B8E14 random
+200 9987519486AB4C random
+252 56C4142F69A21A random
+211 - random
+182 4205B07BB5 random
+1B0 2A10AB09E30D568F random
+359 94541613FEC7 random
+1C8 93DF1975AAD6 random
+7F7 2DACCF random
+2DE F824D6 random
+1AD 00901085 random
+2E0 E5DE9C33 random
+140 59826A4015CC05 random
+210 - random
+570 83 random
+1AA 59 random
+608 0B70CF0902D4591B random
+655 6151712EE7AB random
+400 82C67E random
+1BA 88B9 random
+1E0 70600B356F8D56A4 random
+131 C68683 random
+1C0 15104EFEDF9A random
+5DD B665928F87F7 random
+217 C71F random
+170 6AE89D1489AC02 random
+7ED DCD8BBF863DD random
+4A0 29 random
+293 BBDBC33FC0 random
+1AA 75 random
+7A4 58447031B1A5 random
+1A5 F75E13657F43 random
+110 - random
+1AD - random
+25E 2250 random
+1D0 2562 random
+292 6EC9FA5820FF random
+170 7D60 random
+1A2 8421BE28B68E5BF0 random
+1AE 3CDE random
+5E2 E3C8AA random
+1A7 - random
+0C7 ED52EEBFB4 random
+1AA F4906A417090362D random
+250 6D99FC1FC0681B9E random
+35F 06E9A6D67C35 random
+140 5308FDF8BCDA random
+251 79041666A112 random
+228 5BE74A4980C32F random
+170 F7BB6B13D170 random
+329 7964 random
+215 F4786D90 random
+110 - random
+178 5BE929D1471647A3 random
+5BD 61CCED2BC9BB05 random
+217 0330E4CF9D random
+4C9 A8AA6C random
+0D0 - random
+766 12888B217F random
+030 D3B1 random
+7F8 - random
+211 7F75DF870502 random
+799 B327 random
+3F5 4F43CD47A9634246 random
+190 118E random
+5A3 - random
+023 E9 random
+6EC 9E44C8DAB8E5 random
+7F2 8904 random
+140 1E0328ED017D43 random
+637 8D5D6F random
+214 2C3E7668A8 random
+72A DC random
+1A5 34B5 random
+7E4 E9 random
+160 80 random
+220 DC2461D2B1 random
+7F8 3DE5A80473 random
+692 628E random
+0BD 9E1D random
+1C7 395CE77E random
+6E5 - random
+219 95C02DDF4277DBF9 random
+219 5E1F686109B1797A random
+692 D4547800701D4F2E random
+246 8875B8AA463082D3 random
+132 1FEA13A19F99C79D random
+7B8 3D0536D9 random
+192 - random
+170 AE6D97 random
+7F1 6BECC02A0F259A random
+730 97D45E random
+231 ED717EFC0795 random
+7F8 383D6DE4C6 random
+150 C5D9 random
+1A2 51 random
+1AD EE9E9AF3440AE7DE random
+585 BA6F8A68ECF2 random
+6A5 8DE32138 random
+729 74A37F4F random
+1B9 0FDBCB734524 random
+7F1 7095C8890491 random
+1EC 909AD61F4C31 random
+2A6 F9DD381DB7A29D12 random
+4E6 10B0916C868C56 random
+569 2D124143C4A5ADF1 random
+130 090BD7ED random
+063 C7363F08C42DFF6D random
+131 F1A3600441F1 random
+251 33D5E7972F1AD84E random
+59D 2AE9B9 random
+214 68 random
+1A4 A929 random
+200 21FBECE3C5BAF359 random
+247 - random
+1A6 6A44 random
+7F0 2BF8 random
+230 D9DFF08FF440 random
+1AA 128C47E16F4F random
+713 - random
+1AE 92FA random
+273 C9 random
+12B 00 random
+133 43 random
+150 DCAC8E random
+217 51D129 random
+250 AA34051C4BD06C random
+000 - random edge identifier
+000 67 random edge identifier
+000 2252E90CA7969E4E random edge identifier
+7FF - random edge identifier
+7FF E7 random edge identifier
+7FF 1A1693510CA10C4B random edge identifier

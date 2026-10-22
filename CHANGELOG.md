@@ -2,6 +2,15 @@
 
 All notable changes to this project are documented here.
 
+## [Unreleased]
+
+- **Optional firmware functions, each behind a switch that is off by default** (`0x1AE` writes it, `0x1AF` reads it; it acts after the next power-up and is kept in its own F-RAM record, address 976): a trapezoid and S-curve planner for the stepper (`motion_profile.c`; the `0x120` frame may now carry a cruise speed and a profile, and the step generator does not use the plan yet, which needs a timing bench); a health frame once a second (`0x1B8`: CAN error counters, bus-off count, oscillator trim, longest main-loop pass, and chip temperature and supply when the platform provides them); a trim of the internal oscillator against the CAN bit time (`hsi_trim.c`; the measurement and the register write need a bench); and a PID with anti-windup and relay autotune for the soldering iron and hot-air heaters (`pid_control.c`, gains in F-RAM address 992, frames `0x1B9` and `0x1BA`; the 3D printer hotend keeps the bang-bang control). They add about 7 KB of code, so check the free flash when a release is built. Tested on the host, the PID against a simulated tip; nothing has run on a board.
+- **A virtual board** (`tests/virtual_board.c`): the real receive callback, routing table, global handlers before the error gate, fault recorder, thermal counters and optional functions, compiled for the host with the address and undefined-behaviour sanitizers behind an SLCAN-style text port. `tools/fuzz_virtual_board.py` sends it the valid, invalid and random frames made from the protocol specification by URTC-COMMON (`tests/fuzz/fuzz_corpus.txt`) for seven combinations of tool and optional functions, and checks that it never stops, that it only transmits identifiers a board may send and that it resets into the bootloader exactly when it receives the magic frame. It runs in the unit tests of the CI.
+- **`tools/keys.py` and `docs/KEYS.md`**: the keys of the URTC family in one place (public values and where each is embedded, never a secret) and `keys verify`, which fails when the public key embedded in a program or a bootloader differs from the registered one; the CI runs it (repositories that are not checked out beside it are skipped; run it with `--strict` before a release).
+- The notes of a release carry a compatibility table (protocol, firmware and programs) taken from URTC-COMMON: `tools/changelog_section.py VERSION --compat`, used by the release job.
+- `docs/CANBUS.TXT` and `docs/EEPROM.TXT` describe the new frames and the new F-RAM records.
+- The README lists URTC-GATEWAY, the new gateway in front of the CAN bus, among the related projects.
+
 ## [0.3.9] - The first official release: signed images, a protected release job and cleaner host tests
 
 - The host tests started through WSL no longer put their binaries inside the repository: `tools/run_host_tests.py` translates a Windows `--build-dir` for WSL and refuses one on a Linux host; the output folder named like a Windows path that had been versioned by mistake is removed from git, and such names are ignored.

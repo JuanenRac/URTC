@@ -68,7 +68,7 @@ jobs:
             echo "::error::A release ${REQUESTED_TAG} already exists; a published version is never rebuilt, raise the version first."
             exit 1
           fi
-          python3 tools/changelog_section.py "${version}" > "${RUNNER_TEMP}/notes.md"
+          python3 tools/changelog_section.py "${version}" --compat > "${RUNNER_TEMP}/notes.md"
           echo "VERSION=${version}" >> "${GITHUB_ENV}"
       - name: Check the project baseline
         shell: bash

@@ -581,12 +581,15 @@ Si quelqu'un dans la communauté travaille sur des effecteurs terminaux personna
 
 Les fichiers de conception matérielle (schéma/carte/netlists Eagle) seront ajoutés à mesure que la disposition se stabilise.
 
+**Fonctions optionnelles du firmware et contrôles (testés sur l'hôte seulement) :** rampes du moteur pas à pas, trame de santé, réglage de l'oscillateur et PID du chauffage, chacun derrière un interrupteur désactivé par défaut (`0x1AE` / `0x1AF`, voir [CANBUS.TXT](docs/CANBUS.TXT)) ; une carte virtuelle compilée avec des sanitizers et un fuzzer alimenté par des trames produites à partir de la spécification du protocole (`tools/fuzz_virtual_board.py`) ; et `tools/keys.py verify`, qui vérifie que chaque clé publique intégrée dans un programme ou un bootloader est celle qui est enregistrée ([KEYS.md](docs/KEYS.md)). Rien de cela n'a tourné sur une carte.
+
 ## 🔗 Projets Liés
 
 Ce projet fait partie de l'écosystème robotique HYDRA-UMC du même auteur (JuanenRac / Electro Hobby 3D). Bon à savoir, car une demande pourrait en réalité concerner l'un de ceux-ci plutôt que ce dépôt.
 
 **Projets Enfants** — chacun est un outil de bureau ou navigateur conçu spécifiquement pour flasher, tester ou piloter ce firmware
 - **[URTC-FLASHER](https://github.com/JuanenRac/URTC-FLASHER)** — outil de bureau à interface graphique pour flasher les cartes URTC, CAN-OTA plus SWD/JTAG puce complète ; flashe exactement ce firmware.
+- **[URTC-GATEWAY](https://github.com/JuanenRac/URTC-GATEWAY)** — une passerelle devant le bus CAN qui ne laisse passer que les identifiants d'une liste, limite leur débit et exige une clé de session.
 - **[URTC-TESTER](https://github.com/JuanenRac/URTC-TESTER)** — outil de bureau de diagnostic CAN-bus en direct pour cartes URTC, un panneau par profil d'outil ; un panneau pour chacun des 25 profils d'outil propres à ce firmware.
 - **[URTC-WEB-STUDIO](https://github.com/JuanenRac/URTC-WEB-STUDIO)** — alternative basée navigateur à URTC-TESTER via la Web Serial API, sans installation locale ; le même protocole CAN que les 2 outils de bureau ci-dessus.
 

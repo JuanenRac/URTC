@@ -10,8 +10,9 @@ that bus with the OLED - see ../BOM/BOM.TXT and PINOUT.TXT's I2C2 block). The
 chip holds 8192 bytes (64Kbit) and four regions of it are in use: the
 settings struct SavedState_t at address 0 (34 bytes, described in section 1),
 the lifetime thermal counters at address 192 (13 bytes), the fault recorder
-at address 256 (678 bytes) and the multinode switch at address 960 (8 bytes,
-section 8); section 7 has the whole map. Everything else up to 8191 is free.
+at address 256 (678 bytes) the multinode switch at address 960 (8 bytes,
+section 8) and the optional firmware features at addresses 976 and 992
+(section 9); section 7 has the whole map. Everything else up to 8191 is free.
 
 For the load/save logic itself (when it reads, when it writes, what gets
 restored automatically vs. left for the host to decide) see
@@ -401,7 +402,14 @@ Address | Size  | What                                  | Defined in
         |       | OFF), and the instance number         | (own CRC-8 record, so
         |       | (section 8)                           | SavedState_t does not
         |       |                                       | change)
-968     | 7224  | free                                  |
+968     | 8     | free                                  |
+976     | 8     | optional firmware features: switches  | fw_features.h,
+        |       | of the ramps, the health frame, the   | firmware_features.c
+        |       | oscillator trim and the heater PID    | (own CRC-8 record,
+        |       | (default all OFF; section 9)          | section 9)
+984     | 8     | free                                  |
+992     | 12    | heater PID gains (section 9)          | firmware_features.c
+1004    | 7188  | free                                  |
 8191    |       | last byte of the chip                 |
 
 A region may only grow into the free space that follows it; a change of any
@@ -434,3 +442,37 @@ Written by CAN 0x1AC (four-byte magic 'MNOD', enable, instance), read back
 with 0x1AD (stored value, value in force, instance, node address). It is read
 once at boot, so a change acts after the next power-up. See CANBUS.TXT (the
 appendix) for what the extension does.
+
+-----------------------------------------------------------------------------
+9. Optional firmware features (address 976, 8 bytes) and heater PID gains (address 992, 12 bytes)
+-----------------------------------------------------------------------------
+Feature record (address 976):
+Offset | Size | Field          | Type     | Notes
+-------|------|----------------|----------|---------------------------------
+0      | 4    | magic          | uint32_t | 0x46454154 ('FEAT').
+4      | 1    | struct_version | uint8_t  | 1.
+5      | 1    | mask           | uint8_t  | Features that are on: 0x01 stepper
+       |      |                |          | ramps, 0x02 health frame, 0x04
+       |      |                |          | oscillator trim, 0x08 heater PID.
+6      | 1    | reserved       | uint8_t  | 0.
+7      | 1    | checksum       | uint8_t  | CRC-8/SMBUS over bytes 0-6.
+
+DEFAULT ALL OFF, like the multinode switch: a blank, erased, damaged or
+missing record, or one with a bit this firmware does not have, reads as
+every feature off. Written by CAN 0x1AE, read back with 0x1AF, read once at
+boot (a change acts after the next power-up). The erase command 0x192 does
+not touch it.
+
+PID gains (address 992):
+Offset | Size | Field          | Type     | Notes
+-------|------|----------------|----------|---------------------------------
+0      | 4    | magic          | uint32_t | 0x50494447 ('PIDG').
+4      | 1    | struct_version | uint8_t  | 1.
+5      | 6    | kp, ki, kd     | 3 x u16  | Gains times 100, little-endian in
+       |      |                |          | the record (the CAN frames are
+       |      |                |          | big-endian).
+11     | 1    | checksum       | uint8_t  | CRC-8/SMBUS over bytes 0-10.
+
+Written by 0x1B9 (set gains) and when a relay autotune ends; read once at
+boot only while the heater PID feature is on. A damaged record falls back to
+the built-in gains (Kp 8.00, Ki 0.20, Kd 1.50).

@@ -26,6 +26,8 @@ jobs:
           python-version: "3.12"
       - name: Validate manifest, version, documentation and secret policy
         run: python tools/ci_validate.py
+      - name: Check that every embedded public key is the registered one
+        run: python tools/keys.py verify
       - name: Compile Python sources without running versioning build scripts
         run: |
           python - <<'PY'

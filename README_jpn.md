@@ -568,12 +568,15 @@ URTC のフラッシュは 2 つの独立した部分に分割されているた
 
 ハードウェア設計ファイル（Eagle 回路図/ボード/ネットリスト）は、レイアウトが安定するにつれて追加されます。
 
+**ファームウェアのオプション機能と検査(ホストでのテストのみ):** ステッピングモーターの加減速、状態フレーム、発振器のトリム、ヒーターのPIDがあり、いずれも既定でオフのスイッチの後ろにあります(`0x1AE` / `0x1AF`、[CANBUS.TXT](docs/CANBUS.TXT) 参照)。サニタイザー付きの仮想ボードと、プロトコル仕様から作ったフレームを与えるファジング(`tools/fuzz_virtual_board.py`)、そしてプログラムやブートローダーに埋め込まれた公開鍵が登録されたものと一致するか確かめる `tools/keys.py verify`([KEYS.md](docs/KEYS.md))です。基板上ではどれも動かしていません。
+
 ## 🔗 関連プロジェクト
 
 本プロジェクトは、同じ作者(JuanenRac / Electro Hobby 3D)による HYDRA-UMC ロボティクスエコシステムの一部です。リクエストが実はこの中のどれかについてのものである可能性があるため、知っておく価値があります。
 
 **子プロジェクト** —— いずれも、本ファームウェアを書き込み・テスト・制御するために特化して作られたデスクトップまたはブラウザツールです
 - **[URTC-FLASHER](https://github.com/JuanenRac/URTC-FLASHER)** — URTC 基板用のデスクトップ GUI 書き込みツール、CAN-OTA およびフルチップ SWD/JTAG。まさにこのファームウェアを書き込む。
+- **[URTC-GATEWAY](https://github.com/JuanenRac/URTC-GATEWAY)** — CAN バスの手前に置き、一覧にある識別子だけを通し、レートを制限し、セッション鍵を求めるゲートウェイ。
 - **[URTC-TESTER](https://github.com/JuanenRac/URTC-TESTER)** — URTC 基板向けのデスクトップ CAN バスライブ診断ツール、ツールプロファイルごとに 1 パネル。本ファームウェア自身の 25 のツールプロファイルごとに 1 パネル。
 - **[URTC-WEB-STUDIO](https://github.com/JuanenRac/URTC-WEB-STUDIO)** — Web Serial API を使ったブラウザベースの URTC-TESTER の代替、ローカルインストール不要。上記 2 つのデスクトップツールと同じ CAN プロトコル。
 

@@ -338,6 +338,80 @@ Data:
   - txData[2]: instance number
   - txData[3]: node address read from the ID jumpers (0-31)
 
+ID: 0x1AE [Master -> URTC Tool Head]
+Switch the optional firmware features on or off (fw_features.c, firmware_features.c)
+DLC: 5 bytes
+Data:
+  - rxData[0..3]: magic payload 0x46 0x45 0x41 0x54 (ASCII 'FEAT')
+  - rxData[4]:    bit mask of the features to have ON (any bit outside 0x0F:
+                  the frame is ignored)
+                  0x01 = stepper ramps (trapezoid and S-curve, see 0x120)
+                  0x02 = health frame (0x1B8)
+                  0x04 = oscillator trim against the CAN bit time
+                  0x08 = heater PID with relay autotune (0x1B9 / 0x1BA)
+Effect: stores the mask in its own F-RAM record (address 976, EEPROM.TXT
+        section 8) and answers with 0x1AF. The setting acts after the NEXT
+        power-up, never in the middle of a job. Every feature is OFF by
+        default: a board that was never written, with an erased or damaged
+        record, behaves exactly as in earlier releases. Blocked during a
+        critical error. Like every persistent CAN setting it is protected by
+        the magic payload against corrupted frames, not by authentication
+        (see CAN_THREAT_MODEL.TXT): keep the bus closed.
+        Not yet tried on a board: the logic is tested on the host; the step
+        timer, the analogue channels of the health frame and the oscillator
+        measurement need a bench (see CHANGELOG.md).
+
+ID: 0x1AF [Master -> URTC Tool Head, or URTC Tool Head -> Master answering 0x1AE]
+Query/response: the optional firmware features
+DLC: any as a query (payload ignored) | 3 bytes as a response
+Data:
+  - txData[0]: stored in F-RAM (bit mask)
+  - txData[1]: in force now (bit mask); differs from txData[0] until the
+               next power-up
+  - txData[2]: supported by this firmware (0x0F)
+
+ID: 0x1B8 [URTC Tool Head -> Master]
+Health frame of the board (only while feature 0x02 runs; once a second)
+DLC: 8 bytes
+Data:
+  - txData[0]: transmit error counter of the CAN peripheral (TEC)
+  - txData[1]: receive error counter (REC)
+  - txData[2]: bus-off events since power-up (saturates at 255)
+  - txData[3]: HSI trim value in force (16 = factory value)
+  - txData[4]: longest main-loop pass since the last frame, ms (saturates at 255)
+  - txData[5]: chip temperature + 40 in degrees C (0 = not available)
+  - txData[6..7]: analogue supply in millivolts, big-endian (0 = not available)
+  Note: sent whichever tool is active; a host treats 0 in the temperature and
+        the supply as not reported.
+
+ID: 0x1B9 [Master -> URTC Tool Head]
+Heater PID: gains and relay autotune (only while feature 0x08 runs)
+DLC: 7 bytes
+Data:
+  - rxData[0..1]: Kp x 100 [BIG-ENDIAN]
+  - rxData[2..3]: Ki x 100 (per second)
+  - rxData[4..5]: Kd x 100 (seconds)
+  - rxData[6]:    0 = store the gains of this frame (each at most 600.00),
+                  1 = start the relay autotune around the current setpoint
+                      (soldering iron or hot air tool, no error, setpoint
+                      100..445 C),
+                  2 = abort a running autotune, 3 = change nothing
+Effect: the gains are kept in the F-RAM (address 992) when they are set or
+        when an autotune ends. The thermal guards and the absolute ceiling
+        judge the PID output exactly as they judge the bang-bang one. The
+        hotend of the 3D printer keeps its bang-bang control. Answered with 0x1BA.
+
+ID: 0x1BA [Master -> URTC Tool Head, or URTC Tool Head -> Master answering 0x1B9]
+Query/response: the heater PID
+DLC: any as a query (payload ignored) | 8 bytes as a response
+Data:
+  - txData[0..1]: Kp x 100 in force
+  - txData[2..3]: Ki x 100
+  - txData[4..5]: Kd x 100
+  - txData[6]:    0 = feature off, 1 = running, 2 = autotuning,
+                  3 = autotune done (gains stored), 4 = autotune failed
+  - txData[7]:    heater output of the last control cycle, percent
+
 ID: 0x1A2 [Master -> URTC Tool Head]
 Set free tool configuration
 DLC: 1+ bytes (only byte[0] used)
@@ -517,6 +591,13 @@ Data:
   - rxData[2]: Step count - Byte 2
   - rxData[3]: Step count - Byte 1
   - rxData[4]: Step count - Byte 0 (LSB)
+  Optional ramp extension (feature 0x01 of 0x1AE, off by default): with
+  DLC 8 the frame also carries
+  - rxData[5..6]: cruise speed in steps per second [BIG-ENDIAN] (0 = default 500)
+  - rxData[7]:    profile: 0 = constant speed, 1 = trapezoid, 2 = S-curve
+  The board plans the move (motion_profile.c) and ignores bytes 5 to 7
+  whenever the feature is off. The step generator does not use the plan yet:
+  loading the interval of each step into the timer needs a timing bench.
   Note: Uses lines PB3 (STEP), PB5 (DIR), and PB6 (TMC_ENN). The firmware
         enables power on receiving the frame (PB6=0) and cuts it once
         finished (PB6=1) to avoid static overheating.
@@ -1578,6 +1659,11 @@ accepted.
   0x1AB -> Lifetime thermal counters response (DLC:8)
   0x1AC -> Switch the multinode extension on or off, magic payload 'MNOD' (DLC:6)
   0x1AD -> Query/response: the multinode switch (DLC:any/4)
+  0x1AE -> Switch the optional firmware features, magic payload 'FEAT' (DLC:5)
+  0x1AF -> Query/response: the optional firmware features (DLC:any/3)
+  0x1B8 -> Health frame of the board, once a second while it is on (DLC:8)
+  0x1B9 -> Heater PID gains and autotune (DLC:7)
+  0x1BA -> Query/response: the heater PID (DLC:any/8)
   --- Per-tool commands (see dedicated sections above) ---
   0x120 -> Stepper motor control (Dispensers, Screwdriver, Grippers - DLC:5 - no watchdog)
   0x130 -> T12 setpoint temperature (Soldering iron - DLC:2 - 250ms watchdog)

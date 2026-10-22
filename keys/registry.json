@@ -1,0 +1,48 @@
+{
+  "format": 1,
+  "about": "The public keys of the URTC family, where each one is embedded and where its private half lives. Only public values and file names are written here; no secret ever is. tools/keys.py verify reads every embedding and fails when one differs from the value below.",
+  "keys": [
+    {
+      "id": "urtc-release-ed25519",
+      "algorithm": "ed25519",
+      "role": "Signs every asset of an official release (the .sig files); the flasher, the web studio and the publishing tool check it before they trust a download.",
+      "public": "4020c46d76c8ebacb64c5c7b9f3e7c62475afeb133d7421591988174e0f5dc90",
+      "private_half": "Outside every repository (the file named by URTC_RELEASE_KEY, by default ~/.urtc-keys/urtc_release_ed25519.pem) and, if the maintainer chooses, the secret URTC_RELEASE_ED25519_PEM of the protected release environment.",
+      "embedded_in": [
+        {"repo": "URTC", "file": "tools/release_sign.py", "kind": "text", "pattern": "PUBLIC_KEY_HEX\\s*=\\s*\"([0-9a-fA-F]{64})\""},
+        {"repo": "URTC", "file": "docs/RELEASE_SIGNING.md", "kind": "text", "pattern": "(?m)^ed25519 ([0-9a-fA-F]{64})$"},
+        {"repo": "URTC-FLASHER", "file": "flasher_release_signature.py", "kind": "text", "pattern": "PUBLIC_KEY_HEX\\s*=\\s*\"([0-9a-fA-F]{64})\""},
+        {"repo": "URTC-WEB-STUDIO", "file": "scripts/sync-firmware.mjs", "kind": "text", "pattern": "RELEASE_PUBLIC_KEY_HEX\\s*=\\s*'([0-9a-fA-F]{64})'"},
+        {"repo": "URTC-WEB-STUDIO", "file": "src/lib/releaseSignature.ts", "kind": "text", "pattern": "RELEASE_PUBLIC_KEY_HEX\\s*=\\s*'([0-9a-fA-F]{64})'"}
+      ]
+    },
+    {
+      "id": "urtc-main-bootloader-hmac-development",
+      "algorithm": "hmac-sha256",
+      "role": "The PUBLIC development key of the main bootloader: images built without a production key are signed with it, so they prove nothing about who made them. A production build replaces it with a key that is not in any repository.",
+      "public": "2526cc3e9011ec7c49ecd2d2b7f389e359aa246014ff5154a0af8a3c3bf95581",
+      "private_half": "None: this one is published on purpose. The production key of the main bootloader is a secret in ~/.urtc-keys/signing_keys.txt (line master=) and in the secret URTC_SIGNING_KEYS of the release environment; it is never written to a file of a repository.",
+      "embedded_in": [
+        {"repo": "URTC", "file": "src/F303-master/boot/bootloader_crypto.c", "kind": "c_array", "array": "HMAC_KEY", "branch": "else"}
+      ]
+    },
+    {
+      "id": "urtc-slave-bootloader-hmac-development",
+      "algorithm": "hmac-sha256",
+      "role": "The PUBLIC development key of the expansion slave bootloader (same rule as the main one).",
+      "public": "f6fc5ec3c7c0b8325f088385cd109e637d4558d4535f619cd06f3df2afdc381d",
+      "private_half": "None for this one. The production key of the slave bootloader is the line slave= of the same secret file.",
+      "embedded_in": [
+        {"repo": "URTC", "file": "src/F303-slave/boot/slaveboot_crypto.c", "kind": "c_array", "array": "HMAC_KEY", "branch": "else"}
+      ]
+    }
+  ],
+  "secrets_not_stored_here": [
+    "The production HMAC keys of the two bootloaders (master= and slave=).",
+    "The private half of the release signature key."
+  ],
+  "other_ecosystems": [
+    {"ecosystem": "HYDRA-UMC", "where": "documented and verified by that ecosystem's own repositories; this registry lists only the URTC family"},
+    {"ecosystem": "A.R.M.O.R.", "where": "documented and verified by that ecosystem's own repositories; this registry lists only the URTC family"}
+  ]
+}

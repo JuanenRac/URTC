@@ -552,12 +552,15 @@ URTC 的闪存被拆分为两个独立部分，因此板卡可以通过它已经
 
 硬件设计文件（Eagle 原理图/板卡/网表）将随着布局稳定下来而添加。
 
+**固件可选功能与检查(仅在主机上测试):** 步进电机加减速、健康帧、振荡器微调和加热器 PID,每一项都位于默认关闭的开关之后(`0x1AE` / `0x1AF`,见 [CANBUS.TXT](docs/CANBUS.TXT));一块带 sanitizer 的虚拟板,以及用协议规范生成的帧驱动的模糊测试器(`tools/fuzz_virtual_board.py`);还有 `tools/keys.py verify`,用来检查嵌入在程序或引导程序中的每个公钥是否就是登记的那一个([KEYS.md](docs/KEYS.md))。这些都没有在电路板上运行过。
+
 ## 🔗 相关项目
 
 本项目是同一作者(JuanenRac / Electro Hobby 3D)打造的 HYDRA-UMC 机器人生态系统的一部分。值得了解,因为某个请求实际上可能是关于这些项目之一,而非本仓库本身。
 
 **子项目** —— 每一个都是专为烧录、测试或驱动本固件而构建的桌面或浏览器工具
 - **[URTC-FLASHER](https://github.com/JuanenRac/URTC-FLASHER)** —— 面向 URTC 板卡的桌面图形烧录工具,支持 CAN-OTA 以及全芯片 SWD/JTAG;正是烧录本固件本身。
+- **[URTC-GATEWAY](https://github.com/JuanenRac/URTC-GATEWAY)** — 位于 CAN 总线前的网关，只放行列表中的标识符，限制其速率，并要求会话密钥。
 - **[URTC-TESTER](https://github.com/JuanenRac/URTC-TESTER)** —— 面向 URTC 板卡的桌面实时 CAN 总线诊断工具,每种工具配置对应一个面板;对应本固件自身 25 种工具配置各一个面板。
 - **[URTC-WEB-STUDIO](https://github.com/JuanenRac/URTC-WEB-STUDIO)** —— 通过 Web Serial API 实现的浏览器版 URTC-TESTER 替代方案,无需本地安装;与上述两款桌面工具使用相同的 CAN 协议。
 

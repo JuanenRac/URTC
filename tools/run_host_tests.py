@@ -74,6 +74,12 @@ SUITES = (
     Suite("multinode", "tests/test_multinode.c",
           (f"{FAKE_HAL}/fake_hal.c", f"{MASTER}/multinode.c", f"{MASTER}/firmware_multinode.c", f"{MASTER}/firmware_fram.c",
            f"{MASTER}/firmware_can_dispatch.c", f"{MASTER}/firmware_can_dispatch_routing.c"), ("tests", FAKE_HAL, MASTER, "src/common")),
+    Suite("motion_profile", "tests/test_motion_profile.c", (f"{MASTER}/motion_profile.c",), ("tests", MASTER), std="c11"),
+    Suite("pid_control", "tests/test_pid_control.c", (f"{MASTER}/pid_control.c",), ("tests", MASTER), std="c11", libs=("-lm",)),
+    Suite("health_hsi", "tests/test_health_hsi.c", (f"{MASTER}/health_profile.c", f"{MASTER}/hsi_trim.c"), ("tests", MASTER), std="c11"),
+    Suite("features", "tests/test_features.c",
+          (f"{FAKE_HAL}/fake_hal.c", f"{MASTER}/fw_features.c", f"{MASTER}/firmware_features.c", f"{MASTER}/firmware_fram.c", f"{MASTER}/pid_control.c",
+           f"{MASTER}/health_profile.c", f"{MASTER}/hsi_trim.c", f"{MASTER}/motion_profile.c"), ("tests", FAKE_HAL, MASTER, "src/common")),
     Suite("persistence", "tests/test_persistence.c",
           (f"{FAKE_HAL}/fake_hal.c", f"{MASTER}/firmware_persistence.c", f"{MASTER}/firmware_fram.c"), ("tests", FAKE_HAL, MASTER, "src/common")),
 )

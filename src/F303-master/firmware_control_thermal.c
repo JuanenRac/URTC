@@ -7,6 +7,7 @@
 #include "firmware_control_thermal.h"
 #include "thermal_guard.h"
 #include "firmware_thermal_stats.h"
+#include "firmware_features.h"
 
 // Last thermal-guard fault (ThermalGuardFault_t), 0 = none. Reported as the
 // 5th byte of the 0x111 state answer so a host knows WHY the board blocked
@@ -152,7 +153,12 @@ void Control_SolderingIron_PID(void) {
     // settles exactly at the setpoint this would toggle the heater on/off
     // every 20ms tick indefinitely - pure switching stress and noise for no
     // control benefit.
-    if ((int32_t)current_temperature < (int32_t)target_temperature - 2) {
+    if (Features_Active(FEAT_THERMAL_PID)) {
+        // Optional PID (switch off by default, see firmware_features.h): the output is on-time inside a
+        // half-second window instead of a hysteresis. The guards below and the absolute ceiling above
+        // judge this decision exactly as they judge the bang-bang one.
+        heater_on = ThermalPid_Heater(current_temperature, target_temperature, HAL_GetTick());
+    } else if ((int32_t)current_temperature < (int32_t)target_temperature - 2) {
         heater_on = 1;
     } else if ((int32_t)current_temperature > (int32_t)target_temperature + 2) {
         heater_on = 0;

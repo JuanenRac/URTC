@@ -29,6 +29,7 @@
 #include "firmware_persistence.h"
 #include "firmware_blackbox.h"
 #include "firmware_multinode.h"
+#include "firmware_features.h"
 
 volatile ToolMode_t active_tool;
 
@@ -259,6 +260,10 @@ int main(void) {
     // Several tool heads on one bus: reads the persistent switch (off unless a valid
     // record says on) and the node address, before the CAN peripheral starts.
     MultiNode_Init();
+
+    // Optional functions (ramps, health frame, oscillator trim, heater PID): every switch is off
+    // unless a valid F-RAM record says otherwise.
+    Features_Init();
 
     MX_GPIO_Post_Init();
     MX_CAN_Init();
@@ -524,6 +529,9 @@ int main(void) {
 
         // Multinode discovery answer and status frame (does nothing while the switch is off)
         MultiNode_Service();
+
+        // Health frame and oscillator trim (do nothing while their switches are off)
+        Features_Service();
 
         // Cyclic safe thermal control loop (every 20ms)
         if (HAL_GetTick() - tick_pid >= 20) {

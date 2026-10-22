@@ -566,12 +566,15 @@ If anyone in the community is working on custom end-effectors, smart tool-change
 
 Hardware design files (Eagle schematic/board/netlists) will be added as the layout stabilizes.
 
+**Optional firmware functions and checks (host-tested only):** stepper ramps, a health frame, an oscillator trim and a heater PID, each behind a switch that is off by default (`0x1AE` / `0x1AF`, see [CANBUS.TXT](docs/CANBUS.TXT)); a virtual board built with sanitizers and a fuzzer fed with frames made from the protocol specification (`tools/fuzz_virtual_board.py`); and `tools/keys.py verify`, which checks that every public key embedded in a program or a bootloader is the registered one ([KEYS.md](docs/KEYS.md)). None of it has run on a board.
+
 ## 🔗 Related Projects
 
 This project is part of the HYDRA-UMC robotics ecosystem by the same author (JuanenRac / Electro Hobby 3D). Worth knowing about, since a request might actually be about one of these rather than this repository.
 
 **Child Projects** — each one is a desktop or browser tool built specifically to flash, test, or drive this firmware
 - **[URTC-FLASHER](https://github.com/JuanenRac/URTC-FLASHER)** — desktop GUI flashing tool for URTC boards, CAN-OTA plus full-chip SWD/JTAG; flashes this exact firmware.
+- **[URTC-GATEWAY](https://github.com/JuanenRac/URTC-GATEWAY)** — a gateway in front of the CAN bus that lets only listed identifiers through, limits their rate and asks for a session key.
 - **[URTC-TESTER](https://github.com/JuanenRac/URTC-TESTER)** — desktop live CAN-bus diagnostic tool for URTC boards, one panel per tool profile; one panel per this firmware's own 25 tool profiles.
 - **[URTC-WEB-STUDIO](https://github.com/JuanenRac/URTC-WEB-STUDIO)** — browser-based alternative to URTC-TESTER via the Web Serial API, no local install needed; the same CAN protocol as the 2 desktop tools above.
 

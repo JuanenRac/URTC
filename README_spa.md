@@ -577,12 +577,15 @@ Si alguien de la comunidad está trabajando en efectores finales personalizados,
 
 Los archivos de diseño de hardware (esquemático/placa/netlists de Eagle) se añadirán a medida que el layout se estabilice.
 
+**Funciones opcionales del firmware y comprobaciones (solo probadas en el host):** rampas del paso a paso, una trama de salud, un ajuste del oscilador y un PID del calentador, cada una tras un interruptor apagado por defecto (`0x1AE` / `0x1AF`, véase [CANBUS.TXT](docs/CANBUS.TXT)); una placa virtual compilada con sanitizers y un fuzzer alimentado con tramas hechas desde la especificación del protocolo (`tools/fuzz_virtual_board.py`); y `tools/keys.py verify`, que comprueba que cada clave pública embebida en un programa o un bootloader es la registrada ([KEYS.md](docs/KEYS.md)). Nada de esto se ha ejecutado en una placa.
+
 ## 🔗 Proyectos Relacionados
 
 Este proyecto es parte del ecosistema de robótica HYDRA-UMC del mismo autor (JuanenRac / Electro Hobby 3D). Vale la pena conocerlo, ya que una petición podría en realidad ser sobre alguno de estos en vez de sobre este repositorio.
 
 **Proyectos Hijos** — cada uno es una herramienta de escritorio o navegador construida específicamente para flashear, probar o controlar este firmware
 - **[URTC-FLASHER](https://github.com/JuanenRac/URTC-FLASHER)** — herramienta de escritorio con GUI para flashear placas URTC, CAN-OTA más SWD/JTAG de chip completo; flashea exactamente este firmware.
+- **[URTC-GATEWAY](https://github.com/JuanenRac/URTC-GATEWAY)** — una pasarela delante del bus CAN que solo deja pasar identificadores de una lista, limita su tasa y pide una clave de sesión.
 - **[URTC-TESTER](https://github.com/JuanenRac/URTC-TESTER)** — herramienta de escritorio de diagnóstico CAN-bus en vivo para placas URTC, un panel por perfil de herramienta; un panel por cada uno de los 25 perfiles de herramienta propios de este firmware.
 - **[URTC-WEB-STUDIO](https://github.com/JuanenRac/URTC-WEB-STUDIO)** — alternativa basada en navegador a URTC-TESTER mediante la Web Serial API, sin instalación local; el mismo protocolo CAN que las 2 herramientas de escritorio anteriores.
 

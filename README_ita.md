@@ -563,12 +563,15 @@ Se qualcuno nella community sta lavorando su end-effector personalizzati, cambia
 
 I file di progettazione hardware (schematico/board/netlist Eagle) verranno aggiunti man mano che il layout si stabilizza.
 
+**Funzioni opzionali del firmware e controlli (testati solo sull'host):** rampe del passo-passo, frame di salute, regolazione dell'oscillatore e PID del riscaldatore, ciascuno dietro un interruttore spento per impostazione predefinita (`0x1AE` / `0x1AF`, vedi [CANBUS.TXT](docs/CANBUS.TXT)); una scheda virtuale compilata con i sanitizer e un fuzzer alimentato con frame ricavati dalla specifica del protocollo (`tools/fuzz_virtual_board.py`); e `tools/keys.py verify`, che controlla che ogni chiave pubblica incorporata in un programma o in un bootloader sia quella registrata ([KEYS.md](docs/KEYS.md)). Nulla di tutto ciò è stato eseguito su una scheda.
+
 ## 🔗 Progetti Correlati
 
 Questo progetto fa parte dell'ecosistema robotico HYDRA-UMC dello stesso autore (JuanenRac / Electro Hobby 3D). Vale la pena conoscerlo, poiché una richiesta potrebbe in realtà riguardare uno di questi invece di questo repository.
 
 **Progetti Figli** — ciascuno è uno strumento desktop o browser costruito specificamente per flashare, testare o pilotare questo firmware
 - **[URTC-FLASHER](https://github.com/JuanenRac/URTC-FLASHER)** — strumento desktop con GUI per il flashing delle schede URTC, CAN-OTA più SWD/JTAG a chip intero; flasha esattamente questo firmware.
+- **[URTC-GATEWAY](https://github.com/JuanenRac/URTC-GATEWAY)** — un gateway davanti al bus CAN che lascia passare solo gli identificatori di un elenco, ne limita la frequenza e chiede una chiave di sessione.
 - **[URTC-TESTER](https://github.com/JuanenRac/URTC-TESTER)** — strumento desktop di diagnostica CAN-bus dal vivo per schede URTC, un pannello per profilo utensile; un pannello per ciascuno dei 25 profili utensile propri di questo firmware.
 - **[URTC-WEB-STUDIO](https://github.com/JuanenRac/URTC-WEB-STUDIO)** — alternativa basata su browser a URTC-TESTER tramite la Web Serial API, senza installazione locale; lo stesso protocollo CAN dei 2 strumenti desktop sopra.
 
