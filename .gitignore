@@ -21,3 +21,8 @@ firmware/*.hex
 firmware/*.sha256
 firmware/*.manifest.json
 firmware/firmware_manifest.json
+
+# Output folders named after a Windows path (a path handed to WSL without translation): never versioned
+C:/
+C\uf03a/
+Users/

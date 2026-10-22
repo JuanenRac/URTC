@@ -16,6 +16,7 @@ from pathlib import Path
 
 
 from _doc_policy import check_public_private_boundary
+from _tracked_names import check_tracked_names
 from _readme_parity import check_readme_section_parity
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -321,6 +322,12 @@ def main() -> int:
     doc_policy_error = check_public_private_boundary(ROOT)
     if doc_policy_error:
         fail(doc_policy_error)
+
+    names_error = check_tracked_names(ROOT)
+
+    if names_error:
+
+        fail(names_error)
     for readme_problem in check_readme_section_parity(ROOT):
         fail(readme_problem)
 

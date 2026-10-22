@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -153,12 +154,37 @@ def run_suite(suite: Suite, compiler: str, build_dir: Path) -> bool:
     return True
 
 
+_WINDOWS_PATH = re.compile(r"^([A-Za-z]):[\\/](.*)$")
+
+
+def wsl_path(value: str) -> str:
+    """A Windows path (C:\\x\\y) as WSL sees it (/mnt/c/x/y). Passed through unchanged, WSL would take "C:" for a folder name and put the binaries inside the repository."""
+    match = _WINDOWS_PATH.match(value)
+    if match is None:
+        return value
+    return "/mnt/" + match.group(1).lower() + "/" + match.group(2).replace("\\", "/")
+
+
+def translate_arguments(argv: list[str]) -> list[str]:
+    """The arguments for the copy of this tool that runs inside WSL: the folder given with --build-dir is translated."""
+    result = []
+    previous = ""
+    for item in argv:
+        if previous == "--build-dir":
+            item = wsl_path(item)
+        elif item.startswith("--build-dir="):
+            item = "--build-dir=" + wsl_path(item.split("=", 1)[1])
+        result.append(item)
+        previous = item
+    return result
+
+
 def through_wsl(argv: list[str]) -> int:
     wsl = shutil.which("wsl")
     if wsl is None:
         print("HOST_TESTS=SKIPPED these suites need a 64-bit Linux host (install WSL, or run this tool on Linux)")
         return 2
-    result = subprocess.run([wsl, "--cd", str(ROOT), "--", "python3", "tools/run_host_tests.py", *argv])
+    result = subprocess.run([wsl, "--cd", str(ROOT), "--", "python3", "tools/run_host_tests.py", *translate_arguments(argv)])
     return result.returncode
 
 
@@ -182,6 +208,9 @@ def main(argv: list[str]) -> int:
     selected = [suite for suite in SUITES if not args.only or suite.name in args.only]
     if args.only and len(selected) != len(set(args.only)):
         print("HOST_TESTS=FAIL unknown suite name in --only")
+        return 1
+    if args.build_dir and _WINDOWS_PATH.match(args.build_dir):
+        print(f"HOST_TESTS=FAIL --build-dir {args.build_dir} is a Windows path on a Linux host; it would create a folder named like a drive")
         return 1
     build_dir = Path(args.build_dir) if args.build_dir else ROOT / "build"
     build_dir.mkdir(parents=True, exist_ok=True)
