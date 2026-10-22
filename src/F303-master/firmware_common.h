@@ -29,7 +29,7 @@
 // PATCH+1 on every real build, odometer-carry into MINOR/MAJOR.
 #define FIRMWARE_VERSION_MAJOR 0
 #define FIRMWARE_VERSION_MINOR 3
-#define FIRMWARE_VERSION_PATCH 8
+#define FIRMWARE_VERSION_PATCH 9
 #define FIRMWARE_VERSION_BUILD 0
 
 // ID configuration matrix (physical tool-head address readout)
