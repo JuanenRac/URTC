@@ -43,7 +43,7 @@ Here is the complete breakdown of what it is, what it does, and the hardware eco
 
 | | |
 |---|---|
-| Version | `0.3.8` |
+| Version | `0.3.9` |
 | Maturity | Functional |
 | Stack | STM32F303 / bxCAN / 25 tool profiles |
 | Target | A microcontroller board (the firmware); built on a PC |
