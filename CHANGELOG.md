@@ -1,4 +1,4 @@
-# Changelog - URTC (repo-wide index)
+# Changelog
 
 All notable changes to this project are documented here.
 
@@ -282,41 +282,9 @@ This file only tracks the **current version** of all 4 at a glance and
 documents the versioning *policy* itself. For what actually changed in
 any given version, read the component's own file above.
 
-## Versioning policy (confirmed by the project owner)
+## Earlier history
 
-All 4 components are **incremental** (`MAJOR.MINOR.PATCH`) - every real
-build (`build_firmware.sh`/`.bat`, a real compile+link that produces a
-fresh `.bin`) automatically bumps that component's own `PATCH` by 1, via
-`bump_version.py` (repo root), run as the first step of compiling it -
-*before* the compiler reads the header.
-
-| Component | Header | Macro prefix |
-|---|---|---|
-| Main board application firmware | `src/F303-master/firmware_common.h` | `FIRMWARE_VERSION_*` |
-| Main board bootloader | `src/F303-master/boot/bootloader_common.h` | `BOOTLOADER_VERSION_*` |
-| Expansion slave application firmware | `src/F303-slave/slave_common.h` | `FIRMWARE_VERSION_*` |
-| Expansion slave bootloader | `src/F303-slave/boot/slaveboot_common.h` | `BOOTLOADER_VERSION_*` |
-
-Each bootloader also keeps its own copy of `FIRMWARE_VERSION_MAJOR/MINOR/
-PATCH` (the version of whatever application image is currently
-installed - used by the anti-rollback check in `HandleEndUpdate()`,
-since the bootloader and application never build together and can't
-share a header). `bump_version.py` mirrors the new version into that
-copy every time the matching application is built, so the two can never
-drift apart - never hand-edit either copy directly.
-
-**The carry rule** is a base-10 "odometer" rule: if bumping `PATCH`
-would take it past 9, it resets to 0 and `MINOR` gains 1 instead (and
-the same rule applies one level up, from `MINOR` into `MAJOR`, if
-`MINOR` would ever pass 9). For example:
-`0.1.7` → `0.1.8` → `0.1.9` → `0.2.0` — never `0.1.10`.
-
-Building only one target (`build_firmware.sh master` / `slave`) only
-bumps that target's own 2 components (application + bootloader); the
-other target's components are untouched, exactly as if that build
-hadn't run at all.
-
-## Binary filename convention (changed - see each component's own CHANGELOG)
+### Binary filename convention (changed - see each component's own CHANGELOG)
 
 All 4 compiled binaries now share ONE naming convention -
 `<PREFIX>_v<MAJOR>.<MINOR>.<PATCH>.{bin,hex,elf}` - matching sibling repo
@@ -340,7 +308,7 @@ drift out of sync with what `build_firmware.sh`/`.bat` actually produced.
 See `VERSION_CHECKLIST.txt` (Track A3/C/E2) and each component's own
 CHANGELOG for the full detail.
 
-## Current versions
+### Current versions
 
 | Component | Version | Source of truth |
 |---|---|---|
