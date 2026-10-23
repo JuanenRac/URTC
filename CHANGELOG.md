@@ -4,6 +4,7 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- The two companion links that do not travel on the CAN bus are documented as big-endian in `docs/CANBUS.TXT` (version 2 of the rack serial frame and of the vision head sensor frame; version 1 was little-endian and is refused), and the shared vectors copied into `tests/vectors/` are the current ones.
 - The detached signatures of the firmware images (`firmware/*.sig`) are ignored by git like the images they sign: they are release assets, and the old ones that were tracked are no longer kept in the repository.
 - **The firmware is held to the shared vectors:** `tests/vectors/urtc_fw_vectors.h`, written by URTC-COMMON from its conformance vectors, is compiled into three host suites: the minor and patch fields and the version ordering (`urtc_version_wire.h`), the payload that resets into the bootloader on `0x7F0` (and that no other payload of the vectors does) and the payload that authorizes a downgrade on `0x7FD`; before, only the three programs read those vectors.
 
