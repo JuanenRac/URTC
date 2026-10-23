@@ -200,11 +200,8 @@ int main(void)
     TEST_ASSERT(current_status == STATUS_VERIFY_FAIL && verify_fail_reason == VERIFY_FAIL_REASON_HARDWARE_ID && !update_in_progress, "foreign hardware id: reason 0x04");
     TEST_ASSERT(update_progress_percent == 0xFF, "a foreign hardware id is rejected before anything is erased");
 
-    // A rejected START in the middle of a transfer. KNOWN DIFFERENCE with the main board's bootloader: that one parses the new START into locals and
-    // validates it before it touches the shared state, so a rejected START leaves the transfer underway intact (tests/test_bootloader_update.c).
-    // This bootloader still writes update_total_size first and validates after, so the rejected START (size 0) leaves the transfer "in progress"
-    // with a size of 0: the bytes that follow are dropped and the END ends in VERIFY_FAIL (incomplete) with the main slot untouched. It fails
-    // safe, but the master must start the update again. This test holds that behaviour; when the order is fixed it will fail and say so.
+    // A rejected START in the middle of a transfer is validated before it touches the shared state, as in the main board's bootloader
+    // (tests/test_bootloader_update.c): the size of the transfer underway is kept and the transfer still completes.
     fresh();
     make_image(1000);
     uint8_t hm[32];
@@ -213,7 +210,9 @@ int main(void)
     HandleHmacExpected(hm);
     send_data(384, 32);
     start_update(0, THIS_HARDWARE_ID);
-    TEST_ASSERT(current_status == STATUS_ERROR && update_total_size == 0 && update_in_progress, "known difference: a rejected START mid-transfer overwrites the size of the transfer underway");
+    TEST_ASSERT(current_status == STATUS_ERROR && update_total_size == 1000 && update_bytes_received == 384 && update_in_progress, "a rejected START mid-transfer keeps the size and the progress of the transfer underway");
+    start_update(1000, THIS_HARDWARE_ID ^ 0x100);
+    TEST_ASSERT(update_total_size == 1000 && update_in_progress, "and so does one for foreign hardware");
     for (uint32_t off = 384; off < 1000; off += 32) {
         uint8_t f[32] = {0};
         uint32_t n = 1000 - off < 32 ? 1000 - off : 32;
@@ -221,8 +220,7 @@ int main(void)
         HandleData(f, n);
     }
     end_update(ref_crc32(image, 1000), 0, urtc_minor_field_pack(1, 0));
-    TEST_ASSERT(current_status == STATUS_VERIFY_FAIL && verify_fail_reason == VERIFY_FAIL_REASON_INCOMPLETE && main_slot_blank() && fake_reset_count == 0,
-                "and the transfer then fails safe: INCOMPLETE, the main slot untouched and no reset");
+    TEST_ASSERT(current_status == STATUS_VERIFY_OK && main_slot_equals_image(1000), "the transfer still completes after the rejected STARTs");
 
     // ---- frames outside a transfer / out of bounds -----------------------------------------------------------------------------------------
     fresh();

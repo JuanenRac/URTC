@@ -216,20 +216,27 @@ static uint8_t FlushPageBuffer(void) {
 }
 
 void HandleStartUpdate(uint8_t *data) {
-    update_total_size = ((uint32_t)data[0] << 24) | ((uint32_t)data[1] << 16)
-                       | ((uint32_t)data[2] << 8) | data[3];
-    update_declared_hw_id = ((uint32_t)data[4] << 24) | ((uint32_t)data[5] << 16)
-                           | ((uint32_t)data[6] << 8) | data[7];
+    // Parsed into locals and validated before the shared update_total_size
+    // and update_declared_hw_id are touched, as the main board's bootloader
+    // does: a rejected START arriving in the middle of a transfer (a retried
+    // frame, a bit-flip on the bus) must not leave the transfer underway
+    // with a size that no longer matches what was erased for it.
+    uint32_t new_total_size = ((uint32_t)data[0] << 24) | ((uint32_t)data[1] << 16)
+                             | ((uint32_t)data[2] << 8) | data[3];
+    uint32_t new_hw_id = ((uint32_t)data[4] << 24) | ((uint32_t)data[5] << 16)
+                        | ((uint32_t)data[6] << 8) | data[7];
 
-    if (update_total_size == 0 || update_total_size > APP_MAX_SIZE) {
+    if (new_total_size == 0 || new_total_size > APP_MAX_SIZE) {
         current_status = STATUS_ERROR;
         return;
     }
-    if (update_declared_hw_id != THIS_HARDWARE_ID) {
+    if (new_hw_id != THIS_HARDWARE_ID) {
         current_status = STATUS_VERIFY_FAIL;
         verify_fail_reason = VERIFY_FAIL_REASON_HARDWARE_ID;
         return;
     }
+    update_total_size = new_total_size;
+    update_declared_hw_id = new_hw_id;
 
     uint32_t pages_needed = (update_total_size + FLASH_PAGE_SIZE - 1) / FLASH_PAGE_SIZE;
     current_status = STATUS_ERASING;
