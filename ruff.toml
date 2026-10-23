@@ -1,0 +1,11 @@
+# Static checks run by CI: unused names, bare re-raises inside except, syntax errors.
+exclude = [".venv", "venv", "build", "dist", "__pycache__", "node_modules"]
+
+[lint]
+select = ["F", "B904", "E9"]
+
+[lint.per-file-ignores]
+# copied from the shared tooling; not edited here
+"tools/ci_validate.py" = ["F401"]
+# the generator of the documentation images keeps the fonts it may use
+"docs/tool_image_generator/*" = ["F841"]

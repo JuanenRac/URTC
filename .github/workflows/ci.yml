@@ -26,6 +26,10 @@ jobs:
           python-version: "3.12"
       - name: Validate manifest, version, documentation and secret policy
         run: python tools/ci_validate.py
+      - name: Static checks (unused names, exception chaining, syntax)
+        run: |
+          python -m pip install "ruff==0.17.2"
+          ruff check .
       - name: Check that every embedded public key is the registered one
         run: python tools/keys.py verify
       - name: Compile Python sources without running versioning build scripts

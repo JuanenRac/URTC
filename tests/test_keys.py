@@ -1,6 +1,5 @@
 """tools/keys.py: the registry is well formed, every embedding in this repository matches it, and a different key is noticed."""
 import importlib.util
-import json
 import sys
 import tempfile
 import unittest

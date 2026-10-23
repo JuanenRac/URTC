@@ -125,7 +125,7 @@ def _private_key():
     try:
         from cryptography.hazmat.primitives import serialization
     except ImportError:
-        raise SystemExit("signing needs the `cryptography` package (pip install cryptography)")
+        raise SystemExit("signing needs the `cryptography` package (pip install cryptography)") from None
     key_path = Path(os.environ.get("URTC_RELEASE_KEY") or Path.home() / ".urtc-keys" / "urtc_release_ed25519.pem")
     if not key_path.is_file():
         raise SystemExit("the release key was not found (set URTC_RELEASE_KEY or place it in ~/.urtc-keys/urtc_release_ed25519.pem)")
