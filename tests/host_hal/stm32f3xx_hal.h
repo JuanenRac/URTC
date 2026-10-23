@@ -423,6 +423,10 @@ HAL_StatusTypeDef HAL_ADCEx_Calibration_Start(ADC_HandleTypeDef *h, uint32_t sin
 
 extern int fake_bkup_access_calls;
 void HAL_PWR_EnableBkUpAccess(void);
+// The first backup register of the RTC block: it survives NVIC_SystemReset(), so the fake keeps it across the reset the tests play.
+typedef struct { uint32_t BKP0R; } RTC_TypeDef;
+extern RTC_TypeDef fake_rtc;
+#define RTC (&fake_rtc)
 
 // ---- the hardware I2C of the expansion slave (slave_i2c_link.c, slave_i2c_sensors.c) and its PWM timer ---------------------------------------------------
 // The slave talks to the sensors through HAL_I2C_Master_Transmit / Receive on I2C2: a test that plays a device sets fake_i2c_tx_hook and fake_i2c_rx_hook
