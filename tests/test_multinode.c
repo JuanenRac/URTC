@@ -36,6 +36,7 @@
 #include "firmware_multinode.h"
 #include "firmware_fram.h"
 #include "multinode.h"
+#include "vectors/multinode_scenarios.h"
 
 void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan_m);
 
@@ -175,9 +176,51 @@ static uint8_t ref_crc8(const void *record, size_t len)
 // The identifiers the single-head protocol uses (0x095..0x255 and the bootloader range): none may fall in the block.
 static int is_single_head_block(uint32_t id) { return (id >= 0x095 && id <= 0x255) || (id >= 0x7E9 && id <= 0x7FF); }
 
+
+// The scenarios of URTC-COMMON (conformance/multinode_scenarios.json): one node, a clock, received frames, and what is due and obeyed.
+static int same_frame(const MnFrame_t *got, const urtc_mn_frame_t *want)
+{
+    return got->id == want->id && got->dlc == want->dlc && memcmp(got->data, want->data, want->dlc) == 0;
+}
+
+static void replay_scenarios(int *failures)
+{
+    int count = (int)(sizeof URTC_MN_SCENARIOS / sizeof URTC_MN_SCENARIOS[0]);
+    TEST_ASSERT(count >= 10, "the shared scenarios of the node are there");
+    for (int s = 0; s < count; s++) {
+        const urtc_mn_scenario_t *sc = &URTC_MN_SCENARIOS[s];
+        MnNode_t node;
+        Mn_Init(&node, sc->enabled, sc->address, sc->tool, sc->instance, sc->serial, sc->start_ms);
+        int ok = 1;
+        char label[160] = "scenario";
+        for (int i = 0; i < sc->step_count && ok; i++) {
+            const urtc_mn_step_t *st = &URTC_MN_STEPS[sc->first_step + i];
+            uint32_t now = sc->start_ms + st->t;     // wraps on purpose, like the counter of the board
+            if (st->has_rx) {
+                MnEffects_t fx;
+                MnVerdict_t v = Mn_OnRx(&node, st->rx.id, st->rx.dlc, st->rx.data, now, &fx);
+                int want_pass = st->verdict == URTC_MN_VERDICT_PASS;
+                if ((v == MN_PASS) != want_pass || fx.safe_stop != st->fx_safe_stop || fx.answer_cmd != st->fx_answer_cmd ||
+                    (fx.answer_cmd && fx.cmd_func != st->fx_cmd_func)) ok = 0;
+            }
+            int n = 0;
+            MnFrame_t out;
+            while (Mn_Service(&node, now, st->fault, st->error, &out)) {
+                if (n >= st->emit_count || !same_frame(&out, &st->emit[n])) ok = 0;
+                n++;
+                if (n > 8) break;
+            }
+            if (n != st->emit_count || Mn_MaySingleHead(&node) != st->may) ok = 0;
+            if (!ok) { snprintf(label, sizeof label, "scenario '%s' step %d", sc->name, i); }
+        }
+        TEST_ASSERT(ok, label);
+    }
+}
+
 void run_multinode_tests(int *failures)
 {
     char label[128];
+    replay_scenarios(failures);
 
     // ---- constants and layout ----------------------------------------------------------------
     TEST_ASSERT(sizeof(MnConfig_t) == 8, "the F-RAM record is 8 packed bytes");
