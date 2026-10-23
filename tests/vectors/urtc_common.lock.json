@@ -5,6 +5,10 @@
     "urtc_fw_vectors.h": {
       "from": "generated/urtc_fw_vectors.h",
       "sha256": "bbddb2966366422881b4d2fec358ed5a8782e0571285110947154e486a9aeff6"
+    },
+    "urtc_test.h": {
+      "from": "firmware_base/urtc_test.h",
+      "sha256": "85e9df530ee05e8a9fb4cb06af58be2b73a9b3a15b8a8023b0e4079774c13c39"
     }
   }
 }

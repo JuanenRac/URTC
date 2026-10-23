@@ -4,6 +4,7 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- The `TEST_ASSERT` macro of the host tests comes from URTC-COMMON (`tests/vectors/urtc_test.h`, copied with `vendor_copy.py --set firmware_test`) instead of being written again in `tests/test_runner.h`; the suites are unchanged.
 - The CI holds the build tooling tests to a coverage floor of 35 percent of `tools/` (measured 43 on a machine without the repositories next to this one).
 - The two companion links that do not travel on the CAN bus are documented as big-endian in `docs/CANBUS.TXT` (version 2 of the rack serial frame and of the vision head sensor frame; version 1 was little-endian and is refused), and the shared vectors copied into `tests/vectors/` are the current ones.
 - The detached signatures of the firmware images (`firmware/*.sig`) are ignored by git like the images they sign: they are release assets, and the old ones that were tracked are no longer kept in the repository.
