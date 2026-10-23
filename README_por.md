@@ -680,6 +680,12 @@ Este projeto faz parte do ecossistema de robótica HYDRA-UMC do mesmo autor (Jua
 📧 electrohobby3d@gmail.com
 📺 [youtube.com/@electrohobby3d](https://youtube.com/@electrohobby3d)
 
+<!-- urtc-section:compatibility -->
+## 🧩 Compatibilidade
+
+As versões dos programas URTC que funcionam em conjunto, e a versão do protocolo que cada uma fala, constam da tabela de compatibilidade que o URTC-COMMON gera: [docs/COMPATIBILITY.md](https://github.com/JuanenRac/URTC/blob/main/docs/COMPATIBILITY.md).
+<!-- /urtc-section:compatibility -->
+
 ## 📜 LICENÇA
 
 O URTC é (c) 2026 JuanenRac (Electro Hobby 3D). Este aviso tem de ser incluído em quaisquer distribuições deste projeto ou de trabalhos derivados.
