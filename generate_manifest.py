@@ -59,7 +59,7 @@ def build_timestamp(root, environ=None):
         try:
             moment = datetime.fromtimestamp(int(epoch), timezone.utc)
         except (ValueError, OverflowError, OSError):
-            raise SystemExit(f"generate_manifest.py: invalid timestamp source {epoch!r}")
+            raise SystemExit(f"generate_manifest.py: invalid timestamp source {epoch!r}") from None
     else:
         moment = datetime.now(timezone.utc)
     return moment.strftime("%Y-%m-%dT%H:%M:%SZ")
