@@ -40,6 +40,7 @@ ROOT = Path(__file__).resolve().parent.parent
 MASTER = "src/F303-master"
 BOOT = f"{MASTER}/boot"
 MEL = f"{MASTER}/melexis_mlx90640"
+SLAVEBOOT = "src/F303-slave/boot"
 FAKE_HAL = "tests/host_hal"
 SANITIZE = ["-fsanitize=address,undefined", "-fno-sanitize-recover=all"]
 WARN = ["-Wall", "-Wextra", "-Wno-unused-parameter"]
@@ -71,6 +72,10 @@ SUITES = (
     Suite("bootloader_update", "tests/test_bootloader_update.c",
           (f"{FAKE_HAL}/fake_hal.c", f"{BOOT}/bootloader_protocol.c", f"{BOOT}/bootloader_flash.c", f"{BOOT}/bootloader_crypto.c"),
           ("tests", FAKE_HAL, BOOT, "src/common"), extra=tuple(FAKE_HAL_WARN)),
+    Suite("slaveboot_crypto", "tests/test_slaveboot_crypto.c", (f"{FAKE_HAL}/fake_hal.c", f"{SLAVEBOOT}/slaveboot_crypto.c"), ("tests", FAKE_HAL, SLAVEBOOT), extra=tuple(FAKE_HAL_WARN)),
+    Suite("slaveboot_update", "tests/test_slaveboot_update.c",
+          (f"{FAKE_HAL}/fake_hal.c", f"{SLAVEBOOT}/slaveboot_protocol.c", f"{SLAVEBOOT}/slaveboot_flash.c", f"{SLAVEBOOT}/slaveboot_crypto.c"),
+          ("tests", FAKE_HAL, SLAVEBOOT, "src/common"), extra=tuple(FAKE_HAL_WARN)),
     Suite("can_global_pre", "tests/test_can_global_pre.c", (f"{FAKE_HAL}/fake_hal.c", f"{MASTER}/firmware_can_global_pre.c"), ("tests", FAKE_HAL, MASTER, "src/common")),
     Suite("telemetry_watchdog", "tests/test_telemetry_watchdog.c", (f"{FAKE_HAL}/fake_hal.c", f"{MASTER}/firmware_telemetry_watchdog.c"), ("tests", FAKE_HAL, MASTER, "src/common")),
     Suite("can_slavebridge", "tests/test_can_slavebridge.c", (f"{FAKE_HAL}/fake_hal.c", f"{MASTER}/firmware_can_slavebridge.c"), ("tests", FAKE_HAL, MASTER, "src/common")),
