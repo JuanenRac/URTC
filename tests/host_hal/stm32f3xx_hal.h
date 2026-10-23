@@ -98,6 +98,8 @@ uint32_t HAL_GetTick(void);
 #define CCMDATARAM_BASE  0x10000000UL
 #define CAN_RX_FIFO0     0u
 #define CAN_RX0_IRQn     20
+#define I2C1_EV_IRQn     31  // the expansion slave bootloader disables them before it jumps
+#define I2C1_ER_IRQn     32
 #define FLASH_BASE_ADDR  0x08000000UL
 #define FLASH_SIZE_BYTES 0x40000UL
 #ifndef FLASH_PAGE_SIZE
