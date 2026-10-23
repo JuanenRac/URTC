@@ -60,6 +60,17 @@ class Suite:
     sanitize: bool = True
     extra: tuple[str, ...] = ()
     libs: tuple[str, ...] = ()
+    unsanitize: tuple[str, ...] = ()   # checks of the sanitizers that stay off for this suite (given after them, so they win)
+    defines: tuple[str, ...] = ()      # -D options (a source whose main() the suite calls under another name)
+
+
+# every source of the master application (not the bootloader): the whole firmware, for the suite that runs its main() from the power-up
+APPLICATION = tuple(
+    [p.relative_to(ROOT).as_posix() for p in sorted((ROOT / MASTER).glob("*.c"))]
+    + [f"{MASTER}/melexis_mlx90640/{name}" for name in ("MLX90640_API.c", "firmware_mlx90640_app.c", "firmware_mlx90640_transport.c")]
+    + [f"{MASTER}/melexis_mlx90641/{name}" for name in ("firmware_mlx90641_app.c", "firmware_mlx90641_transport.c")]
+    + [f"{MASTER}/melexis_mlx90642/{name}" for name in ("MLX90642.c", "firmware_mlx90642_app.c", "firmware_mlx90642_transport.c")]
+)
 
 
 SUITES = (
@@ -106,6 +117,54 @@ SUITES = (
           (f"{FAKE_HAL}/fake_hal.c", FAKE_STATE, f"{MASTER}/firmware_control_sensors.c", f"{MASTER}/firmware_can_thermalinspection.c",
            f"{MASTER}/firmware_thermal_stats.c", f"{MASTER}/thermal_stats.c", f"{MASTER}/firmware_fram.c"),
           ("tests", FAKE_HAL, MASTER, "src/common"), extra=tuple(FAKE_HAL_WARN)),
+    Suite("expansion_bus", "tests/test_expansion_bus.c",
+          (f"{FAKE_HAL}/fake_hal.c", FAKE_STATE, f"{FAKE_HAL}/fake_i2c_bus.c", f"{MASTER}/firmware_expansion_i2c.c", f"{MASTER}/firmware_ads1115.c", f"{MASTER}/firmware_expansion_spi.c"),
+          ("tests", FAKE_HAL, MASTER, "src/common"), extra=tuple(FAKE_HAL_WARN)),
+    Suite("led", "tests/test_led.c", (f"{FAKE_HAL}/fake_hal.c", FAKE_STATE, f"{MASTER}/firmware_led.c"), ("tests", FAKE_HAL, MASTER, "src/common"), extra=tuple(FAKE_HAL_WARN)),
+    Suite("oled_render", "tests/test_oled_render.c",
+          (f"{FAKE_HAL}/fake_hal.c", FAKE_STATE, f"{MASTER}/firmware_oled_driver.c", f"{MASTER}/firmware_render.c", f"{MASTER}/firmware_font.c"),
+          ("tests", FAKE_HAL, MASTER, "src/common"), extra=tuple(FAKE_HAL_WARN)),
+    Suite("interrupts", "tests/test_interrupts.c",
+          (f"{FAKE_HAL}/fake_hal.c", FAKE_STATE, f"{MASTER}/firmware_interrupts_can.c", f"{MASTER}/firmware_interrupts_fault.c", f"{MASTER}/firmware_interrupts_gpio.c",
+           f"{MASTER}/firmware_interrupts_timer.c", f"{MASTER}/firmware_multinode_platform.c"), ("tests", FAKE_HAL, MASTER, "src/common"), extra=tuple(FAKE_HAL_WARN)),
+    Suite("init", "tests/test_init.c",
+          (f"{FAKE_HAL}/fake_hal.c", FAKE_STATE, f"{MASTER}/firmware_init_clocks.c", f"{MASTER}/firmware_init_can.c", f"{MASTER}/firmware_init_buses.c",
+           f"{MASTER}/firmware_init_timers.c", f"{MASTER}/firmware_init_gpio.c"), ("tests", FAKE_HAL, MASTER, "src/common"), extra=tuple(FAKE_HAL_WARN)),
+    Suite("mlx_bus", "tests/test_mlx_bus.c",
+          (f"{FAKE_HAL}/fake_hal.c", FAKE_STATE, f"{FAKE_HAL}/fake_i2c_bus.c", f"{MASTER}/firmware_expansion_i2c.c", f"{MEL}/firmware_mlx90640_transport.c",
+           f"{MASTER}/melexis_mlx90641/firmware_mlx90641_transport.c", f"{MASTER}/melexis_mlx90642/firmware_mlx90642_transport.c",
+           f"{MASTER}/melexis_mlx90642/MLX90642.c", f"{MASTER}/melexis_mlx90642/firmware_mlx90642_app.c"),
+          ("tests", FAKE_HAL, MASTER, MEL, f"{MASTER}/melexis_mlx90641", f"{MASTER}/melexis_mlx90642", "src/common"), extra=tuple(FAKE_HAL_WARN)),
+    Suite("mlx_api", "tests/test_mlx_api.c",
+          ("tests/fake_mlx90640_i2c.c", f"{MEL}/MLX90640_API.c", f"{MEL}/firmware_mlx90640_app.c", f"{MASTER}/melexis_mlx90641/firmware_mlx90641_app.c"),
+          ("tests", FAKE_HAL, MASTER, MEL, f"{MASTER}/melexis_mlx90641", "src/common"),
+          # Melexis's extraction shifts a negative signed value to the left (MLX90640_API.c, the supply-voltage parameters): undefined in the C standard,
+          # an arithmetic shift in gcc and in the ARM build; that one check is off for this suite, the others stay on
+          extra=tuple(FAKE_HAL_WARN), libs=("-lm",), unsanitize=("-fno-sanitize=shift-base",)),
+    # the expansion slave carries its own copy of the two Melexis drivers: the same tests run on those copies
+    Suite("mlx_api_slave", "tests/test_mlx_api.c",
+          ("tests/fake_mlx90640_i2c.c", "src/F303-slave/melexis_mlx90640/MLX90640_API.c", f"{MEL}/firmware_mlx90640_app.c", f"{MASTER}/melexis_mlx90641/firmware_mlx90641_app.c"),
+          ("tests", FAKE_HAL, MASTER, "src/F303-slave/melexis_mlx90640", f"{MASTER}/melexis_mlx90641", "src/common"),
+          extra=tuple(FAKE_HAL_WARN), libs=("-lm",), unsanitize=("-fno-sanitize=shift-base",)),
+    Suite("mlx_bus_slave", "tests/test_mlx_bus.c",
+          (f"{FAKE_HAL}/fake_hal.c", FAKE_STATE, f"{FAKE_HAL}/fake_i2c_bus.c", f"{MASTER}/firmware_expansion_i2c.c", f"{MEL}/firmware_mlx90640_transport.c",
+           f"{MASTER}/melexis_mlx90641/firmware_mlx90641_transport.c", f"{MASTER}/melexis_mlx90642/firmware_mlx90642_transport.c",
+           "src/F303-slave/melexis_mlx90642/MLX90642.c", f"{MASTER}/melexis_mlx90642/firmware_mlx90642_app.c"),
+          ("tests", FAKE_HAL, MASTER, MEL, f"{MASTER}/melexis_mlx90641", "src/F303-slave/melexis_mlx90642", "src/common"), extra=tuple(FAKE_HAL_WARN)),
+    Suite("slave", "tests/test_slave.c",
+          (f"{FAKE_HAL}/fake_hal.c", f"{FAKE_HAL}/fake_i2c_bus.c", "src/F303-slave/slave_main.c", "src/F303-slave/slave_i2c_link.c", "src/F303-slave/slave_pwm.c",
+           "src/F303-slave/slave_i2c_sensors.c", "src/F303-slave/melexis_mlx90640/MLX90640_API.c", "src/F303-slave/melexis_mlx90642/MLX90642.c"),
+          ("tests", FAKE_HAL, "src/F303-slave", "src/F303-slave/melexis_mlx90640", "src/F303-slave/melexis_mlx90641", "src/F303-slave/melexis_mlx90642", "src/common", MASTER),
+          extra=tuple(FAKE_HAL_WARN), libs=("-lm",), unsanitize=("-fno-sanitize=shift-base",), defines=("-Dmain=slave_main_entry",)),
+    Suite("bootloader_boot", "tests/test_bootloader_boot.c",
+          (f"{FAKE_HAL}/fake_hal.c", f"{BOOT}/bootloader_main.c", f"{BOOT}/bootloader_oled.c", f"{BOOT}/bootloader_protocol.c", f"{BOOT}/bootloader_flash.c", f"{BOOT}/bootloader_crypto.c"),
+          ("tests", FAKE_HAL, BOOT, "src/common"), extra=tuple(FAKE_HAL_WARN), defines=("-Dmain=bootloader_main_entry",)),
+    Suite("slaveboot_main", "tests/test_slaveboot_main.c",
+          (f"{FAKE_HAL}/fake_hal.c", f"{SLAVEBOOT}/slaveboot_main.c", f"{SLAVEBOOT}/slaveboot_protocol.c", f"{SLAVEBOOT}/slaveboot_flash.c", f"{SLAVEBOOT}/slaveboot_crypto.c"),
+          ("tests", FAKE_HAL, SLAVEBOOT, "src/common"), extra=tuple(FAKE_HAL_WARN), defines=("-Dmain=slaveboot_main_entry",)),
+    Suite("firmware_main", "tests/test_firmware_main.c", (f"{FAKE_HAL}/fake_hal.c", *APPLICATION),
+          ("tests", FAKE_HAL, MASTER, MEL, f"{MASTER}/melexis_mlx90641", f"{MASTER}/melexis_mlx90642", "src/common"),
+          extra=tuple(FAKE_HAL_WARN), libs=("-lm",), unsanitize=("-fno-sanitize=shift-base",), defines=("-Dmain=firmware_main_entry",)),
     Suite("persistence", "tests/test_persistence.c",
           (f"{FAKE_HAL}/fake_hal.c", f"{MASTER}/firmware_persistence.c", f"{MASTER}/firmware_fram.c"), ("tests", FAKE_HAL, MASTER, "src/common")),
 )
@@ -185,9 +244,10 @@ def host_compiler() -> str | None:
 
 
 def command(suite: Suite, compiler: str, binary: Path) -> list[str]:
-    cmd = [compiler, f"-std={suite.std}", *WARN, *suite.extra]
+    cmd = [compiler, f"-std={suite.std}", *WARN, *suite.extra, *suite.defines]
     if suite.sanitize:
         cmd += SANITIZE
+        cmd += suite.unsanitize
     for include in suite.includes:
         cmd.append(f"-I{ROOT / include}")
     cmd += ["-o", str(binary), str(ROOT / suite.test), *[str(ROOT / source) for source in suite.sources], *suite.libs]
@@ -220,7 +280,7 @@ def analysis_sources(selected: list[Suite]) -> list[tuple[Suite, str]]:
 
 
 def analyze_command(suite: Suite, compiler: str, source: str) -> list[str]:
-    cmd = [compiler, f"-std={suite.std}", *WARN, *suite.extra, "-fanalyzer"]
+    cmd = [compiler, f"-std={suite.std}", *WARN, *suite.extra, *suite.defines, "-fanalyzer"]
     cmd += [f"-I{ROOT / include}" for include in suite.includes]
     return cmd + ["-c", "-o", os.devnull, str(ROOT / source)]
 

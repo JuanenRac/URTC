@@ -40,7 +40,11 @@ void MLX90640_I2CInit(void) {}
 
 void MLX90640_I2CFreqSet(int freq) { (void)freq; }
 
-int MLX90640_I2CGeneralReset(void) { return MLX90640_NO_ERROR; }
+int MLX90640_I2CGeneralReset(void)
+{
+    if (fake_i2c.clear_trigger_on_reset) g_reg[MLX90640_CTRL_REG] = (uint16_t)(g_reg[MLX90640_CTRL_REG] & ~MLX90640_CTRL_TRIG_READY_MASK);
+    return MLX90640_NO_ERROR;
+}
 
 int MLX90640_I2CRead(uint8_t slaveAddr, uint16_t startAddress,
                      uint16_t nMemAddressRead, uint16_t *data)
