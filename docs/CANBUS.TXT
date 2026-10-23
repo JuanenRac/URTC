@@ -1084,6 +1084,27 @@ Data (response): Whatever the named register returned, exactly as many
         0x12 (32), 0x13 (32), 0x14 (1) and 0x22 (2) can be read; a length of
         0 or above the register's maximum, or any other register, gets no
         answer. One response frame still carries at most 8 bytes.
+  Version register (0x01): the master reads all 10 bytes of it whatever
+        length was asked, answers with the first bytes as above, and then
+        sends 0x222.
+
+ID: 0x222 [URTC Tool Head -> Master, only ever sent by the board]
+Patch number of the slave application (companion of 0x221)
+DLC: 2 bytes
+Data:
+  - txData[0]: The register the patch belongs to (0x01, the version
+               register of the slave application)
+  - txData[1]: The PATCH number of the slave application (1 to 127)
+  Note: The tenth byte of the version register used to be reserved and
+        read 0. A slave application now puts its PATCH number there; the
+        answer to 0x221 cannot carry it (one frame holds 8 bytes, the
+        register has 10), so the master sends it here, right after that
+        answer, and only when the byte is 1 to 127. A byte of 0 (a slave
+        application from before the field) is ignored: no frame follows
+        and a host takes the patch as unknown, exactly as before. The
+        patch of the slave bootloader and of the application it holds
+        are reported by the bootloader's own extension (0x218, 5 bytes).
+        Nothing on the board listens for 0x222.
 
 ID: 0x230 [Master -> URTC Tool Head]
 Solder Paste Jetting Valve local PWM configuration
@@ -1530,6 +1551,14 @@ Effect: bypasses HandleEndUpdate's own anti-rollback check (see 0x7F4
         the firmware itself - the full image still goes through
         0x7F1/0x7F2/0x7F7/0x7F4 exactly as any other update would, only
         the version-ordering check is bypassed.
+  Session: honoured only in a bootloader session that the application
+        started by accepting 0x7F0 (it leaves a mark that the bootloader
+        reads once at start-up and clears), or when no valid application
+        is installed, so that a board can still be recovered. A 0x7FD
+        that arrives after a power-up, or after a reset of any other
+        cause, is ignored. Send 0x7F0 first, as the Flasher does. The
+        restriction is a bootloader build option
+        (URTC_BOOT_RESTRICT_UNSAFE_COMMANDS, on by default).
 
 ID: 0x7FE [Master -> URTC Tool Head to start; URTC Tool Head -> Master for
 every reply, handled by THIS bootloader only]
@@ -1555,6 +1584,9 @@ Effect: the CAN equivalent of the Flasher's own "back up entire flash
         transfer is abandoned (silently stops sending) if a page goes
         unacked, the same way a stalled write-direction transfer would
         eventually time out on the Flasher's own side instead.
+  Session: like 0x7FD, answered only in a bootloader session that the
+        application started by accepting 0x7F0, or when no valid
+        application is installed; ignored in any other session.
 
 ID: 0x7FF [Master -> URTC Tool Head, handled by THIS bootloader only]
 Read-back page acknowledgement
@@ -1706,6 +1738,7 @@ accepted.
   0x219 -> Slave bootloader verify-fail-reason (DLC:any, or 1 response)
   0x220 -> Write slave application register, generic (DLC:2-8)
   0x221 -> Read slave application register, generic (DLC:2, or up to 8 response)
+  0x222 -> Patch number of the slave application, companion of 0x221 (DLC:2, board to host)
   0x230 -> Local PWM config (Solder Paste Jetting - DLC:3)
   0x231 -> Local PWM pulse (Solder Paste Jetting - DLC:3)
   0x240 -> ADS1115 configuration (Functional Testing Head - DLC:2)
@@ -1802,18 +1835,18 @@ GENERATED REFERENCE (from the specification in URTC-COMMON)
 
 A. Summary
 
-[[ BEGIN GENERATED summary sha256=77dd211acc9df081920d9a280657a24a4c78558c0246ceca9e34d3fe4872d4fd ]]
+[[ BEGIN GENERATED summary sha256=22f3b39b05c5e162556e069bc5a6d0dd01766d8a3287fd5e906ba4815037ba2d ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 URTC CAN protocol: protocol version 1, byte order big.
-95 identifiers, 25 tool profiles, 20 enumerations, 37 constants, 4 magic payloads, 23 registers of the expansion slave.
+96 identifiers, 25 tool profiles, 20 enumerations, 37 constants, 4 magic payloads, 23 registers of the expansion slave.
 
 Machine-readable specification of the CAN bus protocol of the URTC tool head: every identifier with its direction, length rule and payload layout, the magic payloads, the registers of the expansion slave, the version procedures and the SLCAN subset the host tools rely on. All multi-byte fields are big-endian.
 [[ END GENERATED summary ]]
 
 B. Index of identifiers
 
-[[ BEGIN GENERATED index sha256=c9e5b46aa061c13f97dc7504f614746999c205061b8d643a42a499b90e1af621 ]]
+[[ BEGIN GENERATED index sha256=3ad64debcd4bfc5e8e291ac2a04d12b531f7334688f46288bf1b1f5c7947a09c ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 | ID | Name | Direction | DLC | Tools | Group | Title |
@@ -1884,6 +1917,7 @@ Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_do
 | 0x219 | SLAVE_VERIFY_FAIL_REASON | both ways | any / 1 | any | slave_bridge | Slave verify-fail reason |
 | 0x220 | SLAVE_REG_WRITE | host to board | 2-8 | any | slave_bridge | Write a slave application register (generic) |
 | 0x221 | SLAVE_REG_READ | both ways | 2 / 1-8 | any | slave_bridge | Read a slave application register (generic) |
+| 0x222 | SLAVE_APP_PATCH | board to host | 2 | any | slave_bridge | Patch number of the slave application (companion of 0x221) |
 | 0x230 | PASTE_JETTING_CONFIG | host to board | 3 | 23 | pastejetting | Local PWM configuration |
 | 0x231 | PASTE_JETTING_PULSE | host to board | 3 | 23 | pastejetting | Local PWM pulse |
 | 0x240 | ADS1115_CONFIG | host to board | 2 | 17 | functionaltest | ADS1115 configuration |
@@ -1917,7 +1951,7 @@ Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_do
 
 C. Field layouts and examples
 
-[[ BEGIN GENERATED layouts sha256=101d96691d4a7d237b27a6008f4f3414e57557099ce25ebd8d6a0426d01594f5 ]]
+[[ BEGIN GENERATED layouts sha256=3e27f90a55d2922783f2286a5d3fbf0a6540c1c24bc97c1954e5215ca7ed4ca1 ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 ### 0x095 IMPACT_EVENT - Impact register (touch probe, maximum priority)
@@ -2956,7 +2990,22 @@ response, DLC 1-8
 
 Example two bytes: data 1234 (data=1234)
 
-Note: Implemented by the firmware; no host implements it. Reads any application register of the expansion slave with no allow-list.
+Note: Implemented by the firmware; no host implements it. Reads one application register of the expansion slave, from the closed list of registers the firmware relays (anything else is dropped without an answer). The version register (0x01) is read whole: its tenth byte, the PATCH number of the slave application, follows in 0x222.
+
+### 0x222 SLAVE_APP_PATCH - Patch number of the slave application (companion of 0x221)
+
+board to host; handled by the application; tools: any.
+
+response, DLC 2
+
+| Byte | Width | Type | Field | Values | Note |
+|---|---|---|---|---|---|
+| 0 | 1 | u8 | register |  | The register the patch belongs to: 0x01, the version register of the slave application. |
+| 1 | 1 | u8 | patch | 1..127 |  |
+
+Example patch 4: data 0104 (register=1, patch=4)
+
+Note: TX-only; nothing on the board listens for it. Sent right after the 0x221 answer for register 0x01 when the tenth byte of that register, the patch number of the slave application, is 1 to 127. A byte of 0 (what a slave application from before the field sends) is ignored and no frame follows, so a host that sees no 0x222 treats the patch as unknown.
 
 ### 0x230 PASTE_JETTING_CONFIG - Local PWM configuration
 
@@ -3335,6 +3384,7 @@ request, DLC 4
 Example authorise: data D09E12AD (magic=D09E12AD)
 
 Note: One-shot: reset at every 0x7F1 and consumed by the anti-rollback check of the next 0x7F4. The image must still be validly signed.
+Note: Answered only in a bootloader session that the application started by accepting 0x7F0, or when no valid application is installed (a recovery); in any other session the frame is ignored. A build option switches the restriction off.
 
 ### 0x7FE READBACK - Read back the installed application
 
@@ -3363,6 +3413,7 @@ response (data), DLC 1-8: Raw bytes of the main slot, eight per frame; the prose
 Example eight bytes: data 0102030405060708 (data=0102030405060708)
 
 Note: One 2048-byte page (256 frames), then the bootloader waits up to 3 s for the page acknowledgement 0x7FF.
+Note: Answered only in a bootloader session that the application started by accepting 0x7F0, or when no valid application is installed (a recovery); in any other session the frame is ignored. A build option switches the restriction off.
 
 ### 0x7FF READBACK_PAGE_ACK - Read-back page acknowledgement
 
@@ -3675,7 +3726,7 @@ Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_do
 
 H. Registers of the expansion slave
 
-[[ BEGIN GENERATED registers sha256=9f084a77e23ccfc58b1346a7435aef0cf7771f1ec6d08417379c1dfb37814e0d ]]
+[[ BEGIN GENERATED registers sha256=de3e8ebd2fee5fb190cd15ff76461409aa278d24060424a69999569a6d11a020 ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 slave_bootloader: Registers of the expansion slave bootloader (I2C link bus, address 0x42)
@@ -3697,7 +3748,7 @@ slave_application: Registers of the expansion slave application (I2C link bus, a
 | Register | Name | Access | Length | CAN | Title |
 |---|---|---|---|---|---|
 | 0 | APP_STATUS | read | 1 |  | 0 idle, 1 busy |
-| 1 | APP_VERSION | read | 10 |  | Same layout as the bootloader version register, responder 0 |
+| 1 | APP_VERSION | read | 10 |  | Same layout as the bootloader version register, responder 0; the tenth byte is the application PATCH (1 to 127, 0 when not sent) |
 | 2 | ENTER_BOOTLOADER | write | 4 |  | Magic payload B0 07 1D 5A |
 | 16 | MLX_TRIGGER_CAPTURE | write | 0 | 0x250 | Start a capture |
 | 17 | MLX_CAPTURE_STATUS | read | 1 | 0x251 | Capture status |

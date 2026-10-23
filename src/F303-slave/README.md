@@ -207,7 +207,7 @@ table that exists at that moment.
 | Register | Direction | Payload | Purpose |
 |---|---|---|---|
 | `REG_APP_STATUS` (`0x00`) | read | 1 byte | Idle/busy |
-| `REG_APP_VERSION` (`0x01`) | read | 10 bytes | HardwareID + firmware version, same field layout as the bootloader's own version-query response |
+| `REG_APP_VERSION` (`0x01`) | read | 10 bytes | HardwareID + firmware version, same field layout as the bootloader's own version-query response; the tenth byte is the application PATCH number (1 to 127, 0 when not sent) |
 | `REG_ENTER_BOOTLOADER` (`0x02`) | write | 4 bytes | Magic payload `0xB0 0x07 0x1D 0x5A` (same constant the main board's own application checks for CAN `0x7F0`) resets into this chip's own bootloader - see section 5 below |
 | `REG_MLX_TRIGGER_CAPTURE`-`REG_MLX_CALIBRATED_CHUNK` (`0x10`-`0x13`) | both | varies | Capture control and chunked frame reads for whichever MLX9064x sensor is configured - see section 3 |
 | `REG_MLX_SENSOR_VARIANT` (`0x14`) | both | 1 byte | Which of the 3 MLX9064x family members is actually populated (`MLX_VARIANT_90640`/`90641`/`90642`) - set by the main board at boot (and on any later change), since this chip has no persistent storage of its own to remember it across its own resets. See section 3 |

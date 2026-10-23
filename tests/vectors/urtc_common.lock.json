@@ -8,7 +8,7 @@
     },
     "urtc_fw_vectors.h": {
       "from": "generated/urtc_fw_vectors.h",
-      "sha256": "bbddb2966366422881b4d2fec358ed5a8782e0571285110947154e486a9aeff6"
+      "sha256": "eb0f0651904541bde601488d2a31b2c73967e90e60af80bd6d5a641759810446"
     },
     "urtc_test.h": {
       "from": "firmware_base/urtc_test.h",
