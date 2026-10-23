@@ -98,7 +98,9 @@ void run_can_global_pre_tests(int *failures)
     // ---- bootloader entry: magic payload gates the reset ----------------------
     const uint8_t magic[4] = { 0xB0, 0x07, 0x1D, 0x5A };
     active_tool = TOOL_SOLDERING_IRON;
+    fake_rtc.BKP0R = 0;
     TEST_ASSERT(send_expect_reset(4, magic) == 1, "0x7F0 with the exact magic resets into the bootloader");
+    TEST_ASSERT(fake_rtc.BKP0R == 0x7F0B5E55u, "and leaves the mark of an entry somebody asked for, which lets the bootloader answer the readback and the downgrade authorisation");
     TEST_ASSERT(fake_tim_compare[0] == 0, "reset path forces the PWM compare to 0 first");
     TEST_ASSERT(gpio_wrote(TMC_ENN_PORT, TMC_ENN_PIN, GPIO_PIN_SET), "reset path disables stepper drivers (ENN high)");
     TEST_ASSERT(gpio_wrote(DRILL_BRAKE_PORT, DRILL_BRAKE_PIN, GPIO_PIN_RESET), "reset path brakes the drill");
@@ -114,7 +116,9 @@ void run_can_global_pre_tests(int *failures)
         uint8_t w[4];
         memcpy(w, magic, 4);
         w[i] ^= 0xFF;
+        fake_rtc.BKP0R = 0;
         if (send_expect_reset(4, w) != 0) { TEST_ASSERT(0, "any corrupted magic byte must not reset"); break; }
+        if (fake_rtc.BKP0R != 0) { TEST_ASSERT(0, "a rejected 0x7F0 must not leave the mark of a bootloader entry"); break; }
         if (fake_gpio_write_count != 0) { TEST_ASSERT(0, "a rejected 0x7F0 must not touch any actuator"); break; }
     }
     // The payload URTC-COMMON writes down for 0x7F0 is the one this firmware resets on, and no other payload of the shared

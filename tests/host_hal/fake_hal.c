@@ -392,6 +392,7 @@ HAL_StatusTypeDef HAL_ADC_ConfigChannel(ADC_HandleTypeDef *h, ADC_ChannelConfTyp
 HAL_StatusTypeDef HAL_ADCEx_Calibration_Start(ADC_HandleTypeDef *h, uint32_t single_diff) { (void)h; (void)single_diff; fake_adc_calibrations++; return HAL_OK; }
 
 int fake_bkup_access_calls;
+RTC_TypeDef fake_rtc;
 void HAL_PWR_EnableBkUpAccess(void) { fake_bkup_access_calls++; }
 
 // ---- the hardware I2C of the expansion slave and its PWM timer ------------------------------------------------------------------------------

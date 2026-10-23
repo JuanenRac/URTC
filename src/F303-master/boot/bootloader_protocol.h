@@ -31,6 +31,8 @@ void CAN_SendHeartbeat(uint8_t status, uint8_t progress_percent);
 void HandleVersionQuery(void);
 void HandleErrorCounterQuery(void);
 void HandleAuthorizeDowngrade(uint8_t *data);
+// 1 while the current update attempt has been authorised to install an older version (for the host tests).
+uint8_t DowngradeIsAuthorized(void);
 void HandleReadbackStart(void);
 
 // Checks the main slot's metadata (size/CRC32/HMAC/HardwareID) against its

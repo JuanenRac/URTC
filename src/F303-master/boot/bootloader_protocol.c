@@ -496,6 +496,10 @@ void HandleStartUpdate(uint8_t *data) {
 // between HandleStartUpdate and HandleEndUpdate for the SAME attempt - see
 // update_downgrade_authorized's own declaration comment for the full
 // one-shot reasoning.
+uint8_t DowngradeIsAuthorized(void) {
+    return update_downgrade_authorized;
+}
+
 void HandleAuthorizeDowngrade(uint8_t *data) {
     if (data[0] == 0xD0 && data[1] == 0x9E && data[2] == 0x12 && data[3] == 0xAD) {
         update_downgrade_authorized = 1;

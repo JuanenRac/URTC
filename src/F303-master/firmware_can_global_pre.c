@@ -16,6 +16,7 @@
 #include "firmware_blackbox.h"
 #include "firmware_thermal_stats.h"
 #include "urtc_version_wire.h"
+#include "urtc_boot_session.h"
 
 void Handle_CAN_GlobalCommands_PreErrorGate(void) {
 
@@ -54,6 +55,12 @@ void Handle_CAN_GlobalCommands_PreErrorGate(void) {
             // (1), so it can't preempt an already-running ISR - HAL_Delay()
             // here would spin forever waiting for a tick that can't arrive.
             for (volatile uint32_t settle = 0; settle < 320000; settle++); // ~5ms @ 64MHz
+            // Tell the bootloader that this reset is the entry somebody asked
+            // for: it then answers the readback (0x7FE) and downgrade
+            // authorisation (0x7FD) commands in this session only.
+            __HAL_RCC_PWR_CLK_ENABLE();
+            HAL_PWR_EnableBkUpAccess();
+            URTC_BOOT_SESSION_REG = URTC_BOOT_SESSION_MAGIC;
             NVIC_SystemReset();
             // never reached
         }

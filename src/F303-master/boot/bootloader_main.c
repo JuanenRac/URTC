@@ -13,6 +13,7 @@
 #include "bootloader_flash.h"
 #include "bootloader_oled.h"
 #include "bootloader_protocol.h"
+#include "urtc_boot_session.h"
 
 CAN_HandleTypeDef hcan;
 IWDG_HandleTypeDef hiwdg;
@@ -118,6 +119,15 @@ int main(void) {
 
     uint8_t app_valid = ApplicationIsValid();
 
+    // Was this start-up the entry that the application performs when it
+    // accepts 0x7F0? The word it leaves is read once and cleared, so a later
+    // reset of any other cause is not taken for it. See urtc_boot_session.h.
+    __HAL_RCC_PWR_CLK_ENABLE();
+    HAL_PWR_EnableBkUpAccess();
+    uint32_t session_word = URTC_BOOT_SESSION_REG;
+    URTC_BOOT_SESSION_REG = 0;
+    uint8_t unsafe_ok = urtc_boot_unsafe_commands_allowed(URTC_BOOT_RESTRICT_UNSAFE_COMMANDS, session_word, app_valid);
+
     // Listening window: ~600ms. Long enough for a master that wants to
     // trigger an update to get a frame in reliably, short enough not to be
     // a noticeable boot delay for normal operation.
@@ -148,7 +158,7 @@ int main(void) {
                     HandleVersionQuery();
                 } else if (rxHeader.StdId == CAN_ID_QUERY_ERROR_COUNTERS) {
                     HandleErrorCounterQuery();
-                } else if (rxHeader.StdId == CAN_ID_READBACK) {
+                } else if (rxHeader.StdId == CAN_ID_READBACK && unsafe_ok) {
                     HandleReadbackStart();
                 }
             }
@@ -192,9 +202,9 @@ int main(void) {
                     HandleVersionQuery();
                 } else if (rxHeader.StdId == CAN_ID_QUERY_ERROR_COUNTERS) {
                     HandleErrorCounterQuery();
-                } else if (rxHeader.StdId == CAN_ID_AUTHORIZE_DOWNGRADE && rxHeader.DLC == 4) {
+                } else if (rxHeader.StdId == CAN_ID_AUTHORIZE_DOWNGRADE && rxHeader.DLC == 4 && unsafe_ok) {
                     HandleAuthorizeDowngrade(rxData);
-                } else if (rxHeader.StdId == CAN_ID_READBACK) {
+                } else if (rxHeader.StdId == CAN_ID_READBACK && unsafe_ok) {
                     HandleReadbackStart();
                 }
             }

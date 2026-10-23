@@ -17,6 +17,7 @@
 #include "bootloader_flash.h"
 #include "bootloader_oled.h"
 #include "bootloader_protocol.h"
+#include "urtc_boot_session.h"
 #include "test_runner.h"
 
 #define CAN_RTR_REMOTE_FRAME 2u
@@ -251,10 +252,74 @@ static void test_main_loop(int *failures)
     TEST_ASSERT(update_in_progress == 0, "an update for another board is refused");
 }
 
+// An application is installed (a plausible stack pointer in the main slot, a reset vector that the jump refuses, so the bootloader falls back to listening).
+static void install_application(void)
+{
+    HAL_FLASH_Unlock();
+    HAL_FLASH_Program(FLASH_TYPEPROGRAM_HALFWORD, MAIN_APP_ADDR, 0x1000);
+    HAL_FLASH_Program(FLASH_TYPEPROGRAM_HALFWORD, MAIN_APP_ADDR + 2, 0x2000);
+    HAL_FLASH_Lock();
+}
+
+static void test_unsafe_commands(int *failures)
+{
+    // the decision itself
+    TEST_ASSERT(urtc_boot_unsafe_commands_allowed(1, URTC_BOOT_SESSION_MAGIC, 1) == 1, "a session entered through 0x7F0 answers 0x7FE and 0x7FD");
+    TEST_ASSERT(urtc_boot_unsafe_commands_allowed(1, 0, 1) == 0, "a start-up nobody asked for does not, with an application installed");
+    TEST_ASSERT(urtc_boot_unsafe_commands_allowed(1, 0xFFFFFFFFu, 1) == 0 && urtc_boot_unsafe_commands_allowed(1, URTC_BOOT_SESSION_MAGIC ^ 1u, 1) == 0, "only the exact mark counts");
+    TEST_ASSERT(urtc_boot_unsafe_commands_allowed(1, 0, 0) == 1, "with no valid application they stay available for the recovery of the board");
+    TEST_ASSERT(urtc_boot_unsafe_commands_allowed(0, 0, 1) == 1, "with the restriction switched off every session answers them");
+    TEST_ASSERT(URTC_BOOT_RESTRICT_UNSAFE_COMMANDS == 1, "the restriction is on by default");
+
+    uint8_t zero[8] = {0};
+    uint8_t magic[8] = {0xD0, 0x9E, 0x12, 0xAD, 0, 0, 0, 0};
+    uint8_t start[8] = {0, 0, 0x03, 0xE8, 0x03, 0x03, 0xCC, 0x01};
+
+    // a power-up with an application installed: neither command is answered
+    boot_world();
+    install_application();
+    fake_rtc.BKP0R = 0;
+    push(CAN_ID_READBACK, 0, 0, 0, zero);
+    run_boot(3000);
+    TEST_ASSERT(count_id(CAN_ID_READBACK) == 0, "readback (0x7FE) is not answered in a session nobody asked for");
+    boot_world();
+    install_application();
+    fake_rtc.BKP0R = 0;
+    push(CAN_ID_START_UPDATE, 8, 0, 0, start);
+    push(CAN_ID_AUTHORIZE_DOWNGRADE, 4, 0, 0, magic);
+    run_boot(1500);
+    TEST_ASSERT(DowngradeIsAuthorized() == 0, "the downgrade authorisation (0x7FD) is ignored in a session nobody asked for");
+
+    // the session that 0x7F0 started: both are answered, and the mark is used up
+    boot_world();
+    install_application();
+    fake_rtc.BKP0R = URTC_BOOT_SESSION_MAGIC;
+    push(CAN_ID_READBACK, 0, 0, 0, zero);
+    run_boot(3000);
+    TEST_ASSERT(count_id(CAN_ID_READBACK) >= 1, "readback is answered in the session that 0x7F0 started");
+    TEST_ASSERT(fake_rtc.BKP0R == 0, "the mark is cleared as soon as the bootloader has read it");
+    boot_world();
+    install_application();
+    fake_rtc.BKP0R = URTC_BOOT_SESSION_MAGIC;
+    push(CAN_ID_START_UPDATE, 8, 0, 0, start);
+    push(CAN_ID_AUTHORIZE_DOWNGRADE, 4, 0, 0, magic);
+    run_boot(1500);
+    TEST_ASSERT(DowngradeIsAuthorized() == 1, "the downgrade authorisation is honoured in the session that 0x7F0 started");
+
+    // with no application the recovery of the board keeps both
+    boot_world();
+    fake_rtc.BKP0R = 0;
+    push(CAN_ID_READBACK, 0, 0, 0, zero);
+    run_boot(3000);
+    TEST_ASSERT(count_id(CAN_ID_READBACK) >= 1, "with no application installed readback is answered whatever started the session");
+    fake_rtc.BKP0R = 0;
+}
+
 void run_bootloader_boot_tests(int *failures)
 {
     test_display(failures);
     test_main_loop(failures);
+    test_unsafe_commands(failures);
 }
 
 #undef main      // the suite renames the main() of bootloader_main.c (-Dmain=bootloader_main_entry); the main of this test is the real one
