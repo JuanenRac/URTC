@@ -49,14 +49,18 @@ static int pin_level(GPIO_TypeDef *port, uint16_t pin)
     return level;
 }
 
-// PB6 is the stepper enable (active low) in the motor tools and the laser interlock in the laser tool. The firmware writes it twice in the inert
-// state, first high ("steppers disabled") and then low ("laser locked"), so the last write decides: the interlock is locked and the stepper
-// driver is enabled but idle (no step is ever pulsed in that state). The test holds the safety-relevant outcome, the locked interlock.
+// PB6 is the stepper enable (active low) in the motor tools and the laser interlock in the laser tool, so no level is right for both. In the
+// inert state the stepper driver is the part that can move something: the pin must end HIGH (driver disabled), written once so nothing undoes it.
+// The laser is held off because no laser handler runs without the laser tool selected.
 static int safe_outputs(void)
 {
-    return pin_level(TMC_ENN_PORT, LASER_SAFETY_PIN) == GPIO_PIN_RESET &&     // laser interlock locked
-           pin_level(DRILL_BRAKE_PORT, DRILL_BRAKE_PIN) == GPIO_PIN_RESET &&  // drill brake engaged
-           pin_level(T12_PWM_PORT, T12_PWM_PIN) == GPIO_PIN_RESET;            // heater off
+    int pin_writes = 0;
+    for (int i = 0; i < fake_gpio_write_count; i++) {
+        if (fake_gpio_writes[i].port == TMC_ENN_PORT && fake_gpio_writes[i].pin == TMC_ENN_PIN) pin_writes++;
+    }
+    return pin_level(TMC_ENN_PORT, TMC_ENN_PIN) == GPIO_PIN_SET && pin_writes == 1 &&  // stepper driver disabled, no later write undoes it
+           pin_level(DRILL_BRAKE_PORT, DRILL_BRAKE_PIN) == GPIO_PIN_RESET &&           // drill brake engaged
+           pin_level(T12_PWM_PORT, T12_PWM_PIN) == GPIO_PIN_RESET;                     // heater off
 }
 
 static void store_selection(uint8_t selection, int damage)
@@ -99,7 +103,7 @@ int main(void)
         set_id_pins(value);
         Identify_PhysicalTool();
         TEST_ASSERT(active_tool == TOOL_INVALID && system_error_flag == 1 && raw_id_pin_value == value, "a value without a tool is the inert state with the error latched");
-        TEST_ASSERT(safe_outputs(), "and every output goes to its safe position (laser locked, brake on, heater off)");
+        TEST_ASSERT(safe_outputs(), "and every output goes to its safe position (stepper driver disabled, brake on, heater off)");
     }
 
     // free configuration: value 31 and the tool the person stored
