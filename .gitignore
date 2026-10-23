@@ -21,6 +21,7 @@ firmware/*.hex
 firmware/*.sha256
 firmware/*.manifest.json
 firmware/firmware_manifest.json
+firmware/*.sig
 
 # Output folders named after a Windows path (a path handed to WSL without translation): never versioned
 C:/
