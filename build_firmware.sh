@@ -139,7 +139,12 @@ else
     # The suites and their compiler flags live in one list (tools/run_host_tests.py),
     # shared with build_firmware.bat, so both entry points run the same tests.
     mkdir -p "$BUILD"
-    if python3 "$ROOT/tools/run_host_tests.py" --build-dir "$BUILD"; then
+    # URTC_COVERAGE_FLOOR=<percent> (set by CI) also builds the suites with gcov counters and fails under that share of executed lines.
+    COVERAGE_ARGS=()
+    if [ -n "${URTC_COVERAGE_FLOOR:-}" ]; then
+        COVERAGE_ARGS=(--coverage-floor "$URTC_COVERAGE_FLOOR")
+    fi
+    if python3 "$ROOT/tools/run_host_tests.py" --build-dir "$BUILD" ${COVERAGE_ARGS[@]+"${COVERAGE_ARGS[@]}"}; then
         pass "host logic tests passed (every suite, then the static analysis)"
     else
         fail "host logic tests FAILED"

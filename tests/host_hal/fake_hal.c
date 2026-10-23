@@ -20,8 +20,13 @@ int fake_reset_count;
 jmp_buf fake_reset_jmp;
 int fake_reset_jmp_armed;
 
+uint32_t fake_adc_value;
+HAL_StatusTypeDef fake_adc_status = HAL_OK;
+int fake_adc_starts, fake_adc_stops;
+
 void fake_hal_reset_recording(void)
 {
+    fake_adc_starts = fake_adc_stops = 0;
     fake_tx_count = 0;
     fake_tx_mailboxes_free = 3;
     fake_gpio_write_count = 0;
@@ -195,3 +200,8 @@ HAL_StatusTypeDef HAL_I2C_Mem_Read(I2C_HandleTypeDef *h, uint16_t dev, uint16_t 
     memcpy(data, fake_fram + mem, size);
     return HAL_OK;
 }
+
+HAL_StatusTypeDef HAL_ADC_Start(ADC_HandleTypeDef *h) { (void)h; fake_adc_starts++; return HAL_OK; }
+HAL_StatusTypeDef HAL_ADC_PollForConversion(ADC_HandleTypeDef *h, uint32_t timeout) { (void)h; (void)timeout; return fake_adc_status; }
+uint32_t HAL_ADC_GetValue(ADC_HandleTypeDef *h) { (void)h; return fake_adc_value; }
+HAL_StatusTypeDef HAL_ADC_Stop(ADC_HandleTypeDef *h) { (void)h; fake_adc_stops++; return HAL_OK; }

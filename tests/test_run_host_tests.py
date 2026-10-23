@@ -60,3 +60,37 @@ class SuiteListTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CoverageTests(unittest.TestCase):
+    GCOV = (
+        "File '" + ROOT.as_posix() + "/src/F303-master/a.c'\nLines executed:50.00% of 10\nCreating 'a.c.gcov'\n\n"
+        "File '" + ROOT.as_posix() + "/tests/host_hal/fake_hal.c'\nLines executed:28.97% of 107\n\n"
+        "File '" + ROOT.as_posix() + "/src/F303-master/a.h'\nLines executed:100.00% of 3\n\n"
+        "File '" + ROOT.as_posix() + "/src/F303-master/b.c'\nLines executed:100.00% of 4\n"
+    )
+
+    def test_only_the_c_files_of_the_firmware_sources_are_counted(self):
+        self.assertEqual(runner.parse_gcov(self.GCOV), {"src/F303-master/a.c": (5, 10), "src/F303-master/b.c": (4, 4)})
+
+    def test_the_best_of_the_suites_counts_for_a_file_and_the_percentage_is_over_all_lines(self):
+        merged = runner.merge_coverage([{"src/x.c": (2, 10)}, {"src/x.c": (7, 10), "src/y.c": (5, 5)}])
+        self.assertEqual(merged, {"src/x.c": (7, 10), "src/y.c": (5, 5)})
+        self.assertAlmostEqual(runner.coverage_percent(merged), 80.0)
+        self.assertEqual(runner.coverage_percent({}), 0.0)
+
+    def test_the_sources_listed_for_the_report_are_the_c_files_under_src(self):
+        sources = runner.all_firmware_sources()
+        self.assertIn("src/F303-master/firmware_blackbox.c", sources)
+        self.assertTrue(all(name.startswith("src/") and name.endswith(".c") for name in sources))
+
+    def test_the_build_scripts_and_the_ci_pass_the_floor_to_the_runner(self):
+        self.assertIn("--coverage-floor", (ROOT / "build_firmware.sh").read_text(encoding="utf-8"))
+        self.assertIn("--coverage-floor", (ROOT / "build_firmware.bat").read_text(encoding="utf-8"))
+        self.assertIn("URTC_COVERAGE_FLOOR", (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8"))
+
+    def test_the_sources_the_new_suites_link_are_listed_for_the_analysis(self):
+        pairs = {source for _suite, source in runner.analysis_sources(list(runner.SUITES))}
+        for name in ("firmware_can_soldering.c", "firmware_control_thermal.c", "firmware_blackbox.c", "firmware_identify.c", "firmware_can_global_post.c",
+                     "firmware_can_thermalinspection.c", "firmware_control_sensors.c", "firmware_thermal_stats.c"):
+            self.assertIn(f"src/F303-master/{name}", pairs)

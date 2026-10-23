@@ -163,4 +163,15 @@ GPIO_PinState HAL_GPIO_ReadPin(GPIO_TypeDef *port, uint16_t pin);
 HAL_StatusTypeDef HAL_I2C_Mem_Write(I2C_HandleTypeDef *h, uint16_t dev, uint16_t mem, uint16_t memsize, uint8_t *data, uint16_t size, uint32_t timeout);
 HAL_StatusTypeDef HAL_I2C_Mem_Read(I2C_HandleTypeDef *h, uint16_t dev, uint16_t mem, uint16_t memsize, uint8_t *data, uint16_t size, uint32_t timeout);
 
+
+// ---- the ADC of the thermal control loops (firmware_control_thermal.c, firmware_control_sensors.c) ------------------------------------
+// One conversion: HAL_ADC_PollForConversion returns fake_adc_status and HAL_ADC_GetValue fake_adc_value.
+extern uint32_t fake_adc_value;
+extern HAL_StatusTypeDef fake_adc_status;
+extern int fake_adc_starts, fake_adc_stops;
+HAL_StatusTypeDef HAL_ADC_Start(ADC_HandleTypeDef *h);
+HAL_StatusTypeDef HAL_ADC_PollForConversion(ADC_HandleTypeDef *h, uint32_t timeout);
+uint32_t HAL_ADC_GetValue(ADC_HandleTypeDef *h);
+HAL_StatusTypeDef HAL_ADC_Stop(ADC_HandleTypeDef *h);
+
 #endif // HOST_FAKE_STM32F3XX_HAL_H

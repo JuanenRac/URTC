@@ -109,7 +109,9 @@ if errorlevel 1 (
 REM -----------------------------------------------------------------------
 echo.
 echo === 1b. Host logic tests (same suites as build_firmware.sh) ===
-python "%ROOT%\tools\run_host_tests.py" --build-dir "%BUILD%"
+set "COVERAGE_ARGS="
+if defined URTC_COVERAGE_FLOOR set "COVERAGE_ARGS=--coverage-floor %URTC_COVERAGE_FLOOR%"
+python "%ROOT%\tools\run_host_tests.py" --build-dir "%BUILD%" %COVERAGE_ARGS%
 if errorlevel 2 (
     echo   WARN host logic tests were not run: they need WSL or a Linux host
     set /a WARN+=1
