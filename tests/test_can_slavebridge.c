@@ -252,6 +252,46 @@ void run_can_slavebridge_tests(int *failures)
     rx(0x221, 3, rd);
     TEST_ASSERT(read_count == 0, "0x221 with a DLC other than 2 is ignored");
 
+    // ---- the patch number of the slave application (REG_APP_VERSION byte 9) -----
+    uint8_t rd_version[8] = { 0x01, 8 };
+    clear();
+    reg_readable[0x01] = 1;
+    { const uint8_t v[10] = { 0x00, 0x03, 0x03, 0xCB, 0x01, 0x00, 0x00, 0x00, 0x02, 0x04 }; memcpy(reg_value[0x01], v, 10); }
+    rx(0x221, 2, rd_version);
+    TEST_ASSERT(tx(0x221) && tx(0x221)->dlc == 8 && tx(0x221)->data[7] == 0x00 && read_count == 1, "the version answer is the same eight bytes as before");
+    TEST_ASSERT(tx(0x222) && tx(0x222)->dlc == 2 && tx(0x222)->data[0] == 0x01 && tx(0x222)->data[1] == 0x04, "a patch in the tenth byte follows in the 0x222 companion, with the register it belongs to");
+    TEST_ASSERT(fake_tx_count == 2, "and nothing else is sent");
+    clear();
+    reg_readable[0x01] = 1;                       // a slave application from before the field: the tenth byte reads 0
+    { const uint8_t v[10] = { 0x00, 0x03, 0x03, 0xCB, 0x01, 0x00, 0x00, 0x00, 0x02, 0x00 }; memcpy(reg_value[0x01], v, 10); }
+    rx(0x221, 2, rd_version);
+    TEST_ASSERT(tx(0x221) && tx(0x221)->dlc == 8 && !tx(0x222) && fake_tx_count == 1, "a tenth byte of 0 is ignored: no companion, the answer a legacy slave always got");
+    clear();
+    reg_readable[0x01] = 1;
+    reg_value[0x01][9] = 0x80;
+    rx(0x221, 2, rd_version);
+    TEST_ASSERT(!tx(0x222), "a tenth byte above 127 is not a patch number");
+    clear();
+    reg_readable[0x01] = 1;
+    reg_value[0x01][9] = 0x7F;
+    rx(0x221, 2, rd_version);
+    TEST_ASSERT(tx(0x222) && tx(0x222)->data[1] == 0x7F, "127 is the largest patch number");
+    clear();
+    reg_readable[0x01] = 1;
+    reg_value[0x01][9] = 5;
+    uint8_t rd_short[8] = { 0x01, 2 };
+    rx(0x221, 2, rd_short);
+    TEST_ASSERT(tx(0x221) && tx(0x221)->dlc == 2 && tx(0x222) && tx(0x222)->data[1] == 5, "a host that asks for fewer bytes still gets the companion");
+    clear();
+    rx(0x221, 2, rd_version);
+    TEST_ASSERT(fake_tx_count == 0, "a slave that does not answer produces no companion either");
+    clear();
+    reg_readable[0x13] = 1;
+    reg_value[0x13][9] = 5;
+    uint8_t rd_other[8] = { 0x13, 10 };
+    rx(0x221, 2, rd_other);
+    TEST_ASSERT(!tx(0x222), "only the version register has a companion");
+
     // ---- other identifiers -----------------------------------------------------
     clear();
     rx(0x321, 8, eight);
