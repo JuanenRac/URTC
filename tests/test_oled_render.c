@@ -117,12 +117,16 @@ static void test_font(int *failures)
     for (int a = 'A'; a <= 'Z'; a++) for (int b = a + 1; b <= 'Z'; b++) if (memcmp(&Font5x7[(a - 32) * 5], &Font5x7[(b - 32) * 5], 5) == 0) distinct = 0;
     TEST_ASSERT(distinct, "no two capital letters share a glyph");
 
-    // Finding recorded, not changed: the table has no glyph for '/', so every glyph from the digit 0 on sits one place before the character the renderer
-    // looks it up by (the renderer reads Font5x7[(c - 32) * 5]). The slashed zero is found where '/' is looked up, the 1 where '0' is, B where 'A' is.
-    // The day the table is corrected these three lines fail on purpose: replace them with the glyphs of the characters themselves.
-    TEST_ASSERT(memcmp(&Font5x7[('/' - 32) * 5], zero_slashed, 5) == 0, "KNOWN: the glyph looked up for '/' is the slashed zero (the '/' glyph is missing from the table)");
-    TEST_ASSERT(memcmp(&Font5x7[('0' - 32) * 5], one, 5) == 0, "KNOWN: the glyph looked up for '0' is the one of '1'");
-    TEST_ASSERT(memcmp(&Font5x7[('A' - 32) * 5], letter_b, 5) == 0 && memcmp(&Font5x7[('@' - 32) * 5], letter_a, 5) == 0, "KNOWN: the glyph looked up for 'A' is the one of 'B', and the one of '@' is the A");
+    // The renderer reads Font5x7[(c - 32) * 5], so every glyph must sit at the place of its own character.
+    static const uint8_t slash[5] = {0x20, 0x10, 0x08, 0x04, 0x02};
+    TEST_ASSERT(memcmp(&Font5x7[('/' - 32) * 5], slash, 5) == 0, "the glyph looked up for '/' is the slash");
+    TEST_ASSERT(memcmp(&Font5x7[('0' - 32) * 5], zero_slashed, 5) == 0 && memcmp(&Font5x7[('1' - 32) * 5], one, 5) == 0, "the glyphs looked up for '0' and '1' are their own");
+    TEST_ASSERT(memcmp(&Font5x7[('A' - 32) * 5], letter_a, 5) == 0 && memcmp(&Font5x7[('B' - 32) * 5], letter_b, 5) == 0, "the glyphs looked up for 'A' and 'B' are their own");
+    static const uint8_t letter_z[5] = {0x61, 0x51, 0x49, 0x45, 0x43};
+    TEST_ASSERT(memcmp(&Font5x7[('Z' - 32) * 5], letter_z, 5) == 0, "the glyph looked up for 'Z' is its own");
+    static const uint8_t minus[5] = {0x08, 0x08, 0x08, 0x08, 0x08};
+    static const uint8_t comma[5] = {0x00, 0x50, 0x30, 0x00, 0x00};
+    TEST_ASSERT(memcmp(&Font5x7[('-' - 32) * 5], minus, 5) == 0 && memcmp(&Font5x7[(',' - 32) * 5], comma, 5) == 0, "the minus and the comma have glyphs");
 }
 
 static void test_driver(int *failures)
