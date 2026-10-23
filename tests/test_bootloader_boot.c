@@ -96,18 +96,17 @@ static void test_display(int *failures)
     memset(screen, 0xFF, sizeof screen);
     OLED_PrintStr2x_Boot(2, 4, "L");
     model_apply();
-    // Finding recorded, not changed: the buffer of a line is built with the text at the column asked for and then sent from that column on, so the text
-    // lands at twice the column (the L asked for at column 4 is at column 8) and the end of a buffer that is long enough wraps to the start of the page.
-    // The strings of the bootloader are short and the display is only a progress screen. These lines pin the position; if the build of the buffer is
-    // corrected, the L moves to column 4.
-    TEST_ASSERT(screen[2][8] == 0xFF && screen[2][9] == 0xFF && screen[3][8] == 0x3F && screen[3][9] == 0x3F, "text is drawn at double size: the tall stroke of the L is two columns wide, 4 pixels up on one page and 3 on the next");
-    TEST_ASSERT(screen[2][10] == 0x00 && screen[3][10] == 0x30 && screen[3][11] == 0x30, "and the foot of it is two pixels high, on the lowest rows of the bottom half");
-    TEST_ASSERT(screen[2][4] == 0 && screen[2][7] == 0 && screen[2][30] == 0 && screen[1][4] == 0xFF, "the rest of the line is cleared from the column asked for, and the page above is untouched");
-    TEST_ASSERT(screen[2][4] == 0 && screen[2][4 + 4] != 0, "KNOWN: the text starts at twice the column that was asked for");
+    // The text of a line lands at the column asked for (the L asked for at column 4 is at column 4).
+    TEST_ASSERT(screen[2][4] == 0xFF && screen[2][5] == 0xFF && screen[3][4] == 0x3F && screen[3][5] == 0x3F, "text is drawn at double size: the tall stroke of the L is two columns wide, 4 pixels up on one page and 3 on the next");
+    TEST_ASSERT(screen[2][6] == 0x00 && screen[3][6] == 0x30 && screen[3][7] == 0x30, "and the foot of it is two pixels high, on the lowest rows of the bottom half");
+    TEST_ASSERT(screen[2][3] == 0xFF && screen[2][30] == 0 && screen[1][4] == 0xFF, "the line is cleared from the column asked for to the end, the column before it and the page above are untouched");
 
     OLED_PrintStr2x_Boot(2, 4, "aaaaaaaaaaaaaaaaaaaaaaaa");
     model_apply();
     TEST_ASSERT(model_errors == 0, "a string longer than the line stops at the last column that fits, with no write beyond the buffers");
+    OLED_PrintStr2x_Boot(2, 120, "LL");
+    model_apply();
+    TEST_ASSERT(model_errors == 0 && screen[2][120] == 0xFF && screen[2][127] == 0, "text near the right edge is cut at the edge and does not wrap to the start of the page");
     OLED_PrintStr2x_Boot(0, 0, "@~");
     model_apply();
     TEST_ASSERT(blank_page(0) && blank_page(1), "a character the font does not have is a blank");
@@ -116,7 +115,7 @@ static void test_display(int *failures)
     OLED_DrawProgressBar_Boot(50);
     model_apply();
     TEST_ASSERT(screen[5][4] == 0x7F && screen[5][4 + 109] == 0x7F, "the bar has a frame at both ends");
-    TEST_ASSERT(screen[5][4 + 53] == 0x7F && screen[5][4 + 54] == 0x41, "half of the 106 inner pixels is 53");
+    TEST_ASSERT(screen[5][4 + 54] == 0x7F && screen[5][4 + 55] == 0x41, "half of the 108 inner pixels is 54");
     static const uint8_t five[5] = {0x00, 0x27, 0x45, 0x45, 0x39};
     static const uint8_t percent[5] = {0x23, 0x13, 0x08, 0x64, 0x62};
     TEST_ASSERT(memcmp(&screen[3][4], five, 5) == 0 && memcmp(&screen[3][4 + 12], percent, 5) == 0, "the number above the bar is 50% in the small font: '5', then the digit after it, then the percent sign");
@@ -125,20 +124,19 @@ static void test_display(int *failures)
     TEST_ASSERT(screen[5][4 + 1] == 0x41 && screen[5][4] == 0x7F, "zero percent is an empty bar");
     OLED_DrawProgressBar_Boot(100);
     model_apply();
-    TEST_ASSERT(screen[5][4 + 106] == 0x7F && screen[5][4 + 109] == 0x7F, "a hundred percent fills the bar");
-    TEST_ASSERT(screen[5][4 + 107] == 0x41 && screen[5][4 + 108] == 0x41, "KNOWN: but not the last two columns inside the frame (the filled part is computed out of 106 pixels and the bar has 108)");
+    int all_filled = 1;
+    for (int k = 0; k < 110; k++) if (screen[5][4 + k] != 0x7F) all_filled = 0;
+    TEST_ASSERT(all_filled, "a hundred percent fills the whole bar, up to the frame");
     OLED_DrawProgressBar_Boot(200);
     model_apply();
-    TEST_ASSERT(screen[5][4 + 106] == 0x7F && screen[5][4 + 107] == 0x41 && model_errors == 0, "a percentage over a hundred is a hundred");
+    TEST_ASSERT(screen[5][4 + 108] == 0x7F && model_errors == 0, "a percentage over a hundred is a hundred");
 
-    // Finding recorded, not changed: the glyph the small font has for '0' is the picture of a 1 (a column and a base), the same shape the main font draws for
-    // '0' by mistake, and the glyph for '1' is a narrower 1. "10%" is therefore drawn with two ones. The day the table gets a real 0 these lines fail
-    // on purpose: replace the two glyphs below by the 0x3E, 0x51, 0x49, 0x45, 0x3E of a zero.
-    static const uint8_t zero_as_drawn[5] = {0x00, 0x42, 0x7F, 0x40, 0x00};
-    static const uint8_t one_as_drawn[5] = {0x00, 0x44, 0x7E, 0x40, 0x00};
+    // The small font has a real zero and a one: "10%" is drawn as a one, a zero and the percent sign.
+    static const uint8_t zero_as_drawn[5] = {0x3E, 0x51, 0x49, 0x45, 0x3E};
+    static const uint8_t one_as_drawn[5] = {0x00, 0x42, 0x7F, 0x40, 0x00};
     OLED_DrawProgressBar_Boot(10);
     model_apply();
-    TEST_ASSERT(memcmp(&screen[3][4], one_as_drawn, 5) == 0 && memcmp(&screen[3][4 + 6], zero_as_drawn, 5) == 0, "KNOWN: '0' is drawn with the glyph of a one in the small font of the bootloader");
+    TEST_ASSERT(memcmp(&screen[3][4], one_as_drawn, 5) == 0 && memcmp(&screen[3][4 + 6], zero_as_drawn, 5) == 0, "the small font draws '1' and '0' with their own glyphs");
 
     // a display that does not answer: nothing is sent to it, so the update is not slowed down by a bus with nobody on it
     world();

@@ -16,17 +16,14 @@
 // Compact 27-character font (space, %, ., 0-9, and just the letters this
 // bootloader's own status messages need) - most extracted from the
 // application's Font5x7 table, 'P' and 'G' hand-designed and verified by
-// rendering instead: Font5x7 has a known character-extraction-offset bug
-// (documented where it's defined in the application source), and pulling
-// 'G' from it directly returned bytes identical to this font's own
-// already-verified 'H' - a live example of exactly that bug, not
-// something to build on for two brand new letters.
+// rendering instead (the application's table once had a lookup offset
+// error, since fixed; these glyphs were checked on their own).
 static const uint8_t BootFont[][5] = {
     {0x00,0x00,0x00,0x00,0x00}, // 0: space
     {0x23,0x13,0x08,0x64,0x62}, // 1: '%'
     {0x00,0x60,0x60,0x00,0x00}, // 2: '.'
-    {0x00,0x42,0x7F,0x40,0x00}, // 3: '0'
-    {0x00,0x44,0x7E,0x40,0x00}, // 4: '1'
+    {0x3E,0x51,0x49,0x45,0x3E}, // 3: '0'
+    {0x00,0x42,0x7F,0x40,0x00}, // 4: '1'
     {0x00,0x62,0x51,0x49,0x46}, // 5: '2'
     {0x00,0x22,0x49,0x49,0x36}, // 6: '3'
     {0x18,0x14,0x12,0x7F,0x10}, // 7: '4'
@@ -185,8 +182,11 @@ void OLED_PrintStr2x_Boot(uint8_t page, uint8_t col, const char *str) {
     // partway through the character (each of the 5 sub-columns advances c
     // by 2, so a full character needs c+9 to stay within the last valid
     // index, 127) - one byte past these 128-byte arrays.
-    uint16_t c = col;
-    while (*str && c <= 118) {
+    // The buffers are indexed from 0 and sent starting at the requested
+    // column, so the text lands at that column and not at twice it.
+    if (col > 127) return;
+    uint16_t c = 0;
+    while (*str && c <= 118 && (uint16_t)(col + c) <= 127) {
         uint8_t idx = BootFont_Lookup(*str++);
         for (uint8_t gc = 0; gc < 5; gc++) {
             uint8_t byte = BootFont[idx][gc];
@@ -206,9 +206,9 @@ void OLED_PrintStr2x_Boot(uint8_t page, uint8_t col, const char *str) {
                  // rendering status text as a hard-to-read solid block
     }
     OLED_SetCursor_Boot(page, col);
-    OLED_WriteData_Boot(buf_top, 128);
+    OLED_WriteData_Boot(buf_top, (uint16_t)(128 - col));
     OLED_SetCursor_Boot(page + 1, col);
-    OLED_WriteData_Boot(buf_bot, 128);
+    OLED_WriteData_Boot(buf_bot, (uint16_t)(128 - col));
 }
 
 // Progress bar: outlined box with a filled portion proportional to percent,
@@ -216,7 +216,7 @@ void OLED_PrintStr2x_Boot(uint8_t page, uint8_t col, const char *str) {
 void OLED_DrawProgressBar_Boot(uint8_t percent) {
     if (percent > 100) percent = 100;
     uint8_t bar[110];
-    uint8_t filled = (uint8_t)((uint16_t)percent * 106 / 100);
+    uint8_t filled = (uint8_t)((uint16_t)percent * 108 / 100);
     for (uint8_t i = 0; i < 110; i++) {
         if (i == 0 || i == 109) bar[i] = 0x7F;
         else if (i <= filled) bar[i] = 0x7F;
