@@ -15,7 +15,11 @@ class SuiteListTests(unittest.TestCase):
     def test_every_c_suite_of_the_tests_folder_is_listed_once(self):
         listed = sorted(suite.test for suite in runner.SUITES)
         on_disk = sorted(path.relative_to(ROOT).as_posix() for path in (ROOT / "tests").glob("test_*.c"))
-        self.assertEqual(listed, on_disk)
+        self.assertEqual(sorted(set(listed)), on_disk)
+        # a test is listed twice only to run it on the copy of a driver the expansion slave carries
+        again = [suite.name for suite in runner.SUITES if listed.count(suite.test) > 1]
+        self.assertTrue(all(name.startswith("mlx_") for name in again), again)
+        self.assertTrue(all(name.endswith("_slave") or f"{name}_slave" in {item.name for item in runner.SUITES} for name in again), again)
         self.assertEqual(len({suite.name for suite in runner.SUITES}), len(runner.SUITES))
 
     def test_every_source_and_include_folder_exists(self):
@@ -52,6 +56,25 @@ class SuiteListTests(unittest.TestCase):
 
     def test_only_gcc_ten_or_newer_gets_the_analysis(self):
         self.assertFalse(runner.is_gcc_with_analyzer("this-compiler-does-not-exist"))
+
+    def test_every_firmware_source_is_compiled_by_a_suite(self):
+        compiled = {source for suite in runner.SUITES for source in suite.sources if source.startswith("src/")}
+        self.assertEqual(sorted(set(runner.all_firmware_sources()) - compiled), [])
+
+    def test_a_suite_can_rename_a_main_and_switch_off_one_sanitizer_check(self):
+        suite = next(item for item in runner.SUITES if item.name == "slave")
+        cmd = runner.command(suite, "cc", Path("out"))
+        self.assertIn("-Dmain=slave_main_entry", cmd)
+        self.assertLess(cmd.index("-fsanitize=address,undefined"), cmd.index("-fno-sanitize=shift-base"))
+        self.assertIn("-Dmain=slave_main_entry", runner.analyze_command(suite, "gcc", "src/F303-slave/slave_main.c"))
+        plain = runner.command(next(item for item in runner.SUITES if item.name == "persistence"), "cc", Path("out"))
+        self.assertFalse(any(part.startswith("-Dmain") or part.startswith("-fno-sanitize=") for part in plain))
+
+    def test_the_whole_application_suite_links_every_source_of_the_master_but_not_the_bootloader(self):
+        suite = next(item for item in runner.SUITES if item.name == "firmware_main")
+        self.assertIn("src/F303-master/STM32F303CC_main.c", suite.sources)
+        self.assertFalse(any("/boot/" in source for source in suite.sources))
+        self.assertEqual(len(suite.sources), len(set(suite.sources)))
 
     def test_both_build_scripts_call_the_runner(self):
         for script in ("build_firmware.sh", "build_firmware.bat"):
