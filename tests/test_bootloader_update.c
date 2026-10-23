@@ -27,6 +27,7 @@
 #include "bootloader_flash.h"
 #include "bootloader_oled.h"
 #include "urtc_version_wire.h"
+#include "vectors/urtc_fw_vectors.h" // written by URTC-COMMON from its conformance vectors
 
 CAN_TypeDef can_regs;
 CAN_HandleTypeDef hcan = { &can_regs };
@@ -330,6 +331,27 @@ void run_bootloader_update_tests(int *failures)
         TEST_ASSERT(status_seen(STATUS_VERIFY_OK) && main_slot_equals_image(1500), "the downgrade magic authorizes this attempt");
         Metadata_Read(&meta);
         TEST_ASSERT(urtc_minor_field_minor(meta.version_minor) == 3, "downgraded version is recorded");
+    }
+    // The payload URTC-COMMON writes down for 0x7FD is the one that authorizes.
+    fresh();
+    seed_metadata(META_STATE_APP_VALID, 0, urtc_minor_field_pack(4, 2), 3000);
+    {
+        uint8_t hmac[32];
+        const uint8_t *shared = 0;
+        for (int i = 0; i < URTC_VEC_COUNT(URTC_VEC_MAGIC); i++) {
+            if (URTC_VEC_MAGIC[i].id == 0x7FD) shared = URTC_VEC_MAGIC[i].data;
+        }
+        TEST_ASSERT(shared != 0, "the shared vectors have a payload for 0x7FD");
+        if (shared != 0) {
+            make_image(1500); sign_image(1500, hmac);
+            start_update(1500, THIS_HARDWARE_ID);
+            uint8_t payload[4];
+            memcpy(payload, shared, 4);
+            HandleAuthorizeDowngrade(payload);
+            send_hmac(hmac, 4); send_data(1500);
+            end_update(ref_crc32(image, 1500), 0, urtc_minor_field_pack(3, 0));
+            TEST_ASSERT(status_seen(STATUS_VERIFY_OK) && main_slot_equals_image(1500), "the 0x7FD payload of the shared vectors authorizes the downgrade");
+        }
     }
     // The authorization from the previous attempt does not carry over.
     fresh();

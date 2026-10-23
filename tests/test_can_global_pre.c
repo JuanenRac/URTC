@@ -21,6 +21,7 @@
 #include "firmware_blackbox.h"
 #include "firmware_thermal_stats.h"
 #include "urtc_version_wire.h"
+#include "vectors/urtc_fw_vectors.h" // written by URTC-COMMON from its conformance vectors
 
 // ---- globals the firmware module links against ------------------------------
 CAN_TypeDef can_regs;
@@ -116,6 +117,20 @@ void run_can_global_pre_tests(int *failures)
         if (send_expect_reset(4, w) != 0) { TEST_ASSERT(0, "any corrupted magic byte must not reset"); break; }
         if (fake_gpio_write_count != 0) { TEST_ASSERT(0, "a rejected 0x7F0 must not touch any actuator"); break; }
     }
+    // The payload URTC-COMMON writes down for 0x7F0 is the one this firmware resets on, and no other payload of the shared
+    // vectors (the downgrade, the F-RAM erase, the feeder reset) resets it.
+    {
+        int seen = 0, bad = 0;
+        for (int i = 0; i < URTC_VEC_COUNT(URTC_VEC_MAGIC); i++) {
+            const urtc_vec_magic_t *m = &URTC_VEC_MAGIC[i];
+            int resets = send_expect_reset(4, m->data);
+            if (m->id == 0x7F0) { seen++; if (resets != 1) bad++; }
+            else if (resets != 0) bad++;
+        }
+        TEST_ASSERT(seen == 1 && bad == 0, "only the 0x7F0 payload of the shared vectors resets into the bootloader");
+    }
+    active_tool = TOOL_SOLDERING_IRON;
+
     uint8_t wrong[4] = { 0xB0, 0x07, 0x1D, 0x5B };
     TEST_ASSERT(send_expect_reset(4, wrong) == 0, "one wrong magic byte does not reset");
     TEST_ASSERT(send_expect_reset(3, magic) == 0, "short magic frame (DLC 3) does not reset");

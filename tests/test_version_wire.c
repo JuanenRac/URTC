@@ -10,6 +10,7 @@
 
 #include "test_runner.h"
 #include "urtc_version_wire.h"
+#include "vectors/urtc_fw_vectors.h" // written by URTC-COMMON from its conformance vectors
 
 // What an already-released flasher does with the slave answer: it needs the
 // first 8 bytes of 0x217 and the first 2 bytes of 0x218 and ignores the rest.
@@ -24,6 +25,25 @@ static void legacy_slave_decode(const uint8_t p1[8], const uint8_t *p2, uint8_t 
 
 void run_version_wire_tests(int *failures)
 {
+    // The cases URTC-COMMON wrote for every implementation of the version fields (the three programs read the same ones).
+    {
+        int packed_bad = 0, accepting = 0, order_bad = 0;
+        for (int i = 0; i < URTC_VEC_COUNT(URTC_VEC_MINOR); i++) {
+            const urtc_vec_minor_t *c = &URTC_VEC_MINOR[i];
+            if (!c->accepts_patch) continue; // a host decision (the bootloader predates the patch), not the firmware's
+            accepting++;
+            if (urtc_minor_field_pack(c->minor, c->patch) != c->expect) packed_bad++;
+        }
+        TEST_ASSERT(accepting >= 6 && packed_bad == 0, "urtc_minor_field_pack gives the minor fields of the shared vectors");
+        for (int i = 0; i < URTC_VEC_COUNT(URTC_VEC_ORDER); i++) {
+            const urtc_vec_order_t *c = &URTC_VEC_ORDER[i];
+            int older = urtc_version_is_older(c->cand_major, urtc_minor_field_pack(c->cand_minor, c->cand_patch),
+                                              c->inst_major, urtc_minor_field_pack(c->inst_minor, c->inst_patch));
+            if (older != (c->expect < 0)) order_bad++;
+        }
+        TEST_ASSERT(URTC_VEC_COUNT(URTC_VEC_ORDER) >= 9 && order_bad == 0, "urtc_version_is_older agrees with every ordering of the shared vectors");
+    }
+
     // Round trip over every minor and every patch, and the "unknown" encodings.
     int roundtrip_ok = 1;
     for (unsigned minor = 0; minor < 256; minor++) {
