@@ -54,6 +54,7 @@ jobs:
         if: ${{ hashFiles('build_firmware.sh') != '' }}
         env:
           URTC_CI: "1"
+          URTC_COVERAGE_FLOOR: "80"  # measured 88 percent of the firmware sources the host suites compile; the floor is eight points under
         shell: bash
         run: |
           chmod +x build_firmware.sh

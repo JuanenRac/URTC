@@ -2,6 +2,10 @@
   "format": 1,
   "urtc_common_version": "0.0.7",
   "files": {
+    "blackbox_vectors.h": {
+      "from": "generated/blackbox_vectors.h",
+      "sha256": "efd5441c3ec973284a86eb48d867eeb9103a0342ab83e9a82e60df3687cb00ec"
+    },
     "urtc_fw_vectors.h": {
       "from": "generated/urtc_fw_vectors.h",
       "sha256": "bbddb2966366422881b4d2fec358ed5a8782e0571285110947154e486a9aeff6"
