@@ -12,6 +12,10 @@ MCU: STM32F303CCT6 (256KB flash: 30KB bootloader / 2KB metadata / 112KB main
 CRITICAL RECONSTRUCTION NOTE: All multi-byte fields are transmitted in
 BIG-ENDIAN format (Most Significant Byte [MSB] first on the wire). The
 STM32F303 firmware must unpack them strictly respecting this order.
+The two companion links that do not travel on this bus follow the same order: the rack serial
+frame version 2 (temperature of the pre-heat command) and the sensor frame version 2 of the vision
+head (timestamp and thermal reading) are big-endian; version 1 of both was little-endian and is
+refused as an unsupported version. Their vectors are in the shared conformance repository.
 
 -----------------------------------------------------------------------------
 1. MAXIMUM-PRIORITY COMMANDS (Critical Events / Interrupts)
