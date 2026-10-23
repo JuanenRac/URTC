@@ -9,6 +9,19 @@
 // =============================================================================
 // 8. AUTOMATIC MUTANT IDENTIFICATION (TOOL ECOSYSTEM HARDWARE READOUT)
 // =============================================================================
+// The unknown-tool state. PB6 is both the stepper enable (active low, so HIGH
+// disables) and the laser interlock (LOW locks), and no level suits both.
+// Whatever is attached, the stepper driver is the part that can move
+// something, so the pin goes HIGH (driver disabled). The laser stays
+// inhibited by the other means: with no tool selected nothing in the
+// firmware ever raises the laser power (its handler only runs for the laser
+// tool) and the power output is at its reset value of zero. The write is
+// done once, so there is no second write left to undo it.
+static void Identify_ForceInertOutputs(void) {
+    HAL_GPIO_WritePin(TMC_ENN_PORT, TMC_ENN_PIN, GPIO_PIN_SET);   // steppers disabled
+    HAL_GPIO_WritePin(DRILL_BRAKE_PORT, DRILL_BRAKE_PIN, GPIO_PIN_RESET); // drill brake engaged
+}
+
 void Identify_PhysicalTool(void) {
     // Read multiple times with a short settling delay between each,
     // requiring 3 consecutive identical readings before accepting one.
@@ -77,9 +90,8 @@ void Identify_PhysicalTool(void) {
         } else {
             active_tool = TOOL_INVALID;
             system_error_flag = 1;
-            HAL_GPIO_WritePin(TMC_ENN_PORT, TMC_ENN_PIN, GPIO_PIN_SET);   // steppers disabled
+            Identify_ForceInertOutputs();
             HAL_GPIO_WritePin(DRILL_BRAKE_PORT, DRILL_BRAKE_PIN, GPIO_PIN_RESET); // drill brake engaged
-            HAL_GPIO_WritePin(TMC_ENN_PORT, LASER_SAFETY_PIN, GPIO_PIN_RESET); // laser interlock locked
             HAL_GPIO_WritePin(T12_PWM_PORT, T12_PWM_PIN, GPIO_PIN_RESET); // heater off
         }
     } else {
@@ -88,9 +100,7 @@ void Identify_PhysicalTool(void) {
         // Explicit, redundant safety: force every actuator output to its
         // inert state right now, rather than trusting that no other code
         // path will ever touch them for a tool ID nothing else recognizes.
-        HAL_GPIO_WritePin(TMC_ENN_PORT, TMC_ENN_PIN, GPIO_PIN_SET);   // steppers disabled
-        HAL_GPIO_WritePin(DRILL_BRAKE_PORT, DRILL_BRAKE_PIN, GPIO_PIN_RESET); // drill brake engaged
-        HAL_GPIO_WritePin(TMC_ENN_PORT, LASER_SAFETY_PIN, GPIO_PIN_RESET); // laser interlock locked
+        Identify_ForceInertOutputs();
         HAL_GPIO_WritePin(T12_PWM_PORT, T12_PWM_PIN, GPIO_PIN_RESET); // heater off
     }
 }

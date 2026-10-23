@@ -171,7 +171,7 @@ static void expect_post(int tool, int *failures)
     active_tool = (ToolMode_t)tool;
     MX_GPIO_Post_Init();
     int enn = last_level(TMC_ENN_PORT, TMC_ENN_PIN);
-    int expect_enn = (tool == TOOL_LASER_ENGRAVER || tool == TOOL_INVALID) ? GPIO_PIN_RESET : GPIO_PIN_SET;
+    int expect_enn = (tool == TOOL_LASER_ENGRAVER) ? GPIO_PIN_RESET : GPIO_PIN_SET;
     TEST_ASSERT(enn == expect_enn, "the driver enable / laser interlock pin gets the level of the tool before it is an output");
     int brake = last_level(DRILL_BRAKE_PORT, DRILL_BRAKE_PIN);
     TEST_ASSERT((tool == TOOL_DRILL || tool == TOOL_INVALID) ? brake == GPIO_PIN_RESET : brake == -1, "the drill brake line is driven only for the drill (and the unknown tool, to be safe)");

@@ -76,11 +76,12 @@ void MX_GPIO_Post_Init(void) {
         // this same pin below).
         HAL_GPIO_WritePin(GPIOB, TMC_ENN_PIN, GPIO_PIN_SET);
     } else if (active_tool == TOOL_INVALID) {
-        // Covers every possible physical identity this state could
-        // correspond to - LOW is safe for the shared stepper/laser pin,
-        // and the drill's own, separate pin also needs to be forced to its
-        // safe (braked) state independently.
-        HAL_GPIO_WritePin(GPIOB, TMC_ENN_PIN, GPIO_PIN_RESET);
+        // Unknown tool: the shared pin cannot be safe for both a stepper
+        // driver (HIGH disables) and a laser interlock (LOW locks). The
+        // driver is what can move something, so it is disabled; the laser
+        // is held off by the firmware never raising its power without the
+        // laser tool selected. The drill's own pin is forced to braked.
+        HAL_GPIO_WritePin(GPIOB, TMC_ENN_PIN, GPIO_PIN_SET);
         HAL_GPIO_WritePin(DRILL_BRAKE_PORT, DRILL_BRAKE_PIN, GPIO_PIN_RESET);
     } else {
         HAL_GPIO_WritePin(GPIOB, TMC_ENN_PIN, GPIO_PIN_SET); // Motors: HIGH is disabled
