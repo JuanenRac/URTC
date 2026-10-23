@@ -88,6 +88,11 @@ void run_version_wire_tests(int *failures)
 
     // Patch of the slave application: byte 9 of REG_APP_VERSION, 0 means "not sent".
     uint8_t av[URTC_SLAVE_APP_VERSION_LEN] = {0x00, 0x03, 0x03, 0xCB, 0x01, 0x00, 0x00, 0x00, 0x02, 0x04};
+    {
+        int listed = 0;
+        for (int i = 0; i < URTC_VEC_COUNT(URTC_VEC_IDENTIFIERS); i++) if (URTC_VEC_IDENTIFIERS[i] == URTC_CAN_ID_SLAVE_APP_PATCH) listed = 1;
+        TEST_ASSERT(listed, "0x222 is an identifier of the shared specification");
+    }
     TEST_ASSERT(urtc_slave_app_patch_from_version(av) == 4, "the tenth byte is the patch of the slave application");
     av[9] = 0;
     TEST_ASSERT(urtc_slave_app_patch_from_version(av) == URTC_PATCH_UNKNOWN, "0 (the reserved byte of an older slave) is not a patch");

@@ -39,6 +39,12 @@ The firmware protects against ACCIDENTS, not against a hostile node:
                    (the image must still be correctly signed)
   0x7FE            read back the installed application (the firmware is
                    not secret: it is published in this repository)
+                   Both bootloader commands are answered only in a session
+                   that the application started by accepting 0x7F0 (or on a
+                   board with no valid application): a node that cannot make
+                   the application reset first, and cannot reset the board
+                   by power, gets no answer to them. A node that can send
+                   0x7F0 can still use them.
   0x192 + magic    erase the recovered persisted state
   0x7F4 / 0x214    declare the version of the image being installed: the
                    version travels in this frame and the signature covers
@@ -74,7 +80,36 @@ that holds them and malfunctions.
   R5. E-STOP CUTS POWER, NOT DATA. The emergency stop must remove actuator
       power; a "stop" frame on the bus is not an emergency stop.
 
-4. WHAT WOULD CHANGE THIS
+4. SEVERAL TOOL HEADS ON ONE BUS (MULTINODE, OFF BY DEFAULT)
+-------------------------------------------------------------------------------
+A bus with one head is the case above. With the multinode switch on
+(docs/CANBUS.TXT, appendix; frames 0x400-0x49F) several heads share the bus
+and every single-head frame is obeyed only by the head the host selected.
+What this changes for the model:
+  * It adds no authentication. Any node can still send SELECT, DISCOVER or
+    SAFE_STOP, so a hostile node can select another head, deselect all of
+    them, or stop them; it can do through SELECT what it could already do
+    with one head, to the head it selects. R2 and R3 hold unchanged.
+  * It narrows the blast radius of a mistake: a head that is not selected
+    ignores actuation, configuration and bootloader frames (including 0x7F0),
+    and its tool stays in whatever state its own watchdog gives it.
+  * SELECT lapses after 2 s unless repeated, so a host that dies leaves no
+    head selected; a lapse does not by itself switch an output off (each
+    tool's own communication watchdog does, as today).
+  * SAFE_STOP only moves toward safety. It is not an emergency stop (R5).
+  * Two boards on one node address are a conflict: both stop obeying
+    commands and keep announcing until the next power-up. Nothing resolves
+    it silently, and a node that never hears the other still behaves as a
+    single head, so give heads of the same type different identities.
+  * The switch itself (0x1AC, magic 'MNOD') is a persistent setting like the
+    others in this document: a node on the bus can turn it on or off, which
+    acts at the next power-up. Keep the bus closed (R2).
+  * Enter-bootloader, erase and update frames are never broadcast. A
+    firmware update begins with SELECT, and a tool must see SELECTED in the
+    status of the node before it sends anything destructive.
+  * Nothing of this has run on a board yet; it is tested on the host.
+
+5. WHAT WOULD CHANGE THIS
 -------------------------------------------------------------------------------
 If a future installation cannot meet R2/R3, the place to add protection is
 the gateway in front of the bus (ID whitelisting, rate limiting, a session
