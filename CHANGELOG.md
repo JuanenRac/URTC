@@ -4,6 +4,7 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- The detached signatures of the firmware images (`firmware/*.sig`) are ignored by git like the images they sign: they are release assets, and the old ones that were tracked are no longer kept in the repository.
 - **The firmware is held to the shared vectors:** `tests/vectors/urtc_fw_vectors.h`, written by URTC-COMMON from its conformance vectors, is compiled into three host suites: the minor and patch fields and the version ordering (`urtc_version_wire.h`), the payload that resets into the bootloader on `0x7F0` (and that no other payload of the vectors does) and the payload that authorizes a downgrade on `0x7FD`; before, only the three programs read those vectors.
 
 ## [0.4.0] - Optional functions behind switches, health frame, heater PID and a virtual board
