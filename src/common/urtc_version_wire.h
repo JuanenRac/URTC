@@ -21,6 +21,10 @@
 #include <stdint.h>
 
 #define URTC_CAN_ID_VERSION_PATCH 0x7E9u // companion of 0x7F9, sent by whichever side answered 0x7F8
+#define URTC_CAN_ID_SLAVE_APP_PATCH 0x222u // companion of the 0x221 answer for REG_APP_VERSION of the expansion slave
+#define URTC_SLAVE_APP_VERSION_REG 0x01u // REG_APP_VERSION of the slave application
+#define URTC_SLAVE_APP_VERSION_LEN 10u // its length: byte 0 responder, 1..4 hardware id, 5..6 major, 7..8 minor, 9 patch
+#define URTC_SLAVE_APP_PATCH_FRAME_DLC 2u
 
 #define URTC_PATCH_UNKNOWN      0xFFu // the patch number is not known (legacy metadata, blank board)
 #define URTC_MINOR_PATCH_FLAG   0x80u // in the high byte of a minor field: a patch number follows in bits 6..0
@@ -97,6 +101,24 @@ static inline void urtc_slave_version_ext_build(uint8_t out[URTC_SLAVE_VERSION_E
     out[1] = app_patch;
     out[2] = boot_minor;
     out[3] = boot_patch;
+}
+
+// The patch number in the tenth byte of the slave application version answer
+// (REG_APP_VERSION), or URTC_PATCH_UNKNOWN. An older slave application sends 0
+// there (the byte was reserved), and 0 is read as "not sent": a patch of 0 is
+// not announced, a host that does not see the companion frame treats the patch
+// as unknown, exactly as before. Anything above URTC_PATCH_MAX is not a patch.
+static inline uint8_t urtc_slave_app_patch_from_version(const uint8_t version[URTC_SLAVE_APP_VERSION_LEN])
+{
+    uint8_t patch = version[9];
+    return (patch >= 1u && patch <= URTC_PATCH_MAX) ? patch : URTC_PATCH_UNKNOWN;
+}
+
+// 0x222 payload: [0] the register the patch belongs to (URTC_SLAVE_APP_VERSION_REG), [1] the patch (1..127).
+static inline void urtc_slave_app_patch_frame_build(uint8_t out[URTC_SLAVE_APP_PATCH_FRAME_DLC], uint8_t patch)
+{
+    out[0] = (uint8_t)URTC_SLAVE_APP_VERSION_REG;
+    out[1] = patch;
 }
 
 // Builds the 0x218 payload on the master from the 2 legacy bytes read from the

@@ -86,6 +86,21 @@ void run_version_wire_tests(int *failures)
     TEST_ASSERT(memcmp(pf, want_pf2, 3) == 0, "0x7E9 from an application with no patch flag");
     TEST_ASSERT(URTC_CAN_ID_VERSION_PATCH == 0x7E9u, "0x7E9 is the companion ID");
 
+    // Patch of the slave application: byte 9 of REG_APP_VERSION, 0 means "not sent".
+    uint8_t av[URTC_SLAVE_APP_VERSION_LEN] = {0x00, 0x03, 0x03, 0xCB, 0x01, 0x00, 0x00, 0x00, 0x02, 0x04};
+    TEST_ASSERT(urtc_slave_app_patch_from_version(av) == 4, "the tenth byte is the patch of the slave application");
+    av[9] = 0;
+    TEST_ASSERT(urtc_slave_app_patch_from_version(av) == URTC_PATCH_UNKNOWN, "0 (the reserved byte of an older slave) is not a patch");
+    av[9] = 0x7F;
+    TEST_ASSERT(urtc_slave_app_patch_from_version(av) == 0x7F, "127 is the largest patch");
+    av[9] = 0x80;
+    TEST_ASSERT(urtc_slave_app_patch_from_version(av) == URTC_PATCH_UNKNOWN, "above 127 it is not a patch");
+    av[9] = 0xFF;
+    TEST_ASSERT(urtc_slave_app_patch_from_version(av) == URTC_PATCH_UNKNOWN, "0xFF stays the unknown marker");
+    uint8_t apf[URTC_SLAVE_APP_PATCH_FRAME_DLC];
+    urtc_slave_app_patch_frame_build(apf, 6);
+    TEST_ASSERT(apf[0] == 0x01 && apf[1] == 6 && URTC_CAN_ID_SLAVE_APP_PATCH == 0x222u && URTC_SLAVE_APP_PATCH_FRAME_DLC == 2u, "0x222 payload is the register and the patch");
+
     // Slave extension.
     uint8_t ext[URTC_SLAVE_VERSION_EXT_LEN];
     urtc_slave_version_ext_build(ext, 9, 2, 5);

@@ -55,7 +55,7 @@ void HAL_I2C_AddrCallback(I2C_HandleTypeDef *hi2c, uint8_t TransferDirection, ui
                 tx_buffer[6] = (uint8_t)(FIRMWARE_VERSION_MAJOR);
                 tx_buffer[7] = (uint8_t)(FIRMWARE_VERSION_MINOR >> 8);
                 tx_buffer[8] = (uint8_t)(FIRMWARE_VERSION_MINOR);
-                tx_buffer[9] = 0; // reserved, matches the bootloader's own 10-byte response length for a consistent read size regardless of who's answering
+                tx_buffer[9] = (uint8_t)FIRMWARE_VERSION_PATCH; // the PATCH number of this application (1..127; 0 reads as "not sent", the value the byte had while it was reserved); the master passes it on in its 0x222 companion frame
                 len = 10;
                 break;
             case REG_MLX_CAPTURE_STATUS:

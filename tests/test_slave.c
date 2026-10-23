@@ -166,7 +166,7 @@ static void test_link(int *failures)
     TEST_ASSERT(fake_i2c_slave_tx_len == 10 && fake_i2c_slave_tx[0] == 0, "the version answer is ten bytes after a zero status byte");
     TEST_ASSERT(fake_i2c_slave_tx[1] == 0x03 && fake_i2c_slave_tx[2] == 0x03 && fake_i2c_slave_tx[3] == 0xCB && fake_i2c_slave_tx[4] == 0x01, "the hardware identifier of the slave, high byte first");
     TEST_ASSERT(fake_i2c_slave_tx[5] == 0 && fake_i2c_slave_tx[6] == FIRMWARE_VERSION_MAJOR && fake_i2c_slave_tx[7] == 0 && fake_i2c_slave_tx[8] == FIRMWARE_VERSION_MINOR, "the major and the minor version, two bytes each");
-    TEST_ASSERT(fake_i2c_slave_tx[9] == 0, "KNOWN: the tenth byte is always zero: FIRMWARE_VERSION_PATCH is defined but never sent");
+    TEST_ASSERT(fake_i2c_slave_tx[9] == FIRMWARE_VERSION_PATCH && FIRMWARE_VERSION_PATCH >= 0 && FIRMWARE_VERSION_PATCH <= 127, "the tenth byte is the patch number of the application, which the master passes on");
 
     uint8_t variant[2] = {REG_MLX_SENSOR_VARIANT, MLX_VARIANT_90641};
     master_writes(variant, 2);

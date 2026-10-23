@@ -187,12 +187,28 @@ void Handle_CAN_SlaveBridge(void) {
         // doesn't maintain a length table per register the way it could,
         // since the caller already knows this from slave_common.h same
         // as this file does).
+        uint8_t reg = rxData[0];
         uint8_t len = rxData[1];
-        if (!urtc_slave_app_read_allowed(rxData[0], len)) return; // not in the closed list
+        if (!urtc_slave_app_read_allowed(reg, len)) return; // not in the closed list
         if (len > 8) len = 8; // one CAN response frame's own ceiling
-        uint8_t response[8];
-        if (ExpansionI2C_SlaveReadRegister(rxData[0], response, len)) {
+        // The version register is read whole: its tenth byte, the PATCH number
+        // of the slave application, does not fit the answer frame and travels
+        // in the 0x222 companion instead.
+        uint8_t response[URTC_SLAVE_APP_VERSION_LEN > 8 ? URTC_SLAVE_APP_VERSION_LEN : 8];
+        uint8_t is_version = (reg == URTC_SLAVE_APP_VERSION_REG);
+        if (ExpansionI2C_SlaveReadRegister(reg, response, is_version ? (uint8_t)URTC_SLAVE_APP_VERSION_LEN : len)) {
             SendCanResponse(0x221, response, len);
+            if (is_version) {
+                // Accepted when the slave sends one (1..127); a slave application
+                // from before the field reads 0 there, which is ignored, so the
+                // answer to such a slave is the same as it always was.
+                uint8_t patch = urtc_slave_app_patch_from_version(response);
+                if (patch != URTC_PATCH_UNKNOWN) {
+                    uint8_t companion[URTC_SLAVE_APP_PATCH_FRAME_DLC];
+                    urtc_slave_app_patch_frame_build(companion, patch);
+                    SendCanResponse(URTC_CAN_ID_SLAVE_APP_PATCH, companion, URTC_SLAVE_APP_PATCH_FRAME_DLC);
+                }
+            }
         }
     }
 }
