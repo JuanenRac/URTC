@@ -43,7 +43,7 @@ Qui trovi la descrizione completa di cosa sia, cosa faccia, e l'ecosistema hardw
 
 | | |
 |---|---|
-| Versione | `0.4.0` |
+| Versione | `0.4.1` |
 | Maturità | Funzionale |
 | Tecnologia | STM32F303 / bxCAN / 25 tool profiles |
 | Destinazione | Una scheda con microcontrollore (il firmware); compilato su un PC |

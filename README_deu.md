@@ -43,7 +43,7 @@ Hier ist die vollständige Aufschlüsselung dessen, was es ist, was es tut, und 
 
 | | |
 |---|---|
-| Version | `0.4.0` |
+| Version | `0.4.1` |
 | Reifegrad | Funktionsfähig |
 | Technik | STM32F303 / bxCAN / 25 tool profiles |
 | Ziel | Eine Mikrocontroller-Platine (die Firmware); wird auf einem PC gebaut |
