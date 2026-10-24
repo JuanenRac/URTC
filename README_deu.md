@@ -583,6 +583,7 @@ Dieses Projekt ist Teil des HYDRA-UMC-Robotik-Ökosystems desselben Autors (Juan
 
 **Untergeordnete Projekte** — jedes davon ist ein Desktop- oder Browser-Tool, das speziell zum Flashen, Testen oder Steuern dieser Firmware gebaut wurde
 - **[URTC-FLASHER](https://github.com/JuanenRac/URTC-FLASHER)** — Desktop-GUI-Flash-Tool für URTC-Platinen, CAN-OTA plus Full-Chip-SWD/JTAG; flasht genau diese Firmware.
+- **[URTC-COMMON](https://github.com/JuanenRac/URTC-COMMON)** — das CAN-Protokoll einmal als Daten geschrieben (Spezifikation, erzeugte Tabellen, Konformitätsvektoren) und der Code, den die Programme teilen; dieses Repository trägt Kopien der Teile, die es verwendet.
 - **[URTC-GATEWAY](https://github.com/JuanenRac/URTC-GATEWAY)** — ein Gateway vor dem CAN-Bus, das nur Kennungen einer Liste durchlässt, ihre Rate begrenzt und einen Sitzungsschlüssel verlangt.
 - **[URTC-TESTER](https://github.com/JuanenRac/URTC-TESTER)** — Desktop-Live-CAN-Bus-Diagnosetool für URTC-Platinen, ein Panel pro Werkzeugprofil; ein Panel pro den eigenen 25 Werkzeugprofilen dieser Firmware.
 - **[URTC-WEB-STUDIO](https://github.com/JuanenRac/URTC-WEB-STUDIO)** — browserbasierte Alternative zu URTC-TESTER über die Web-Serial-API, ohne lokale Installation; dasselbe CAN-Protokoll wie die beiden obigen Desktop-Tools.
