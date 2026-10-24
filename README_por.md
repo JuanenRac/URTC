@@ -286,7 +286,7 @@ A flash do URTC está dividida em 2 peças independentes, para que a placa possa
            │                                   │  de saltar para a app.
 0x08008000 ├─────────────────────────────────┤
            │  Slot principal (112K)            │  Este é o firmware de aplicação /
-           │                                   │  URTC_MAIN_FIRMWARE_v0.3.5.* — o firmware
+           │                                   │  URTC_MAIN_FIRMWARE_v<version>.* — o firmware
            │                                   │  real que corre no dia a dia,
            │                                   │  descrito em todo o resto deste
            │                                   │  README. Nunca é tocado por uma
@@ -319,8 +319,8 @@ O bootloader só consegue chegar ao chip por programação física — não há 
 
 1. Abre o projeto no **STM32CubeIDE** (construído e testado para o alvo STM32F303CC), ou usa diretamente o **STM32CubeProgrammer** com as saídas compiladas abaixo.
 2. Grava **ambas** as imagens por SWD (ST-Link) através do header `STM_JTAG` integrado — cada ficheiro `.hex` tem o seu endereço de destino incorporado, pelo que a maioria das ferramentas (incluindo o STM32CubeProgrammer) consegue carregar ambas na mesma sessão:
-   * `URTC_MAIN_BOOTLOADER_v0.3.9.hex` → `0x08000000`
-   * `URTC_MAIN_FIRMWARE_v0.3.5.hex` → `0x08008000`
+   * `URTC_MAIN_BOOTLOADER_v<version>.hex` → `0x08000000`
+   * `URTC_MAIN_FIRMWARE_v<version>.hex` → `0x08008000`
 3. Define a identidade da ferramenta através dos jumpers de soldadura de ID antes de ligar - a placa lê-os uma vez no arranque, como sempre. Cinco jumpers (ID0-ID4), cobrindo o espaço completo de 32 endereços (31 endereços de ferramenta diretos, mais o endereço reservado `11111` de configuração livre - ver a secção da Matriz de Ferramentas acima).
 4. Liga. O bootloader escuta durante ~600ms, não vê nada e salta diretamente para a aplicação — a partir daqui, tudo se comporta exatamente como descrito no resto deste README. A janela começa depois de o bootloader ter verificado a aplicação guardada, e uma ferramenta que queira atualizar tem de enviar dentro dela a trama de início de atualização (0x7F1); o estado de escuta (0x7F5 = 0x01) é enviado quando a janela termina sem salto, e não no seu início.
 
@@ -451,6 +451,11 @@ Se alguém da comunidade estiver a trabalhar em efetores finais personalizados, 
 │   │                            build_firmware.sh/.bat na raiz do repositório automatizam este mesmo
 │   │                            processo de ponta a ponta
 │   ├── FIRMWARE_DISTRIBUTION.md Onde os ficheiros de firmware são publicados e o que cada consumidor lê
+│   ├── FIRMWARE_SIGNING.TXT     Como as imagens de firmware são assinadas: HMAC hoje, Ed25519 previsto
+│   ├── RELEASE_SIGNING.md       Como uma versão publicada é assinada (assinatura Ed25519 separada de cada ficheiro) e a chave pública
+│   ├── KEYS.md                  Cada chave de que a família depende: finalidade, valor público, onde está incorporada e onde vive a metade privada
+│   ├── CAN_THREAT_MODEL.TXT     No que o barramento CAN confia e os requisitos de instalação que daí resultam
+│   ├── COMPATIBILITY.md         Que versões dos programas funcionam em conjunto (gerado por URTC-COMMON)
 │   ├── datasheet/               2 datasheets de componentes ainda não cobertos em
 │   │                            PCB/datasheet/ (CFM_40.pdf, EFB0424VHD-CP0.pdf)
 │   └── tool_image_generator/    Kit de ferramentas que gera images/TOOL_*.png (ver abaixo) -
@@ -460,7 +465,7 @@ Se alguém da comunidade estiver a trabalhar em efetores finais personalizados, 
 ├── src/
 │   ├── F303-master/
 │   │   ├── STM32F303CC_main.c    Ponto de entrada - definições globais e main()
-│   │   ├── firmware_*.c/.h       ~85 ficheiros adicionais, um por subsistema (OLED, LEDs, handlers
+│   │   ├── firmware_*.c/.h       ~100 ficheiros adicionais, um por subsistema (OLED, LEDs, handlers
 │   │   │                         CAN por ferramenta, init, persistência, etc.), incluindo
 │   │   │                         firmware_ads1115.c (driver ADS1115 direto, placa
 │   │   │                         Basic+ADS1115) - ver o README.md desta pasta para a
@@ -484,6 +489,7 @@ Se alguém da comunidade estiver a trabalhar em efetores finais personalizados, 
 │   │       │                      flash/metadados, OLED, protocolo CAN)
 │   │       ├── STM32F303CCTx_BOOTLOADER.ld  Linker script do bootloader (região de 30K em 0x08000000)
 │   │       └── README.md          O mesmo papel de referência técnica que o da aplicação, para o bootloader
+│   ├── common/                   Cabeçalhos partilhados pela aplicação, pelo bootloader e pelo escravo: a marca da sessão de arranque, os registos do escravo e o formato da versão no barramento
 │   └── F303-slave/               Chip companheiro (STM32F303CBT6) apenas nas 2 variantes de placa de
 │       │                         expansão AVANÇADAS - ver a secção Conector de Expansão
 │       │                         acima. Par bootloader/aplicação próprio, protocolo de atualização
@@ -513,15 +519,15 @@ Se alguém da comunidade estiver a trabalhar em efetores finais personalizados, 
 │           ├── STM32F303CBTx_SLAVEBOOT.ld  Linker script (região de 18K em 0x08000000)
 │           └── README.md          O mesmo papel de referência técnica que o da aplicação
 ├── firmware/  (saída de compilação ignorada pelo git - publicada apenas como assets da release)
-│   ├── URTC_MAIN_BOOTLOADER_v0.3.9.bin  Bootloader compilado, gravar em 0x08000000
-│   ├── URTC_MAIN_BOOTLOADER_v0.3.9.elf  Bootloader compilado, gravar em 0x08000000
-│   ├── URTC_MAIN_BOOTLOADER_v0.3.9.hex  Bootloader compilado, gravar em 0x08000000 (endereço incorporado)
-│   ├── URTC_MAIN_FIRMWARE_v0.3.5.bin    Bin da aplicação compilado, gravar em 0x08008000
-│   ├── URTC_MAIN_FIRMWARE_v0.3.5.elf    Elf da aplicação compilado, gravar em 0x08008000
-│   ├── URTC_MAIN_FIRMWARE_v0.3.5.hex    HEX da aplicação compilado, gravar em 0x08008000 (endereço incorporado)
-│   ├── URTC_SLAVE_BOOTLOADER_v0.2.3.{bin,elf,hex}  Bootloader próprio do escravo de expansão, gravar em 0x08000000
+│   ├── URTC_MAIN_BOOTLOADER_v<version>.bin  Bootloader compilado, gravar em 0x08000000
+│   ├── URTC_MAIN_BOOTLOADER_v<version>.elf  Bootloader compilado, gravar em 0x08000000
+│   ├── URTC_MAIN_BOOTLOADER_v<version>.hex  Bootloader compilado, gravar em 0x08000000 (endereço incorporado)
+│   ├── URTC_MAIN_FIRMWARE_v<version>.bin    Bin da aplicação compilado, gravar em 0x08008000
+│   ├── URTC_MAIN_FIRMWARE_v<version>.elf    Elf da aplicação compilado, gravar em 0x08008000
+│   ├── URTC_MAIN_FIRMWARE_v<version>.hex    HEX da aplicação compilado, gravar em 0x08008000 (endereço incorporado)
+│   ├── URTC_SLAVE_BOOTLOADER_v<version>.{bin,elf,hex}  Bootloader próprio do escravo de expansão, gravar em 0x08000000
 │   │                             no STM32F303CBT6 (apenas placas de expansão avançadas)
-│   ├── URTC_SLAVE_FIRMWARE_v0.2.0.{bin,elf,hex}  Aplicação própria do escravo de expansão, gravar em 0x08005000
+│   ├── URTC_SLAVE_FIRMWARE_v<version>.{bin,elf,hex}  Aplicação própria do escravo de expansão, gravar em 0x08005000
 │   └── firmware_manifest.json    Índice legível por máquina dos 4 componentes acima - versão,
 │                                 endereço de flash e tamanho/CRC32 de cada ficheiro, para uma
 │                                 ferramenta externa verificar o que aqui está e o que é mais recente do que
@@ -546,14 +552,24 @@ Se alguém da comunidade estiver a trabalhar em efetores finais personalizados, 
 │   │                            BOM/BOM.TXT para a versão organizada e curada deste projeto)
 │   ├── datasheet/               Datasheets de todas as peças usadas na placa
 │   └── *_PARLIST/PINLIST/NETLIST.TXT   Netlists exportadas do Eagle (referência para o mapeamento de pinos)
+├── keys/ registry.json: as chaves públicas da família e onde cada uma está incorporada (verificado por tools/keys.py)
+├── tests/ Testes do firmware no anfitrião, compilados contra um HAL simulado (tests/host_hal/) e os vetores partilhados, mais os testes das ferramentas Python
 ├── tools/
 │   ├── build_test.py            Verificação de build/compilação sem alteração de versão
 │   ├── publish_release_assets.py  Lista os assets da release e imprime o comando gh
-│   └── ci_validate.py           Validação de manifesto/CHANGELOG/docs usada pelo CI
+│   ├── ci_validate.py           Validação de manifesto/CHANGELOG/docs usada pelo CI
+│   ├── keys.py                  Confronta docs/KEYS.md e keys/registry.json entre si e com o código
+│   ├── release_sign.py          Assina os ficheiros de uma versão publicada (assinaturas Ed25519 separadas)
+│   ├── run_host_tests.py        Compila e executa as suites de testes do anfitrião contra o HAL simulado, com um mínimo de cobertura
+│   ├── changelog_section.py / fuzz_virtual_board.py O texto de uma secção do CHANGELOG para uma versão publicada; uma execução de fuzzing da placa virtual
+│   └── _doc_policy.py / _readme_parity.py / _tracked_names.py Verificações partilhadas usadas por ci_validate.py
 ├── VERSION_CHECKLIST.txt        Lista de verificação mecânica para incrementar corretamente qualquer um dos
 │                                4 números de versão independentes deste projeto
 ├── check_version_consistency.sh  Verificações automatizadas de consistência de versão/ficheiros - executar antes de
 │                                confiar nas afirmações do VERSION_CHECKLIST.txt
+├── check_shared_drivers.py       Verifica que os drivers Melexis copiados nos dois chips são idênticos
+├── firmware_signing.py           Chaves de assinatura do firmware e os ficheiros de assinatura e resumo junto a cada imagem
+├── ruff.toml / urtc.project.json Definições das verificações estáticas e manifesto do projeto (versão, maturidade, evidência)
 ├── build_firmware.sh            Instala a toolchain, obtém o HAL/CMSIS da ST e
 │                                compila os 4 binários de firmware de ponta a ponta (Linux)
 ├── build_firmware.bat           O mesmo, para Windows - ver docs/COMPILE_STM32F303.TXT para
@@ -569,7 +585,7 @@ Se alguém da comunidade estiver a trabalhar em efetores finais personalizados, 
 │                                manifesto precise de ser atualizado sem uma recompilação completa
 ├── LICENSE
 ├── README.md                    Este ficheiro
-└── README_spa.md / README_ita.md / README_fra.md / README_deu.md / README_zho.md / README_jpn.md  <- traduções
+└── README_spa.md / README_ita.md / README_fra.md / README_deu.md / README_zho.md / README_jpn.md / README_por.md  <- traduções
 ```
 
 Os ficheiros de design de hardware (esquema/placa/netlists do Eagle) serão adicionados à medida que o layout estabilizar.
