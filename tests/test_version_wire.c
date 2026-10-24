@@ -103,8 +103,10 @@ void run_version_wire_tests(int *failures)
     av[9] = 0xFF;
     TEST_ASSERT(urtc_slave_app_patch_from_version(av) == URTC_PATCH_UNKNOWN, "0xFF stays the unknown marker");
     uint8_t apf[URTC_SLAVE_APP_PATCH_FRAME_DLC];
-    urtc_slave_app_patch_frame_build(apf, 6);
-    TEST_ASSERT(apf[0] == 0x01 && apf[1] == 6 && URTC_CAN_ID_SLAVE_APP_PATCH == 0x222u && URTC_SLAVE_APP_PATCH_FRAME_DLC == 2u, "0x222 payload is the register and the patch");
+    urtc_slave_app_patch_frame_build(apf, 6, 12);
+    TEST_ASSERT(apf[0] == 0x01 && apf[1] == 6 && apf[2] == 12 && URTC_CAN_ID_SLAVE_APP_PATCH == 0x222u && URTC_SLAVE_APP_PATCH_FRAME_DLC == 3u && URTC_SLAVE_APP_PATCH_FRAME_MIN_DLC == 2u, "0x222 payload is the register, the patch and the low byte of the minor");
+    urtc_slave_app_patch_frame_build(apf, 6, 0);
+    TEST_ASSERT(apf[2] == 0, "a minor of 0 is sent as a byte of 0, not left out");
 
     // Slave extension.
     uint8_t ext[URTC_SLAVE_VERSION_EXT_LEN];

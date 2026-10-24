@@ -1090,11 +1090,14 @@ Data (response): Whatever the named register returned, exactly as many
 
 ID: 0x222 [URTC Tool Head -> Master, only ever sent by the board]
 Patch number of the slave application (companion of 0x221)
-DLC: 2 bytes
+DLC: 2 or 3 bytes
 Data:
   - txData[0]: The register the patch belongs to (0x01, the version
                register of the slave application)
   - txData[1]: The PATCH number of the slave application (1 to 127)
+  - txData[2]: The low byte of the MINOR number of the slave
+               application (byte 8 of its version register); optional
+               for a reader, always sent by the master
   Note: The tenth byte of the version register used to be reserved and
         read 0. A slave application now puts its PATCH number there; the
         answer to 0x221 cannot carry it (one frame holds 8 bytes, the
@@ -1104,6 +1107,13 @@ Data:
         and a host takes the patch as unknown, exactly as before. The
         patch of the slave bootloader and of the application it holds
         are reported by the bootloader's own extension (0x218, 5 bytes).
+        The answer to 0x221 holds the first 8 bytes of the register and
+        stops at the HIGH byte of the minor number (byte 7), so no other
+        frame carried the low byte (byte 8): the third byte of this frame
+        does, and the whole minor is (byte 7 of the 0x221 answer) * 256 +
+        txData[2]. A reader that takes only two bytes still gets the
+        patch and shows the minor as unknown; a slave or a master from
+        before the byte behaves as it always did.
         Nothing on the board listens for 0x222.
 
 ID: 0x230 [Master -> URTC Tool Head]
@@ -1846,7 +1856,7 @@ Machine-readable specification of the CAN bus protocol of the URTC tool head: ev
 
 B. Index of identifiers
 
-[[ BEGIN GENERATED index sha256=3ad64debcd4bfc5e8e291ac2a04d12b531f7334688f46288bf1b1f5c7947a09c ]]
+[[ BEGIN GENERATED index sha256=fb505b9a976922bcb0e7c84a1de6ec8f168c274bcc9b6fb5baaf20b43e8653b6 ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 | ID | Name | Direction | DLC | Tools | Group | Title |
@@ -1917,7 +1927,7 @@ Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_do
 | 0x219 | SLAVE_VERIFY_FAIL_REASON | both ways | any / 1 | any | slave_bridge | Slave verify-fail reason |
 | 0x220 | SLAVE_REG_WRITE | host to board | 2-8 | any | slave_bridge | Write a slave application register (generic) |
 | 0x221 | SLAVE_REG_READ | both ways | 2 / 1-8 | any | slave_bridge | Read a slave application register (generic) |
-| 0x222 | SLAVE_APP_PATCH | board to host | 2 | any | slave_bridge | Patch number of the slave application (companion of 0x221) |
+| 0x222 | SLAVE_APP_PATCH | board to host | 2-3 | any | slave_bridge | Patch number of the slave application (companion of 0x221) |
 | 0x230 | PASTE_JETTING_CONFIG | host to board | 3 | 23 | pastejetting | Local PWM configuration |
 | 0x231 | PASTE_JETTING_PULSE | host to board | 3 | 23 | pastejetting | Local PWM pulse |
 | 0x240 | ADS1115_CONFIG | host to board | 2 | 17 | functionaltest | ADS1115 configuration |
@@ -1951,7 +1961,7 @@ Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_do
 
 C. Field layouts and examples
 
-[[ BEGIN GENERATED layouts sha256=3e27f90a55d2922783f2286a5d3fbf0a6540c1c24bc97c1954e5215ca7ed4ca1 ]]
+[[ BEGIN GENERATED layouts sha256=3e86fb7a69fa96b8f656657f89fea02b289dbb6cecc8d82deb9d09e2075fe691 ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 ### 0x095 IMPACT_EVENT - Impact register (touch probe, maximum priority)
@@ -2996,16 +3006,19 @@ Note: Implemented by the firmware; no host implements it. Reads one application 
 
 board to host; handled by the application; tools: any.
 
-response, DLC 2
+response, DLC 2-3
 
 | Byte | Width | Type | Field | Values | Note |
 |---|---|---|---|---|---|
 | 0 | 1 | u8 | register |  | The register the patch belongs to: 0x01, the version register of the slave application. |
 | 1 | 1 | u8 | patch | 1..127 |  |
+| 2 | 1 | u8 | minor_low | optional | The low byte of the minor number of the slave application (its byte 8 of the version register, which the 8-byte answer to 0x221 cuts off); with the high byte, byte 7 of that answer, it is the whole minor. Absent from firmware before this byte: the minor is then not known. |
 
 Example patch 4: data 0104 (register=1, patch=4)
 
-Note: TX-only; nothing on the board listens for it. Sent right after the 0x221 answer for register 0x01 when the tenth byte of that register, the patch number of the slave application, is 1 to 127. A byte of 0 (what a slave application from before the field sends) is ignored and no frame follows, so a host that sees no 0x222 treats the patch as unknown.
+Example patch 4 of version 0.2: data 010402 (register=1, patch=4, minor_low=2)
+
+Note: TX-only; nothing on the board listens for it. Sent right after the 0x221 answer for register 0x01 when the tenth byte of that register, the patch number of the slave application, is 1 to 127. A byte of 0 (what a slave application from before the field sends) is ignored and no frame follows, so a host that sees no 0x222 treats the patch as unknown. The third byte, when present, is the low byte of the minor number: the 0x221 answer holds only the first 8 bytes of the register and stops at the high byte of the minor, so a host that reads two bytes of 0x222 (the first release of this frame) still gets the patch and shows the minor as unknown.
 
 ### 0x230 PASTE_JETTING_CONFIG - Local PWM configuration
 
