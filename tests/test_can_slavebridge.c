@@ -259,7 +259,8 @@ void run_can_slavebridge_tests(int *failures)
     { const uint8_t v[10] = { 0x00, 0x03, 0x03, 0xCB, 0x01, 0x00, 0x00, 0x00, 0x02, 0x04 }; memcpy(reg_value[0x01], v, 10); }
     rx(0x221, 2, rd_version);
     TEST_ASSERT(tx(0x221) && tx(0x221)->dlc == 8 && tx(0x221)->data[7] == 0x00 && read_count == 1, "the version answer is the same eight bytes as before");
-    TEST_ASSERT(tx(0x222) && tx(0x222)->dlc == 2 && tx(0x222)->data[0] == 0x01 && tx(0x222)->data[1] == 0x04, "a patch in the tenth byte follows in the 0x222 companion, with the register it belongs to");
+    TEST_ASSERT(tx(0x222) && tx(0x222)->dlc == 3 && tx(0x222)->data[0] == 0x01 && tx(0x222)->data[1] == 0x04, "a patch in the tenth byte follows in the 0x222 companion, with the register it belongs to");
+    TEST_ASSERT(tx(0x222)->data[2] == 0x02, "and so does the low byte of the minor, the ninth byte of the register, which the eight-byte answer cuts off");
     TEST_ASSERT(fake_tx_count == 2, "and nothing else is sent");
     clear();
     reg_readable[0x01] = 1;                       // a slave application from before the field: the tenth byte reads 0
@@ -276,6 +277,13 @@ void run_can_slavebridge_tests(int *failures)
     reg_value[0x01][9] = 0x7F;
     rx(0x221, 2, rd_version);
     TEST_ASSERT(tx(0x222) && tx(0x222)->data[1] == 0x7F, "127 is the largest patch number");
+    clear();
+    reg_readable[0x01] = 1;
+    reg_value[0x01][8] = 0xFF;
+    reg_value[0x01][9] = 0x03;
+    rx(0x221, 2, rd_version);
+    TEST_ASSERT(tx(0x222) && tx(0x222)->data[2] == 0xFF && tx(0x222)->dlc == 3, "the low byte of the minor goes through whole, up to 255");
+    TEST_ASSERT(tx(0x221) && tx(0x221)->data[7] == 0x00 && tx(0x221)->dlc == 8, "while the answer to 0x221 is still the same eight bytes");
     clear();
     reg_readable[0x01] = 1;
     reg_value[0x01][9] = 5;

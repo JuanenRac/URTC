@@ -24,7 +24,8 @@
 #define URTC_CAN_ID_SLAVE_APP_PATCH 0x222u // companion of the 0x221 answer for REG_APP_VERSION of the expansion slave
 #define URTC_SLAVE_APP_VERSION_REG 0x01u // REG_APP_VERSION of the slave application
 #define URTC_SLAVE_APP_VERSION_LEN 10u // its length: byte 0 responder, 1..4 hardware id, 5..6 major, 7..8 minor, 9 patch
-#define URTC_SLAVE_APP_PATCH_FRAME_DLC 2u
+#define URTC_SLAVE_APP_PATCH_FRAME_DLC 3u // the master sends 3 bytes; a host that reads 2 (the first form of the frame) still gets the patch
+#define URTC_SLAVE_APP_PATCH_FRAME_MIN_DLC 2u
 
 #define URTC_PATCH_UNKNOWN      0xFFu // the patch number is not known (legacy metadata, blank board)
 #define URTC_MINOR_PATCH_FLAG   0x80u // in the high byte of a minor field: a patch number follows in bits 6..0
@@ -114,11 +115,14 @@ static inline uint8_t urtc_slave_app_patch_from_version(const uint8_t version[UR
     return (patch >= 1u && patch <= URTC_PATCH_MAX) ? patch : URTC_PATCH_UNKNOWN;
 }
 
-// 0x222 payload: [0] the register the patch belongs to (URTC_SLAVE_APP_VERSION_REG), [1] the patch (1..127).
-static inline void urtc_slave_app_patch_frame_build(uint8_t out[URTC_SLAVE_APP_PATCH_FRAME_DLC], uint8_t patch)
+// 0x222 payload: [0] the register the patch belongs to (URTC_SLAVE_APP_VERSION_REG), [1] the patch (1..127),
+// [2] the low byte of the minor number, byte 8 of the version register (the 0x221 answer holds 8 bytes and stops at
+// the high byte of the minor, so this is the only place the low byte travels).
+static inline void urtc_slave_app_patch_frame_build(uint8_t out[URTC_SLAVE_APP_PATCH_FRAME_DLC], uint8_t patch, uint8_t minor_low)
 {
     out[0] = (uint8_t)URTC_SLAVE_APP_VERSION_REG;
     out[1] = patch;
+    out[2] = minor_low;
 }
 
 // Builds the 0x218 payload on the master from the 2 legacy bytes read from the
