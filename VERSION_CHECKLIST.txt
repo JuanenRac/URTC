@@ -33,7 +33,7 @@ in the last migration.
 
 -----------------------------------------------------------------------------
 TRACK A - MAIN BOARD APPLICATION FIRMWARE VERSION (MAJOR.MINOR.PATCH,
-currently 0.2.x)
+FIRMWARE_VERSION_* in src/F303-master/firmware_common.h)
 -----------------------------------------------------------------------------
 Covers ONLY the main board's own application firmware now - Flasher and
 Tester moved to their own repos (URTC-FLASHER, URTC-TESTER) with their
@@ -345,8 +345,8 @@ recognize and leave alone, not "fix")
     number exists somewhere else in the document
 
 -----------------------------------------------------------------------------
-TRACK E - EXPANSION SLAVE CHIP VERSIONS (application currently 0.1,
-bootloader currently 0.1.3 - both fully independent of every track
+TRACK E - EXPANSION SLAVE CHIP VERSIONS (the application and the bootloader each
+keep their own version, in slave_common.h and slaveboot_common.h - both fully independent of every track
 above; a separate chip, on a separate board, versioned on its own
 schedule since it can be updated without touching the main board at all)
 -----------------------------------------------------------------------------

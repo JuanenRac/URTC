@@ -287,7 +287,7 @@ URTC のフラッシュは 2 つの独立した部分に分割されているた
 0x08008000 ├─────────────────────────────────┤
            │  メインスロット（112K）            │  これはアプリケーション
            │                                   │  ファームウェア /
-           │                                   │  URTC_MAIN_FIRMWARE_v0.3.5.* ——
+           │                                   │  URTC_MAIN_FIRMWARE_v<version>.* ——
            │                                   │  日々実行される実際の
            │                                   │  ファームウェアで、本
            │                                   │  README の他の場所で
@@ -322,8 +322,8 @@ URTC のフラッシュは 2 つの独立した部分に分割されているた
 
 1. **STM32CubeIDE**（STM32F303CC ターゲットに対してビルド・テスト済み）でプロジェクトを開くか、下記のコンパイル済み出力を使って **STM32CubeProgrammer** を直接使用します。
 2. 板載の `STM_JTAG` ヘッダー経由で、SWD（ST-Link）で**両方の**イメージを書き込みます——各 `.hex` ファイルにはターゲットアドレスが焼き込まれているため、（STM32CubeProgrammer を含む）ほとんどのツールは同じセッションで両方を読み込めます：
-   * `URTC_MAIN_BOOTLOADER_v0.3.9.hex` → `0x08000000`
-   * `URTC_MAIN_FIRMWARE_v0.3.5.hex` → `0x08008000`
+   * `URTC_MAIN_BOOTLOADER_v<version>.hex` → `0x08000000`
+   * `URTC_MAIN_FIRMWARE_v<version>.hex` → `0x08008000`
 3. 電源を入れる前に、ID はんだジャンパーでツールの識別情報を設定します——ボードは起動時に一度だけそれを読み取ります、いつもどおりです。5 つのジャンパー（ID0-ID4）で、完全な 32 アドレス空間をカバーします（31 の直接ツールアドレスに加え、予約された `11111` のフリー構成アドレス——上記のツールマトリクスの節を参照）。
 4. 電源を入れます。ブートローダーは約 600ms リッスンし、何も見つからず、直接アプリケーションへジャンプします——ここから先は、すべてが本 README の残りの部分で説明されているとおりに動作します。このウィンドウは、ブートローダーが保存済みアプリケーションを検査した後に始まり、更新したいツールはその間に更新開始フレーム（0x7F1）を送る必要があります。待機ステータス（0x7F5 = 0x01）は、ジャンプせずにウィンドウが終了したときに送られ、開始時には送られません。
 
@@ -438,6 +438,11 @@ URTC のフラッシュは 2 つの独立した部分に分割されているた
 │   │                            コンパイル/リンクコマンド；リポジトリルートの
 │   │                            build_firmware.sh/.bat が同じプロセスをエンドツーエンドで自動化
 │   ├── FIRMWARE_DISTRIBUTION.md ファームウェアファイルの公開場所と各利用側が読むもの
+│   ├── FIRMWARE_SIGNING.TXT     ファームウェアイメージの署名方法：現在は HMAC、Ed25519 を計画
+│   ├── RELEASE_SIGNING.md       リリースの署名方法（各ファイルの分離 Ed25519 署名）と公開鍵
+│   ├── KEYS.md                  ファミリーが依存するすべての鍵：用途、公開値、埋め込み先、秘密鍵の保管場所
+│   ├── CAN_THREAT_MODEL.TXT     CAN バスが何を信頼するか、およびそこから導かれる設置要件
+│   ├── COMPATIBILITY.md         どのバージョンのプログラム同士が連携できるか（URTC-COMMON が生成）
 │   ├── datasheet/               PCB/datasheet/ の下にまだ含まれていない 2 つの部品
 │   │                            データシート（CFM_40.pdf、EFB0424VHD-CP0.pdf）
 │   └── tool_image_generator/    images/TOOL_*.png を生成するツールキット（下記参照）——
@@ -447,7 +452,7 @@ URTC のフラッシュは 2 つの独立した部分に分割されているた
 ├── src/
 │   ├── F303-master/
 │   │   ├── STM32F303CC_main.c    エントリポイント——グローバル定義と main()
-│   │   ├── firmware_*.c/.h       サブシステムごとに 1 つ、さらに約 85 個のファイル
+│   │   ├── firmware_*.c/.h       サブシステムごとに 1 つ、さらに約 100 個のファイル
 │   │   │                         （OLED、LED、ツールごとの CAN ハンドラー、初期化、
 │   │   │                         永続化など）、firmware_ads1115.c（直接 ADS1115
 │   │   │                         ドライバー、Basic+ADS1115 ボード）を含む——完全な
@@ -473,6 +478,7 @@ URTC のフラッシュは 2 つの独立した部分に分割されているた
 │   │       │                      暗号、フラッシュ/メタデータ、OLED、CAN プロトコル）
 │   │       ├── STM32F303CCTx_BOOTLOADER.ld  ブートローダーのリンカスクリプト（0x08000000 の 30K 領域）
 │   │       └── README.md          アプリケーションと同じ技術リファレンスの役割、ブートローダー向け
+│   ├── common/                   アプリケーション、ブートローダー、スレーブが共有するヘッダー：ブートセッションの印、スレーブのレジスタ、バス上のバージョン形式
 │   └── F303-slave/               2 つのアドバンスド拡張ボードバリエーションにのみ存在する
 │       │                         コンパニオンチップ（STM32F303CBT6）——上記の拡張コネクタの
 │       │                         節を参照。自身のブートローダー/アプリケーションペア、
@@ -506,15 +512,15 @@ URTC のフラッシュは 2 つの独立した部分に分割されているた
 │           ├── STM32F303CBTx_SLAVEBOOT.ld  リンカスクリプト（0x08000000 の 18K 領域）
 │           └── README.md          アプリケーションと同じ技術リファレンスの役割
 ├── firmware/  （git が無視するビルド出力——リリースアセットとしてのみ公開）
-│   ├── URTC_MAIN_BOOTLOADER_v0.3.9.bin  ブートローダーコンパイル済み、0x08000000 へフラッシュ
-│   ├── URTC_MAIN_BOOTLOADER_v0.3.9.elf  ブートローダーコンパイル済み、0x08000000 へフラッシュ
-│   ├── URTC_MAIN_BOOTLOADER_v0.3.9.hex  ブートローダーコンパイル済み、0x08000000 へフラッシュ（アドレス焼き込み済み）
-│   ├── URTC_MAIN_FIRMWARE_v0.3.5.bin    アプリケーション bin コンパイル済み、0x08008000 へフラッシュ
-│   ├── URTC_MAIN_FIRMWARE_v0.3.5.elf    アプリケーション elf コンパイル済み、0x08008000 へフラッシュ
-│   ├── URTC_MAIN_FIRMWARE_v0.3.5.hex    アプリケーション HEX コンパイル済み、0x08008000 へフラッシュ（アドレス焼き込み済み）
-│   ├── URTC_SLAVE_BOOTLOADER_v0.2.3.{bin,elf,hex}  拡張スレーブ自身のブートローダー、
+│   ├── URTC_MAIN_BOOTLOADER_v<version>.bin  ブートローダーコンパイル済み、0x08000000 へフラッシュ
+│   ├── URTC_MAIN_BOOTLOADER_v<version>.elf  ブートローダーコンパイル済み、0x08000000 へフラッシュ
+│   ├── URTC_MAIN_BOOTLOADER_v<version>.hex  ブートローダーコンパイル済み、0x08000000 へフラッシュ（アドレス焼き込み済み）
+│   ├── URTC_MAIN_FIRMWARE_v<version>.bin    アプリケーション bin コンパイル済み、0x08008000 へフラッシュ
+│   ├── URTC_MAIN_FIRMWARE_v<version>.elf    アプリケーション elf コンパイル済み、0x08008000 へフラッシュ
+│   ├── URTC_MAIN_FIRMWARE_v<version>.hex    アプリケーション HEX コンパイル済み、0x08008000 へフラッシュ（アドレス焼き込み済み）
+│   ├── URTC_SLAVE_BOOTLOADER_v<version>.{bin,elf,hex}  拡張スレーブ自身のブートローダー、
 │   │                             STM32F303CBT6 上の 0x08000000 へフラッシュ（アドバンスド拡張ボードのみ）
-│   ├── URTC_SLAVE_FIRMWARE_v0.2.0.{bin,elf,hex}  拡張スレーブ自身のアプリケーション、0x08005000 へフラッシュ
+│   ├── URTC_SLAVE_FIRMWARE_v<version>.{bin,elf,hex}  拡張スレーブ自身のアプリケーション、0x08005000 へフラッシュ
 │   └── firmware_manifest.json    上記 4 つのコンポーネントすべての機械可読インデックス——
 │                                 バージョン、フラッシュアドレス、そして各ファイル自身の
 │                                 サイズ/CRC32、外部ツールがここに何があり、現在持っている
@@ -541,14 +547,24 @@ URTC のフラッシュは 2 つの独立した部分に分割されているた
 │   │                            自身の整理・体系化されたバージョンは BOM/BOM.TXT を参照）
 │   ├── datasheet/               ボードで使用されるすべての部品のデータシート
 │   └── *_PARLIST/PINLIST/NETLIST.TXT   Eagle エクスポートのネットリスト（ピンマッピングの正典）
+├── keys/ registry.json：ファミリーの公開鍵と各鍵の埋め込み先（tools/keys.py が検査）
+├── tests/ ダミー HAL（tests/host_hal/）と共有ベクターに対してビルドするファームウェアのホストテストと、Python ツールのテスト
 ├── tools/
 │   ├── build_test.py            バージョンを更新しないビルド/コンパイル確認
 │   ├── publish_release_assets.py  添付するリリースアセットを列挙し gh コマンドを表示
-│   └── ci_validate.py           CI が使用する manifest/CHANGELOG/docs の検証
+│   ├── ci_validate.py           CI が使用する manifest/CHANGELOG/docs の検証
+│   ├── keys.py                  docs/KEYS.md と keys/registry.json を相互に、またコードと照合する
+│   ├── release_sign.py          リリースのファイルに署名する（分離 Ed25519 署名）
+│   ├── run_host_tests.py        ダミー HAL に対してホストテストスイートをビルドして実行し、カバレッジの下限を設ける
+│   ├── changelog_section.py / fuzz_virtual_board.py リリース用の CHANGELOG セクションのテキスト、仮想ボードのファズ実行
+│   └── _doc_policy.py / _readme_parity.py / _tracked_names.py ci_validate.py が使う共有チェック
 ├── VERSION_CHECKLIST.txt        本プロジェクト自身の 4 つの独立したバージョン番号のいずれかを
 │                                正しく加算するための機械的なチェックリスト
 ├── check_version_consistency.sh  自動化されたバージョン/ファイル整合性チェック——
 │                                VERSION_CHECKLIST.txt 自身の主張を信頼する前に実行
+├── check_shared_drivers.py       両方のチップにコピーした Melexis ドライバーが同一であることを確認する
+├── firmware_signing.py           ファームウェア署名鍵と、各イメージに添える署名・ダイジェストファイル
+├── ruff.toml / urtc.project.json 静的チェックの設定と、プロジェクトマニフェスト（バージョン、成熟度、証拠）
 ├── build_firmware.sh            ツールチェーンをインストールし、ST 自身の HAL/CMSIS を取得し、
 │                                4 つのファームウェアバイナリすべてをエンドツーエンドで
 │                                コンパイル（Linux）
@@ -565,7 +581,7 @@ URTC のフラッシュは 2 つの独立した部分に分割されているた
 │                                追いつかせる必要があるときにいつでも単独で実行
 ├── LICENSE
 ├── README.md                    本ファイル
-└── README_spa.md / README_ita.md / README_fra.md / README_deu.md / README_zho.md / README_jpn.md  <- 翻訳
+└── README_spa.md / README_ita.md / README_fra.md / README_deu.md / README_zho.md / README_jpn.md / README_por.md  <- 翻訳
 ```
 
 ハードウェア設計ファイル（Eagle 回路図/ボード/ネットリスト）は、レイアウトが安定するにつれて追加されます。
