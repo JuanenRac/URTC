@@ -684,6 +684,21 @@ URTC 的闪存被拆分为两个独立部分，因此板卡可以通过它已经
 哪些版本的 URTC 程序可以配合使用、各自使用哪个协议版本，列在 URTC-COMMON 生成的兼容性表中：[docs/COMPATIBILITY.md](https://github.com/JuanenRac/URTC/blob/main/docs/COMPATIBILITY.md)。
 <!-- /urtc-section:compatibility -->
 
+<!-- urtc-section:status_firmware -->
+## 💡 项目状态
+
+🟢 已完成并已验证 · 🟡 可用，但有已知限制 · 🟠 做了一半或未验证 · 🔴 未完成或不能用。从未在真实硬件上运行过的内容不会是绿色。
+
+| 部分 | 状态 | 仓库能够证明的内容 |
+| --- | :---: | --- |
+| 软件 | 🟡 | 可编译并通过电脑上的测试；在真实工具头上的运行仍待进行。 |
+| 测试 | 🟢 | 每次推送时测试套件都会在 CI 中通过。 |
+| 真实硬件 | 🟠 | 尚未在真实板子上运行：台架测试仍待进行。 |
+| 安全 | 🟡 | 发布版使用 Ed25519 签名，并在使用前检查；密钥的处理没有他人审阅过。 |
+| 文档 | 🟡 | 提供八种语言的 README 和参考文档；翻译未经母语者审阅。 |
+
+<!-- /urtc-section:status_firmware -->
+
 ## 📜 许可证
 
 URTC 版权所有 (c) 2026 JuanenRac（Electro Hobby 3D）。分发本项目或其衍生作品时必须包含此声明。
