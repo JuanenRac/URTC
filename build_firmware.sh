@@ -81,6 +81,12 @@ prepare_output_dir() {
 step "1. Toolchain"
 # -----------------------------------------------------------------------
 if ! command -v arm-none-eabi-gcc >/dev/null 2>&1; then
+    # A build or a test run never changes the machine it runs on by itself: the toolchain is installed here only when a
+    # person is at the terminal (and sudo asks for the password); a CI job or a script installs it first, on purpose.
+    if [ "$URTC_CI_MODE" = "1" ] || [ ! -t 0 ]; then
+        fail "arm-none-eabi-gcc not found, and this run is not interactive so nothing is installed - install it first (Debian/Ubuntu: sudo apt install gcc-arm-none-eabi binutils-arm-none-eabi libnewlib-arm-none-eabi libstdc++-arm-none-eabi-newlib git)"
+        echo ""; echo "$PASS passed, $WARN warnings, $FAIL failed"; exit 1
+    fi
     echo "arm-none-eabi-gcc not found - attempting install via apt..."
     if command -v apt >/dev/null 2>&1; then
         sudo apt update

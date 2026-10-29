@@ -110,7 +110,7 @@ def main() -> int:
             # WSL does not reliably inherit a Python child environment;
             # pass the read-only CI flag as an explicit WSL command argument.
             run(
-                "wsl.exe", "--distribution", "Ubuntu-24.04", "--",
+                "wsl.exe", "--distribution", os.environ.get("URTC_WSL_DISTRIBUTION", "Ubuntu-24.04"), "--",
                 "env", "URTC_CI=1", "bash", "build_firmware.sh",
             )
         else:
