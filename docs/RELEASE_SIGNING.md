@@ -90,6 +90,18 @@ already has a release is never rebuilt. Giving the keys to GitHub is a choice: i
 repository's settings or the account are compromised, so are they; the first way keeps them on
 your machine.
 
+**Telling the flasher and the web studio.** After the release is published, the job can send a
+`repository_dispatch` event (type `urtc-firmware-released`, with the tag and the commit) to
+URTC-FLASHER and URTC-WEB-STUDIO, whose scheduled workflows also start on it. That needs one
+repository secret that you create yourself, named `URTC_DISPATCH_TOKEN`: a fine-grained token
+that can write to the contents of those two repositories (the permission GitHub asks for to send
+the event). Without the secret the step prints a notice and is skipped, and the release is
+unaffected. A release made from your own machine does not run the workflow, so it sends nothing.
+
+```
+gh secret set URTC_DISPATCH_TOKEN --repo JuanenRac/URTC
+```
+
 After the first official release exists, the flasher and the web studio take their images from
 it: delete `firmware_release.json` (flasher) and `firmware-release.json` (web studio), which only
 name the bench pre-release to use while there is no official one.

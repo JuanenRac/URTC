@@ -15,6 +15,10 @@
 #   URTC_SIGNING_KEYS           the file of the bootloader keys: "master=<64 hex>" and "slave=<64 hex>"
 #   URTC_RELEASE_ED25519_PEM    the Ed25519 private key of the releases (PEM)
 # and, in the same place, required reviewers and a deployment branch limited to main.
+# Optional, as a repository secret: URTC_DISPATCH_TOKEN, a token that may send a repository_dispatch
+# event to URTC-FLASHER and URTC-WEB-STUDIO. When it exists, the last step tells both repositories
+# that a release was published (event type urtc-firmware-released); when it does not, the step is
+# skipped with a notice and the run is not affected.
 # docs/RELEASE_SIGNING.md has the commands, and the way to publish from a machine
 # instead, which needs no secret in GitHub.
 name: URTC firmware release
@@ -141,6 +145,26 @@ jobs:
               sys.exit("applications not signed with a release key: " + ", ".join(bad))
           print("PUBLISHED_RELEASE=PASS")
           PY
+      - name: Tell the flasher and the web studio that a release was published (when a token is set)
+        shell: bash
+        env:
+          URTC_DISPATCH_TOKEN: ${{ secrets.URTC_DISPATCH_TOKEN }}
+        run: |
+          set -uo pipefail
+          # The token is optional: without it this step only says so and ends well, so the run
+          # of the release never turns red because of a notification. Do not print the token.
+          if [ -z "${URTC_DISPATCH_TOKEN:-}" ]; then
+            echo "::notice::The secret URTC_DISPATCH_TOKEN is not set; URTC-FLASHER and URTC-WEB-STUDIO were not told about ${REQUESTED_TAG} (see docs/RELEASE_SIGNING.md)."
+            exit 0
+          fi
+          payload="$(jq -nc --arg tag "${REQUESTED_TAG}" --arg sha "${GITHUB_SHA}" '{event_type: "urtc-firmware-released", client_payload: {tag: $tag, sha: $sha}}')"
+          for target in URTC-FLASHER URTC-WEB-STUDIO; do
+            if curl --fail-with-body --silent --show-error --retry 3 --retry-all-errors                  --connect-timeout 10 --max-time 30                  --request POST                  --header "Accept: application/vnd.github+json"                  --header "Authorization: Bearer ${URTC_DISPATCH_TOKEN}"                  --header "X-GitHub-Api-Version: 2022-11-28"                  --url "https://api.github.com/repos/JuanenRac/${target}/dispatches"                  --data "${payload}"; then
+              echo "${target} was told about ${REQUESTED_TAG}."
+            else
+              echo "::warning::${target} could not be told about ${REQUESTED_TAG}; the release itself is published."
+            fi
+          done
       - name: Remove the key files
         if: ${{ always() }}
         shell: bash
