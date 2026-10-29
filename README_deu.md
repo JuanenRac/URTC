@@ -49,6 +49,21 @@ Hier ist die vollständige Aufschlüsselung dessen, was es ist, was es tut, und 
 | Ziel | Eine Mikrocontroller-Platine (die Firmware); wird auf einem PC gebaut |
 | Auf echter Hardware | Noch nicht: für diese Version ist kein Lauf auf echter Hardware vermerkt |
 
+<!-- urtc-section:status_firmware -->
+## 🚦 Projektstatus
+
+🟢 fertig und überprüft · 🟡 funktioniert, mit bekannten Grenzen · 🟠 halb fertig oder nicht überprüft · 🔴 nicht gemacht oder funktioniert nicht. Nichts ist grün, wenn es nie auf echter Hardware lief.
+
+| Teil | Status | Was das Repository belegen kann |
+| --- | :---: | --- |
+| Software | 🟡 | Baut und besteht die Tests am PC; der Lauf an einem echten Werkzeugkopf steht noch aus. |
+| Tests | 🟢 | Die Testsuite besteht bei jedem Push in der CI. |
+| Echte Hardware | 🟠 | Noch kein Lauf an einer echten Platine: der Bankversuch steht noch aus. |
+| Sicherheit | 🟡 | Releases werden mit Ed25519 signiert und vor der Nutzung geprüft; der Umgang mit den Schlüsseln wurde von niemand anderem geprüft. |
+| Dokumentation | 🟡 | README in acht Sprachen und Referenzdokumente; die Übersetzungen wurden nicht von Muttersprachlern geprüft. |
+
+<!-- /urtc-section:status_firmware -->
+
 ## ⚙️ Was ist URTC?
 
 URTC ist eine All-in-One-, kompakte Steuerplatine, angetrieben von einem STM32-Mikrocontroller (STM32F303CCT6, LQFP48). Sie kommuniziert mit dem Haupt-Robotercontroller über CAN-Bus, was die Ausführung komplexer Aufgaben mit geringer Latenz direkt am Werkzeugkopf oder an der Achse ermöglichen soll (die Latenz wurde nie auf einer Platine gemessen, und harte Echtzeit wird nicht zugesichert). Sie verfügt über ein integriertes OLED-Display für sofortige Diagnose — animierter Boot-Splash, animierte Icons pro Werkzeug, Live-Telemetrie auf einem zweifarbigen Panel —, eine Einzelpixel-RGB-Status-LED plus einen adressierbaren RGB-LED-Ring für die Kamerabeleuchtung, einen 20-poligen Erweiterungsstecker für Zusatzplatinen, ein integriertes F-RAM, das die Sollwerte des aktiven Werkzeugs über einen Stromausfall hinweg erhält, sowie dedizierte Analog- und Hochstrom-Leistungsstufen.
@@ -688,21 +703,6 @@ Dieses Projekt ist Teil des HYDRA-UMC-Robotik-Ökosystems desselben Autors (Juan
 
 Welche Versionen der URTC-Programme zusammenarbeiten und welche Protokollversion jede spricht, steht in der Kompatibilitätstabelle, die URTC-COMMON erzeugt: [docs/COMPATIBILITY.md](https://github.com/JuanenRac/URTC/blob/main/docs/COMPATIBILITY.md).
 <!-- /urtc-section:compatibility -->
-
-<!-- urtc-section:status_firmware -->
-## 💡 Projektstatus
-
-🟢 fertig und überprüft · 🟡 funktioniert, mit bekannten Grenzen · 🟠 halb fertig oder nicht überprüft · 🔴 nicht gemacht oder funktioniert nicht. Nichts ist grün, wenn es nie auf echter Hardware lief.
-
-| Teil | Status | Was das Repository belegen kann |
-| --- | :---: | --- |
-| Software | 🟡 | Baut und besteht die Tests am PC; der Lauf an einem echten Werkzeugkopf steht noch aus. |
-| Tests | 🟢 | Die Testsuite besteht bei jedem Push in der CI. |
-| Echte Hardware | 🟠 | Noch kein Lauf an einer echten Platine: der Bankversuch steht noch aus. |
-| Sicherheit | 🟡 | Releases werden mit Ed25519 signiert und vor der Nutzung geprüft; der Umgang mit den Schlüsseln wurde von niemand anderem geprüft. |
-| Dokumentation | 🟡 | README in acht Sprachen und Referenzdokumente; die Übersetzungen wurden nicht von Muttersprachlern geprüft. |
-
-<!-- /urtc-section:status_firmware -->
 
 ## 📜 LIZENZ
 

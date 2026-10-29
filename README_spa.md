@@ -49,6 +49,21 @@ Aquí está el desglose completo de qué es, qué hace, y el ecosistema de hardw
 | Destino | Una placa con microcontrolador (el firmware); se compila en un PC |
 | En hardware real | Todavía no: no consta ninguna ejecución en hardware real para esta versión |
 
+<!-- urtc-section:status_firmware -->
+## 🚦 Estado del proyecto
+
+🟢 hecho y verificado · 🟡 funciona, con límites conocidos · 🟠 a medias o sin verificar · 🔴 sin hacer o sin funcionar. Nada es verde si nunca corrió en hardware real.
+
+| Parte | Estado | Lo que el repositorio puede demostrar |
+| --- | :---: | --- |
+| Software | 🟡 | Compila y pasa las pruebas en un PC; la prueba en un cabezal real sigue pendiente. |
+| Pruebas | 🟢 | La batería de pruebas pasa en la CI en cada subida. |
+| Hardware real | 🟠 | Aún no se ha ejecutado con una placa real: la prueba de banco sigue pendiente. |
+| Seguridad | 🟡 | Las versiones se firman con Ed25519 y se comprueban antes de usarlas; el manejo de las claves no lo ha revisado nadie más. |
+| Documentación | 🟡 | README en ocho idiomas y documentos de referencia; las traducciones no las ha revisado ningún hablante nativo. |
+
+<!-- /urtc-section:status_firmware -->
+
 ## ⚙️ ¿Qué es URTC?
 
 URTC es una placa de control todo-en-uno y compacta, impulsada por un microcontrolador STM32 (STM32F303CCT6, LQFP48). Se comunica con el controlador principal del robot vía bus CAN, pensada para ejecutar con baja latencia tareas complejas directamente en el cabezal de la herramienta o en el eje (la latencia nunca se ha medido en una placa y no se promete tiempo real estricto). Cuenta con una pantalla OLED integrada para diagnóstico instantáneo — splash de arranque animado, iconos animados por herramienta, telemetría en vivo en un panel de dos tonos — un LED RGB de estado de un solo píxel más un anillo de LED RGB direccionable para iluminación de cámara, un conector de expansión de 20 pines para placas adicionales, una F-RAM integrada que persiste los setpoints de la herramienta activa a través de un corte de energía, y etapas dedicadas de potencia analógica y de alta corriente.
@@ -708,21 +723,6 @@ Este proyecto es parte del ecosistema de robótica HYDRA-UMC del mismo autor (Ju
 
 Qué versiones de los programas de URTC funcionan juntas, y qué versión del protocolo habla cada una, figura en la tabla de compatibilidad que genera URTC-COMMON: [docs/COMPATIBILITY.md](https://github.com/JuanenRac/URTC/blob/main/docs/COMPATIBILITY.md).
 <!-- /urtc-section:compatibility -->
-
-<!-- urtc-section:status_firmware -->
-## 💡 Estado del proyecto
-
-🟢 hecho y verificado · 🟡 funciona, con límites conocidos · 🟠 a medias o sin verificar · 🔴 sin hacer o sin funcionar. Nada es verde si nunca corrió en hardware real.
-
-| Parte | Estado | Lo que el repositorio puede demostrar |
-| --- | :---: | --- |
-| Software | 🟡 | Compila y pasa las pruebas en un PC; la prueba en un cabezal real sigue pendiente. |
-| Pruebas | 🟢 | La batería de pruebas pasa en la CI en cada subida. |
-| Hardware real | 🟠 | Aún no se ha ejecutado con una placa real: la prueba de banco sigue pendiente. |
-| Seguridad | 🟡 | Las versiones se firman con Ed25519 y se comprueban antes de usarlas; el manejo de las claves no lo ha revisado nadie más. |
-| Documentación | 🟡 | README en ocho idiomas y documentos de referencia; las traducciones no las ha revisado ningún hablante nativo. |
-
-<!-- /urtc-section:status_firmware -->
 
 ## 📜 LICENCIA
 

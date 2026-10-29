@@ -4,6 +4,9 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **The layout of the README is checked in the CI:** the validator runs `tools/universal_readme_check.py` and lists, as a warning, what differs from the universal layout of the README.
+- **Project status is the second section of the README,** right after At a glance, in the eight languages.
+
 (nothing yet)
 
 ## [0.4.1] - Every firmware source host-tested, a generated tool table and CAN reference, the slave patch number and a bootloader session rule

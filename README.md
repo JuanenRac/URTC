@@ -49,6 +49,21 @@ Here is the complete breakdown of what it is, what it does, and the hardware eco
 | Target | A microcontroller board (the firmware); built on a PC |
 | On real hardware | Not yet: no run on real hardware is recorded for this version |
 
+<!-- urtc-section:status_firmware -->
+## 🚦 Project status
+
+🟢 done and verified · 🟡 works, with known limits · 🟠 half done or not verified · 🔴 not done or not working. Nothing is green if it never ran on real hardware.
+
+| Part | Status | What the repository can show |
+| --- | :---: | --- |
+| Software | 🟡 | Builds and passes the tests on a PC; the run on a real tool head is still pending. |
+| Tests | 🟢 | The test suite passes in the CI on every push. |
+| Real hardware | 🟠 | No run on a real board yet: the bench test is still pending. |
+| Security | 🟡 | Releases are signed with Ed25519 and checked before use; the key handling was not reviewed by anyone else. |
+| Documentation | 🟡 | README in eight languages and reference documents; the translations were not reviewed by native speakers. |
+
+<!-- /urtc-section:status_firmware -->
+
 ## ⚙️ What is URTC?
 
 URTC is an all-in-one, compact control board powered by an STM32 microcontroller (STM32F303CCT6, LQFP48). It communicates with the main robot controller via CAN bus, intended for low-latency execution of complex tasks right at the tool head or axis (latency has never been measured on a board, and no hard real-time guarantee is made). It features an onboard OLED display for instant diagnostics — animated boot splash, per-tool animated icons, live telemetry on a two-tone panel — a single-pixel RGB status LED plus an addressable RGB LED ring for camera illumination, a 20-pin expansion connector for add-on boards, an onboard F-RAM that persists the active tool's setpoints across a power loss, and dedicated analog and high-current power stages.
@@ -697,21 +712,6 @@ This project is part of the HYDRA-UMC robotics ecosystem by the same author (Jua
 
 Which versions of the URTC programs work together, and which protocol version each one speaks, is listed in the compatibility table that URTC-COMMON generates: [docs/COMPATIBILITY.md](https://github.com/JuanenRac/URTC/blob/main/docs/COMPATIBILITY.md).
 <!-- /urtc-section:compatibility -->
-
-<!-- urtc-section:status_firmware -->
-## 💡 Project status
-
-🟢 done and verified · 🟡 works, with known limits · 🟠 half done or not verified · 🔴 not done or not working. Nothing is green if it never ran on real hardware.
-
-| Part | Status | What the repository can show |
-| --- | :---: | --- |
-| Software | 🟡 | Builds and passes the tests on a PC; the run on a real tool head is still pending. |
-| Tests | 🟢 | The test suite passes in the CI on every push. |
-| Real hardware | 🟠 | No run on a real board yet: the bench test is still pending. |
-| Security | 🟡 | Releases are signed with Ed25519 and checked before use; the key handling was not reviewed by anyone else. |
-| Documentation | 🟡 | README in eight languages and reference documents; the translations were not reviewed by native speakers. |
-
-<!-- /urtc-section:status_firmware -->
 
 ## 📜 LICENSE
 

@@ -49,6 +49,21 @@ Aqui está a descrição completa do que é, do que faz, e do ecossistema de har
 | Destino | Uma placa com microcontrolador (o firmware); compila-se num PC |
 | Em hardware real | Ainda não: não há registo de execução em hardware real para esta versão |
 
+<!-- urtc-section:status_firmware -->
+## 🚦 Estado do projeto
+
+🟢 feito e verificado · 🟡 funciona, com limites conhecidos · 🟠 a meio ou por verificar · 🔴 por fazer ou a não funcionar. Nada é verde se nunca correu em hardware real.
+
+| Parte | Estado | O que o repositório consegue demonstrar |
+| --- | :---: | --- |
+| Software | 🟡 | Compila e passa os testes num PC; o ensaio numa cabeça de ferramenta real continua pendente. |
+| Testes | 🟢 | A bateria de testes passa na CI em cada envio. |
+| Hardware real | 🟠 | Ainda não correu numa placa real: o ensaio de bancada continua pendente. |
+| Segurança | 🟡 | As versões são assinadas com Ed25519 e verificadas antes de usar; o tratamento das chaves não foi revisto por mais ninguém. |
+| Documentação | 🟡 | README em oito línguas e documentos de referência; as traduções não foram revistas por falantes nativos. |
+
+<!-- /urtc-section:status_firmware -->
+
 ## ⚙️ O que é o URTC?
 
 O URTC é uma placa de controlo tudo-em-um e compacta, alimentada por um microcontrolador STM32 (STM32F303CCT6, LQFP48). Comunica com o controlador principal do robô através de bus CAN, pensada para executar com baixa latência tarefas complexas diretamente na cabeça da ferramenta ou no eixo (a latência nunca foi medida numa placa e não se promete tempo real estrito). Dispõe de um ecrã OLED integrado para diagnóstico instantâneo — splash de arranque animado, ícones animados por ferramenta, telemetria em direto num painel de dois tons — um LED RGB de estado de um único píxel mais um anel de LEDs RGB endereçáveis para iluminação de câmara, um conector de expansão de 20 pinos para placas adicionais, uma F-RAM integrada que guarda os setpoints da ferramenta ativa através de uma falha de energia, e etapas dedicadas de potência analógica e de alta corrente.
@@ -703,21 +718,6 @@ Este projeto faz parte do ecossistema de robótica HYDRA-UMC do mesmo autor (Jua
 
 As versões dos programas URTC que funcionam em conjunto, e a versão do protocolo que cada uma fala, constam da tabela de compatibilidade que o URTC-COMMON gera: [docs/COMPATIBILITY.md](https://github.com/JuanenRac/URTC/blob/main/docs/COMPATIBILITY.md).
 <!-- /urtc-section:compatibility -->
-
-<!-- urtc-section:status_firmware -->
-## 💡 Estado do projeto
-
-🟢 feito e verificado · 🟡 funciona, com limites conhecidos · 🟠 a meio ou por verificar · 🔴 por fazer ou a não funcionar. Nada é verde se nunca correu em hardware real.
-
-| Parte | Estado | O que o repositório consegue demonstrar |
-| --- | :---: | --- |
-| Software | 🟡 | Compila e passa os testes num PC; o ensaio numa cabeça de ferramenta real continua pendente. |
-| Testes | 🟢 | A bateria de testes passa na CI em cada envio. |
-| Hardware real | 🟠 | Ainda não correu numa placa real: o ensaio de bancada continua pendente. |
-| Segurança | 🟡 | As versões são assinadas com Ed25519 e verificadas antes de usar; o tratamento das chaves não foi revisto por mais ninguém. |
-| Documentação | 🟡 | README em oito línguas e documentos de referência; as traduções não foram revistas por falantes nativos. |
-
-<!-- /urtc-section:status_firmware -->
 
 ## 📜 LICENÇA
 
