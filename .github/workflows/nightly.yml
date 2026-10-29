@@ -1,0 +1,42 @@
+# =============================================================================
+# URTC - the nightly run of the full CI
+# Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
+# GPL-3.0-or-later - see LICENSE
+# =============================================================================
+# A push or a pull request is the only moment the CI baseline normally runs, so a change in
+# something the repository depends on (a runner image, a toolchain, a pinned action, a published
+# firmware image) is only found by the next unrelated change. Every night, and when asked, the
+# complete baseline workflow is run again on the current default branch.
+# A failing night opens (or updates) one issue.
+name: URTC nightly CI
+
+on:
+  schedule:
+    - cron: "7 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  baseline:
+    name: Run the full CI baseline
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ci.yml
+
+  report:
+    name: Report a failing night
+    needs: baseline
+    if: ${{ failure() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Open an issue (or comment on the open one)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="The nightly CI failed"
+          existing=$(gh issue list --repo "${{ github.repository }}" --state open --search "${title} in:title" --json number --jq '.[0].number')
+          body="The complete CI baseline fails on the default branch: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          if [ -n "$existing" ]; then gh issue comment "$existing" --repo "${{ github.repository }}" --body "$body"; else gh issue create --repo "${{ github.repository }}" --title "$title" --body "$body"; fi
