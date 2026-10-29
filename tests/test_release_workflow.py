@@ -11,6 +11,8 @@ WORKFLOW = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="
 CODE = "\n".join(line for line in WORKFLOW.split("\n") if not line.lstrip().startswith("#"))
 
 SECRET_VARIABLES = ("URTC_SIGNING_KEYS", "URTC_RELEASE_ED25519_PEM")
+# the optional token that tells the flasher and the web studio about a release: it is not a key and has a step of its own
+NOTIFY_TOKEN = "URTC_DISPATCH_TOKEN"
 
 
 def triggers() -> list[str]:
@@ -56,9 +58,22 @@ class WhatItMayDo(unittest.TestCase):
 class WhereTheKeysGo(unittest.TestCase):
     def test_the_secrets_are_read_in_one_step_and_only_into_environment_variables(self):
         uses = re.findall(r"\$\{\{\s*secrets\.([A-Z0-9_]+)\s*\}\}", CODE)
-        self.assertEqual(sorted(uses), sorted(SECRET_VARIABLES))
+        self.assertEqual(sorted(uses), sorted((*SECRET_VARIABLES, NOTIFY_TOKEN)))
         for name in SECRET_VARIABLES:
             self.assertRegex(CODE, rf"(?m)^          {name}: \$\{{\{{ secrets\.{name} \}}\}}$")
+
+    def test_the_notification_token_has_a_step_of_its_own_and_is_optional(self):
+        steps = re.split(r"(?m)^      - name: ", CODE)
+        holders = [step for step in steps if f"secrets.{NOTIFY_TOKEN}" in step]
+        self.assertEqual(len(holders), 1)
+        step = holders[0]
+        for name in SECRET_VARIABLES:
+            self.assertNotIn(name, step)
+        self.assertIn(f'[ -z "${{{NOTIFY_TOKEN}:-}}" ]', step)
+        self.assertRegex(step, r"(?s)::notice::.*exit 0")
+        self.assertIn("urtc-firmware-released", step)
+        self.assertNotIn("exit 1", step)
+        self.assertIn("repos/JuanenRac/${target}/dispatches", step)
 
     def test_a_key_is_only_written_to_a_file_with_printf_and_never_echoed_or_listed(self):
         for name in SECRET_VARIABLES:
