@@ -1,5 +1,7 @@
 # Static checks run by CI: unused names, bare re-raises inside except, syntax errors.
 exclude = [".venv", "venv", "build", "dist", "__pycache__", "node_modules"]
+# the shared picture tools are copied from the family's canonical copy and are not edited (or linted) here
+extend-exclude = ["tools/_readme_svg.py", "tools/make_architecture.py", "tools/make_structure.py"]
 
 [lint]
 select = ["F", "B904", "E9"]

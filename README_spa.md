@@ -2,7 +2,7 @@
   <img src="images/URTC_BANNER.svg" alt="URTC banner" width="100%">
 </p>
 
-# 🚀 URTC — Universal Robot Tool Controller (v0.3)
+# 🚀 URTC — Universal Robot Tool Controller
 
 <p align="center">
   <a href="README.md">🇺🇸 English</a> |
@@ -15,27 +15,24 @@
   <a href="README_por.md">🇵🇹 Português</a>
 </p>
 
+### El controlador de cabezales de un brazo robótico: una placa STM32F303 con 25 perfiles de herramienta por CAN, un bootloader CAN y un esclavo de expansión
 
 <p align="center">
   <img src="https://img.shields.io/badge/Licencia-GPL%203.0-blue.svg" alt="GPL 3.0">
+  <img src="https://img.shields.io/badge/Tests-38%20suites-2ea44f.svg" alt="Tests">
   <img src="https://img.shields.io/badge/Hardware-CERN%20OHL--S-orange.svg" alt="CERN OHL-S">
   <img src="https://img.shields.io/badge/Lenguaje-C-00599C.svg" alt="C">
   <img src="https://img.shields.io/badge/Plataforma-STM32F303-003551.svg" alt="STM32">
   <img src="https://img.shields.io/badge/Bus-CAN-yellow.svg" alt="CAN">
 </p>
 
-
-> **⚠️ Aviso de seguridad (fase de diseño, ninguna placa ha ejecutado aún este firmware):** esta placa controla un **diodo láser de grabado de 10W** y varias etapas de calentamiento (cartucho de soldador T12, hotend de impresora 3D). Construirla y usarla implica trabajar con equipo que puede causar **quemaduras, incendios o daño ocular** si se ensambla o se opera sin las medidas de seguridad adecuadas (gafas láser calificadas para la longitud de onda del diodo, protección térmica, un corte de energía accesible). Este es un proyecto hobbyista/maker compartido tal cual - constrúyelo y úsalo bajo tu propio riesgo, y no te saltes las prácticas básicas de seguridad solo porque el firmware tenga watchdogs (watchdogs por software que nunca se han ejecutado en una placa real).
-
-¡Hola a todos! Quería compartir un proyecto que he estado desarrollando llamado URTC (Universal Robot Tool Controller). Es una placa de control monolítica y altamente integrada, diseñada específicamente para expandir las capacidades de brazos robóticos y configuraciones de automatización, lo que la convierte en una pareja perfecta para plataformas como PAROL6 y Faze4 — dos brazos robóticos de código abierto diseñados y desarrollados por [Source-Robotics](https://source-robotics.com/) ([GitHub](https://github.com/Source-Robotics)).
-
-**URTC es un proyecto independiente y no oficial.** No está desarrollado ni respaldado por Source-Robotics — es un controlador de cabezal de herramienta compatible, construido para funcionar bien con PAROL6 y Faze4, y la misma arquitectura basada en CAN está abierta para adaptarse también a otras plataformas de brazos robóticos.
-
-Aquí está el desglose completo de qué es, qué hace, y el ecosistema de hardware que gestiona actualmente.
+---
 
 **Estado: 🚧 Proyecto en evolución activa — existen releases, pero nada se ha ejecutado en una placa real.** Existen releases etiquetadas (v0.3.x), cada una con las imágenes de firmware compiladas desde este código, pero no existe ninguna placa poblada, así que el firmware nunca se ha ejecutado en una placa real. URTC está en desarrollo continuo y activo en ambos frentes a la vez: firmware (nuevos perfiles de herramienta, el ecosistema de esclavos de expansión, cambios de protocolo) y hardware (el esquemático y la BOM todavía se están finalizando, todavía no existe ninguna placa poblada). Como ambos lados se mueven juntos, lo que hay en este repositorio en un momento dado es una instantánea de trabajo en curso, no un producto estable y versionado - los nombres de archivo, la estructura de carpetas, el número de herramientas, y la documentación pueden todos cambiar todavía mientras el diseño se asienta. Una vez que tanto el firmware como el hardware alcancen un estado genuinamente estable y verificado en hardware real, se etiquetará un **Release** propiamente dicho que agrupe todo (firmware, bootloader, herramientas de PC, archivos de diseño de hardware, y documentación) como una instantánea coherente y congelada. Hasta entonces, trata `main` como el objetivo activamente cambiante que es.
 
 ---
+
+> **⚠️ Aviso de seguridad (fase de diseño, ninguna placa ha ejecutado aún este firmware):** esta placa controla un **diodo láser de grabado de 10W** y varias etapas de calentamiento (cartucho de soldador T12, hotend de impresora 3D). Construirla y usarla implica trabajar con equipo que puede causar **quemaduras, incendios o daño ocular** si se ensambla o se opera sin las medidas de seguridad adecuadas (gafas láser calificadas para la longitud de onda del diodo, protección térmica, un corte de energía accesible). Este es un proyecto hobbyista/maker compartido tal cual - constrúyelo y úsalo bajo tu propio riesgo, y no te saltes las prácticas básicas de seguridad solo porque el firmware tenga watchdogs (watchdogs por software que nunca se han ejecutado en una placa real).
 
 > **Estado de seguridad física y de ciberseguridad:** este ecosistema no es un sistema de seguridad certificado y todavía no existe ninguna placa URTC poblada. Los bootloaders comprueban las imágenes de firmware con CRC32 y un HMAC-SHA256 de clave compartida, no con una firma asimétrica (prevista); las imágenes de aplicación publicadas están firmadas con la clave pública de desarrollo (`signing_key_kind: dev`), así que cualquiera puede producir una imagen que el bootloader acepte; no se ha transmitido nada a una placa real. Lee la [línea base de seguridad](https://github.com/JuanenRac/URTC-DOCS/blob/main/docs/SECURITY_BASELINE.md) y el [modelo de amenazas](https://github.com/JuanenRac/URTC-DOCS/blob/main/docs/THREAT_MODEL.md) antes de fiarte de cualquier afirmación de aquí para la seguridad de una persona.
 
@@ -48,6 +45,8 @@ Aquí está el desglose completo de qué es, qué hace, y el ecosistema de hardw
 | Tecnología | STM32F303 / bxCAN / 25 tool profiles |
 | Destino | Una placa con microcontrolador (el firmware); se compila en un PC |
 | En hardware real | Todavía no: no consta ninguna ejecución en hardware real para esta versión |
+
+**Ir a:** [Resumen](#-resumen) · [Arquitectura](#-arquitectura) · [Funciones](#-funciones) · [Seguridad](#-seguridad-y-protección) · [Interfaces](#-interfaces) · [Inicio rápido](#-inicio-rápido) · [Pruebas](#-pruebas) · [Estructura](#-estructura-del-repositorio) · [Relacionados](#-proyectos-relacionados)
 
 <!-- urtc-section:status_firmware -->
 ## 🚦 Estado del proyecto
@@ -64,11 +63,29 @@ Aquí está el desglose completo de qué es, qué hace, y el ecosistema de hardw
 
 <!-- /urtc-section:status_firmware -->
 
-## ⚙️ ¿Qué es URTC?
+## 🎯 Resumen
+
+¡Hola a todos! Quería compartir un proyecto que he estado desarrollando llamado URTC (Universal Robot Tool Controller). Es una placa de control monolítica y altamente integrada, diseñada específicamente para expandir las capacidades de brazos robóticos y configuraciones de automatización, lo que la convierte en una pareja perfecta para plataformas como PAROL6 y Faze4 — dos brazos robóticos de código abierto diseñados y desarrollados por [Source-Robotics](https://source-robotics.com/) ([GitHub](https://github.com/Source-Robotics)).
+
+**URTC es un proyecto independiente y no oficial.** No está desarrollado ni respaldado por Source-Robotics — es un controlador de cabezal de herramienta compatible, construido para funcionar bien con PAROL6 y Faze4, y la misma arquitectura basada en CAN está abierta para adaptarse también a otras plataformas de brazos robóticos.
+
+Aquí está el desglose completo de qué es, qué hace, y el ecosistema de hardware que gestiona actualmente.
 
 URTC es una placa de control todo-en-uno y compacta, impulsada por un microcontrolador STM32 (STM32F303CCT6, LQFP48). Se comunica con el controlador principal del robot vía bus CAN, pensada para ejecutar con baja latencia tareas complejas directamente en el cabezal de la herramienta o en el eje (la latencia nunca se ha medido en una placa y no se promete tiempo real estricto). Cuenta con una pantalla OLED integrada para diagnóstico instantáneo — splash de arranque animado, iconos animados por herramienta, telemetría en vivo en un panel de dos tonos — un LED RGB de estado de un solo píxel más un anillo de LED RGB direccionable para iluminación de cámara, un conector de expansión de 20 pines para placas adicionales, una F-RAM integrada que persiste los setpoints de la herramienta activa a través de un corte de energía, y etapas dedicadas de potencia analógica y de alta corriente.
 
-## 🛠️ Arquitectura Escalable y Matriz de Herramientas
+## 🧩 Papel en URTC
+
+URTC es la placa y su firmware: la parte del ecosistema que va en el cabezal del robot y hace el trabajo, con un bootloader CAN que permite actualizar la aplicación por el mismo cable. Todo lo demás de la familia se construye a su alrededor. URTC-COMMON escribe su protocolo CAN una sola vez como datos, URTC-FLASHER y URTC-TESTER lo actualizan y lo ejercitan desde un PC (URTC-WEB-STUDIO hace ambas cosas en un navegador), URTC-GATEWAY puede ponerse delante de su bus, URTC-SMART-RACK guarda los cabezales, URTC-VISION-TOOL es un cabezal que inspecciona, URTC-UPDATER mantiene al día los programas y URTC-DOCS guarda la arquitectura y lo que está probado. Está pensado para brazos robóticos como PAROL6 y Faze4 y es un proyecto independiente y no oficial. Todavía no existe ninguna placa montada.
+
+## 🏛️ Arquitectura
+
+<p align="center">
+  <img src="images/architecture.svg" alt="Arquitectura de URTC: quién lo usa, qué contiene y de qué depende" width="100%">
+</p>
+
+Cómo encajan las partes de este repositorio: quién lo usa, qué contiene y de qué depende. La imagen se dibuja desde `docs/architecture.json` y se comprueba contra el código.
+
+### Arquitectura Escalable y Matriz de Herramientas
 
 La fortaleza principal de URTC es su extrema versatilidad. En vez de cambiar la electrónica para cada trabajo distinto, la placa presenta una arquitectura de matriz escalable:
 
@@ -76,7 +93,51 @@ La fortaleza principal de URTC es su extrema versatilidad. En vez de cambiar la 
 * **25 perfiles automatizados plug-and-play:** el firmware maneja nativamente 25 perfiles de herramienta - la placa lee la identidad física del cabezal de herramienta y configura las etapas de potencia, sensores, y la lógica de conmutación de forma transparente sin necesitar un reflasheo completo. Quedan 6 direcciones más libres dentro del esquema existente para futuros perfiles de herramienta.
 * **Configuración libre de herramienta:** la lectura de jumper reservada `11111` no elige una herramienta fija - le indica a la placa que busque qué herramienta usar en un registro de su propia F-RAM persistente, establecido de antemano por CAN (mediante `URTC Flasher`). Útil para una placa que necesita reprogramarse a una herramienta distinta sin volver a soldar jumpers físicamente. Ver `docs/EEPROM.TXT` sección 5 para el mecanismo completo.
 
-## 🔌 Flexibilidad de Hardware y Soporte de Motores
+### Layout de memoria flash (256K total, modelo de imagen dorada / actualización A-B)
+
+```
+0x08000000 ┌─────────────────────────────────┐
+           │  Bootloader (30K)                 │  Siempre se ejecuta primero en cada
+           │                                   │  arranque. Escucha brevemente por
+           │                                   │  CAN, y luego o salta a la app o
+           │                                   │  espera una actualización. Controla
+           │                                   │  el OLED directamente durante una
+           │                                   │  actualización (ver abajo).
+0x08007800 ├─────────────────────────────────┤
+           │  Página de metadatos (2K)         │  Describe lo que sea que haya en el
+           │                                   │  slot principal en este momento:
+           │                                   │  HardwareID, versión, tamaño, CRC32,
+           │                                   │  y una firma HMAC-SHA256. El
+           │                                   │  bootloader lo comprueba todo antes
+           │                                   │  de saltar a la app.
+0x08008000 ├─────────────────────────────────┤
+           │  Slot principal (112K)            │  Este es el firmware de aplicación /
+           │                                   │  URTC_MAIN_FIRMWARE_v<version>.* — el firmware
+           │                                   │  real que se ejecuta día a día,
+           │                                   │  descrito en el resto de este
+           │                                   │  README. Nunca se toca en una
+           │                                   │  actualización hasta que una imagen
+           │                                   │  verificada y buena conocida está
+           │                                   │  lista para reemplazarlo.
+0x08024000 ├─────────────────────────────────┤
+           │  Slot de respaldo / staging (112K)│  Solo almacenamiento en bruto,
+           │                                   │  nunca ejecutado directamente. Cada
+           │                                   │  actualización CAN escribe aquí
+           │                                   │  primero.
+0x08040000 └─────────────────────────────────┘
+```
+
+**Por qué un slot de respaldo.** Una actualización CAN nunca se escribe en el slot que está corriendo actualmente. Va al respaldo primero, se verifica completamente ahí — tamaño, CRC32, y una comprobación HMAC-SHA256 con una clave simétrica compartida, que muestra que la hizo alguien que posee esa clave (las imágenes publicadas usan la clave pública de desarrollo), no solo que llegó intacta — y solo entonces se copia al slot principal. Una pérdida de energía en cualquier punto antes de que empiece esa copia deja el firmware actualmente en ejecución completamente intacto, así que no hay ninguna ventana en la que una descarga interrumpida pueda inutilizar la placa. Si la pérdida de energía ocurre *durante* la propia copia, el bootloader se da cuenta en el siguiente arranque (el respaldo, nunca tocado durante la copia, sigue completamente intacto) y simplemente retoma la copia desde ahí hasta que tiene éxito.
+
+## 🖼️ Capturas de pantalla
+
+![URTC v1.0](images/URTC_BOARD.png)
+
+*(Trabajo en progreso — más ángulos y una placa poblada llegarán pronto.)*
+
+## ✨ Funciones
+
+### Flexibilidad de Hardware y Soporte de Motores
 
 Para manejar una variedad tan amplia de aplicaciones, el hardware de URTC está completamente equipado para controlar:
 
@@ -85,7 +146,7 @@ Para manejar una variedad tan amplia de aplicaciones, el hardware de URTC está 
 * **Motores con sensores Hall y tacómetros** para control en lazo cerrado.
 * **Entradas dedicadas** para sensores de proximidad óptica reflectivos como el TCRT5000, más una entrada genérica de fin de carrera/límite activa en bajo, compartida entre cuatro perfiles de herramienta.
 
-## 🧩 Conector de Expansión
+### Conector de Expansión
 
 Un header de 20 pines, separado de los conectores específicos de herramienta, para placas adicionales que necesiten más de lo que un perfil de herramienta dado expone por sí solo - un eje paso a paso extra (TMC2209 o TMC5160), una segunda placa de sensores, ese tipo de cosas.
 
@@ -109,19 +170,19 @@ Un header de 20 pines, separado de los conectores específicos de herramienta, p
 
 El detalle completo pin por pin — qué pin del MCU respalda qué señal, y el razonamiento detrás de un par de restricciones de layout que tiene el paquete de 48 pines de este chip — vive en `docs/PINOUT_CONNECTORS.TXT` y `src/F303-master/README.md`.
 
-### Las 6 variantes de placa de expansión
+#### Las 6 variantes de placa de expansión
 
 4 de las 6 variantes de placa de expansión llevan un driver de motor paso a paso — ya sea un TMC2209 (hasta 2A/bobina, MOSFETs de potencia integrados) o un TMC5160A (hasta 10A+/bobina, necesita 8 MOSFETs de potencia externos que el propio driver no incluye). Independientemente de esa elección de driver, una placa con driver es o bien **básica** (driver + conectores solamente, sin MCU — STEP/DIR/EN enrutado directamente desde la placa principal) o **avanzada** (añade un segundo microcontrolador, STM32F303CBT6, más 2 chips de sensor locales — un ADC de 16 bits ADS1115 y una cámara térmica de la familia MLX9064x — y generación local de PWM para herramientas cuyo timing necesita generarse justo en el cabezal de herramienta en vez de enrutarse por un cable). 2×2 combinaciones, más 2 placas básicas solo-sensor adicionales (ADS1115 o MLX9064x, cableadas directamente a la propia STM32F303CC de la placa principal, sin driver y sin MCU esclavo) para una herramienta que solo necesita uno de esos 2 chips y nada más de lo que también lleva una placa avanzada — 6 placas en total — ver `BOM/BOM_EXPANSION_*.TXT` (6 archivos), `docs/EXPANSION.TXT`, y `docs/PINOUT_SLAVE.txt`.
 
 La propia STM32F303CBT6 de la variante avanzada habla con la placa principal a través del bus I2C por bit-banging ya existente del conector de expansión de arriba — placa principal como maestro, chip esclavo respondiendo como un verdadero esclavo I2C por hardware — y controla su propio segundo bus I2C, local únicamente, para los 2 chips de sensor. Tiene su propio bootloader y firmware de aplicación, actualizados de la misma forma que la placa principal (CAN-OTA desde `URTC Flasher`), solo que retransmitidos a través de ese enlace I2C en vez de alcanzar el chip esclavo directamente. Ver `src/F303-slave/README.md` y `src/F303-slave/boot/README.md` para el detalle técnico completo.
 
-## 💾 Persistencia de Parámetros
+### Persistencia de Parámetros
 
 Una F-RAM FM24CL64B integrada (64Kbit, I2C) mantiene una instantánea actualizada periódicamente de los setpoints de la herramienta activa y de los ajustes globales de LED/OLED, para que un corte de energía repentino no deje "qué estaba haciendo esta placa" tan desconocido como fue imprevista la propia pérdida de energía. Comparte el bus I2C2 por hardware del OLED en vez de tener uno propio — este MCU solo tiene un periférico I2C por hardware utilizable para este propósito, ya reclamado por el OLED (ver `src/F303-master/README.md` sección 6 para el razonamiento completo).
 
 **El estado recuperado es consultable, nunca auto-aplicado a nada peligroso.** Al arrancar, lo que se guardó se vuelve legible por CAN (`0x190`/`0x191`) — pero un setpoint de calentador, la potencia del láser, o un comando de motor nunca se rearman silenciosamente por sí solos. Solo los ajustes seguros y pasivos (colores de LED, modo OLED) se restauran directamente. Reenviar deliberadamente un setpoint después de realmente revisar qué pasó se deja como decisión del controlador maestro, no algo que esta placa decida por sí misma en el instante en que vuelve la energía.
 
-## 💼 Catálogo de Herramientas Automatizadas Nativamente (25 Perfiles de Firmware)
+### Catálogo de Herramientas Automatizadas Nativamente (25 Perfiles de Firmware)
 
 Mediante su lógica de conmutación dinámica, el firmware maneja nativamente los siguientes cabezales de herramienta:
 
@@ -153,11 +214,11 @@ Mediante su lógica de conmutación dinámica, el firmware maneja nativamente lo
 
 *(Existen imágenes de configuración de herramienta para las herramientas 1-12; las imágenes para las herramientas 13-25 se irán completando a medida que la documentación de hardware se ponga al día - los nombres de archivo de arriba coinciden con la convención de nomenclatura ya en uso en `images/`.)*
 
-## 🖥️ Interfaz OLED Local
+### Interfaz OLED Local
 
 Cada cabezal de herramienta muestra telemetría en vivo, específica de la herramienta, en un OLED de dos tonos de 128×64: un splash de arranque animado al encender, un indicador parpadeante de actividad CAN, una lectura "hero" en vivo en la franja superior (temperatura, RPM, potencia — lo que más importe para la herramienta activa), y un pequeño icono animado de cuatro fotogramas por perfil de herramienta.
 
-### El módulo
+#### El módulo
 
 Ambas variantes físicas de abajo son el mismo panel eléctricamente (controlado por SSD1306 o SSD1315 - la secuencia de inicialización del firmware está verificada como compatible con ambos, ver `OLED_Init()` en `firmware_oled_driver.c`; el SSD1315 es un controlador de reemplazo directo más nuevo que muchos módulos llevan hoy bajo el mismo listado/serigrafía "SSD1306"), **128×64**, y la misma división de dos tonos "amarillo/azul", donde el propio material de LED físico está dividido en 2 zonas de color fijo (esto no es seleccionable por software):
 
@@ -166,7 +227,7 @@ Ambas variantes físicas de abajo son el mismo panel eléctricamente (controlado
 
 Ambos caen en el mismo bus I2C2 y en el mismo `OLED_Init()` — el firmware no puede saber cuál de los 2 está conectado, y no lo necesita. Son mutuamente excluyentes en una placa dada (ver la nota `CONN_OLED2` de `BOM/BOM.TXT` - el nombre que usa este documento para lo que el esquemático llama `LCD1`).
 
-#### Opción A — montaje directo (`CONN_OLED2`, el footprint realmente poblado en la placa)
+##### Opción A — montaje directo (`CONN_OLED2`, el footprint realmente poblado en la placa)
 
 <img src="images/OLED_DIRECT_MOUNT.jpg" width="220">
 
@@ -187,7 +248,7 @@ Un panel desnudo sin PCB de breakout separado - solo el cristal y su cinta FPC d
 
 `BS0`/`BS1`/`BS2` son el propio strap de selección de interfaz del panel (GND/VCC/GND aquí), fijo en hardware en vez de expuesto al MCU — esto es lo que pone al controlador en modo I2C en primer lugar, en vez del modo paralelo 8080/6800 al que pertenecen los otros 22 pines FPC.
 
-#### Opción B — módulo breakout (`CONN_OLED`, alternativa externa)
+##### Opción B — módulo breakout (`CONN_OLED`, alternativa externa)
 
 <img src="images/OLED_BREAKOUT_MODULE.jpg" width="220">
 
@@ -200,12 +261,12 @@ El mismo panel pre-montado en una pequeña placa portadora con un header de 4 pi
 | SCK | 3 | SCL — PA9, I2C2 por hardware |
 | SDA | 4 | SDA — PA10, I2C2 por hardware |
 
-### Splash de arranque
+#### Splash de arranque
 
 <img src="ani/splash_boot.gif" width="480">
 
 
-### Iconos de herramienta (uno por perfil, animación de 4 fotogramas)
+#### Iconos de herramienta (uno por perfil, animación de 4 fotogramas)
 
 <table>
 <tr>
@@ -250,7 +311,7 @@ El mismo panel pre-montado en una pequeña placa portadora con un header de 4 pi
 </table>
 
 
-### Advertencia de ID de herramienta inválida
+#### Advertencia de ID de herramienta inválida
 
 Si los jumpers de ID no coinciden con ninguno de los 25 perfiles asignados, la placa bloquea todos los actuadores y parpadea esto en su lugar:
 
@@ -258,7 +319,7 @@ Si los jumpers de ID no coinciden con ninguno de los 25 perfiles asignados, la p
 
 Todos los GIFs fuente de las animaciones viven en [`/ani`](ani/).
 
-## 🔴🟢🔵 LED de Estado Digital
+### LED de Estado Digital
 
 Separado del OLED y del anillo de iluminación de 8 píxeles, `CONN_LED1` lleva un único LED RGB direccionable (familia WS2812B, controlado por SPI/DMA) dedicado al estado de un vistazo.
 
@@ -272,78 +333,17 @@ El maestro todavía puede anular esto en cualquier momento enviando el ID CAN `0
 
 Ver `docs/CANBUS.TXT` (ID `0x100`) para el layout exacto de bytes, que también comparte este mismo mensaje con el control del anillo de LED y del modo nocturno del OLED.
 
-## 📸 Fotos
+## 🔒 Seguridad y protección
 
-![URTC v1.0](images/URTC_BOARD.png)
+- **Protección contra embalamiento térmico** (`thermal_guard.c`, desde la aplicación 0.3.2) en el soldador / aire caliente y el hotend 3D: un MAXTEMP sobre la temperatura *medida* (449 °C T12, 310 °C hotend), una vigilancia de calentamiento (la temperatura debe subir de verdad con el calentador encendido - detecta un termistor o una punta suelta) y una comprobación de mantenimiento (una vez alcanzado el objetivo, sin caídas largas con el calentador encendido). Un fallo corta el calentador, enclava el error de la placa e indica la causa en el byte 4 de `0x111`. Probado en host con un calentador simulado (`tests/test_thermal_guard.c`). Sus límites nunca se han medido con un calentador real, y nada de esto se ha ejecutado en una placa.
+- **Pruebas de host de la lógica del firmware alrededor del hardware** (`tools/run_host_tests.py`, 38 suites): además del bootloader, la guardia térmica y el despachador, los manejadores CAN reales de las 13 herramientas (`firmware_can_*.c`), los bucles de control del calentador (`firmware_control_thermal.c`: conversión del ADC, lecturas imposibles, techos de la consigna, histéresis, calentador atascado, las averías de la guardia), el registrador de fallos (`firmware_blackbox.c`, comparado byte a byte con los escenarios que URTC-COMMON escribe desde su propio modelo, y su lectura por CAN), la identificación de la herramienta por los puentes, los comandos tras la puerta de error y los comandos de la cámara térmica se compilan contra una HAL falsa (`tests/host_hal/`) y se ejecutan bajo los sanitizers de direcciones y de comportamiento indefinido y `gcc -fanalyzer`; `--coverage-floor` (`URTC_COVERAGE_FLOOR` en la CI) los obliga a una parte de líneas ejecutadas (95 por ciento de las líneas de las 78 fuentes del firmware, que ahora incluyen el arranque y el bucle principal de la aplicación, el controlador del OLED y sus pantallas, el LED de estado, los manejadores de interrupción, los buses del conector de expansión, las tres cámaras térmicas, el esclavo de expansión y los programas principales de los dos bootloaders; el suelo de la CI es 90). Nada de esto ha corrido en una placa.
+- **Diagnóstico:** el byte 5 de `0x111` indica la causa del último reinicio (bit0 = saltó el watchdog de hardware); `0x1AA`/`0x1AB` devuelven contadores de vida guardados en F-RAM - fallos térmicos, código del último fallo y tiempo total con el calentador encendido (desde 0.3.3); las muestras de la caja negra registran el código de fallo térmico.
+- **Firma del firmware:** la clave HMAC de los bootloaders se inyecta al compilar desde un fichero privado (`URTC_SIGNING_KEY_FILE`); sin él, el build usa la *clave pública de desarrollo* y lo avisa, y `URTC_RELEASE=1` la rechaza. Cada imagen de `firmware/` va acompañada de `<bin>.sha256` y `<bin>.manifest.json` (con la firma ya calculada), así que URTC Flasher y URTC Web Studio no llevan ninguna clave. Ver [`docs/FIRMWARE_SIGNING.TXT`](docs/FIRMWARE_SIGNING.TXT). HMAC es una clave simétrica compartida: las imágenes de aplicación publicadas están firmadas con la clave pública de desarrollo, así que cualquiera puede firmar una imagen que acepte una placa compilada con esa clave; una firma asimétrica (Ed25519) está prevista. Cada recurso de una release oficial lleva además una firma de release Ed25519 separada (`<recurso>.sig`, clave pública en [`docs/RELEASE_SIGNING.md`](docs/RELEASE_SIGNING.md)); el flasher y el web studio la verifican cuando existe.
+- **Bus CAN:** no autentica al emisor - cualquier nodo puede mandar a las herramientas. Las instalaciones con láser, calentadores o soldadura **deben** tener un interlock de hardware independiente del MCU y un bus cerrado: [`docs/CAN_THREAT_MODEL.TXT`](docs/CAN_THREAT_MODEL.TXT).
+- **Varias cabezas de herramienta en un mismo bus CAN (desactivado por defecto):** un interruptor persistente (CAN `0x1AC` lo cambia, `0x1AD` lo lee, el registro de F-RAM se describe en [`docs/EEPROM.TXT`](docs/EEPROM.TXT)) activa las direcciones de nodo tomadas de los cinco jumpers de ID, el descubrimiento y una regla de selección: solo la cabeza seleccionada obedece órdenes y una cabeza no seleccionada nunca acciona nada. Con el interruptor apagado, que es el valor por defecto y también lo que lee una F-RAM en blanco, la placa se comporta exactamente como una sola cabeza y las tramas e identificadores no cambian. Implementado en el firmware y probado solo en el ordenador; no se ha probado en placas. El diseño y las tramas están en URTC-COMMON (`docs/MULTINODE.md`) y en el apéndice de [`docs/CANBUS.TXT`](docs/CANBUS.TXT).
+- **Qué responde el bootloader y el parche del esclavo:** la lectura de vuelta (`0x7FE`) y la autorización de bajada de versión (`0x7FD`) solo se responden en una sesión del bootloader que la aplicación inició al aceptar `0x7F0` (o en una placa sin aplicación válida); tras un arranque normal se ignoran, y una opción de compilación lo desactiva. El esclavo de expansión envía su número de parche en el décimo byte de su registro de versión y el maestro lo reenvía en `0x222` (un byte 0 significa que no se envía, como en un esclavo antiguo), seguido del byte bajo de su número menor en un tercer byte, para que un programa pueda mostrar la versión completa. Está en el código fuente y probado en el host; ninguna imagen de firmware lo incluye todavía.
 
-*(Trabajo en progreso — más ángulos y una placa poblada llegarán pronto.)*
-
-## 🔧 Compilación y Flasheo
-
-La flash de URTC está dividida en 2 piezas independientes, para que la placa pueda reflashearse por el mismo cordón umbilical CAN que ya usa para todo lo demás — sin necesitar nunca más acceso físico al header JTAG/SWD después de la configuración inicial.
-
-### Layout de memoria flash (256K total, modelo de imagen dorada / actualización A-B)
-
-```
-0x08000000 ┌─────────────────────────────────┐
-           │  Bootloader (30K)                 │  Siempre se ejecuta primero en cada
-           │                                   │  arranque. Escucha brevemente por
-           │                                   │  CAN, y luego o salta a la app o
-           │                                   │  espera una actualización. Controla
-           │                                   │  el OLED directamente durante una
-           │                                   │  actualización (ver abajo).
-0x08007800 ├─────────────────────────────────┤
-           │  Página de metadatos (2K)         │  Describe lo que sea que haya en el
-           │                                   │  slot principal en este momento:
-           │                                   │  HardwareID, versión, tamaño, CRC32,
-           │                                   │  y una firma HMAC-SHA256. El
-           │                                   │  bootloader lo comprueba todo antes
-           │                                   │  de saltar a la app.
-0x08008000 ├─────────────────────────────────┤
-           │  Slot principal (112K)            │  Este es el firmware de aplicación /
-           │                                   │  URTC_MAIN_FIRMWARE_v<version>.* — el firmware
-           │                                   │  real que se ejecuta día a día,
-           │                                   │  descrito en el resto de este
-           │                                   │  README. Nunca se toca en una
-           │                                   │  actualización hasta que una imagen
-           │                                   │  verificada y buena conocida está
-           │                                   │  lista para reemplazarlo.
-0x08024000 ├─────────────────────────────────┤
-           │  Slot de respaldo / staging (112K)│  Solo almacenamiento en bruto,
-           │                                   │  nunca ejecutado directamente. Cada
-           │                                   │  actualización CAN escribe aquí
-           │                                   │  primero.
-0x08040000 └─────────────────────────────────┘
-```
-
-**Por qué un slot de respaldo.** Una actualización CAN nunca se escribe en el slot que está corriendo actualmente. Va al respaldo primero, se verifica completamente ahí — tamaño, CRC32, y una comprobación HMAC-SHA256 con una clave simétrica compartida, que muestra que la hizo alguien que posee esa clave (las imágenes publicadas usan la clave pública de desarrollo), no solo que llegó intacta — y solo entonces se copia al slot principal. Una pérdida de energía en cualquier punto antes de que empiece esa copia deja el firmware actualmente en ejecución completamente intacto, así que no hay ninguna ventana en la que una descarga interrumpida pueda inutilizar la placa. Si la pérdida de energía ocurre *durante* la propia copia, el bootloader se da cuenta en el siguiente arranque (el respaldo, nunca tocado durante la copia, sigue completamente intacto) y simplemente retoma la copia desde ahí hasta que tiene éxito.
-
-### 0. Compilar desde el código fuente (opcional — los binarios precompilados son assets de cada release de GitHub, no ficheros del repositorio)
-
-Dos formas de ir desde el código fuente de este repositorio hasta los 4 binarios de arriba:
-
-- **Automatizada:** `build_firmware.sh` (Linux) o `build_firmware.bat` (Windows), en la raíz del repositorio. Cualquiera de los 2 instala la toolchain ARM GNU si falta, descarga el commit fijado de ST HAL/CMSIS, y compila, enlaza, y aplica `objcopy` a los 4 binarios (app + bootloader de la placa principal, app + bootloader del esclavo de expansión) directamente en `firmware/`, y luego regenera `firmware/firmware_manifest.json`. Ejecútalo sin argumentos para una build completa, `--clean` para vaciar primero la caché local `build/`, o `master`/`slave` para compilar solo el par propio de un chip. `build_firmware.sh` corre de principio a fin contra el árbol de código fuente real de este proyecto; `build_firmware.bat` refleja esa misma lógica para Windows — si alguna vez discrepan, confía en la lógica del script `.sh` como referencia.
-- **Manual:** cada comando que cualquiera de los 2 scripts ejecuta, más el razonamiento detrás de cada elección de toolchain/HAL, está detallado paso a paso en `docs/COMPILE_STM32F303.TXT` — útil en un sistema operativo distinto, con una fuente HAL/CMSIS distinta, o simplemente para ver exactamente qué automatizan los scripts.
-- **Assets de la release:** las imágenes de firmware (`.bin`, `.hex`, `.elf` y sus ficheros de suma y manifiesto) no se versionan en git. `build_firmware.sh`/`.bat` las escriben en `firmware/` (ignorado por git; `build/firmware` en modo CI, `URTC_CI=1`), y `python tools/publish_release_assets.py` comprueba el conjunto e imprime el comando `gh release create` exacto con los ficheros a adjuntar. Se publican solo como assets de la release de GitHub de cada versión. Quién lee qué: [`docs/FIRMWARE_DISTRIBUTION.md`](docs/FIRMWARE_DISTRIBUTION.md).
-
-Después de cualquier cambio en el código fuente del firmware (o antes de confiar en un incremento de versión), ejecuta **`check_version_consistency.sh`** desde la raíz del repositorio: lee las constantes de versión de las Pistas A/E (firmware de la placa principal, aplicación del esclavo de expansión) como fuente de verdad y comprueba cada ubicación que documenta `VERSION_CHECKLIST.txt` para esa etiqueta de versión, reportando cualquier discrepancia — solo reporta, no arregla nada por sí mismo. `VERSION_CHECKLIST.txt` es la referencia completa para las 5 pistas de versión independientes que lleva este proyecto (firmware principal, hardware/PCB, bootloader principal, aplicación del esclavo de expansión, bootloader del esclavo de expansión) y exactamente qué hay que tocar al incrementar cualquiera de ellas.
-
-### 1. Configuración inicial — requiere JTAG/SWD (una vez)
-
-El bootloader solo puede entrar al chip mediante programación física — no hay forma de flashear por CAN una placa que todavía no tiene un bootloader instalado. Este es un paso único:
-
-1. Abre el proyecto en **STM32CubeIDE** (construido y probado contra el target STM32F303CC), o usa **STM32CubeProgrammer** directamente con los binarios compilados de abajo.
-2. Flashea **ambas** imágenes por SWD (ST-Link) mediante el header `STM_JTAG` integrado — cada archivo `.hex` tiene su dirección de destino incrustada, así que la mayoría de las herramientas (incluyendo STM32CubeProgrammer) pueden cargar ambas en la misma sesión:
-   * `URTC_MAIN_BOOTLOADER_v<version>.hex` → `0x08000000`
-   * `URTC_MAIN_FIRMWARE_v<version>.hex` → `0x08008000`
-3. Establece la identidad de la herramienta mediante los jumpers de soldadura de ID antes de encender - la placa los lee una vez al arrancar, como siempre. Cinco jumpers (ID0-ID4), cubriendo el espacio completo de 32 direcciones (31 direcciones de herramienta directas, más la dirección reservada `11111` de configuración libre - ver la sección de Matriz de Herramientas de arriba).
-4. Enciende. El bootloader escucha durante ~600ms, no ve nada, y salta directamente a la aplicación — desde aquí en adelante, todo se comporta exactamente como se describe en el resto de este README. La ventana empieza después de que el bootloader haya comprobado la aplicación almacenada, y una herramienta que quiera actualizar debe enviar dentro de ella su trama de inicio de actualización (0x7F1); el estado de escucha (0x7F5 = 0x01) se envía cuando la ventana termina sin salto, no al empezar.
-
-**El header JTAG nunca se quita ni se deshabilita.** Siempre está ahí como respaldo — si una actualización CAN alguna vez sale mal, o simplemente lo prefieres, puedes reflashear cualquiera de las 2 imágenes por SWD en cualquier momento.
-
-**Dos pulsadores integrados, BOOT y RESET**, también están ahí para recuperación — RESET es un reset de hardware ordinario (`NRST`), y BOOT pone `BOOT0` en alto, que es una decisión a nivel de chip tomada *antes* de que nada de este repositorio corra en absoluto: normalmente (no mantenido) el chip arranca desde la flash hacia el propio bootloader de este proyecto como se describió arriba; mantenido durante el reset, arranca hacia el propio bootloader de System Memory de fábrica de ST en su lugar (recuperación por USB DFU/UART, completamente separado de cualquier cosa de aquí). Ver `src/F303-master/README.md` sección 4a para el detalle técnico completo.
-
-### 2. Actualizaciones posteriores — por bus CAN
+## 🔌 Interfaces
 
 Una vez que el bootloader está en su lugar, actualizar la aplicación ya no necesita acceso físico a la placa en absoluto — solo envía la build de firmware nueva por la misma línea CAN umbilical que ya lleva comandos al cabezal de herramienta.
 
@@ -362,6 +362,25 @@ Una vez que el bootloader está en su lugar, actualizar la aplicación ya no nec
 **Progreso en pantalla.** El bootloader controla el OLED directamente durante una actualización — nadie tiene que adivinar si algo está pasando. Muestra "UPDATING" más una barra de progreso en vivo y un porcentaje mientras se escriben o copian páginas, "FLASH OK" durante un instante antes de resetear hacia el firmware nuevo, y "ERROR" si falla la escritura de una página, la transferencia se estanca más de 10 segundos, o la verificación vuelve con una discrepancia.
 
 **⚠️ Prueba esto en banco antes de confiar en ello en campo.** El protocolo de arriba compila y enlaza limpio y la lógica se ha razonado cuidadosamente, pero un bootloader es exactamente el tipo de firmware donde "compila correctamente" está muy lejos de "confiable en hardware" — el timing real de programación de flash, el comportamiento de CAN a través de una transferencia de varios miles de tramas, y el traspaso bootloader-a-aplicación necesitan todos verificarse en una placa real (idealmente con JTAG a mano como respaldo) antes de confiar en esto para una actualización desatendida con actuadores reales conectados.
+
+## 🚀 Inicio rápido
+
+La flash de URTC está dividida en 2 piezas independientes, para que la placa pueda reflashearse por el mismo cordón umbilical CAN que ya usa para todo lo demás — sin necesitar nunca más acceso físico al header JTAG/SWD después de la configuración inicial.
+
+### Configuración inicial — requiere JTAG/SWD (una vez)
+
+El bootloader solo puede entrar al chip mediante programación física — no hay forma de flashear por CAN una placa que todavía no tiene un bootloader instalado. Este es un paso único:
+
+1. Abre el proyecto en **STM32CubeIDE** (construido y probado contra el target STM32F303CC), o usa **STM32CubeProgrammer** directamente con los binarios compilados de abajo.
+2. Flashea **ambas** imágenes por SWD (ST-Link) mediante el header `STM_JTAG` integrado — cada archivo `.hex` tiene su dirección de destino incrustada, así que la mayoría de las herramientas (incluyendo STM32CubeProgrammer) pueden cargar ambas en la misma sesión:
+   * `URTC_MAIN_BOOTLOADER_v<version>.hex` → `0x08000000`
+   * `URTC_MAIN_FIRMWARE_v<version>.hex` → `0x08008000`
+3. Establece la identidad de la herramienta mediante los jumpers de soldadura de ID antes de encender - la placa los lee una vez al arrancar, como siempre. Cinco jumpers (ID0-ID4), cubriendo el espacio completo de 32 direcciones (31 direcciones de herramienta directas, más la dirección reservada `11111` de configuración libre - ver la sección de Matriz de Herramientas de arriba).
+4. Enciende. El bootloader escucha durante ~600ms, no ve nada, y salta directamente a la aplicación — desde aquí en adelante, todo se comporta exactamente como se describe en el resto de este README. La ventana empieza después de que el bootloader haya comprobado la aplicación almacenada, y una herramienta que quiera actualizar debe enviar dentro de ella su trama de inicio de actualización (0x7F1); el estado de escucha (0x7F5 = 0x01) se envía cuando la ventana termina sin salto, no al empezar.
+
+**El header JTAG nunca se quita ni se deshabilita.** Siempre está ahí como respaldo — si una actualización CAN alguna vez sale mal, o simplemente lo prefieres, puedes reflashear cualquiera de las 2 imágenes por SWD en cualquier momento.
+
+**Dos pulsadores integrados, BOOT y RESET**, también están ahí para recuperación — RESET es un reset de hardware ordinario (`NRST`), y BOOT pone `BOOT0` en alto, que es una decisión a nivel de chip tomada *antes* de que nada de este repositorio corra en absoluto: normalmente (no mantenido) el chip arranca desde la flash hacia el propio bootloader de este proyecto como se describió arriba; mantenido durante el reset, arranca hacia el propio bootloader de System Memory de fábrica de ST en su lugar (recuperación por USB DFU/UART, completamente separado de cualquier cosa de aquí). Ver `src/F303-master/README.md` sección 4a para el detalle técnico completo.
 
 ### Herramientas de PC
 
@@ -382,17 +401,27 @@ También existe una alternativa basada en web que cubre terreno similar
 (monitorización en vivo, análisis CAN, flasheo OTA, inspección térmica)
 sin instalar nada localmente: [URTC Web Studio](https://github.com/JuanenRac/URTC-WEB-STUDIO).
 
-## 🛡️ Protección térmica (solo probada en el host), firma de firmware (clave de desarrollo) y bus CAN (sin autenticación)
+<!-- urtc-section:compatibility -->
+### Requisitos y compatibilidad
 
-- **Protección contra embalamiento térmico** (`thermal_guard.c`, desde la aplicación 0.3.2) en el soldador / aire caliente y el hotend 3D: un MAXTEMP sobre la temperatura *medida* (449 °C T12, 310 °C hotend), una vigilancia de calentamiento (la temperatura debe subir de verdad con el calentador encendido - detecta un termistor o una punta suelta) y una comprobación de mantenimiento (una vez alcanzado el objetivo, sin caídas largas con el calentador encendido). Un fallo corta el calentador, enclava el error de la placa e indica la causa en el byte 4 de `0x111`. Probado en host con un calentador simulado (`tests/test_thermal_guard.c`). Sus límites nunca se han medido con un calentador real, y nada de esto se ha ejecutado en una placa.
-- **Pruebas de host de la lógica del firmware alrededor del hardware** (`tools/run_host_tests.py`, 38 suites): además del bootloader, la guardia térmica y el despachador, los manejadores CAN reales de las 13 herramientas (`firmware_can_*.c`), los bucles de control del calentador (`firmware_control_thermal.c`: conversión del ADC, lecturas imposibles, techos de la consigna, histéresis, calentador atascado, las averías de la guardia), el registrador de fallos (`firmware_blackbox.c`, comparado byte a byte con los escenarios que URTC-COMMON escribe desde su propio modelo, y su lectura por CAN), la identificación de la herramienta por los puentes, los comandos tras la puerta de error y los comandos de la cámara térmica se compilan contra una HAL falsa (`tests/host_hal/`) y se ejecutan bajo los sanitizers de direcciones y de comportamiento indefinido y `gcc -fanalyzer`; `--coverage-floor` (`URTC_COVERAGE_FLOOR` en la CI) los obliga a una parte de líneas ejecutadas (95 por ciento de las líneas de las 78 fuentes del firmware, que ahora incluyen el arranque y el bucle principal de la aplicación, el controlador del OLED y sus pantallas, el LED de estado, los manejadores de interrupción, los buses del conector de expansión, las tres cámaras térmicas, el esclavo de expansión y los programas principales de los dos bootloaders; el suelo de la CI es 90). Nada de esto ha corrido en una placa.
-- **Diagnóstico:** el byte 5 de `0x111` indica la causa del último reinicio (bit0 = saltó el watchdog de hardware); `0x1AA`/`0x1AB` devuelven contadores de vida guardados en F-RAM - fallos térmicos, código del último fallo y tiempo total con el calentador encendido (desde 0.3.3); las muestras de la caja negra registran el código de fallo térmico.
-- **Firma del firmware:** la clave HMAC de los bootloaders se inyecta al compilar desde un fichero privado (`URTC_SIGNING_KEY_FILE`); sin él, el build usa la *clave pública de desarrollo* y lo avisa, y `URTC_RELEASE=1` la rechaza. Cada imagen de `firmware/` va acompañada de `<bin>.sha256` y `<bin>.manifest.json` (con la firma ya calculada), así que URTC Flasher y URTC Web Studio no llevan ninguna clave. Ver [`docs/FIRMWARE_SIGNING.TXT`](docs/FIRMWARE_SIGNING.TXT). HMAC es una clave simétrica compartida: las imágenes de aplicación publicadas están firmadas con la clave pública de desarrollo, así que cualquiera puede firmar una imagen que acepte una placa compilada con esa clave; una firma asimétrica (Ed25519) está prevista. Cada recurso de una release oficial lleva además una firma de release Ed25519 separada (`<recurso>.sig`, clave pública en [`docs/RELEASE_SIGNING.md`](docs/RELEASE_SIGNING.md)); el flasher y el web studio la verifican cuando existe.
-- **Bus CAN:** no autentica al emisor - cualquier nodo puede mandar a las herramientas. Las instalaciones con láser, calentadores o soldadura **deben** tener un interlock de hardware independiente del MCU y un bus cerrado: [`docs/CAN_THREAT_MODEL.TXT`](docs/CAN_THREAT_MODEL.TXT).
-- **Varias cabezas de herramienta en un mismo bus CAN (desactivado por defecto):** un interruptor persistente (CAN `0x1AC` lo cambia, `0x1AD` lo lee, el registro de F-RAM se describe en [`docs/EEPROM.TXT`](docs/EEPROM.TXT)) activa las direcciones de nodo tomadas de los cinco jumpers de ID, el descubrimiento y una regla de selección: solo la cabeza seleccionada obedece órdenes y una cabeza no seleccionada nunca acciona nada. Con el interruptor apagado, que es el valor por defecto y también lo que lee una F-RAM en blanco, la placa se comporta exactamente como una sola cabeza y las tramas e identificadores no cambian. Implementado en el firmware y probado solo en el ordenador; no se ha probado en placas. El diseño y las tramas están en URTC-COMMON (`docs/MULTINODE.md`) y en el apéndice de [`docs/CANBUS.TXT`](docs/CANBUS.TXT).
-- **Qué responde el bootloader y el parche del esclavo:** la lectura de vuelta (`0x7FE`) y la autorización de bajada de versión (`0x7FD`) solo se responden en una sesión del bootloader que la aplicación inició al aceptar `0x7F0` (o en una placa sin aplicación válida); tras un arranque normal se ignoran, y una opción de compilación lo desactiva. El esclavo de expansión envía su número de parche en el décimo byte de su registro de versión y el maestro lo reenvía en `0x222` (un byte 0 significa que no se envía, como en un esclavo antiguo), seguido del byte bajo de su número menor en un tercer byte, para que un programa pueda mostrar la versión completa. Está en el código fuente y probado en el host; ninguna imagen de firmware lo incluye todavía.
+Qué versiones de los programas de URTC funcionan juntas, y qué versión del protocolo habla cada una, figura en la tabla de compatibilidad que genera URTC-COMMON: [docs/COMPATIBILITY.md](https://github.com/JuanenRac/URTC/blob/main/docs/COMPATIBILITY.md).
+<!-- /urtc-section:compatibility -->
 
-## 📋 Registro de Cambios
+## 🧪 Pruebas
+
+La lógica del firmware alrededor del hardware se prueba en un ordenador: `python tools/run_host_tests.py` compila y ejecuta 38 suites de pruebas en C (`tests/test_*.c`) con el compilador del equipo, un HAL simulado y los sanitizadores AddressSanitizer y UBSan con `-fanalyzer`: los bootloaders, la protección térmica, el despachador, los controladores CAN reales de las 13 herramientas, los lazos de control de los calentadores y la caja negra, entre otros. La CI compila y enlaza además los cuatro binarios y falla por debajo de un mínimo de cobertura de las líneas ejecutadas de los fuentes del firmware. Nada de esto se ha ejecutado en una placa: no existe ninguna placa montada, y las pruebas en el equipo no pueden demostrar que funcionen los tiempos, los controladores o las etapas de potencia.
+
+## 🏗️ Compilación y publicación
+
+### Compilar desde el código fuente (opcional — los binarios precompilados son assets de cada release de GitHub, no ficheros del repositorio)
+
+Dos formas de ir desde el código fuente de este repositorio hasta los 4 binarios de arriba:
+
+- **Automatizada:** `build_firmware.sh` (Linux) o `build_firmware.bat` (Windows), en la raíz del repositorio. Cualquiera de los 2 instala la toolchain ARM GNU si falta, descarga el commit fijado de ST HAL/CMSIS, y compila, enlaza, y aplica `objcopy` a los 4 binarios (app + bootloader de la placa principal, app + bootloader del esclavo de expansión) directamente en `firmware/`, y luego regenera `firmware/firmware_manifest.json`. Ejecútalo sin argumentos para una build completa, `--clean` para vaciar primero la caché local `build/`, o `master`/`slave` para compilar solo el par propio de un chip. `build_firmware.sh` corre de principio a fin contra el árbol de código fuente real de este proyecto; `build_firmware.bat` refleja esa misma lógica para Windows — si alguna vez discrepan, confía en la lógica del script `.sh` como referencia.
+- **Manual:** cada comando que cualquiera de los 2 scripts ejecuta, más el razonamiento detrás de cada elección de toolchain/HAL, está detallado paso a paso en `docs/COMPILE_STM32F303.TXT` — útil en un sistema operativo distinto, con una fuente HAL/CMSIS distinta, o simplemente para ver exactamente qué automatizan los scripts.
+- **Assets de la release:** las imágenes de firmware (`.bin`, `.hex`, `.elf` y sus ficheros de suma y manifiesto) no se versionan en git. `build_firmware.sh`/`.bat` las escriben en `firmware/` (ignorado por git; `build/firmware` en modo CI, `URTC_CI=1`), y `python tools/publish_release_assets.py` comprueba el conjunto e imprime el comando `gh release create` exacto con los ficheros a adjuntar. Se publican solo como assets de la release de GitHub de cada versión. Quién lee qué: [`docs/FIRMWARE_DISTRIBUTION.md`](docs/FIRMWARE_DISTRIBUTION.md).
+
+Después de cualquier cambio en el código fuente del firmware (o antes de confiar en un incremento de versión), ejecuta **`check_version_consistency.sh`** desde la raíz del repositorio: lee las constantes de versión de las Pistas A/E (firmware de la placa principal, aplicación del esclavo de expansión) como fuente de verdad y comprueba cada ubicación que documenta `VERSION_CHECKLIST.txt` para esa etiqueta de versión, reportando cualquier discrepancia — solo reporta, no arregla nada por sí mismo. `VERSION_CHECKLIST.txt` es la referencia completa para las 5 pistas de versión independientes que lleva este proyecto (firmware principal, hardware/PCB, bootloader principal, aplicación del esclavo de expansión, bootloader del esclavo de expansión) y exactamente qué hay que tocar al incrementar cualquiera de ellas.
 
 El firmware y el bootloader se versionan y publican de forma
 independiente - flashear un bootloader nuevo no implica una versión de
@@ -405,9 +434,52 @@ implicaría que siempre se mueven juntos:
 - Aplicación del esclavo de expansión (`src/F303-slave/`, STM32F303CBT6): [`src/F303-slave/CHANGELOG.md`](src/F303-slave/CHANGELOG.md)
 - Bootloader del esclavo de expansión (`src/F303-slave/boot/`): [`src/F303-slave/boot/CHANGELOG.md`](src/F303-slave/boot/CHANGELOG.md)
 
-**Política de versionado:** los 4 componentes (2 firmwares de aplicación, 2 bootloaders - `FIRMWARE_VERSION_MAJOR`/`MINOR`/`PATCH` y `BOOTLOADER_VERSION_MAJOR`/`MINOR`/`PATCH`) son **incrementales** - el `PATCH` propio de cada componente sube en 1 solo con el paso explícito `python bump.py` (que usa `bump_version.py`, en la raíz del repositorio); compilar nunca cambia una versión, con acarreo hacia `MINOR` (y luego `MAJOR`) cuando `PATCH` superaría 9, la misma regla en base 10 de "cuentakilómetros" que usa un odómetro real - p. ej. `0.1.7` → `0.1.8` → `0.1.9` → `0.2.0`, nunca `0.1.10`. Cada bootloader mantiene además su propia copia del `FIRMWARE_VERSION_*` de la aplicación correspondiente, sincronizada automáticamente por el mismo bump. Ver [`CHANGELOG.md`](CHANGELOG.md) en la raíz del repositorio para el estado actual de los 4 componentes de un vistazo, y [`VERSION_CHECKLIST.txt`](VERSION_CHECKLIST.txt) para la mecánica completa por pista.
+**Versiones:** los cuatro componentes (dos firmwares de aplicación y dos bootloaders: `FIRMWARE_VERSION_MAJOR`/`MINOR`/`PATCH` y `BOOTLOADER_VERSION_MAJOR`/`MINOR`/`PATCH`) se versionan de forma independiente. La versión de cada uno solo se sube con el paso explícito `python bump.py` (que usa `bump_version.py` en la raíz del repositorio); compilar nunca cambia una versión. Cada bootloader guarda además su propia copia de los `FIRMWARE_VERSION_*` de la aplicación que le corresponde, que ese mismo paso mantiene sincronizada. Consulta [`CHANGELOG.md`](CHANGELOG.md) en la raíz para ver de un vistazo la versión actual de los 4 componentes, y [`VERSION_CHECKLIST.txt`](VERSION_CHECKLIST.txt) para la mecánica de cada línea.
 
-## 🔍 Estado Actual
+## 📂 Estructura del repositorio
+
+<p align="center">
+  <img src="images/repository-structure.svg" alt="Estructura del repositorio URTC" width="100%">
+</p>
+
+<details>
+<summary>Versión en texto del árbol</summary>
+
+```text
+URTC/
+├── src/                                               los cuatro componentes de firmware y lo que comparten
+├── PCB/                                               el esquema y el diseño de la placa
+├── BOM/                                               listas de materiales de la placa y las seis de expansión
+├── 3D/                                                modelos 3D
+├── ani/                                               las animaciones del OLED
+├── keys/                                              solo claves públicas, nunca una privada
+├── docs/                                              protocolo CAN, patillajes, firma, modelo de amenazas, hojas de datos
+├── tests/                                             38 suites de pruebas de host en C
+├── tools/                                             ejecutor de pruebas de host, herramientas de release, comprobaciones compartidas
+├── images/                                            banner e imágenes de este README
+├── .github/                                           flujo de CI y plantillas de issues y pull requests
+├── build-test.sh build-test.bat                       scripts de compilación y pruebas que no cambian nada en el repositorio
+├── test.sh test.bat                                   ejecutan las pruebas
+├── urtc.project.json                                  manifiesto: versión, papel, madurez y comando de compilación
+├── CHANGELOG.md                                       qué cambió en cada versión
+├── SECURITY.md SUPPORT.md LICENSE                     política de seguridad, soporte y licencia
+├── CONTRIBUTING.md CODE_OF_CONDUCT.md                 cómo contribuir y código de conducta
+├── .gitattributes .gitignore                          ajustes de Git
+├── build_firmware.sh build_firmware.bat               compila los cuatro binarios
+├── bump.py bump_version.py bump_manifest_version.py   scripts que suben la versión
+├── check_version_consistency.sh                       comprueba cada lugar donde se indica una versión
+├── check_shared_drivers.py                            comprueba las copias de los controladores compartidos
+├── firmware_signing.py                                firma las imágenes
+├── generate_manifest.py                               escribe el manifiesto de una imagen
+├── VERSION_CHECKLIST.txt                              la mecánica de las cuatro versiones
+└── LICENSE.md ruff.toml                               licencia del hardware y ajustes de lint
+```
+
+</details>
+
+La lista anotada de cada archivo de código, una línea por archivo, está en [docs/SOURCE_MAP.md](docs/SOURCE_MAP.md).
+
+## 🗺️ Hoja de ruta y límites conocidos
 
 **Firmware (`src/F303-master/`):** completo en funcionalidad para los 25 perfiles de herramienta — control térmico todo/nada con histéresis, telemetría por herramienta, watchdogs de comunicación, detección de stall/fallo, y el propio diagnóstico en vivo del OLED, junto con un par de consulta de herramienta activa (`0x110`/`0x111`), un paso-a-través SPI genérico (`0x180`/`0x181`) para el conector de expansión, una F-RAM integrada que persiste los setpoints a través de un corte de energía (`0x190`/`0x191`), el mecanismo de configuración libre de herramienta con jumper `11111` (`0x1A2`/`0x1A3`), reporte de tipo de periférico + número de serie de dispositivo (`0x1A4`/`0x1A5`) para distinguir múltiples placas por lo demás idénticas en un bus compartido, y un puente CAN-a-I2C (`0x210`-`0x221`) que alcanza el chip esclavo de expansión en placas de expansión avanzadas. Versionado independientemente del bootloader (ver el Registro de Cambios abajo). Nada de ello se ha ejecutado en una placa real, y el guardián térmico solo está probado en el host con un calentador simulado.
 
@@ -419,200 +491,11 @@ implicaría que siempre se mueven juntos:
 
 Si alguien de la comunidad está trabajando en efectores finales personalizados, cambiadores de herramienta inteligentes, o integración avanzada de herramientas para PAROL6, Faze4, o cualquier otra plataforma de brazo robótico, ¡me encantaría charlar, intercambiar ideas, o profundizar en los comandos CAN!
 
-## 📂 Estructura del Repositorio
+## 🌍 Idiomas
 
-```
-/
-├── 3D/
-│   ├── RACK/                    Rack de montaje de la placa, 2 variantes (x1, x3) - cada una
-│   │                            en .stl/.3mf/.amf/.scad
-│   ├── REVOLVER/                Placeholder - vacío, contenido todavía no iniciado
-│   └── TOOLS/
-│       └── PAROL6/              Piezas imprimibles en 3D por herramienta para el brazo robótico
-│                                PAROL6 - una subcarpeta por herramienta (0.Universal parts, luego
-│                                1-12 según la numeración del Catálogo de Herramientas de arriba),
-│                                cada una en .stl/.3mf/.amf/.scad donde está poblada; varias
-│                                (4, 6-12) siguen siendo placeholders vacíos
-├── ani/                          27 GIFs: una animación de 4 fotogramas por perfil de herramienta
-│                                 (00-24, coincidiendo con el propio ID numérico de cada
-│                                 herramienta), el splash de arranque (splash_boot.gif), y la
-│                                 advertencia de ID inválido (error_warning.gif) - todos
-│                                 decodificados directamente desde el propio código fuente del
-│                                 firmware de este proyecto (las propias tablas
-│                                 ToolIcons[]/SplashFace[]/ErrorText[] de firmware_render.c), no
-│                                 dibujados a mano por separado, así que siempre coinciden con lo
-│                                 que el OLED real realmente muestra
-├── BOM/
-│   ├── BOM.TXT                  Lista de materiales completa de la placa PCB
-│   ├── BOM_EXPANSION_BASIC_TMC2209.TXT     Placa de expansión, básica + TMC2209
-│   ├── BOM_EXPANSION_BASIC_TMC5160A.TXT    Placa de expansión, básica + TMC5160A
-│   ├── BOM_EXPANSION_ADVANCED_TMC2209.TXT  Placa de expansión, avanzada + TMC2209
-│   ├── BOM_EXPANSION_ADVANCED_TMC5160A.TXT Placa de expansión, avanzada + TMC5160A
-│   ├── BOM_EXPANSION_BASIC_ADS1115.TXT     Placa de expansión, básica + ADS1115 (solo sensor, sin driver/MCU)
-│   └── BOM_EXPANSION_BASIC_MLX9064X.TXT    Placa de expansión, básica + MLX9064x (solo sensor, sin driver/MCU)
-├── docs/
-│   ├── CANBUS.TXT               Referencia del protocolo de bus CAN (todos los IDs de comando/telemetría)
-│   ├── ECOVIA.TXT               Matriz de identificación de herramienta y lógica de mutación de pines
-│   ├── TOOLS.TXT                Catálogo de alto nivel de las 25 herramientas - qué hace cada una y
-│   │                            qué periféricos usa, sin detalle a nivel de pin
-│   ├── PINOUT.TXT               Pinout completo del MCU, bloque por bloque
-│   ├── PINOUT_CONNECTORS.TXT    Pinouts físicos de los conectores (CONN_DRILL, CONN_SEN, etc.)
-│   ├── EXPANSION.TXT            Conector CONN_EXPANSION y las variantes de placa adicional
-│   ├── PINOUT_SLAVE.txt         Pinout completo del chip esclavo de expansión (solo variantes avanzadas)
-│   ├── EEPROM.TXT               Mapa completo de registros de la F-RAM (cada ajuste persistido, offsets de byte)
-│   ├── COMPILE_STM32F303.TXT    Guía de compilación desde cero para los 4 binarios de firmware -
-│   │                            toolchain, configuración de ST HAL/CMSIS, comandos exactos de
-│   │                            compilación/enlazado; build_firmware.sh/.bat en la raíz del
-│   │                            repositorio automatizan este mismo proceso de principio a fin
-│   ├── FIRMWARE_DISTRIBUTION.md Dónde se publican los ficheros de firmware y qué lee cada consumidor
-│   ├── FIRMWARE_SIGNING.TXT     Cómo se firman las imágenes de firmware: HMAC hoy, Ed25519 previsto
-│   ├── RELEASE_SIGNING.md       Cómo se firma una versión publicada (firma Ed25519 separada de cada recurso) y la clave pública
-│   ├── KEYS.md                  Cada clave de la que depende la familia: para qué sirve, valor público, dónde está incrustada y dónde vive la mitad privada
-│   ├── CAN_THREAT_MODEL.TXT     En qué confía el bus CAN y los requisitos de instalación que se derivan
-│   ├── COMPATIBILITY.md         Qué versiones de los programas funcionan juntas (generado por URTC-COMMON)
-│   ├── datasheet/               2 datasheets de componentes no cubiertos ya bajo
-│   │                            PCB/datasheet/ (CFM_40.pdf, EFB0424VHD-CP0.pdf)
-│   └── tool_image_generator/    Toolkit que genera images/TOOL_*.png (ver abajo) -
-│                                render_engine.py + tool_data.py + generate_all.py, y
-│                                PROCEDURE.TXT explicando cómo añadir la imagen propia de una
-│                                herramienta nueva o regenerar una existente
-├── src/
-│   ├── F303-master/
-│   │   ├── STM32F303CC_main.c    Punto de entrada - definiciones globales y main()
-│   │   ├── firmware_*.c/.h       ~100 archivos más, uno por subsistema (OLED, LEDs, manejadores
-│   │   │                         CAN por herramienta, inicialización, persistencia, etc.), incluyendo
-│   │   │                         firmware_ads1115.c (driver directo de ADS1115, placa
-│   │   │                         Basic+ADS1115) - ver el propio README.md de esta carpeta para
-│   │   │                         la tabla completa archivo por archivo
-│   │   ├── melexis_mlx90640/     Biblioteca oficial propia de Melexis para MLX90640 (Apache-2.0,
-│   │   │                         C plano) más el propio driver de conexión directa de esta placa
-│   │   │                         encima de ella, para la placa de expansión Basic+MLX9064x
-│   │   ├── melexis_mlx90641/     Misma idea, biblioteca MLX90641 (Apache-2.0, C++ - ver el
-│   │   │                         propio README.md de esta carpeta, sección 8a, para por qué esta
-│   │   │                         biblioteca es C++ en un proyecto por lo demás todo-C)
-│   │   ├── melexis_mlx90642/     Misma idea, biblioteca MLX90642 (Apache-2.0, C plano) - ver la
-│   │   │                         sección 8a para por qué el propio driver de este sensor es
-│   │   │                         genuinamente más simple que el de los otros 2
-│   │   ├── STM32F303CCTx_APP.ld  Script de enlazado para la aplicación (slot principal de 112K en 0x08008000)
-│   │   ├── README.md             Referencia técnica: plataforma de hardware, el sistema de
-│   │   │                         selección de herramienta por jumper de ID, el cableado de
-│   │   │                         periféricos por herramienta - ver CANBUS.TXT para el protocolo
-│   │   │                         a nivel de cable cuyo por qué explica esto
-│   │   └── boot/
-│   │       ├── bootloader_main.c  Punto de entrada del bootloader
-│   │       ├── bootloader_*.c/.h  9 archivos más (tipos/constantes compartidos, criptografía,
-│   │       │                      flash/metadatos, OLED, protocolo CAN)
-│   │       ├── STM32F303CCTx_BOOTLOADER.ld  Script de enlazado para el bootloader (región de 30K en 0x08000000)
-│   │       └── README.md          Mismo rol de referencia técnica que el de la aplicación, para el bootloader
-│   ├── common/                   Cabeceras compartidas por la aplicación, el bootloader y el esclavo: la marca de sesión de arranque, los registros del esclavo y el formato de versión en el bus
-│   └── F303-slave/               Chip acompañante (STM32F303CBT6) solo en las 2 variantes de placa
-│       │                         de expansión AVANZADA - ver la sección Conector de Expansión de
-│       │                         arriba. Par propio de bootloader/aplicación, protocolo de
-│       │                         actualización propio basado en I2C (no CAN), versionado propio
-│       │                         independiente.
-│       ├── slave_main.c          Punto de entrada
-│       ├── slave_*.c/.h          7 archivos más (tipos/constantes compartidos, protocolo de
-│       │                         enlace I2C, bus de sensor local, PWM local)
-│       ├── STM32F303CBTx_SLAVEAPP.ld  Script de enlazado (slot principal de 54K en 0x08005000)
-│       ├── README.md             Referencia técnica: por qué existe este chip, el propio bus de
-│       │                         sensores ADS1115/MLX9064x local, PWM local, el protocolo de
-│       │                         enlace I2C hacia la placa principal
-│       ├── melexis_mlx90640/     Biblioteca oficial propia de Melexis para MLX90640 (Apache-2.0,
-│       │                         C plano, sin modificar, con su propio archivo de licencia) -
-│       │                         mantenida como su propia unidad de compilación separada,
-│       │                         deliberadamente nunca fusionada en el propio código fuente de
-│       │                         este proyecto, ya que Apache-2.0 exige que el propio aviso de
-│       │                         copyright de ese código se mantenga intacto
-│       ├── melexis_mlx90641/     Biblioteca oficial propia de Melexis para MLX90641 (Apache-2.0,
-│       │                         C++ - una biblioteca genuinamente separada de la propia de
-│       │                         MLX90640, no una variante de ella - ver el propio README.md de
-│       │                         esta carpeta, sección 3, para por qué es C++ y cómo lo maneja
-│       │                         la build)
-│       ├── melexis_mlx90642/     Biblioteca oficial propia de Melexis para MLX90642 (Apache-2.0,
-│       │                         C plano) - interfaz de transporte genuinamente más simple que la
-│       │                         propia de los otros 2 sensores, ver README.md sección 3 para
-│       │                         saber por qué
-│       └── boot/
-│           ├── slaveboot_main.c   Punto de entrada del bootloader
-│           ├── slaveboot_*.c/.h   7 archivos más (criptografía, flash/metadatos, protocolo)
-│           ├── STM32F303CBTx_SLAVEBOOT.ld  Script de enlazado (región de 18K en 0x08000000)
-│           └── README.md          Mismo rol de referencia técnica que el de la aplicación
-├── firmware/  (salida de compilación ignorada por git - se publica solo como assets de la release)
-│   ├── URTC_MAIN_BOOTLOADER_v<version>.bin  Bootloader compilado, flashear en 0x08000000
-│   ├── URTC_MAIN_BOOTLOADER_v<version>.elf  Bootloader compilado, flashear en 0x08000000
-│   ├── URTC_MAIN_BOOTLOADER_v<version>.hex  Bootloader compilado, flashear en 0x08000000 (dirección incrustada)
-│   ├── URTC_MAIN_FIRMWARE_v<version>.bin    Bin de aplicación compilado, flashear en 0x08008000
-│   ├── URTC_MAIN_FIRMWARE_v<version>.elf    Elf de aplicación compilado, flashear en 0x08008000
-│   ├── URTC_MAIN_FIRMWARE_v<version>.hex    HEX de aplicación compilado, flashear en 0x08008000 (dirección incrustada)
-│   ├── URTC_SLAVE_BOOTLOADER_v<version>.{bin,elf,hex}  Bootloader propio del esclavo de expansión, flashear en 0x08000000
-│   │                             en el STM32F303CBT6 (solo placas de expansión avanzadas)
-│   ├── URTC_SLAVE_FIRMWARE_v<version>.{bin,elf,hex}  Aplicación propia del esclavo de expansión, flashear en 0x08005000
-│   └── firmware_manifest.json    Índice legible por máquina de los 4 componentes de arriba - versión,
-│                                 dirección de flash, y el tamaño/CRC32 propio de cada archivo, para
-│                                 que una herramienta externa compruebe qué hay aquí y qué es más
-│                                 nuevo que lo que tenga actualmente. Regenerado automáticamente por
-│                                 generate_manifest.py (llamado por el propio último paso de
-│                                 build_firmware.sh/.bat) - nunca editado a mano.
-├── images/
-│   ├── OLED_DIRECT_MOUNT.jpg     LCD1/CONN_OLED2 - panel FPC desnudo de 30 pines, opción de montaje directo
-│   ├── OLED_BREAKOUT_MODULE.jpg  CONN_OLED - módulo breakout I2C externo, opción alternativa
-│   ├── URTC_BANNER.svg             Logo general del proyecto, incrustado al principio de este README
-│   ├── URTC_BOARD.png           Foto de la placa
-│   ├── URTC_SCHEMATIC.png       Esquemático de la placa
-│   ├── URTC_PCB_TOP.png         Capa TOP de la placa (cuando se añada)
-│   ├── URTC_PCB_BOTTOM.png      Capa BOTTOM de la placa (cuando se añada)
-│   └── TOOL_*.png               Diagrama de referencia de jumper/cableado por herramienta, uno por perfil
-│                                (los 25 presentes - ver el propio enlace de cada herramienta en el Catálogo de Herramientas de arriba)
-├── PCB/
-│   ├── URTC_V1.0.sch            Esquemático Eagle (cuando se añada)
-│   ├── URTC_V1.0.brd            Layout de placa Eagle (cuando se añada)
-│   ├── URTC_V1.0_JLCPCB.ZIP     Gerbers, archivos bom y cpl (cuando se añadan)
-│   ├── URTC_BOM.TXT             BOM en bruto exportada de Eagle (exportación de referencia - ver
-│   │                            BOM/BOM.TXT para la propia versión curada y organizada de este proyecto)
-│   ├── datasheet/               Datasheets de todas las piezas usadas en la placa
-│   └── *_PARLIST/PINLIST/NETLIST.TXT   Netlists exportadas de Eagle (referencia para el mapeo de pines)
-├── keys/ registry.json: las claves públicas de la familia y dónde está incrustada cada una (la comprueba tools/keys.py)
-├── tests/ Tests del firmware en el host, compilados contra un HAL falso (tests/host_hal/) y los vectores compartidos, más los tests de las herramientas Python
-├── tools/
-│   ├── build_test.py            Comprobación de build/compilación sin subir versión
-│   ├── publish_release_assets.py  Lista los assets de la release y imprime el comando gh
-│   ├── ci_validate.py           Validación de manifest/CHANGELOG/docs usada por la CI
-│   ├── keys.py                  Contrasta docs/KEYS.md y keys/registry.json entre sí y con el código
-│   ├── release_sign.py          Firma los recursos de una versión publicada (firmas Ed25519 separadas)
-│   ├── run_host_tests.py        Compila y ejecuta las suites de tests del host contra el HAL falso, con un mínimo de cobertura
-│   ├── changelog_section.py / fuzz_virtual_board.py El texto de una sección del CHANGELOG para una versión publicada; una ejecución de fuzzing de la placa virtual
-│   └── _doc_policy.py / _readme_parity.py / _tracked_names.py Comprobaciones compartidas que usa ci_validate.py
-├── VERSION_CHECKLIST.txt        Checklist mecánico para incrementar correctamente cualquiera de los
-│                                propios 4 números de versión independientes de este proyecto
-├── check_version_consistency.sh  Comprobaciones automatizadas de consistencia de versión/archivo - ejecutar antes
-│                                de confiar en las propias afirmaciones de VERSION_CHECKLIST.txt
-├── check_shared_drivers.py       Comprueba que los drivers de Melexis copiados en ambos chips son idénticos
-├── firmware_signing.py           Claves de firma del firmware y los archivos de firma y resumen junto a cada imagen
-├── ruff.toml / urtc.project.json Ajustes de las comprobaciones estáticas y manifiesto del proyecto (versión, madurez, evidencia)
-├── build_firmware.sh            Instala la toolchain, descarga el propio HAL/CMSIS de ST, y
-│                                compila los 4 binarios de firmware de principio a fin (Linux)
-├── build_firmware.bat           Igual, para Windows - ver docs/COMPILE_STM32F303.TXT para
-│                                el proceso manual completo que automatiza cualquiera de los 2 scripts
-├── build-test.sh / build-test.bat  Comprobación de build/compilación sin subir versión
-│                                (envoltorios delgados de tools/build_test.py)
-├── bump.py                      Orden explícita de subir versión (compilar nunca la sube)
-├── bump_version.py              Incremento tipo cuentakilómetros de una cabecera, llamado por bump.py
-├── bump_manifest_version.py     Sincroniza la versión de urtc.project.json con la nativa (--sync)
-├── generate_manifest.py         Regenera firmware/firmware_manifest.json - llamado
-│                                automáticamente como último paso de una ejecución completa de
-│                                build_firmware.sh/.bat, o de forma independiente en cualquier
-│                                momento en que el manifiesto necesite ponerse al día sin una
-│                                recompilación completa
-├── LICENSE
-├── README.md                    Este archivo
-└── README_spa.md / README_ita.md / README_fra.md / README_deu.md / README_zho.md / README_jpn.md / README_por.md  <- traducciones
-```
+El README y los textos existen en inglés, español, francés, italiano, alemán, chino, japonés y portugués de Portugal.
 
-Los archivos de diseño de hardware (esquemático/placa/netlists de Eagle) se añadirán a medida que el layout se estabilice.
-
-**Funciones opcionales del firmware y comprobaciones (solo probadas en el host):** rampas del paso a paso, una trama de salud, un ajuste del oscilador y un PID del calentador, cada una tras un interruptor apagado por defecto (`0x1AE` / `0x1AF`, véase [CANBUS.TXT](docs/CANBUS.TXT)); una placa virtual compilada con sanitizers y un fuzzer alimentado con tramas hechas desde la especificación del protocolo (`tools/fuzz_virtual_board.py`); y `tools/keys.py verify`, que comprueba que cada clave pública embebida en un programa o un bootloader es la registrada ([KEYS.md](docs/KEYS.md)). Nada de esto se ha ejecutado en una placa.
-
-## 🔗 Proyectos Relacionados
+## 🔗 Proyectos relacionados
 
 Este proyecto es parte del ecosistema de robótica HYDRA-UMC del mismo autor (JuanenRac / Electro Hobby 3D). Vale la pena conocerlo, ya que una petición podría en realidad ser sobre alguno de estos en vez de sobre este repositorio.
 
@@ -703,9 +586,7 @@ Este proyecto es parte del ecosistema de robótica HYDRA-UMC del mismo autor (Ju
 - **[HYDRA-UMC-OPS-AGENT](https://github.com/JuanenRac/HYDRA-UMC-OPS-AGENT)** — coordinador de incidencias de mantenimiento: un rol edge de bajo privilegio recopila un snapshot de inventario/salud saneado, un rol control-plane lo renderiza de solo lectura y pide a un proveedor de IA que sugiera un diagnóstico - nunca aplica un parche ni despliega nada.
 - **[HYDRA-UMC-DEV-SERVER](https://github.com/JuanenRac/HYDRA-UMC-DEV-SERVER)** — host de desarrollo reproducible (Raspberry Pi 5 / CM5) que almacena el código del ecosistema y ejecuta tareas acotadas de compilación/pruebas bajo una cola duradera; un rol de desarrollo dedicado, explícitamente distinto de un CM5 operativo.
 
----
-
-## 📚 Documentación y Comunidad
+## 📚 Documentación
 
 - **[CONTRIBUTING.md](CONTRIBUTING.md)** — stack tecnológico y pautas de codificación para un pull request.
 - **[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)** — los estándares de comportamiento esperados en esta comunidad.
@@ -713,16 +594,18 @@ Este proyecto es parte del ecosistema de robótica HYDRA-UMC del mismo autor (Ju
 - **[SUPPORT.md](SUPPORT.md)** — dónde hacer preguntas y reportar errores.
 - **[LICENSE.md](LICENSE.md)** — la licencia propia de este proyecto.
 
+## 🤝 Contribuir y comunidad
+
+* Antes de una pull request ejecuta `URTC_CI=1 python tools/ci_validate.py`: debe pasar. Consulta [CONTRIBUTING.md](CONTRIBUTING.md) y el [código de conducta](CODE_OF_CONDUCT.md).
+* El README existe en ocho idiomas: un cambio en el texto se hace en los ocho archivos, y las secciones compartidas con otros repositorios las escribe `tools/readme_sections.py` de URTC-COMMON.
+* No describas como funcionando en una placa lo que solo se ha compilado.
+* Informa de una vulnerabilidad en privado: [SECURITY.md](SECURITY.md). Preguntas, ideas e informes: electrohobby3d@gmail.com ([SUPPORT.md](SUPPORT.md)).
+
 ## 👤 AUTOR
+
 **JuanenRac** (Electro Hobby 3D)
 📧 electrohobby3d@gmail.com
 📺 [youtube.com/@electrohobby3d](https://youtube.com/@electrohobby3d)
-
-<!-- urtc-section:compatibility -->
-## 🧩 Compatibilidad
-
-Qué versiones de los programas de URTC funcionan juntas, y qué versión del protocolo habla cada una, figura en la tabla de compatibilidad que genera URTC-COMMON: [docs/COMPATIBILITY.md](https://github.com/JuanenRac/URTC/blob/main/docs/COMPATIBILITY.md).
-<!-- /urtc-section:compatibility -->
 
 ## 📜 LICENCIA
 

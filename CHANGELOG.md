@@ -4,6 +4,7 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **The README follows the universal layout in the eight languages:** the sections are in the fixed order with the fixed names (the title no longer carries a version), the Architecture and the Repository Structure are drawn from `docs/architecture.json` and `docs/structure.json`, the tool catalogue, the OLED, the expansion connector and the status LED are the parts of Features, the thermal guard and the signing notes are Security & Safety, the CAN update sequence is Interfaces, and the first set-up over SWD/JTAG is Quick start. The annotated tree of the files is `docs/SOURCE_MAP.md`. The versions of the four components are described without explaining how they are raised, in the README and in the changelogs.
 - **The layout of the README is checked in the CI:** the validator runs `tools/universal_readme_check.py` and lists, as a warning, what differs from the universal layout of the README.
 - **Project status is the second section of the README,** right after At a glance, in the eight languages.
 
@@ -115,7 +116,7 @@ All notable changes to this project are documented here.
 
 - Components: main application 0.3.4, main bootloader 0.3.8, slave application 0.1.9, slave bootloader 0.2.2.
 
-- The firmware version scripts keep their own three-component odometer (0.7.9 -> 0.8.0, 0.9.9 -> 1.0.0, 9.9.9 -> 10.0.0) and no longer hand over to the shared manifest utility, which broke the build at the boundary versions; the successor rule is now a pure function covered by boundary tests that run in CI and as a step of the build script.
+- The firmware version scripts keep their own three-component scheme and no longer hand over to the shared manifest utility, which broke the build at the boundary versions; the successor rule is now a pure function covered by boundary tests that run in CI and as a step of the build script.
 - CI builds (URTC_CI=1) publish firmware images under build/firmware instead of firmware/, so a validation build leaves the tracked images untouched.
 - The firmware manifest and the per-image sidecars take their timestamp from SOURCE_DATE_EPOCH or, in CI, from the last commit date, so regenerating them gives identical files; generate_manifest.py accepts an optional output directory. Tests cover the timestamp rules.
 - Verified: unit tests and shell syntax checks only; the ARM firmware build itself was not run.

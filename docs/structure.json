@@ -1,0 +1,434 @@
+{
+  "repo": "URTC",
+  "ecosystem": "urtc",
+  "svg": "en",
+  "cards": [
+    {
+      "name": "src/",
+      "span": 3,
+      "accent": "a",
+      "tree": {
+        "en": "the four firmware components and what they share",
+        "es": "los cuatro componentes de firmware y lo que comparten",
+        "de": "die vier Firmware-Komponenten und was sie teilen",
+        "fr": "les quatre composants de firmware et ce qu'ils partagent",
+        "it": "i quattro componenti firmware e ciò che condividono",
+        "zh": "四个固件组件及其共用部分",
+        "ja": "4 つのファームウェアコンポーネントとその共有部分",
+        "pt": "os quatro componentes de firmware e o que partilham"
+      },
+      "rows": [
+        {
+          "name": "F303-master/",
+          "desc": {
+            "en": "the application of the board (25 profiles)",
+            "es": "la aplicación de la placa (25 perfiles)",
+            "de": "die Anwendung der Platine (25 Profile)",
+            "fr": "l'application de la carte (25 profils)",
+            "it": "l'applicazione della scheda (25 profili)",
+            "zh": "板子的应用程序（25 种配置）",
+            "ja": "ボードのアプリケーション（25 プロファイル）",
+            "pt": "a aplicação da placa (25 perfis)"
+          }
+        },
+        {
+          "name": "F303-master/boot/",
+          "desc": {
+            "en": "its CAN bootloader with a backup slot",
+            "es": "su bootloader CAN con ranura de respaldo",
+            "de": "sein CAN-Bootloader mit Sicherungsslot",
+            "fr": "son bootloader CAN avec slot de secours",
+            "it": "il suo bootloader CAN con slot di backup",
+            "zh": "带备份槽的 CAN 引导程序",
+            "ja": "バックアップスロット付きの CAN ブートローダー",
+            "pt": "o seu bootloader CAN com ranhura de reserva"
+          }
+        },
+        {
+          "name": "F303-slave/",
+          "desc": {
+            "en": "the expansion slave and its bootloader",
+            "es": "el esclavo de expansión y su bootloader",
+            "de": "der Erweiterungs-Slave und sein Bootloader",
+            "fr": "l'esclave d'extension et son bootloader",
+            "it": "lo slave di espansione e il suo bootloader",
+            "zh": "扩展从机及其引导程序",
+            "ja": "拡張スレーブとそのブートローダー",
+            "pt": "o escravo de expansão e o seu bootloader"
+          }
+        },
+        {
+          "name": "common/",
+          "desc": {
+            "en": "C code shared by the components",
+            "es": "código C compartido entre los componentes",
+            "de": "von den Komponenten geteilter C-Code",
+            "fr": "code C partagé entre les composants",
+            "it": "codice C condiviso tra i componenti",
+            "zh": "各组件共用的 C 代码",
+            "ja": "コンポーネントが共有する C コード",
+            "pt": "código C partilhado entre os componentes"
+          }
+        }
+      ]
+    },
+    {
+      "name": "PCB/ BOM/ 3D/ ani/ keys/",
+      "kind": "group",
+      "span": 3,
+      "columns": 2,
+      "rows": [
+        {
+          "name": "PCB/",
+          "desc": {
+            "en": "the schematic and board design",
+            "es": "el esquema y el diseño de la placa",
+            "de": "Schaltplan und Platinenentwurf",
+            "fr": "le schéma et le dessin de la carte",
+            "it": "lo schema e il progetto della scheda",
+            "zh": "原理图和板子设计",
+            "ja": "回路図と基板設計",
+            "pt": "o esquema e o desenho da placa"
+          }
+        },
+        {
+          "name": "BOM/",
+          "desc": {
+            "en": "bills of materials of the board and the six expansion boards",
+            "es": "listas de materiales de la placa y las seis de expansión",
+            "de": "Stücklisten der Platine und der sechs Erweiterungsplatinen",
+            "fr": "nomenclatures de la carte et des six cartes d'extension",
+            "it": "distinte base della scheda e delle sei di espansione",
+            "zh": "主板和六种扩展板的物料清单",
+            "ja": "ボードと 6 種の拡張ボードの部品表",
+            "pt": "listas de materiais da placa e das seis de expansão"
+          }
+        },
+        {
+          "name": "3D/",
+          "desc": {
+            "en": "3D models",
+            "es": "modelos 3D",
+            "de": "3D-Modelle",
+            "fr": "modèles 3D",
+            "it": "modelli 3D",
+            "zh": "3D 模型",
+            "ja": "3D モデル",
+            "pt": "modelos 3D"
+          }
+        },
+        {
+          "name": "ani/",
+          "desc": {
+            "en": "the animations of the OLED",
+            "es": "las animaciones del OLED",
+            "de": "die Animationen des OLED",
+            "fr": "les animations de l'OLED",
+            "it": "le animazioni dell'OLED",
+            "zh": "OLED 的动画",
+            "ja": "OLED のアニメーション",
+            "pt": "as animações do OLED"
+          }
+        },
+        {
+          "name": "keys/",
+          "desc": {
+            "en": "public keys only, never a private one",
+            "es": "solo claves públicas, nunca una privada",
+            "de": "nur öffentliche Schlüssel, nie ein privater",
+            "fr": "uniquement des clés publiques, jamais une privée",
+            "it": "solo chiavi pubbliche, mai una privata",
+            "zh": "只有公钥，绝无私钥",
+            "ja": "公開鍵のみ、秘密鍵は一切なし",
+            "pt": "só chaves públicas, nunca uma privada"
+          }
+        },
+        {
+          "name": "docs/",
+          "desc": {
+            "en": "CAN protocol, pinouts, signing, threat model, datasheets",
+            "es": "protocolo CAN, patillajes, firma, modelo de amenazas, hojas de datos",
+            "de": "CAN-Protokoll, Pinbelegungen, Signierung, Bedrohungsmodell, Datenblätter",
+            "fr": "protocole CAN, brochages, signature, modèle de menaces, fiches techniques",
+            "it": "protocollo CAN, piedinature, firma, modello delle minacce, datasheet",
+            "zh": "CAN 协议、引脚、签名、威胁模型、数据手册",
+            "ja": "CAN プロトコル、ピン配置、署名、脅威モデル、データシート",
+            "pt": "protocolo CAN, pinagens, assinatura, modelo de ameaças, folhas de dados"
+          }
+        },
+        {
+          "name": "tests/",
+          "desc": {
+            "en": "38 C host test suites",
+            "es": "38 suites de pruebas de host en C",
+            "de": "38 C-Host-Testsuiten",
+            "fr": "38 suites de tests hôte en C",
+            "it": "38 suite di test host in C",
+            "zh": "38 个 C 主机测试套件",
+            "ja": "38 の C ホストテストスイート",
+            "pt": "38 conjuntos de testes de host em C"
+          }
+        },
+        {
+          "name": "tools/",
+          "desc": {
+            "en": "host test runner, release tools, shared checks",
+            "es": "ejecutor de pruebas de host, herramientas de release, comprobaciones compartidas",
+            "de": "Host-Testläufer, Release-Werkzeuge, gemeinsame Prüfungen",
+            "fr": "lanceur de tests hôte, outils de release, contrôles partagés",
+            "it": "esecutore dei test host, strumenti di release, controlli condivisi",
+            "zh": "主机测试运行器、发布工具、共用检查",
+            "ja": "ホストテストの実行、リリースツール、共有検査",
+            "pt": "executor de testes de host, ferramentas de release, verificações partilhadas"
+          }
+        },
+        {
+          "name": "images/",
+          "desc": {
+            "en": "banner and the pictures of this README",
+            "es": "banner e imágenes de este README",
+            "de": "Banner und Bilder dieses READMEs",
+            "fr": "bannière et images de ce README",
+            "it": "banner e immagini di questo README",
+            "zh": "横幅和本 README 的图片",
+            "ja": "バナーとこの README の画像",
+            "pt": "faixa e imagens deste README"
+          }
+        },
+        {
+          "name": ".github/",
+          "desc": {
+            "en": "CI workflow, issue and pull-request templates",
+            "es": "flujo de CI y plantillas de issues y pull requests",
+            "de": "CI-Workflow sowie Vorlagen für Issues und Pull Requests",
+            "fr": "workflow de CI et modèles d'issues et de pull requests",
+            "it": "workflow di CI e modelli per issue e pull request",
+            "zh": "CI 工作流以及 Issue 和 Pull Request 模板",
+            "ja": "CI ワークフローと Issue・プルリクエストのテンプレート",
+            "pt": "fluxo de CI e modelos de issues e pull requests"
+          }
+        }
+      ]
+    },
+    {
+      "name": {
+        "en": "Files at the root",
+        "es": "Archivos de la raíz",
+        "de": "Dateien im Wurzelverzeichnis",
+        "fr": "Fichiers à la racine",
+        "it": "File nella radice",
+        "zh": "根目录文件",
+        "ja": "ルートのファイル",
+        "pt": "Ficheiros na raiz"
+      },
+      "kind": "group",
+      "span": 3,
+      "columns": 2,
+      "rows": [
+        {
+          "name": "build-test.sh  build-test.bat",
+          "desc": {
+            "en": "build and test scripts that change nothing in the repository",
+            "es": "scripts de compilación y pruebas que no cambian nada en el repositorio",
+            "de": "Build- und Testskripte, die im Repository nichts ändern",
+            "fr": "scripts de compilation et de test qui ne changent rien dans le dépôt",
+            "it": "script di compilazione e test che non cambiano nulla nel repository",
+            "zh": "构建并测试的脚本，不会修改仓库内容",
+            "ja": "リポジトリを変更しないビルド・テストのスクリプト",
+            "pt": "scripts de compilação e testes que não alteram nada no repositório"
+          },
+          "tree_name": "build-test.sh build-test.bat"
+        },
+        {
+          "name": "test.sh  test.bat",
+          "desc": {
+            "en": "run the tests",
+            "es": "ejecutan las pruebas",
+            "de": "führen die Tests aus",
+            "fr": "lancent les tests",
+            "it": "eseguono i test",
+            "zh": "运行测试",
+            "ja": "テストを実行",
+            "pt": "executam os testes"
+          },
+          "tree_name": "test.sh test.bat"
+        },
+        {
+          "name": "urtc.project.json",
+          "desc": {
+            "en": "manifest: version, role, maturity and build command",
+            "es": "manifiesto: versión, papel, madurez y comando de compilación",
+            "de": "Manifest: Version, Rolle, Reifegrad und Build-Befehl",
+            "fr": "manifeste : version, rôle, maturité et commande de compilation",
+            "it": "manifesto: versione, ruolo, maturità e comando di compilazione",
+            "zh": "清单：版本、角色、成熟度和构建命令",
+            "ja": "マニフェスト：バージョン、役割、成熟度、ビルドコマンド",
+            "pt": "manifesto: versão, papel, maturidade e comando de compilação"
+          }
+        },
+        {
+          "name": "CHANGELOG.md",
+          "desc": {
+            "en": "what changed in each version",
+            "es": "qué cambió en cada versión",
+            "de": "was sich in jeder Version geändert hat",
+            "fr": "ce qui a changé à chaque version",
+            "it": "che cosa è cambiato in ogni versione",
+            "zh": "每个版本的变更",
+            "ja": "各バージョンの変更内容",
+            "pt": "o que mudou em cada versão"
+          }
+        },
+        {
+          "name": "SECURITY.md  SUPPORT.md  LICENSE",
+          "desc": {
+            "en": "security policy, support and license",
+            "es": "política de seguridad, soporte y licencia",
+            "de": "Sicherheitsrichtlinie, Support und Lizenz",
+            "fr": "politique de sécurité, assistance et licence",
+            "it": "politica di sicurezza, supporto e licenza",
+            "zh": "安全政策、支持和许可证",
+            "ja": "セキュリティポリシー、サポート、ライセンス",
+            "pt": "política de segurança, suporte e licença"
+          },
+          "tree_name": "SECURITY.md SUPPORT.md LICENSE"
+        },
+        {
+          "name": "CONTRIBUTING.md  CODE_OF_CONDUCT.md",
+          "desc": {
+            "en": "how to contribute and the code of conduct",
+            "es": "cómo contribuir y código de conducta",
+            "de": "wie man mitwirkt, und der Verhaltenskodex",
+            "fr": "comment contribuer et code de conduite",
+            "it": "come contribuire e codice di condotta",
+            "zh": "如何参与贡献和行为准则",
+            "ja": "貢献方法と行動規範",
+            "pt": "como contribuir e código de conduta"
+          },
+          "tree_name": "CONTRIBUTING.md CODE_OF_CONDUCT.md"
+        },
+        {
+          "name": ".gitattributes  .gitignore",
+          "desc": {
+            "en": "Git settings",
+            "es": "ajustes de Git",
+            "de": "Git-Einstellungen",
+            "fr": "réglages Git",
+            "it": "impostazioni di Git",
+            "zh": "Git 设置",
+            "ja": "Git の設定",
+            "pt": "definições do Git"
+          },
+          "tree_name": ".gitattributes .gitignore"
+        },
+        {
+          "name": "build_firmware.sh  build_firmware.bat",
+          "tree_name": "build_firmware.sh build_firmware.bat",
+          "desc": {
+            "en": "builds the four binaries",
+            "es": "compila los cuatro binarios",
+            "de": "baut die vier Binärdateien",
+            "fr": "compile les quatre binaires",
+            "it": "compila i quattro binari",
+            "zh": "构建四个二进制文件",
+            "ja": "4 つのバイナリをビルド",
+            "pt": "compila os quatro binários"
+          }
+        },
+        {
+          "name": "bump.py  bump_version.py  bump_manifest_version.py",
+          "desc": {
+            "en": "scripts that raise the version",
+            "es": "scripts que suben la versión",
+            "de": "Skripte, die die Version erhöhen",
+            "fr": "scripts qui augmentent la version",
+            "it": "script che alzano la versione",
+            "zh": "提升版本号的脚本",
+            "ja": "バージョンを上げるスクリプト",
+            "pt": "scripts que sobem a versão"
+          },
+          "tree_name": "bump.py bump_version.py bump_manifest_version.py"
+        },
+        {
+          "name": "check_version_consistency.sh",
+          "desc": {
+            "en": "checks every place that states a version",
+            "es": "comprueba cada lugar donde se indica una versión",
+            "de": "prüft jede Stelle, die eine Version nennt",
+            "fr": "vérifie chaque endroit qui indique une version",
+            "it": "controlla ogni posto che indica una versione",
+            "zh": "检查每个标明版本的地方",
+            "ja": "バージョンを示すすべての箇所を検査",
+            "pt": "verifica cada sítio que indica uma versão"
+          }
+        },
+        {
+          "name": "check_shared_drivers.py",
+          "desc": {
+            "en": "checks the shared driver copies",
+            "es": "comprueba las copias de los controladores compartidos",
+            "de": "prüft die Kopien der geteilten Treiber",
+            "fr": "vérifie les copies des pilotes partagés",
+            "it": "controlla le copie dei driver condivisi",
+            "zh": "检查共用驱动的副本",
+            "ja": "共有ドライバーのコピーを検査",
+            "pt": "verifica as cópias dos controladores partilhados"
+          }
+        },
+        {
+          "name": "firmware_signing.py",
+          "desc": {
+            "en": "signs the images",
+            "es": "firma las imágenes",
+            "de": "signiert die Images",
+            "fr": "signe les images",
+            "it": "firma le immagini",
+            "zh": "为镜像签名",
+            "ja": "イメージに署名",
+            "pt": "assina as imagens"
+          }
+        },
+        {
+          "name": "generate_manifest.py",
+          "desc": {
+            "en": "writes the manifest of an image",
+            "es": "escribe el manifiesto de una imagen",
+            "de": "schreibt das Manifest eines Images",
+            "fr": "écrit le manifeste d'une image",
+            "it": "scrive il manifesto di un'immagine",
+            "zh": "写出镜像的清单",
+            "ja": "イメージのマニフェストを書き出す",
+            "pt": "escreve o manifesto de uma imagem"
+          }
+        },
+        {
+          "name": "VERSION_CHECKLIST.txt",
+          "desc": {
+            "en": "the mechanics of the four versions",
+            "es": "la mecánica de las cuatro versiones",
+            "de": "die Mechanik der vier Versionen",
+            "fr": "la mécanique des quatre versions",
+            "it": "la meccanica delle quattro versioni",
+            "zh": "四个版本的机制",
+            "ja": "4 つのバージョンの仕組み",
+            "pt": "a mecânica das quatro versões"
+          }
+        },
+        {
+          "name": "LICENSE.md  ruff.toml",
+          "tree_name": "LICENSE.md ruff.toml",
+          "desc": {
+            "en": "hardware license and lint settings",
+            "es": "licencia del hardware y ajustes de lint",
+            "de": "Hardware-Lizenz und Lint-Einstellungen",
+            "fr": "licence du matériel et réglages de lint",
+            "it": "licenza dell'hardware e impostazioni di lint",
+            "zh": "硬件许可证和 lint 设置",
+            "ja": "ハードウェアのライセンスと lint 設定",
+            "pt": "licença do hardware e definições de lint"
+          }
+        }
+      ]
+    }
+  ]
+}

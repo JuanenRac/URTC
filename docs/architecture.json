@@ -1,0 +1,130 @@
+{
+  "repo": "URTC",
+  "ecosystem": "urtc",
+  "tagline": "The tool-head board: an STM32F303 with 25 tool profiles over CAN, a bootloader that updates it over the same cable and an expansion slave.",
+  "description": "URTC is the firmware of a tool-head controller board and its hardware files. The application reads a five-jumper identity, runs the profile of that tool (heaters with a thermal guard, motors, laser, welders, sensors), answers on CAN, shows what it does on an OLED and keeps its setpoints in an F-RAM. A bootloader with a backup slot lets the application be replaced over CAN after a first setup over SWD. An expansion slave chip serves add-on boards. No populated board exists yet; the logic is tested on a computer.",
+  "columns": [
+    "WHO CALLS IT",
+    "THE BOARD",
+    "WHAT IT DRIVES"
+  ],
+  "nodes": [
+    {
+      "id": "master",
+      "column": 0,
+      "level": "external",
+      "title": "The robot controller",
+      "lines": [
+        "sends commands, reads",
+        "telemetry on the CAN bus;",
+        "PAROL6, Faze4, any arm"
+      ]
+    },
+    {
+      "id": "pc",
+      "column": 0,
+      "level": "external",
+      "title": "FLASHER and TESTER",
+      "lines": [
+        "update the board over CAN and",
+        "exercise it from a PC; SWD for",
+        "the first setup"
+      ]
+    },
+    {
+      "id": "app",
+      "column": 1,
+      "level": "tested",
+      "title": "Application firmware",
+      "lines": [
+        "25 tool profiles, CAN handlers,",
+        "watchdogs, OLED, status LED and",
+        "an F-RAM that keeps setpoints"
+      ],
+      "code": [
+        "src/F303-master"
+      ]
+    },
+    {
+      "id": "boot",
+      "column": 1,
+      "level": "contract",
+      "title": "Bootloader",
+      "lines": [
+        "golden image: a backup slot, CRC32",
+        "and a shared-key HMAC before the",
+        "jump to the application"
+      ],
+      "code": [
+        "src/F303-master/boot"
+      ]
+    },
+    {
+      "id": "guard",
+      "column": 1,
+      "level": "contract",
+      "title": "Thermal guard",
+      "lines": [
+        "a maximum temperature, a heating",
+        "watch and a stall check on the",
+        "soldering iron and the hotend"
+      ],
+      "code": [
+        "src/F303-master"
+      ]
+    },
+    {
+      "id": "slave",
+      "column": 1,
+      "level": "tested",
+      "title": "Expansion slave",
+      "lines": [
+        "its own STM32F303CB and",
+        "bootloader, updated through",
+        "the main board"
+      ],
+      "code": [
+        "src/F303-slave"
+      ]
+    },
+    {
+      "id": "tools",
+      "column": 2,
+      "level": "untested",
+      "title": "Tool stages",
+      "lines": [
+        "soldering iron, hotend, 10 W laser,",
+        "welders, motors and sensors; no",
+        "board has driven them"
+      ]
+    },
+    {
+      "id": "common",
+      "column": 2,
+      "level": "external",
+      "title": "URTC-COMMON",
+      "lines": [
+        "the CAN protocol as data and the",
+        "checked copies of the shared C"
+      ],
+      "code": [
+        "docs/urtc_common.lock.json"
+      ]
+    }
+  ],
+  "edges": [
+    {"from": "master", "to": "app", "label": "CAN", "level": "untested"},
+    {"from": "pc", "to": "boot", "label": "CAN-OTA", "level": "untested"},
+    {"from": "app", "to": "boot", "level": "contract"},
+    {"from": "app", "to": "guard", "level": "contract"},
+    {"from": "app", "to": "tools", "label": "drives", "level": "untested"},
+    {"from": "slave", "to": "common", "level": "contract"}
+  ],
+  "legend": {
+    "tested": "host-tested C logic",
+    "contract": "protects the board; host-tested only",
+    "untested": "has not run on real hardware",
+    "external": "another repository or the robot"
+  },
+  "footer": "No populated board exists yet: laser, heater and welder installations need an independent hardware interlock."
+}

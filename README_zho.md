@@ -15,27 +15,24 @@
   <a href="README_por.md">🇵🇹 Português</a>
 </p>
 
+### 机械臂的工具头控制器：一块 STM32F303 板，通过 CAN 提供 25 种工具配置，带 CAN 引导程序和扩展从机
 
 <p align="center">
   <img src="https://img.shields.io/badge/License-GPL%203.0-blue.svg" alt="GPL 3.0">
+  <img src="https://img.shields.io/badge/Tests-38%20suites-2ea44f.svg" alt="Tests">
   <img src="https://img.shields.io/badge/Hardware-CERN%20OHL--S-orange.svg" alt="CERN OHL-S">
   <img src="https://img.shields.io/badge/Language-C-00599C.svg" alt="C">
   <img src="https://img.shields.io/badge/Platform-STM32F303-003551.svg" alt="STM32">
   <img src="https://img.shields.io/badge/Bus-CAN-yellow.svg" alt="CAN">
 </p>
 
-
-> **⚠️ 安全提示（设计阶段，尚无板卡运行过此固件）：** 本板驱动一个**10W 雕刻激光二极管**以及多个加热级（T12 电烙铁头、3D 打印机热端）。制作和使用它意味着要操作在缺乏适当安全措施（针对该激光二极管波长的护目镜、热防护、可及的电源切断装置）时可能造成**烧伤、火灾或眼部伤害**的设备。这是一个按原样分享的爱好者/创客项目——自行承担构建和使用的风险，不要仅仅因为固件带有看门狗机制就跳过基本的安全规范（这些是软件看门狗，从未在真实板卡上运行过）。
-
-大家好！我想分享一个我一直在开发的项目，叫做 URTC（通用机器人工具控制器）。它是一块单体式、高度集成的控制板，专为扩展机械臂和自动化装置的能力而设计，非常适合像 PAROL6 和 Faze4 这样的平台——这两款开源机械臂由 [Source-Robotics](https://source-robotics.com/)（[GitHub](https://github.com/Source-Robotics)）设计开发。
-
-**URTC 是一个独立的、非官方的项目。** 它不是由 Source-Robotics 开发或认可的——它是一款兼容的工具头控制器，设计用来与 PAROL6 和 Faze4 良好协作，同样基于 CAN 的架构也可以开放用于适配其他机械臂平台。
-
-以下是关于它是什么、能做什么，以及它目前所管理的硬件生态系统的完整分解。
+---
 
 **状态：🚧 积极演进中的项目——已有发布版本，但没有任何东西在真实板卡上运行过。** 已有带标签的发布版本（v0.3.x），每个都包含由本源码构建的固件镜像，但不存在已组装的板卡，因此固件从未在真实板卡上运行过。 URTC 正同时在两条战线上持续、积极地开发：固件（新的工具配置文件、扩展从属生态系统、协议变更）和硬件（原理图和 BOM 仍在最终确定中，尚不存在已实际组装的板卡）。由于两侧始终同步推进，本仓库中在任何给定时刻的内容都是正在进行中工作的快照，而非一个稳定的、有版本号的产品——文件名、文件夹结构、工具数量和文档在设计稳定下来之前都仍可能变化。一旦固件和硬件都真正达到稳定、在真实硬件上经过验证的状态，就会打上一个正式的 **Release** 标签，将所有内容（固件、引导程序、PC 工具、硬件设计文件和文档）作为一个连贯的、冻结的快照捆绑在一起。在那之前，请将 `main` 视为它本身——一个正在积极移动的目标。
 
 ---
+
+> **⚠️ 安全提示（设计阶段，尚无板卡运行过此固件）：** 本板驱动一个**10W 雕刻激光二极管**以及多个加热级（T12 电烙铁头、3D 打印机热端）。制作和使用它意味着要操作在缺乏适当安全措施（针对该激光二极管波长的护目镜、热防护、可及的电源切断装置）时可能造成**烧伤、火灾或眼部伤害**的设备。这是一个按原样分享的爱好者/创客项目——自行承担构建和使用的风险，不要仅仅因为固件带有看门狗机制就跳过基本的安全规范（这些是软件看门狗，从未在真实板卡上运行过）。
 
 > **安全与安防现状:**本生态系统不是经认证的安全系统,目前也不存在已组装的 URTC 电路板。引导程序使用 CRC32 和共享密钥的 HMAC-SHA256 校验固件映像,而非非对称签名(计划中);已发布的应用映像使用公开的开发密钥签名(`signing_key_kind: dev`),因此任何人都可以生成引导程序接受的映像;尚未向任何真实电路板发送过任何内容。在依赖此处任何说法来保障人身安全之前,请先阅读[安全基线](https://github.com/JuanenRac/URTC-DOCS/blob/main/docs/SECURITY_BASELINE.md)和[威胁模型](https://github.com/JuanenRac/URTC-DOCS/blob/main/docs/THREAT_MODEL.md)。
 
@@ -48,6 +45,8 @@
 | 技术栈 | STM32F303 / bxCAN / 25 tool profiles |
 | 目标 | 微控制器板（固件）；在电脑上构建 |
 | 真实硬件 | 尚未：此版本没有在真实硬件上运行的记录 |
+
+**跳转到：** [概述](#-概述) · [架构](#-架构) · [功能](#-功能) · [安全](#-安全与防护) · [接口](#-接口) · [快速开始](#-快速开始) · [测试](#-测试) · [结构](#-仓库结构) · [相关项目](#-相关项目)
 
 <!-- urtc-section:status_firmware -->
 ## 🚦 项目状态
@@ -64,11 +63,29 @@
 
 <!-- /urtc-section:status_firmware -->
 
-## ⚙️ 什么是 URTC？
+## 🎯 概述
+
+大家好！我想分享一个我一直在开发的项目，叫做 URTC（通用机器人工具控制器）。它是一块单体式、高度集成的控制板，专为扩展机械臂和自动化装置的能力而设计，非常适合像 PAROL6 和 Faze4 这样的平台——这两款开源机械臂由 [Source-Robotics](https://source-robotics.com/)（[GitHub](https://github.com/Source-Robotics)）设计开发。
+
+**URTC 是一个独立的、非官方的项目。** 它不是由 Source-Robotics 开发或认可的——它是一款兼容的工具头控制器，设计用来与 PAROL6 和 Faze4 良好协作，同样基于 CAN 的架构也可以开放用于适配其他机械臂平台。
+
+以下是关于它是什么、能做什么，以及它目前所管理的硬件生态系统的完整分解。
 
 URTC 是一块由 STM32 微控制器（STM32F303CCT6，LQFP48）驱动的一体化、紧凑型控制板。它通过 CAN 总线与主机器人控制器通信，旨在让工具头或轴端以低延迟执行复杂任务（延迟从未在真实板卡上测量过，也不保证硬实时）。它配备了一块板载 OLED 显示屏用于即时诊断——动画开机画面、每个工具的动画图标、双色面板上的实时遥测——一个单像素 RGB 状态 LED，加上一圈可寻址 RGB LED 环用于摄像头照明，一个 20 针扩展接口用于附加板，一块板载 F-RAM 在断电时保留当前工具的设定值，以及专用的模拟和大电流电源级。
 
-## 🛠️ 可扩展架构与工具矩阵
+## 🧩 在 URTC 中的角色
+
+URTC 是板子及其固件：生态系统中安装在机器人工具头上、负责干活的部分，带有 CAN 引导程序，可通过同一根线更新应用程序。家族中的其他一切都围绕它建立。URTC-COMMON 把它的 CAN 协议作为数据只写一次，URTC-FLASHER 和 URTC-TESTER 从电脑更新并测试它（URTC-WEB-STUDIO 在浏览器中两者都能做），URTC-GATEWAY 可以放在它的总线前面，URTC-SMART-RACK 存放工具头，URTC-VISION-TOOL 是一个做检测的工具头，URTC-UPDATER 让各程序保持最新，URTC-DOCS 保存架构和已被证明的内容。它面向 PAROL6 和 Faze4 这样的机械臂，是一个独立的非官方项目。目前还没有焊装完成的板子。
+
+## 🏛️ 架构
+
+<p align="center">
+  <img src="images/architecture.svg" alt="URTC 的架构：谁在使用、包含什么、依赖什么" width="100%">
+</p>
+
+本仓库各部分如何协作：谁在使用它、它包含什么、它依赖什么。图片由 `docs/architecture.json` 绘制，并与代码核对。
+
+### 可扩展架构与工具矩阵
 
 URTC 的核心优势在于其极强的多功能性。板卡采用可扩展矩阵架构，而不是为每一项不同的工作更换电子设备：
 
@@ -76,7 +93,47 @@ URTC 的核心优势在于其极强的多功能性。板卡采用可扩展矩阵
 * **25 个即插即用自动化配置文件：** 固件原生支持 25 种工具配置文件——板卡读取工具头的物理身份，无需完整重新刷写即可无缝配置电源级、传感器和逻辑切换。在现有方案内还有 6 个地址保留给未来的工具配置文件。
 * **自由工具配置：** 保留的 `11111` 跳线读数不会选定一个固定的工具——它会告诉板卡改为从其自身持久化的 F-RAM 中的一个寄存器查找应使用哪个工具，该寄存器通过 CAN（经由 `URTC Flasher`）提前设置。适用于需要重新编程为不同工具、而无需物理重新焊接跳线的板卡。完整机制见 `docs/EEPROM.TXT` 第 5 节。
 
-## 🔌 硬件灵活性与电机支持
+### 闪存布局（总计 256K，黄金镜像/A-B 更新模型）
+
+```
+0x08000000 ┌─────────────────────────────────┐
+           │  引导程序（30K）                  │  每次启动时始终首先运行。
+           │                                   │  在 CAN 上短暂监听，然后要么
+           │                                   │  跳转到应用程序，要么等待
+           │                                   │  更新。更新期间直接驱动
+           │                                   │  OLED（见下文）。
+0x08007800 ├─────────────────────────────────┤
+           │  元数据页（2K）                   │  描述主槽当前的内容：
+           │                                   │  硬件 ID、版本、大小、CRC32，
+           │                                   │  以及一个 HMAC-SHA256 签名。
+           │                                   │  引导程序在跳转到应用程序
+           │                                   │  之前会检查全部这些内容。
+0x08008000 ├─────────────────────────────────┤
+           │  主槽（112K）                     │  这是应用固件 /
+           │                                   │  URTC_MAIN_FIRMWARE_v<version>.* ——
+           │                                   │  日常运行的实际固件，
+           │                                   │  本 README 其他部分描述的
+           │                                   │  正是它。在一个经过验证的、
+           │                                   │  已知良好的镜像准备好替换
+           │                                   │  它之前，绝不会被更新触碰。
+0x08024000 ├─────────────────────────────────┤
+           │  备份/暂存槽（112K）               │  仅作原始存储，从不
+           │                                   │  被直接执行。每次 CAN 更新
+           │                                   │  都会先写入这里。
+0x08040000 └─────────────────────────────────┘
+```
+
+**为什么需要一个备份槽。** 一次 CAN 更新绝不会写入当前正在运行的那个槽。它会先写入备份槽，并在那里被完整验证——大小、CRC32，以及一个使用共享对称密钥的 HMAC-SHA256 校验，表明它由持有该密钥的人生成（已发布的镜像使用公开的开发密钥），而不仅仅是完整到达——只有那之后才会被复制到主槽中。在这次复制开始之前的任何时刻发生断电，都会让当前运行的固件完全不受影响，因此不存在一个被中断的下载可能使板卡变砖的窗口期。如果断电恰好发生在复制过程*本身*期间，引导程序会在下一次启动时注意到这一点（备份槽在复制期间从未被触碰，依然完整无损），并简单地从那里恢复复制，直到成功为止。
+
+## 🖼️ 屏幕截图
+
+![URTC v1.0](images/URTC_BOARD.png)
+
+*（进行中——更多角度和已组装板卡即将上线。）*
+
+## ✨ 功能
+
+### 硬件灵活性与电机支持
 
 为应对如此广泛的应用场景，URTC 硬件完全具备控制以下设备的能力：
 
@@ -85,7 +142,7 @@ URTC 的核心优势在于其极强的多功能性。板卡采用可扩展矩阵
 * **带霍尔传感器和转速计的电机**，用于闭环控制。
 * 面向反射式光电接近传感器（如 TCRT5000）的**专用输入**，加上一个通用的低电平有效限位/限位开关输入，在四种工具配置文件间共享。
 
-## 🧩 扩展接口
+### 扩展接口
 
 一个独立于各工具专用接口的 20 针接口，供需要超出单一工具配置文件所暴露内容的附加板使用——例如一个额外的步进轴（TMC2209 或 TMC5160）、第二块传感器板等等。
 
@@ -109,19 +166,19 @@ URTC 的核心优势在于其极强的多功能性。板卡采用可扩展矩阵
 
 完整的逐引脚细节——哪个 MCU 引脚对应哪个信号，以及该芯片 48 针封装背后几处布局约束的原因——见 `docs/PINOUT_CONNECTORS.TXT` 和 `src/F303-master/README.md`。
 
-### 6 种扩展板变体
+#### 6 种扩展板变体
 
 6 种扩展板变体中有 4 种带有步进驱动器——要么是 TMC2209（每相高达 2A，集成功率 MOSFET），要么是 TMC5160A（每相高达 10A+，需要驱动器本身不包含的 8 颗外部功率 MOSFET）。与驱动器选择无关，带驱动器的板要么是**基础型**（仅驱动器 + 接口，无 MCU——STEP/DIR/EN 直接从主板路由过来），要么是**高级型**（增加第二颗微控制器 STM32F303CBT6，加上 2 颗本地传感器芯片——一个 16 位 ADS1115 ADC 和一个 MLX9064x 系列热成像相机——以及针对时序需要在工具头本地生成而非通过线缆路由的工具的本地 PWM 生成）。2×2 种组合，再加上 2 种仅带传感器的基础板（ADS1115 或 MLX9064x，直接接线到主板自身的 STM32F303CC，没有驱动器也没有从属 MCU），供只需要这两颗芯片之一、且不需要高级板所携带的其他任何内容的工具使用——共计 6 块板——见 `BOM/BOM_EXPANSION_*.TXT`（6 个文件）、`docs/EXPANSION.TXT` 和 `docs/PINOUT_SLAVE.txt`。
 
 高级变体自身的 STM32F303CBT6 通过上述扩展接口既有的位模拟 I2C 总线与主板通信——主板作为主机，从属芯片作为真正的硬件 I2C 从机应答——并驱动其自身第二条、仅供本地使用的 I2C 总线以连接那 2 颗传感器芯片。它拥有自己的引导程序和应用固件，更新方式与主板相同（来自 `URTC Flasher` 的 CAN-OTA），只是经由那条 I2C 链路中继，而非直接触达从属芯片。完整技术细节见 `src/F303-slave/README.md` 和 `src/F303-slave/boot/README.md`。
 
-## 💾 参数持久化
+### 参数持久化
 
 一块板载的 FM24CL64B F-RAM（64Kbit，I2C）保存着当前工具设定值以及全局 LED/OLED 设置的定期更新快照，因此突然的断电不会让“这块板当时在做什么”像断电本身一样无从得知。它共享 OLED 的硬件 I2C2 总线，而不是拥有自己的一条——本 MCU 为此目的只有一个可用的硬件 I2C 外设，已经被 OLED 占用了（完整推理见 `src/F303-master/README.md` 第 6 节）。
 
 **恢复的状态可查询，但绝不会自动应用于任何有危险性的内容。** 开机时，任何已保存的内容都可通过 CAN 读取（`0x190`/`0x191`）——但加热器设定值、激光功率或电机指令绝不会在自身悄然重新启用。只有安全的、被动性的设置（LED 颜色、OLED 模式）会被直接恢复。是否在真正审查了发生了什么之后再刻意重新发送一个设定值，留给主控制器自行决定，而不是由本板在电源恢复的那一刻自行决定。
 
-## 💼 原生自动化工具目录（25 种固件配置文件）
+### 原生自动化工具目录（25 种固件配置文件）
 
 通过其动态切换逻辑，固件原生管理以下工具头：
 
@@ -153,11 +210,11 @@ URTC 的核心优势在于其极强的多功能性。板卡采用可扩展矩阵
 
 *（工具 1-12 已有配置图；工具 13-25 的图像将随硬件文档跟进而逐步补充——上方文件名与 `images/` 中已使用的命名惯例一致。）*
 
-## 🖥️ 本地 OLED 界面
+### 本地 OLED 界面
 
 每个工具头都会在一块 128×64 双色 OLED 上显示实时的、针对该工具的遥测数据：开机时的动画开机画面、闪烁的 CAN 活动指示器、顶部条带上的实时“主要”读数（温度、转速、功率——对当前工具而言最重要的内容），以及每个工具配置文件对应的一个小型四帧动画图标。
 
-### 模组
+#### 模组
 
 下方两种物理变体在电气上是同一块面板（由 SSD1306 或 SSD1315 驱动——固件的初始化序列已验证与两者兼容，见 `firmware_oled_driver.c` 中的 `OLED_Init()`；SSD1315 是一款更新的、可直接替代的控制器，如今许多模组在同一“SSD1306”标注/丝印下出货的其实是它），均为 **128×64**，且都是相同的双色“黄/蓝”分区，其中物理 LED 材料本身被分成两个固定颜色区域（这不是软件可选的）：
 
@@ -166,7 +223,7 @@ URTC 的核心优势在于其极强的多功能性。板卡采用可扩展矩阵
 
 两者都接在同一条 I2C2 总线上，使用同一个 `OLED_Init()`——固件无法分辨究竟连接了哪一种，也不需要分辨。在同一块板上两者互斥（见 `BOM/BOM.TXT` 中 `CONN_OLED2` 的注释——本文档中对应原理图所称的 `LCD1`）。
 
-#### 选项 A —— 直接安装（`CONN_OLED2`，板上实际焊接的封装）
+##### 选项 A —— 直接安装（`CONN_OLED2`，板上实际焊接的封装）
 
 <img src="images/OLED_DIRECT_MOUNT.jpg" width="220">
 
@@ -187,7 +244,7 @@ URTC 的核心优势在于其极强的多功能性。板卡采用可扩展矩阵
 
 `BS0`/`BS1`/`BS2` 是该面板自身的接口选择跳接（此处为 GND/VCC/GND），在硬件上固定，而非暴露给 MCU——正是这一设置首先将控制器置于 I2C 模式，而不是其余 22 个 FPC 引脚所属的 8080/6800 并行模式。
 
-#### 选项 B —— 分线模组（`CONN_OLED`，外部替代方案）
+##### 选项 B —— 分线模组（`CONN_OLED`，外部替代方案）
 
 <img src="images/OLED_BREAKOUT_MODULE.jpg" width="220">
 
@@ -200,12 +257,12 @@ URTC 的核心优势在于其极强的多功能性。板卡采用可扩展矩阵
 | SCK | 3 | SCL——PA9，硬件 I2C2 |
 | SDA | 4 | SDA——PA10，硬件 I2C2 |
 
-### 开机画面
+#### 开机画面
 
 <img src="ani/splash_boot.gif" width="480">
 
 
-### 工具图标（每个配置文件一个，4 帧动画）
+#### 工具图标（每个配置文件一个，4 帧动画）
 
 <table>
 <tr>
@@ -250,7 +307,7 @@ URTC 的核心优势在于其极强的多功能性。板卡采用可扩展矩阵
 </table>
 
 
-### 无效工具 ID 警告
+#### 无效工具 ID 警告
 
 如果 ID 跳线不匹配 25 个已分配配置文件中的任何一个，板卡会阻断所有执行器并改为闪烁以下画面：
 
@@ -258,7 +315,7 @@ URTC 的核心优势在于其极强的多功能性。板卡采用可扩展矩阵
 
 所有动画源 GIF 位于 [`/ani`](ani/) 中。
 
-## 🔴🟢🔵 数字状态 LED
+### 数字状态 LED
 
 与 OLED 及 8 像素照明环分开，`CONN_LED1` 携带一颗独立的可寻址 RGB LED（WS2812B 系列，SPI/DMA 驱动），专用于一目了然的状态显示。
 
@@ -272,74 +329,17 @@ URTC 的核心优势在于其极强的多功能性。板卡采用可扩展矩阵
 
 确切的字节布局见 `docs/CANBUS.TXT`（ID `0x100`），该消息也与环形 LED 及 OLED 夜间模式控制共用。
 
-## 📸 照片
+## 🔒 安全与防护
 
-![URTC v1.0](images/URTC_BOARD.png)
+- **热失控保护**（`thermal_guard.c`，自应用 0.3.2 起）用于烙铁／热风和 3D 热端：对*实测*温度的 MAXTEMP（T12 449 °C，热端 310 °C）、加热监视（加热器开启时温度必须真正上升——可检测松脱的热敏电阻或烙铁头）以及保温检查（达到目标后，加热器开启时不得长时间下降）。一旦故障即切断加热器、锁定板卡错误，并通过 `0x111` 的第 4 字节报告原因。已在主机上用模拟加热器测试（`tests/test_thermal_guard.c`）。 这些限值从未在真实加热器上测量过，这一切也从未在真实板卡上运行过。
+- **围绕硬件的固件逻辑的主机测试**（`tools/run_host_tests.py`，38 个测试套件）：除引导程序、热保护和分发器外，13 种工具的真实 CAN 处理程序（`firmware_can_*.c`）、加热器控制回路（`firmware_control_thermal.c`：ADC 换算、不可能的读数、设定值上限、迟滞、加热器卡死、保护触发的故障）、故障记录器（`firmware_blackbox.c`，与 URTC-COMMON 由自身模型写出的场景逐字节比对，并检查其 CAN 读出）、由跳线识别工具、错误门之后的命令以及热像仪命令，都针对模拟 HAL（`tests/host_hal/`）编译，并在地址与未定义行为检查器及 `gcc -fanalyzer` 下运行；`--coverage-floor`（CI 中为 `URTC_COVERAGE_FLOOR`）要求执行的行数达到一定比例（全部 78 个固件源文件的行为 95%，其中现在包括应用程序的启动与主循环、OLED 驱动及其画面、状态 LED、中断处理程序、扩展接口的总线、三种热像仪、扩展从机以及两个引导程序的主程序；CI 的下限为 90）。以上均未在开发板上运行过。
+- **诊断：** `0x111` 的第 5 字节报告上次复位原因（bit0 = 硬件看门狗触发）；`0x1AA`/`0x1AB` 返回保存在 F-RAM 中的累计计数——热故障次数、最后一次故障代码和加热器总开启时间（自 0.3.3 起）；黑匣子采样也会记录热故障代码。
+- **固件签名：** 引导程序的 HMAC 密钥在构建时从私有文件（`URTC_SIGNING_KEY_FILE`）注入；没有该文件时构建使用*公开开发密钥*并给出提示，`URTC_RELEASE=1` 会拒绝该密钥。`firmware/` 中每个镜像都附带 `<bin>.sha256` 和 `<bin>.manifest.json`（含预先计算的签名），因此 URTC Flasher 和 URTC Web Studio 不包含任何密钥。参见 [`docs/FIRMWARE_SIGNING.TXT`](docs/FIRMWARE_SIGNING.TXT)。 HMAC 使用共享的对称密钥：已发布的应用镜像使用公开的开发密钥签名，因此任何人都可以为使用该密钥构建的板卡签出它会接受的镜像；非对称签名（Ed25519）仍在计划中。 正式发布的每个文件还带有分离式 Ed25519 发布签名（`<文件>.sig`，公钥见 [`docs/RELEASE_SIGNING.md`](docs/RELEASE_SIGNING.md)）；刷写器和 Web Studio 在签名存在时会进行验证。
+- **CAN 总线：** 不验证发送方——任何节点都可以控制工具。使用激光、加热器或焊接设备的安装**必须**配备独立于 MCU 的硬件联锁和封闭总线：[`docs/CAN_THREAT_MODEL.TXT`](docs/CAN_THREAT_MODEL.TXT)。
+- **同一 CAN 总线上的多个工具头（默认关闭）：** 一个持久开关（CAN `0x1AC` 设置，`0x1AD` 读取，F-RAM 记录见 [`docs/EEPROM.TXT`](docs/EEPROM.TXT)）会启用由五个 ID 跳线得到的节点地址、发现机制和选择规则：只有被选中的工具头才执行命令，未被选中的工具头绝不动作。开关关闭时（这是默认值，空白的 F-RAM 读出的也是关闭），电路板的行为与单个工具头完全相同，帧和标识符不变。已在固件中实现，仅在计算机上测试，尚未在电路板上试验。设计和帧见 URTC-COMMON（`docs/MULTINODE.md`）以及 [`docs/CANBUS.TXT`](docs/CANBUS.TXT) 的附录。
+- **引导程序的应答范围与从机补丁号：** 回读（`0x7FE`）和降级授权（`0x7FD`）只在由应用程序接受 `0x7F0` 后启动的引导程序会话中应答（或在没有有效应用程序的板上）；正常上电后会被忽略，编译选项可关闭此限制。扩展从机把补丁号放在版本寄存器的第十个字节中，主机用 `0x222` 转发（字节为 0 表示未发送，与旧从机相同）。第三个字节携带次版本号的低字节，程序因此可以显示完整版本。已在源码中实现并在主机上测试；目前还没有固件映像包含它。
 
-*（进行中——更多角度和已组装板卡即将上线。）*
-
-## 🔧 构建与刷写
-
-URTC 的闪存被拆分为两个独立部分，因此板卡可以通过它已经用于其他一切事务的同一条 CAN 脐带线重新刷写——初次设置之后，再也不需要物理接触 JTAG/SWD 接口。
-
-### 闪存布局（总计 256K，黄金镜像/A-B 更新模型）
-
-```
-0x08000000 ┌─────────────────────────────────┐
-           │  引导程序（30K）                  │  每次启动时始终首先运行。
-           │                                   │  在 CAN 上短暂监听，然后要么
-           │                                   │  跳转到应用程序，要么等待
-           │                                   │  更新。更新期间直接驱动
-           │                                   │  OLED（见下文）。
-0x08007800 ├─────────────────────────────────┤
-           │  元数据页（2K）                   │  描述主槽当前的内容：
-           │                                   │  硬件 ID、版本、大小、CRC32，
-           │                                   │  以及一个 HMAC-SHA256 签名。
-           │                                   │  引导程序在跳转到应用程序
-           │                                   │  之前会检查全部这些内容。
-0x08008000 ├─────────────────────────────────┤
-           │  主槽（112K）                     │  这是应用固件 /
-           │                                   │  URTC_MAIN_FIRMWARE_v<version>.* ——
-           │                                   │  日常运行的实际固件，
-           │                                   │  本 README 其他部分描述的
-           │                                   │  正是它。在一个经过验证的、
-           │                                   │  已知良好的镜像准备好替换
-           │                                   │  它之前，绝不会被更新触碰。
-0x08024000 ├─────────────────────────────────┤
-           │  备份/暂存槽（112K）               │  仅作原始存储，从不
-           │                                   │  被直接执行。每次 CAN 更新
-           │                                   │  都会先写入这里。
-0x08040000 └─────────────────────────────────┘
-```
-
-**为什么需要一个备份槽。** 一次 CAN 更新绝不会写入当前正在运行的那个槽。它会先写入备份槽，并在那里被完整验证——大小、CRC32，以及一个使用共享对称密钥的 HMAC-SHA256 校验，表明它由持有该密钥的人生成（已发布的镜像使用公开的开发密钥），而不仅仅是完整到达——只有那之后才会被复制到主槽中。在这次复制开始之前的任何时刻发生断电，都会让当前运行的固件完全不受影响，因此不存在一个被中断的下载可能使板卡变砖的窗口期。如果断电恰好发生在复制过程*本身*期间，引导程序会在下一次启动时注意到这一点（备份槽在复制期间从未被触碰，依然完整无损），并简单地从那里恢复复制，直到成功为止。
-
-### 0. 从源码编译（可选——预构建的二进制文件是每个 GitHub 发布的资源，而不是仓库中的文件）
-
-从本仓库的源码得到上述 4 个二进制文件有两种方式：
-
-- **自动化：** 仓库根目录下的 `build_firmware.sh`（Linux）或 `build_firmware.bat`（Windows）。两者都会在 ARM GNU 工具链缺失时安装它，获取固定版本的 ST HAL/CMSIS 提交，并将全部 4 个二进制文件（主板应用 + 引导程序，扩展从属应用 + 引导程序）编译、链接、`objcopy` 直接输出到 `firmware/`，然后重新生成 `firmware/firmware_manifest.json`。不带参数运行进行完整构建，`--clean` 先清空本地 `build/` 缓存，或 `master`/`slave` 只构建某一颗芯片自身的一对文件。`build_firmware.sh` 针对本项目真实的源码树端到端运行；`build_firmware.bat` 在 Windows 上镜像同样的逻辑——如果两者出现分歧，以 `.sh` 脚本的逻辑为准。
-- **手动：** 无论哪个脚本运行的每一条命令，以及每一项工具链/HAL 选择背后的推理，都在 `docs/COMPILE_STM32F303.TXT` 中逐步详细列出——适用于不同的操作系统、不同的 HAL/CMSIS 源，或只是想确切看看这些脚本自动化了什么。
-- **发布资源：** 固件映像（`.bin`、`.hex`、`.elf` 及其校验和与清单文件）不纳入 git 版本管理。`build_firmware.sh`/`.bat` 将它们写入 `firmware/`（已被 git 忽略；CI 模式即 `URTC_CI=1` 时写入 `build/firmware`），`python tools/publish_release_assets.py` 会检查整套文件并输出带有待附加文件的准确 `gh release create` 命令。它们仅作为每个版本的 GitHub 发布资源发布。 谁读取什么：[`docs/FIRMWARE_DISTRIBUTION.md`](docs/FIRMWARE_DISTRIBUTION.md)。
-
-每次固件源码更改之后（或在信任一次版本递增之前），从仓库根目录运行 **`check_version_consistency.sh`**：它以 Track A/E 的版本常量（主板固件、扩展从属应用）作为权威来源，检查 `VERSION_CHECKLIST.txt` 为该版本标签记录的每一处位置，报告任何不匹配之处——它只报告，不会自行修复任何内容。`VERSION_CHECKLIST.txt` 是本项目所携带的全部 5 条独立版本轨道（主固件、硬件/PCB、主引导程序、扩展从属应用、扩展从属引导程序）的完整参考，以及递增其中任意一条时确切需要修改的内容。
-
-### 1. 首次设置——需要 JTAG/SWD（一次性）
-
-引导程序只能通过物理编程进入芯片——没有办法对一块尚未拥有引导程序的板卡进行 CAN 刷写。这是一次性步骤：
-
-1. 在 **STM32CubeIDE** 中打开项目（已针对 STM32F303CC 目标构建和测试），或直接使用 **STM32CubeProgrammer** 配合下方的编译输出。
-2. 通过板载 `STM_JTAG` 接口，经由 SWD（ST-Link）刷写**两个**镜像——每个 `.hex` 文件都已内置目标地址，因此大多数工具（包括 STM32CubeProgrammer）都可以在同一会话中加载两者：
-   * `URTC_MAIN_BOOTLOADER_v<version>.hex` → `0x08000000`
-   * `URTC_MAIN_FIRMWARE_v<version>.hex` → `0x08008000`
-3. 在通电之前通过 ID 焊接跳线设置工具身份——板卡在开机时读取一次，一如既往。5 个跳线（ID0-ID4），覆盖完整的 32 地址空间（31 个直接工具地址，加上保留的 `11111` 自由配置地址——见上方工具矩阵一节）。
-4. 通电。引导程序监听约 600ms，未发现任何内容，直接跳转进入应用程序——从此刻起，一切行为都与本 README 其余部分所描述的完全一致。该窗口在引导程序检查完已存储的应用之后才开始，想要更新的工具必须在窗口内发送开始更新帧（0x7F1）；监听状态（0x7F5 = 0x01）在窗口结束且未跳转时发送，而不是在窗口开始时发送。
-
-**JTAG 接口从不会被移除或禁用。** 它始终作为后备手段存在——如果某次 CAN 更新出了问题，或者你只是更喜欢这种方式，随时都可以通过 SWD 重新刷写任意一个镜像。
-
-**板载的两个按钮 BOOT 和 RESET** 同样用于恢复——RESET 是普通的硬件复位（`NRST`），BOOT 则将 `BOOT0` 拉高，这是一个在本仓库中任何代码运行*之前*就已在芯片层面做出的决定：正常情况下（未按住）芯片从闪存启动，进入如上所述的本项目自身引导程序；复位时按住，则改为进入 ST 自身的出厂系统内存引导程序（USB DFU/UART 恢复，与本仓库中的任何内容完全无关）。完整技术细节见 `src/F303-master/README.md` 第 4a 节。
-
-### 2. 后续更新——通过 CAN 总线
+## 🔌 接口
 
 一旦引导程序就位，更新应用程序就完全不再需要物理接触板卡——只需通过已经承载着工具头指令的同一条脐带 CAN 线发送新的固件构建即可。
 
@@ -359,6 +359,25 @@ URTC 的闪存被拆分为两个独立部分，因此板卡可以通过它已经
 
 **⚠️ 在信任它之前先在实验台上测试。** 上述协议编译和链接干净，逻辑也经过了仔细推敲，但引导程序恰恰是那种“编译正确”与“在硬件上值得信赖”相去甚远的固件类型——真实的闪存编程时序、跨越数千帧传输的 CAN 行为，以及引导程序到应用程序的交接，都需要在真实板卡上（理想情况下手边备有 JTAG 作为后备）验证，之后才能在连接了真实执行器的无人值守更新场景中依赖它。
 
+## 🚀 快速开始
+
+URTC 的闪存被拆分为两个独立部分，因此板卡可以通过它已经用于其他一切事务的同一条 CAN 脐带线重新刷写——初次设置之后，再也不需要物理接触 JTAG/SWD 接口。
+
+### 首次设置——需要 JTAG/SWD（一次性）
+
+引导程序只能通过物理编程进入芯片——没有办法对一块尚未拥有引导程序的板卡进行 CAN 刷写。这是一次性步骤：
+
+1. 在 **STM32CubeIDE** 中打开项目（已针对 STM32F303CC 目标构建和测试），或直接使用 **STM32CubeProgrammer** 配合下方的编译输出。
+2. 通过板载 `STM_JTAG` 接口，经由 SWD（ST-Link）刷写**两个**镜像——每个 `.hex` 文件都已内置目标地址，因此大多数工具（包括 STM32CubeProgrammer）都可以在同一会话中加载两者：
+   * `URTC_MAIN_BOOTLOADER_v<version>.hex` → `0x08000000`
+   * `URTC_MAIN_FIRMWARE_v<version>.hex` → `0x08008000`
+3. 在通电之前通过 ID 焊接跳线设置工具身份——板卡在开机时读取一次，一如既往。5 个跳线（ID0-ID4），覆盖完整的 32 地址空间（31 个直接工具地址，加上保留的 `11111` 自由配置地址——见上方工具矩阵一节）。
+4. 通电。引导程序监听约 600ms，未发现任何内容，直接跳转进入应用程序——从此刻起，一切行为都与本 README 其余部分所描述的完全一致。该窗口在引导程序检查完已存储的应用之后才开始，想要更新的工具必须在窗口内发送开始更新帧（0x7F1）；监听状态（0x7F5 = 0x01）在窗口结束且未跳转时发送，而不是在窗口开始时发送。
+
+**JTAG 接口从不会被移除或禁用。** 它始终作为后备手段存在——如果某次 CAN 更新出了问题，或者你只是更喜欢这种方式，随时都可以通过 SWD 重新刷写任意一个镜像。
+
+**板载的两个按钮 BOOT 和 RESET** 同样用于恢复——RESET 是普通的硬件复位（`NRST`），BOOT 则将 `BOOT0` 拉高，这是一个在本仓库中任何代码运行*之前*就已在芯片层面做出的决定：正常情况下（未按住）芯片从闪存启动，进入如上所述的本项目自身引导程序；复位时按住，则改为进入 ST 自身的出厂系统内存引导程序（USB DFU/UART 恢复，与本仓库中的任何内容完全无关）。完整技术细节见 `src/F303-master/README.md` 第 4a 节。
+
 ### PC 工具
 
 有两款独立的、跨平台（Windows/Linux）的 GUI 工具支持本板——**URTC Flasher**（CAN-OTA 及全芯片 SWD/JTAG 更新，同时适用于本板和高级扩展变体自身的扩展从属芯片）以及 **URTC Tester**（一个实时 CAN 总线测试器，显示当前跳接的任意工具配置文件）。两者曾经都存在于本仓库 `tools/` 目录下；如今各自都是独立项目，拥有各自的 README、许可证和翻译：
@@ -368,17 +387,27 @@ URTC 的闪存被拆分为两个独立部分，因此板卡可以通过它已经
 
 还存在一个基于网页的替代方案，覆盖类似的功能范围（实时监控、CAN 分析、OTA 刷写、热成像检测），无需在本地安装任何东西：[URTC Web Studio](https://github.com/JuanenRac/URTC-WEB-STUDIO)。
 
-## 🛡️ 热保护（仅在主机上测试）、固件签名（开发密钥）与 CAN（无身份验证）
+<!-- urtc-section:compatibility -->
+### 要求与兼容性
 
-- **热失控保护**（`thermal_guard.c`，自应用 0.3.2 起）用于烙铁／热风和 3D 热端：对*实测*温度的 MAXTEMP（T12 449 °C，热端 310 °C）、加热监视（加热器开启时温度必须真正上升——可检测松脱的热敏电阻或烙铁头）以及保温检查（达到目标后，加热器开启时不得长时间下降）。一旦故障即切断加热器、锁定板卡错误，并通过 `0x111` 的第 4 字节报告原因。已在主机上用模拟加热器测试（`tests/test_thermal_guard.c`）。 这些限值从未在真实加热器上测量过，这一切也从未在真实板卡上运行过。
-- **围绕硬件的固件逻辑的主机测试**（`tools/run_host_tests.py`，38 个测试套件）：除引导程序、热保护和分发器外，13 种工具的真实 CAN 处理程序（`firmware_can_*.c`）、加热器控制回路（`firmware_control_thermal.c`：ADC 换算、不可能的读数、设定值上限、迟滞、加热器卡死、保护触发的故障）、故障记录器（`firmware_blackbox.c`，与 URTC-COMMON 由自身模型写出的场景逐字节比对，并检查其 CAN 读出）、由跳线识别工具、错误门之后的命令以及热像仪命令，都针对模拟 HAL（`tests/host_hal/`）编译，并在地址与未定义行为检查器及 `gcc -fanalyzer` 下运行；`--coverage-floor`（CI 中为 `URTC_COVERAGE_FLOOR`）要求执行的行数达到一定比例（全部 78 个固件源文件的行为 95%，其中现在包括应用程序的启动与主循环、OLED 驱动及其画面、状态 LED、中断处理程序、扩展接口的总线、三种热像仪、扩展从机以及两个引导程序的主程序；CI 的下限为 90）。以上均未在开发板上运行过。
-- **诊断：** `0x111` 的第 5 字节报告上次复位原因（bit0 = 硬件看门狗触发）；`0x1AA`/`0x1AB` 返回保存在 F-RAM 中的累计计数——热故障次数、最后一次故障代码和加热器总开启时间（自 0.3.3 起）；黑匣子采样也会记录热故障代码。
-- **固件签名：** 引导程序的 HMAC 密钥在构建时从私有文件（`URTC_SIGNING_KEY_FILE`）注入；没有该文件时构建使用*公开开发密钥*并给出提示，`URTC_RELEASE=1` 会拒绝该密钥。`firmware/` 中每个镜像都附带 `<bin>.sha256` 和 `<bin>.manifest.json`（含预先计算的签名），因此 URTC Flasher 和 URTC Web Studio 不包含任何密钥。参见 [`docs/FIRMWARE_SIGNING.TXT`](docs/FIRMWARE_SIGNING.TXT)。 HMAC 使用共享的对称密钥：已发布的应用镜像使用公开的开发密钥签名，因此任何人都可以为使用该密钥构建的板卡签出它会接受的镜像；非对称签名（Ed25519）仍在计划中。 正式发布的每个文件还带有分离式 Ed25519 发布签名（`<文件>.sig`，公钥见 [`docs/RELEASE_SIGNING.md`](docs/RELEASE_SIGNING.md)）；刷写器和 Web Studio 在签名存在时会进行验证。
-- **CAN 总线：** 不验证发送方——任何节点都可以控制工具。使用激光、加热器或焊接设备的安装**必须**配备独立于 MCU 的硬件联锁和封闭总线：[`docs/CAN_THREAT_MODEL.TXT`](docs/CAN_THREAT_MODEL.TXT)。
-- **同一 CAN 总线上的多个工具头（默认关闭）：** 一个持久开关（CAN `0x1AC` 设置，`0x1AD` 读取，F-RAM 记录见 [`docs/EEPROM.TXT`](docs/EEPROM.TXT)）会启用由五个 ID 跳线得到的节点地址、发现机制和选择规则：只有被选中的工具头才执行命令，未被选中的工具头绝不动作。开关关闭时（这是默认值，空白的 F-RAM 读出的也是关闭），电路板的行为与单个工具头完全相同，帧和标识符不变。已在固件中实现，仅在计算机上测试，尚未在电路板上试验。设计和帧见 URTC-COMMON（`docs/MULTINODE.md`）以及 [`docs/CANBUS.TXT`](docs/CANBUS.TXT) 的附录。
-- **引导程序的应答范围与从机补丁号：** 回读（`0x7FE`）和降级授权（`0x7FD`）只在由应用程序接受 `0x7F0` 后启动的引导程序会话中应答（或在没有有效应用程序的板上）；正常上电后会被忽略，编译选项可关闭此限制。扩展从机把补丁号放在版本寄存器的第十个字节中，主机用 `0x222` 转发（字节为 0 表示未发送，与旧从机相同）。第三个字节携带次版本号的低字节，程序因此可以显示完整版本。已在源码中实现并在主机上测试；目前还没有固件映像包含它。
+哪些版本的 URTC 程序可以配合使用、各自使用哪个协议版本，列在 URTC-COMMON 生成的兼容性表中：[docs/COMPATIBILITY.md](https://github.com/JuanenRac/URTC/blob/main/docs/COMPATIBILITY.md)。
+<!-- /urtc-section:compatibility -->
 
-## 📋 更新日志
+## 🧪 测试
+
+围绕硬件的固件逻辑在电脑上测试：`python tools/run_host_tests.py` 用主机编译器、模拟 HAL 以及 AddressSanitizer 和 UBSan（带 `-fanalyzer`）构建并运行 38 个 C 测试套件（`tests/test_*.c`），涵盖引导程序、热保护、分发器、13 种工具的真实 CAN 处理程序、加热器控制回路和黑匣子等。CI 还会编译并链接四个二进制文件，并在固件源码已执行行的覆盖率低于下限时失败。这一切都没有在板子上运行过：目前没有焊装完成的板子，主机测试也无法证明时序、驱动或功率级能正常工作。
+
+## 🏗️ 构建与发布
+
+### 从源码编译（可选——预构建的二进制文件是每个 GitHub 发布的资源，而不是仓库中的文件）
+
+从本仓库的源码得到上述 4 个二进制文件有两种方式：
+
+- **自动化：** 仓库根目录下的 `build_firmware.sh`（Linux）或 `build_firmware.bat`（Windows）。两者都会在 ARM GNU 工具链缺失时安装它，获取固定版本的 ST HAL/CMSIS 提交，并将全部 4 个二进制文件（主板应用 + 引导程序，扩展从属应用 + 引导程序）编译、链接、`objcopy` 直接输出到 `firmware/`，然后重新生成 `firmware/firmware_manifest.json`。不带参数运行进行完整构建，`--clean` 先清空本地 `build/` 缓存，或 `master`/`slave` 只构建某一颗芯片自身的一对文件。`build_firmware.sh` 针对本项目真实的源码树端到端运行；`build_firmware.bat` 在 Windows 上镜像同样的逻辑——如果两者出现分歧，以 `.sh` 脚本的逻辑为准。
+- **手动：** 无论哪个脚本运行的每一条命令，以及每一项工具链/HAL 选择背后的推理，都在 `docs/COMPILE_STM32F303.TXT` 中逐步详细列出——适用于不同的操作系统、不同的 HAL/CMSIS 源，或只是想确切看看这些脚本自动化了什么。
+- **发布资源：** 固件映像（`.bin`、`.hex`、`.elf` 及其校验和与清单文件）不纳入 git 版本管理。`build_firmware.sh`/`.bat` 将它们写入 `firmware/`（已被 git 忽略；CI 模式即 `URTC_CI=1` 时写入 `build/firmware`），`python tools/publish_release_assets.py` 会检查整套文件并输出带有待附加文件的准确 `gh release create` 命令。它们仅作为每个版本的 GitHub 发布资源发布。 谁读取什么：[`docs/FIRMWARE_DISTRIBUTION.md`](docs/FIRMWARE_DISTRIBUTION.md)。
+
+每次固件源码更改之后（或在信任一次版本递增之前），从仓库根目录运行 **`check_version_consistency.sh`**：它以 Track A/E 的版本常量（主板固件、扩展从属应用）作为权威来源，检查 `VERSION_CHECKLIST.txt` 为该版本标签记录的每一处位置，报告任何不匹配之处——它只报告，不会自行修复任何内容。`VERSION_CHECKLIST.txt` 是本项目所携带的全部 5 条独立版本轨道（主固件、硬件/PCB、主引导程序、扩展从属应用、扩展从属引导程序）的完整参考，以及递增其中任意一条时确切需要修改的内容。
 
 固件和引导程序是独立版本化和发布的——刷写一个新的引导程序并不意味着有新的应用版本，反之亦然，因此各自在自己的文件中拥有自己的历史，而不是用一个隐含二者始终同步移动的合并版本号：
 
@@ -387,9 +416,52 @@ URTC 的闪存被拆分为两个独立部分，因此板卡可以通过它已经
 - 扩展从属应用（`src/F303-slave/`，STM32F303CBT6）：[`src/F303-slave/CHANGELOG.md`](src/F303-slave/CHANGELOG.md)
 - 扩展从属引导程序（`src/F303-slave/boot/`）：[`src/F303-slave/boot/CHANGELOG.md`](src/F303-slave/boot/CHANGELOG.md)
 
-**版本管理策略：** 全部 4 个组件（2 个应用固件、2 个引导程序——`FIRMWARE_VERSION_MAJOR`/`MINOR`/`PATCH` 和 `BOOTLOADER_VERSION_MAJOR`/`MINOR`/`PATCH`）都是**递增式**的——该组件自身的 `PATCH` 只会通过显式的 `python bump.py` 步骤加 1（由它调用仓库根目录下的 `bump_version.py`），编译从不改变版本，一旦 `PATCH` 会超过 9，就进位到 `MINOR`（然后是 `MAJOR`），与汽车自身里程表使用的相同十进制“里程表”规则一致——例如 `0.1.7` → `0.1.8` → `0.1.9` → `0.2.0`，绝不会是 `0.1.10`。每个引导程序还保留一份对应应用程序 `FIRMWARE_VERSION_*` 的自身副本，由同一次递增自动保持同步。全部 4 个组件当前版本的一览见仓库根目录下的 [`CHANGELOG.md`](CHANGELOG.md)，每条轨道完整的运作机制见 [`VERSION_CHECKLIST.txt`](VERSION_CHECKLIST.txt)。
+**版本：** 四个组件（两个应用固件和两个引导程序：`FIRMWARE_VERSION_MAJOR`/`MINOR`/`PATCH` 和 `BOOTLOADER_VERSION_MAJOR`/`MINOR`/`PATCH`）各自独立计版本。每个组件的版本只会通过明确的 `python bump.py` 步骤提高（它使用仓库根目录的 `bump_version.py`）；编译从不改变版本。每个引导程序还保存对应应用程序 `FIRMWARE_VERSION_*` 的副本，由同一步骤自动保持同步。四个组件的当前版本一目了然地列在仓库根目录的 [`CHANGELOG.md`](CHANGELOG.md) 中，各条线的具体机制见 [`VERSION_CHECKLIST.txt`](VERSION_CHECKLIST.txt)。
 
-## 🔍 当前状态
+## 📂 仓库结构
+
+<p align="center">
+  <img src="images/repository-structure.svg" alt="URTC 的仓库结构" width="100%">
+</p>
+
+<details>
+<summary>目录树的文本版</summary>
+
+```text
+URTC/
+├── src/                                               四个固件组件及其共用部分
+├── PCB/                                               原理图和板子设计
+├── BOM/                                               主板和六种扩展板的物料清单
+├── 3D/                                                3D 模型
+├── ani/                                               OLED 的动画
+├── keys/                                              只有公钥，绝无私钥
+├── docs/                                              CAN 协议、引脚、签名、威胁模型、数据手册
+├── tests/                                             38 个 C 主机测试套件
+├── tools/                                             主机测试运行器、发布工具、共用检查
+├── images/                                            横幅和本 README 的图片
+├── .github/                                           CI 工作流以及 Issue 和 Pull Request 模板
+├── build-test.sh build-test.bat                       构建并测试的脚本，不会修改仓库内容
+├── test.sh test.bat                                   运行测试
+├── urtc.project.json                                  清单：版本、角色、成熟度和构建命令
+├── CHANGELOG.md                                       每个版本的变更
+├── SECURITY.md SUPPORT.md LICENSE                     安全政策、支持和许可证
+├── CONTRIBUTING.md CODE_OF_CONDUCT.md                 如何参与贡献和行为准则
+├── .gitattributes .gitignore                          Git 设置
+├── build_firmware.sh build_firmware.bat               构建四个二进制文件
+├── bump.py bump_version.py bump_manifest_version.py   提升版本号的脚本
+├── check_version_consistency.sh                       检查每个标明版本的地方
+├── check_shared_drivers.py                            检查共用驱动的副本
+├── firmware_signing.py                                为镜像签名
+├── generate_manifest.py                               写出镜像的清单
+├── VERSION_CHECKLIST.txt                              四个版本的机制
+└── LICENSE.md ruff.toml                               硬件许可证和 lint 设置
+```
+
+</details>
+
+每个源文件的带注释清单（每个文件一行）见 [docs/SOURCE_MAP.md](docs/SOURCE_MAP.md)。
+
+## 🗺️ 路线图与已知限制
 
 **固件（`src/F303-master/`）：** 全部 25 种工具配置文件功能完整——带滞回的热开关式控制、逐工具遥测、通信看门狗、失速/故障检测，以及 OLED 自身的实时诊断，此外还有一对当前工具查询命令（`0x110`/`0x111`）、面向扩展接口的通用 SPI 透传（`0x180`/`0x181`）、一块在断电时保留设定值的板载 F-RAM（`0x190`/`0x191`）、`11111` 跳线自由工具配置机制（`0x1A2`/`0x1A3`）、外设类型 + 设备序列号报告（`0x1A4`/`0x1A5`，用于在共享总线上区分多块原本相同的板卡），以及一条到达高级扩展板上从属芯片的 CAN 转 I2C 桥（`0x210`-`0x221`）。独立于引导程序进行版本管理（见下方更新日志）。 这一切都从未在真实板卡上运行过，热保护仅在主机上用模拟加热器测试过。
 
@@ -401,191 +473,9 @@ URTC 的闪存被拆分为两个独立部分，因此板卡可以通过它已经
 
 如果社区中有人正在为 PAROL6、Faze4 或任何其他机械臂平台开发定制末端执行器、智能换刀器或高级工具集成，我很乐意交流、交换想法，或更深入地探讨 CAN 指令！
 
-## 📂 仓库结构
+## 🌍 语言
 
-```
-/
-├── 3D/
-│   ├── RACK/                    板卡安装架，2 种变体（x1、x3）——各自提供
-│   │                            .stl/.3mf/.amf/.scad
-│   ├── REVOLVER/                占位——空目录，内容尚未开始
-│   └── TOOLS/
-│       └── PAROL6/              面向 PAROL6 机械臂的逐工具可 3D 打印零件——
-│                                每种工具一个子文件夹（0.通用零件，然后是与上方
-│                                工具目录编号对应的 1-12），已填充的均提供
-│                                .stl/.3mf/.amf/.scad；其中若干（4、6-12）
-│                                仍是空占位符
-├── ani/                          27 个 GIF：每种工具配置文件一个 4 帧动画（00-24，
-│                                 对应每种工具自身的数字 ID），开机画面
-│                                 （splash_boot.gif），以及无效 ID 警告
-│                                 （error_warning.gif）——全部直接从本项目
-│                                 自身的固件源码（firmware_render.c 自身的
-│                                 ToolIcons[]/SplashFace[]/ErrorText[] 表）
-│                                 解码而来，而非单独手绘，因此始终与真实
-│                                 OLED 实际显示的内容一致
-├── BOM/
-│   ├── BOM.TXT                  PCB 板的完整物料清单
-│   ├── BOM_EXPANSION_BASIC_TMC2209.TXT     扩展板，基础 + TMC2209
-│   ├── BOM_EXPANSION_BASIC_TMC5160A.TXT    扩展板，基础 + TMC5160A
-│   ├── BOM_EXPANSION_ADVANCED_TMC2209.TXT  扩展板，高级 + TMC2209
-│   ├── BOM_EXPANSION_ADVANCED_TMC5160A.TXT 扩展板，高级 + TMC5160A
-│   ├── BOM_EXPANSION_BASIC_ADS1115.TXT     扩展板，基础 + ADS1115（仅传感器，无驱动器/MCU）
-│   └── BOM_EXPANSION_BASIC_MLX9064X.TXT    扩展板，基础 + MLX9064x（仅传感器，无驱动器/MCU）
-├── docs/
-│   ├── CANBUS.TXT               CAN 总线协议参考（所有指令/遥测 ID）
-│   ├── ECOVIA.TXT               工具识别矩阵与引脚变换逻辑
-│   ├── TOOLS.TXT                全部 25 种工具的高层目录——每种做什么、
-│   │                            使用哪些外设，不含引脚级细节
-│   ├── PINOUT.TXT               完整 MCU 引脚定义，逐模块列出
-│   ├── PINOUT_CONNECTORS.TXT    物理接口引脚定义（CONN_DRILL、CONN_SEN 等）
-│   ├── EXPANSION.TXT            CONN_EXPANSION 接口及附加板变体
-│   ├── PINOUT_SLAVE.txt         扩展从属芯片的完整引脚定义（仅限高级变体）
-│   ├── EEPROM.TXT               完整的 F-RAM 寄存器映射（每一项持久化设置、字节偏移量）
-│   ├── COMPILE_STM32F303.TXT    全部 4 个固件二进制文件从零开始的构建指南——
-│   │                            工具链、ST HAL/CMSIS 设置、确切的编译/链接命令；
-│   │                            仓库根目录下的 build_firmware.sh/.bat 端到端
-│   │                            自动化了同一个流程
-│   ├── FIRMWARE_DISTRIBUTION.md 固件文件的发布位置以及各使用方读取的内容
-│   ├── FIRMWARE_SIGNING.TXT     固件镜像如何签名：目前为 HMAC，计划改用 Ed25519
-│   ├── RELEASE_SIGNING.md       发布版本如何签名（每个文件一个分离的 Ed25519 签名）以及公钥
-│   ├── KEYS.md                  整个系列所依赖的每一把密钥：用途、公开值、嵌入位置以及私钥所在位置
-│   ├── CAN_THREAT_MODEL.TXT     CAN 总线信任什么，以及由此产生的安装要求
-│   ├── COMPATIBILITY.md         哪些版本的程序可以一起使用（由 URTC-COMMON 生成）
-│   ├── datasheet/               PCB/datasheet/ 下尚未涵盖的 2 份元器件数据手册
-│   │                            （CFM_40.pdf、EFB0424VHD-CP0.pdf）
-│   └── tool_image_generator/    生成 images/TOOL_*.png 的工具包（见下文）——
-│                                render_engine.py + tool_data.py + generate_all.py，
-│                                以及说明如何添加新工具自身图像或重新生成现有
-│                                图像的 PROCEDURE.TXT
-├── src/
-│   ├── F303-master/
-│   │   ├── STM32F303CC_main.c    入口点——全局定义和 main()
-│   │   ├── firmware_*.c/.h       另外约 100 个文件，每个子系统一个（OLED、LED、
-│   │   │                         逐工具 CAN 处理程序、初始化、持久化等），
-│   │   │                         包括 firmware_ads1115.c（直接 ADS1115 驱动，
-│   │   │                         Basic+ADS1115 板）——完整的逐文件表见本
-│   │   │                         文件夹自身的 README.md
-│   │   ├── melexis_mlx90640/     Melexis 自身官方的 MLX90640 库（Apache-2.0，
-│   │   │                         纯 C），加上本板自身在其之上构建的直连驱动，
-│   │   │                         用于 Basic+MLX9064x 扩展板
-│   │   ├── melexis_mlx90641/     同样的思路，MLX90641 库（Apache-2.0，C++——
-│   │   │                         该库为何是 C++ 见本文件夹自身 README.md 第 8a 节，
-│   │   │                         在这个原本全 C 的项目中）
-│   │   ├── melexis_mlx90642/     同样的思路，MLX90642 库（Apache-2.0，纯 C）——
-│   │   │                         该传感器自身驱动为何确实比另外两个更简单，
-│   │   │                         见第 8a 节
-│   │   ├── STM32F303CCTx_APP.ld  应用程序的链接脚本（0x08008000 处的 112K 主槽）
-│   │   ├── README.md             技术参考：硬件平台、ID 跳线工具选择系统、
-│   │   │                         逐工具外设接线——线级协议见 CANBUS.TXT，
-│   │   │                         此处解释的是其原因
-│   │   └── boot/
-│   │       ├── bootloader_main.c  引导程序的入口点
-│   │       ├── bootloader_*.c/.h  另外 9 个文件（共享类型/常量、加密学、
-│   │       │                      闪存/元数据、OLED、CAN 协议）
-│   │       ├── STM32F303CCTx_BOOTLOADER.ld  引导程序的链接脚本（0x08000000 处的 30K 区域）
-│   │       └── README.md          与应用程序相同的技术参考角色，针对引导程序
-│   ├── common/                   应用、引导程序和从机共用的头文件：启动会话标记、从机寄存器以及总线上的版本格式
-│   └── F303-slave/               仅存在于 2 种高级扩展板变体上的伴侣芯片
-│       │                         （STM32F303CBT6）——见上方扩展接口一节。
-│       │                         拥有自己的引导程序/应用对，自己基于 I2C（而非
-│       │                         CAN）的更新协议，自己独立的版本管理。
-│       ├── slave_main.c          入口点
-│       ├── slave_*.c/.h          另外 7 个文件（共享类型/常量、I2C 链路协议、
-│       │                         本地传感器总线、本地 PWM）
-│       ├── STM32F303CBTx_SLAVEAPP.ld  链接脚本（0x08005000 处的 54K 主槽）
-│       ├── README.md             技术参考：本芯片为何存在、本地
-│       │                         ADS1115/MLX9064x 传感器总线、本地 PWM、
-│       │                         到主板的 I2C 链路协议
-│       ├── melexis_mlx90640/     Melexis 自身官方的 MLX90640 库（Apache-2.0，
-│       │                         纯 C，未修改，自带许可证文件）——作为其自身
-│       │                         独立的编译单元保留，刻意从未并入本项目自身
-│       │                         的源码中，因为 Apache-2.0 要求该代码自身的
-│       │                         版权声明保持完整
-│       ├── melexis_mlx90641/     Melexis 自身官方的 MLX90641 库（Apache-2.0，
-│       │                         C++——一个与 MLX90640 自身真正独立的库，而
-│       │                         非其变体——为何是 C++ 及构建如何处理这一点，
-│       │                         见本文件夹自身 README.md 第 3 节）
-│       ├── melexis_mlx90642/     Melexis 自身官方的 MLX90642 库（Apache-2.0，
-│       │                         纯 C）——比另外 2 个传感器自身的传输接口
-│       │                         确实更简单，原因见 README.md 第 3 节
-│       └── boot/
-│           ├── slaveboot_main.c   引导程序的入口点
-│           ├── slaveboot_*.c/.h   另外 7 个文件（加密学、闪存/元数据、协议）
-│           ├── STM32F303CBTx_SLAVEBOOT.ld  链接脚本（0x08000000 处的 18K 区域）
-│           └── README.md          与应用程序相同的技术参考角色
-├── firmware/  （被 git 忽略的构建输出——仅作为发布资源发布）
-│   ├── URTC_MAIN_BOOTLOADER_v<version>.bin  引导程序编译产物，刷写至 0x08000000
-│   ├── URTC_MAIN_BOOTLOADER_v<version>.elf  引导程序编译产物，刷写至 0x08000000
-│   ├── URTC_MAIN_BOOTLOADER_v<version>.hex  引导程序编译产物，刷写至 0x08000000（地址已内置）
-│   ├── URTC_MAIN_FIRMWARE_v<version>.bin    应用程序 bin 编译产物，刷写至 0x08008000
-│   ├── URTC_MAIN_FIRMWARE_v<version>.elf    应用程序 elf 编译产物，刷写至 0x08008000
-│   ├── URTC_MAIN_FIRMWARE_v<version>.hex    应用程序 HEX 编译产物，刷写至 0x08008000（地址已内置）
-│   ├── URTC_SLAVE_BOOTLOADER_v<version>.{bin,elf,hex}  扩展从属自身的引导程序，
-│   │                             刷写至 STM32F303CBT6 上的 0x08000000（仅限高级扩展板）
-│   ├── URTC_SLAVE_FIRMWARE_v<version>.{bin,elf,hex}  扩展从属自身的应用程序，刷写至 0x08005000
-│   └── firmware_manifest.json    上述全部 4 个组件的机器可读索引——版本、
-│                                 闪存地址，以及每个文件自身的大小/CRC32，
-│                                 供外部工具检查此处有什么以及比它当前所拥有
-│                                 的更新的内容。由 generate_manifest.py 自动
-│                                 重新生成（由 build_firmware.sh/.bat 自身的
-│                                 最后一步调用）——从不手动编辑。
-├── images/
-│   ├── OLED_DIRECT_MOUNT.jpg     LCD1/CONN_OLED2——裸 30 针 FPC 面板，直接安装选项
-│   ├── OLED_BREAKOUT_MODULE.jpg  CONN_OLED——外部 I2C 分线模组，替代选项
-│   ├── URTC_BANNER.svg             项目通用 Logo，嵌入本 README 顶部
-│   ├── URTC_BOARD.png           板卡照片
-│   ├── URTC_SCHEMATIC.png       板卡原理图
-│   ├── URTC_PCB_TOP.png         板卡顶层（添加后）
-│   ├── URTC_PCB_BOTTOM.png      板卡底层（添加后）
-│   └── TOOL_*.png               逐工具跳线/接线参考图，每个配置文件一张
-│                                （全部 25 张均已提供——各工具自身链接见上方工具目录）
-├── PCB/
-│   ├── URTC_V1.0.sch            Eagle 原理图（添加后）
-│   ├── URTC_V1.0.brd            Eagle 板卡布局（添加后）
-│   ├── URTC_V1.0_JLCPCB.ZIP     Gerber、BOM 和 CPL 文件（添加后）
-│   ├── URTC_BOM.TXT             Eagle 导出的原始 BOM（真实来源导出——本项目
-│   │                            自身经过整理组织的版本见 BOM/BOM.TXT）
-│   ├── datasheet/               板上所用全部元件的数据手册
-│   └── *_PARLIST/PINLIST/NETLIST.TXT   Eagle 导出的网表（引脚映射的真实来源）
-├── keys/ registry.json：整个系列的公钥以及每把公钥的嵌入位置（由 tools/keys.py 检查）
-├── tests/ 固件的主机测试，针对模拟 HAL（tests/host_hal/）和共享向量编译，另有 Python 工具的测试
-├── tools/
-│   ├── build_test.py            不递增版本号的构建/编译检查
-│   ├── publish_release_assets.py  列出要附加的发布资源并输出 gh 命令
-│   ├── ci_validate.py           CI 使用的 manifest/CHANGELOG/docs 校验
-│   ├── keys.py                  将 docs/KEYS.md 与 keys/registry.json 相互比对，并与代码比对
-│   ├── release_sign.py          为发布版本的文件签名（分离的 Ed25519 签名）
-│   ├── run_host_tests.py        对模拟 HAL 编译并运行主机测试套件，并设有覆盖率下限
-│   ├── changelog_section.py / fuzz_virtual_board.py 某个发布版本的 CHANGELOG 段落文本；对虚拟板的模糊测试运行
-│   └── _doc_policy.py / _readme_parity.py / _tracked_names.py ci_validate.py 使用的共享检查
-├── VERSION_CHECKLIST.txt        用于正确递增本项目自身 4 个独立版本号中
-│                                任意一个的机械化检查清单
-├── check_version_consistency.sh  自动化的版本/文件一致性检查——在信任
-│                                VERSION_CHECKLIST.txt 自身的说法之前运行
-├── check_shared_drivers.py       检查两颗芯片上的 Melexis 驱动副本是否一致
-├── firmware_signing.py           固件签名密钥，以及每个镜像旁的签名和摘要文件
-├── ruff.toml / urtc.project.json 静态检查的设置，以及项目清单（版本、成熟度、证据）
-├── build_firmware.sh            安装工具链，获取 ST 自身的 HAL/CMSIS，并
-│                                端到端编译全部 4 个固件二进制文件（Linux）
-├── build_firmware.bat           同上，适用于 Windows——两个脚本自动化的
-│                                完整手动流程见 docs/COMPILE_STM32F303.TXT
-├── build-test.sh / build-test.bat  不递增版本号的构建/编译检查
-│                                （tools/build_test.py 的轻量包装）
-├── bump.py                      显式的版本递增命令（编译从不递增）
-├── bump_version.py              单个头文件的里程表式递增，由 bump.py 调用
-├── bump_manifest_version.py     将 urtc.project.json 的版本与原生版本同步（--sync）
-├── generate_manifest.py         重新生成 firmware/firmware_manifest.json——
-│                                作为完整 build_firmware.sh/.bat 运行的最后
-│                                一步自动调用，或在清单需要跟上进度而无需
-│                                完整重新构建时随时独立运行
-├── LICENSE
-├── README.md                    本文件
-└── README_spa.md / README_ita.md / README_fra.md / README_deu.md / README_zho.md / README_jpn.md / README_por.md  <- 翻译
-```
-
-硬件设计文件（Eagle 原理图/板卡/网表）将随着布局稳定下来而添加。
-
-**固件可选功能与检查(仅在主机上测试):** 步进电机加减速、健康帧、振荡器微调和加热器 PID,每一项都位于默认关闭的开关之后(`0x1AE` / `0x1AF`,见 [CANBUS.TXT](docs/CANBUS.TXT));一块带 sanitizer 的虚拟板,以及用协议规范生成的帧驱动的模糊测试器(`tools/fuzz_virtual_board.py`);还有 `tools/keys.py verify`,用来检查嵌入在程序或引导程序中的每个公钥是否就是登记的那一个([KEYS.md](docs/KEYS.md))。这些都没有在电路板上运行过。
+README 和文本提供英语、西班牙语、法语、意大利语、德语、汉语、日语和欧洲葡萄牙语版本。
 
 ## 🔗 相关项目
 
@@ -678,9 +568,7 @@ URTC 的闪存被拆分为两个独立部分，因此板卡可以通过它已经
 - **[HYDRA-UMC-OPS-AGENT](https://github.com/JuanenRac/HYDRA-UMC-OPS-AGENT)** — 维护事件协调器：一个低权限的边缘角色采集经过脱敏的库存/健康快照，一个控制面角色以只读方式渲染它，并请求某个 AI 提供方给出诊断建议——从不应用补丁，也从不部署任何内容。
 - **[HYDRA-UMC-DEV-SERVER](https://github.com/JuanenRac/HYDRA-UMC-DEV-SERVER)** —— 可复现的开发主机（Raspberry Pi 5 / CM5），保存整个生态系统的源代码，并在持久队列下运行有界的构建/测试任务；这是专用的开发角色，明确区别于运行中的 CM5。
 
----
-
-## 📚 文档与社区
+## 📚 文档
 
 - **[CONTRIBUTING.md](CONTRIBUTING.md)** —— 提交 Pull Request 所需的技术栈和编码规范。
 - **[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)** —— 本社区所期望的行为准则。
@@ -688,16 +576,18 @@ URTC 的闪存被拆分为两个独立部分，因此板卡可以通过它已经
 - **[SUPPORT.md](SUPPORT.md)** —— 在哪里提问和报告缺陷。
 - **[LICENSE.md](LICENSE.md)** —— 本项目自身的许可证。
 
+## 🤝 参与贡献与社区
+
+* 提交 Pull Request 之前请运行 `URTC_CI=1 python tools/ci_validate.py`：必须通过。参见 [CONTRIBUTING.md](CONTRIBUTING.md) 和[行为准则](CODE_OF_CONDUCT.md)。
+* README 有八种语言：修改文字时要同步修改全部八个文件，与其他仓库共用的章节由 URTC-COMMON 的 `tools/readme_sections.py` 写入。
+* 不要把仅仅构建过的东西描述为已在板子上运行。
+* 请私下报告漏洞：[SECURITY.md](SECURITY.md)。问题、想法和报告：electrohobby3d@gmail.com（[SUPPORT.md](SUPPORT.md)）。
+
 ## 👤 作者
+
 **JuanenRac** (Electro Hobby 3D)
 📧 electrohobby3d@gmail.com
 📺 [youtube.com/@electrohobby3d](https://youtube.com/@electrohobby3d)
-
-<!-- urtc-section:compatibility -->
-## 🧩 兼容性
-
-哪些版本的 URTC 程序可以配合使用、各自使用哪个协议版本，列在 URTC-COMMON 生成的兼容性表中：[docs/COMPATIBILITY.md](https://github.com/JuanenRac/URTC/blob/main/docs/COMPATIBILITY.md)。
-<!-- /urtc-section:compatibility -->
 
 ## 📜 许可证
 
