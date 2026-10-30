@@ -265,6 +265,16 @@ def _universal_readme_ci(root: Path) -> list[str]:
     return universal_readme_check.run_in_ci(root)
 
 
+def _status_lights_ci(root: Path) -> list[str]:
+    """No light of the "Project status" table above what the manifest (maturity, evidence) allows; see tools/status_lights.py."""
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import status_lights
+    except ImportError:
+        return []
+    return status_lights.run_in_ci(root)
+
+
 def main() -> int:
     try:
         manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
@@ -343,6 +353,8 @@ def main() -> int:
 
     for _universal_problem in _universal_readme_ci(ROOT):
         fail(_universal_problem)
+    for _lights_problem in _status_lights_ci(ROOT):
+        fail(_lights_problem)
     print(f"CI_VALIDATION=PASS project={manifest['name']} version={manifest['version']}")
     return 0
 

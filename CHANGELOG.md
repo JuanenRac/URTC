@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **The version checklist keeps its table of versions by itself:** `tools/version_checklist_state.py` writes, between two marker lines of `VERSION_CHECKLIST.txt`, the project version and every firmware component with the file that holds it, from `urtc.project.json`; `bump.py` runs it after raising a version and `--check` tells when the block is out of date.
+
 - **The lights of Project status follow the evidence of the manifest:** the manifest says how far the repository has been shown to work (`evidence`: `host-test`, `simulator`, `bench` or `field`) and the validator fails when a light is above what that evidence and the maturity allow (`tools/status_lights.py`), so a green that never ran on real hardware cannot come back.
 
 ## [0.4.2] - The CAN identifiers as named macros, extended and remote frames ignored, the release workflow telling the flasher and the web studio, and the universal README
