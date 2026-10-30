@@ -26,9 +26,10 @@
 // =============================================================================
 #include "firmware_common.h"
 #include "firmware_can_hotair.h"
+#include "urtc_can_ids.h"
 
 void Handle_CAN_HotAirRework(void) {
-    if (rxHeader.StdId == 0x1E0 && rxHeader.DLC >= 3 && !boot_sequence_active) {
+    if (rxHeader.StdId == URTC_CAN_ID_HOTAIR_CMD && rxHeader.DLC >= 3 && !boot_sequence_active) {
         target_temperature = ((uint16_t)rxData[0] << 8) | rxData[1];
         solder_iron_last_kick_tick = HAL_GetTick(); // same watchdog timer field the shared thermal loop already reads - see this file's own top note on why this tool reuses it rather than needing its own
 

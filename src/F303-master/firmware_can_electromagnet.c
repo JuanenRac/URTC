@@ -15,6 +15,7 @@
 // =============================================================================
 #include "firmware_common.h"
 #include "firmware_can_electromagnet.h"
+#include "urtc_can_ids.h"
 
 // Deliberately no communication-loss watchdog here, unlike every other
 // actuator on this board (UV Curing, Hot Air Rework, laser, drill, layer
@@ -26,7 +27,7 @@
 // vacuum gripper's own check valve would use. Confirmed explicitly with
 // the project owner (not an oversight).
 void Handle_CAN_Electromagnet(void) {
-    if (rxHeader.StdId == 0x1B0 && rxHeader.DLC >= 1 && !boot_sequence_active) {
+    if (rxHeader.StdId == URTC_CAN_ID_ELECTROMAGNET_CMD && rxHeader.DLC >= 1 && !boot_sequence_active) {
         // Any nonzero byte energizes the coil - not just 0x01 - so a
         // master sending a "power level" byte from old habit (0-255)
         // still gets predictable on/off behavior rather than silently

@@ -5,9 +5,10 @@
 // =============================================================================
 #include "firmware_common.h"
 #include "firmware_can_laser.h"
+#include "urtc_can_ids.h"
 
 void Handle_CAN_Laser(void) {
-                if (rxHeader.StdId == 0x160 && rxHeader.DLC >= 2 && !boot_sequence_active) {
+                if (rxHeader.StdId == URTC_CAN_ID_LASER_CMD && rxHeader.DLC >= 2 && !boot_sequence_active) {
                     laser_power_setpoint = rxData[0];
                     laser_last_kick_tick = HAL_GetTick();
 

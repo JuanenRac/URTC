@@ -13,9 +13,10 @@
 #include "firmware_common.h"
 #include "firmware_can_motion.h"
 #include "firmware_features.h"
+#include "urtc_can_ids.h"
 
 void Handle_CAN_MotionTools(void) {
-                if (rxHeader.StdId == 0x120 && rxHeader.DLC >= 5 && !boot_sequence_active) {
+                if (rxHeader.StdId == URTC_CAN_ID_MOTION_CMD && rxHeader.DLC >= 5 && !boot_sequence_active) {
                     __disable_irq();
                     // Clears any steps left over from the previous command
                     // before a direction change takes effect - not a

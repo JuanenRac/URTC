@@ -24,9 +24,10 @@
 // =============================================================================
 #include "firmware_common.h"
 #include "firmware_can_crimping.h"
+#include "urtc_can_ids.h"
 
 void Handle_CAN_CrimpingActuator(void) {
-    if (rxHeader.StdId == 0x1F0 && rxHeader.DLC >= 5 && !boot_sequence_active) {
+    if (rxHeader.StdId == URTC_CAN_ID_CRIMPING_CMD && rxHeader.DLC >= 5 && !boot_sequence_active) {
         __disable_irq();
         // Same stale-steps-under-a-new-direction reasoning as
         // Handle_CAN_MotionTools() - see that file's own comment for the

@@ -5,9 +5,10 @@
 // =============================================================================
 #include "firmware_common.h"
 #include "firmware_can_aoi.h"
+#include "urtc_can_ids.h"
 
 void Handle_CAN_AOI(void) {
-                if (rxHeader.StdId == 0x150 && rxHeader.DLC >= 3) {
+                if (rxHeader.StdId == URTC_CAN_ID_AOI_CMD && rxHeader.DLC >= 3) {
                     aoi_mode = rxData[0];
                     // Strobe period, big-endian
                     aoi_strobe_period = (rxData[1] << 8) | rxData[2];

@@ -13,9 +13,10 @@
 // =============================================================================
 #include "firmware_common.h"
 #include "firmware_can_uvcuring.h"
+#include "urtc_can_ids.h"
 
 void Handle_CAN_UVCuring(void) {
-    if (rxHeader.StdId == 0x1D0 && rxHeader.DLC >= 1 && !boot_sequence_active) {
+    if (rxHeader.StdId == URTC_CAN_ID_UV_CURING_CMD && rxHeader.DLC >= 1 && !boot_sequence_active) {
         uv_curing_duty = rxData[0];
         uv_curing_last_kick_tick = HAL_GetTick();
         uint32_t uv_duty = (uv_curing_duty * 3199) / 255;

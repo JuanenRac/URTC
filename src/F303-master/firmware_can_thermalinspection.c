@@ -46,6 +46,7 @@
 #include "melexis_mlx90640/firmware_mlx90640_app.h"
 #include "melexis_mlx90641/firmware_mlx90641_app.h"
 #include "melexis_mlx90642/firmware_mlx90642_app.h"
+#include "urtc_can_ids.h"
 
 #define REG_APP_MLX_TRIGGER_CAPTURE  0x10
 #define REG_APP_MLX_CAPTURE_STATUS   0x11
@@ -67,7 +68,7 @@ static void SendChunkFrames(uint32_t id, const uint8_t *data32) {
 }
 
 void Handle_CAN_ThermalInspection(void) {
-    if (rxHeader.StdId == 0x250 && !boot_sequence_active) {
+    if (rxHeader.StdId == URTC_CAN_ID_THERMAL_TRIGGER && !boot_sequence_active) {
         if (expansion_board_type == 6 && mlx_sensor_variant == MLX_VARIANT_90640) {
             MLX90640_Direct_TriggerCapture();
         } else if (expansion_board_type == 6 && mlx_sensor_variant == MLX_VARIANT_90641) {
@@ -81,7 +82,7 @@ void Handle_CAN_ThermalInspection(void) {
         // no sensor configured, deliberately does nothing - see this
         // file's own header comment.
 
-    } else if (rxHeader.StdId == 0x251) {
+    } else if (rxHeader.StdId == URTC_CAN_ID_THERMAL_STATUS) {
         uint8_t status = 0;
         uint8_t got_status = 0;
         if (expansion_board_type == 6 && mlx_sensor_variant == MLX_VARIANT_90640) {
@@ -106,7 +107,7 @@ void Handle_CAN_ThermalInspection(void) {
         }
         if (got_status && HAL_CAN_GetTxMailboxesFreeLevel(&hcan) > 0) {
             CAN_TxHeaderTypeDef txH;
-            txH.StdId = 0x251;
+            txH.StdId = URTC_CAN_ID_THERMAL_STATUS;
             txH.IDE = CAN_ID_STD;
             txH.RTR = CAN_RTR_DATA;
             txH.DLC = 1;
@@ -115,36 +116,36 @@ void Handle_CAN_ThermalInspection(void) {
             HAL_CAN_AddTxMessage(&hcan, &txH, &status, &mb);
         }
 
-    } else if (rxHeader.StdId == 0x252 && rxHeader.DLC >= 1) {
+    } else if (rxHeader.StdId == URTC_CAN_ID_THERMAL_RAW_CHUNK_REQ && rxHeader.DLC >= 1) {
         uint8_t chunk[32];
         if (expansion_board_type == 6 && mlx_sensor_variant == MLX_VARIANT_90640) {
             MLX90640_Direct_GetRawChunk(rxData[0], chunk);
-            SendChunkFrames(0x253, chunk);
+            SendChunkFrames(URTC_CAN_ID_THERMAL_RAW_CHUNK, chunk);
         } else if (expansion_board_type == 6 && mlx_sensor_variant == MLX_VARIANT_90641) {
             MLX90641_Direct_GetRawChunk(rxData[0], chunk);
-            SendChunkFrames(0x253, chunk);
+            SendChunkFrames(URTC_CAN_ID_THERMAL_RAW_CHUNK, chunk);
         } else if (expansion_board_type == 6 && mlx_sensor_variant == MLX_VARIANT_90642) {
             MLX90642_Direct_GetRawChunk(rxData[0], chunk);
-            SendChunkFrames(0x253, chunk);
+            SendChunkFrames(URTC_CAN_ID_THERMAL_RAW_CHUNK, chunk);
         } else if (expansion_board_type != 6 && ExpansionI2C_SlaveReadRegisterWithParam(REG_APP_MLX_RAW_CHUNK, rxData[0], chunk, 32)) {
-            SendChunkFrames(0x253, chunk);
+            SendChunkFrames(URTC_CAN_ID_THERMAL_RAW_CHUNK, chunk);
         }
         // expansion_board_type==6 && MLX_VARIANT_NONE: no response, same
         // reasoning as the trigger command above.
 
-    } else if (rxHeader.StdId == 0x254 && rxHeader.DLC >= 1) {
+    } else if (rxHeader.StdId == URTC_CAN_ID_THERMAL_CAL_CHUNK_REQ && rxHeader.DLC >= 1) {
         uint8_t chunk[32];
         if (expansion_board_type == 6 && mlx_sensor_variant == MLX_VARIANT_90640) {
             MLX90640_Direct_GetCalibratedChunk(rxData[0], chunk);
-            SendChunkFrames(0x255, chunk);
+            SendChunkFrames(URTC_CAN_ID_THERMAL_CAL_CHUNK, chunk);
         } else if (expansion_board_type == 6 && mlx_sensor_variant == MLX_VARIANT_90641) {
             MLX90641_Direct_GetCalibratedChunk(rxData[0], chunk);
-            SendChunkFrames(0x255, chunk);
+            SendChunkFrames(URTC_CAN_ID_THERMAL_CAL_CHUNK, chunk);
         } else if (expansion_board_type == 6 && mlx_sensor_variant == MLX_VARIANT_90642) {
             MLX90642_Direct_GetCalibratedChunk(rxData[0], chunk);
-            SendChunkFrames(0x255, chunk);
+            SendChunkFrames(URTC_CAN_ID_THERMAL_CAL_CHUNK, chunk);
         } else if (expansion_board_type != 6 && ExpansionI2C_SlaveReadRegisterWithParam(REG_APP_MLX_CALIBRATED_CHUNK, rxData[0], chunk, 32)) {
-            SendChunkFrames(0x255, chunk);
+            SendChunkFrames(URTC_CAN_ID_THERMAL_CAL_CHUNK, chunk);
         }
         // expansion_board_type==6 && MLX_VARIANT_NONE: no response, same
         // reasoning as the trigger command above.

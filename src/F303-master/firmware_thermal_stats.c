@@ -8,6 +8,7 @@
 #include "firmware_common.h"
 #include "firmware_thermal_stats.h"
 #include "thermal_stats.h"
+#include "urtc_can_ids.h"
 
 #define THERMAL_STATS_SAVE_INTERVAL_MS 60000u // heater time is saved at most once a minute
 
@@ -62,7 +63,7 @@ void ThermalStats_HandleQuery(void) {
     uint8_t txD[8];
     uint32_t mb;
     ThermalStats_Encode(&stats, stats_persisted, txD);
-    txH.StdId = 0x1AB;
+    txH.StdId = URTC_CAN_ID_THERMAL_STATS_RESP;
     txH.IDE = CAN_ID_STD;
     txH.RTR = CAN_RTR_DATA;
     txH.DLC = 8;

@@ -17,6 +17,7 @@
 #include "firmware_thermal_stats.h"
 #include "urtc_version_wire.h"
 #include "urtc_boot_session.h"
+#include "urtc_can_ids.h"
 
 void Handle_CAN_GlobalCommands_PreErrorGate(void) {
 
@@ -27,7 +28,7 @@ void Handle_CAN_GlobalCommands_PreErrorGate(void) {
         // convenient. Requires a specific magic payload, not just the ID
         // alone, so a corrupted/malformed frame can't accidentally trigger
         // a reset into update mode.
-        if (rxHeader.StdId == 0x7F0 && rxHeader.DLC == 4 &&
+        if (rxHeader.StdId == URTC_CAN_ID_ENTER_BOOTLOADER && rxHeader.DLC == 4 &&
             rxData[0] == 0xB0 && rxData[1] == 0x07 && rxData[2] == 0x1D && rxData[3] == 0x5A) {
             // Explicit, inline shutdown of every actuator - not deferred to
             // system_error_flag's usual next-loop-iteration handling, since
@@ -71,7 +72,7 @@ void Handle_CAN_GlobalCommands_PreErrorGate(void) {
         // bootloader answering from stored metadata, byte0=1 - see
         // bootloader_protocol.c), then HardwareID (4 bytes) + version major
         // (2 bytes) + version minor (1 byte), all big-endian.
-        if (rxHeader.StdId == 0x7F8) {
+        if (rxHeader.StdId == URTC_CAN_ID_QUERY_VERSION) {
             if (HAL_CAN_GetTxMailboxesFreeLevel(&hcan) > 0) {
                 CAN_TxHeaderTypeDef txH;
                 uint8_t txD[8];
@@ -83,7 +84,7 @@ void Handle_CAN_GlobalCommands_PreErrorGate(void) {
                 txD[5] = (uint8_t)(FIRMWARE_VERSION_MAJOR >> 8);
                 txD[6] = (uint8_t)(FIRMWARE_VERSION_MAJOR);
                 txD[7] = (uint8_t)(FIRMWARE_VERSION_MINOR);
-                txH.StdId = 0x7F9;
+                txH.StdId = URTC_CAN_ID_VERSION_RESPONSE;
                 txH.IDE = CAN_ID_STD;
                 txH.RTR = CAN_RTR_DATA;
                 txH.DLC = 8;
@@ -119,14 +120,14 @@ void Handle_CAN_GlobalCommands_PreErrorGate(void) {
         // rather than tracked in software, since the peripheral already
         // maintains these per the CAN bus protocol's own fault-confinement
         // rules.
-        if (rxHeader.StdId == 0x7FB) {
+        if (rxHeader.StdId == URTC_CAN_ID_QUERY_ERROR_COUNTERS) {
             if (HAL_CAN_GetTxMailboxesFreeLevel(&hcan) > 0) {
                 uint32_t esr = hcan.Instance->ESR;
                 CAN_TxHeaderTypeDef txH;
                 uint8_t txD[2];
                 txD[0] = (uint8_t)((esr >> 16) & 0xFF); // TEC
                 txD[1] = (uint8_t)((esr >> 24) & 0xFF); // REC
-                txH.StdId = 0x7FC;
+                txH.StdId = URTC_CAN_ID_ERROR_COUNTERS_RESPONSE;
                 txH.IDE = CAN_ID_STD;
                 txH.RTR = CAN_RTR_DATA;
                 txH.DLC = 2;
@@ -145,7 +146,7 @@ void Handle_CAN_GlobalCommands_PreErrorGate(void) {
         // Answered even during a declared error, unlike most commands
         // below - this is exactly the kind of read-only diagnostic that's
         // most useful precisely when something's gone wrong.
-        if (rxHeader.StdId == 0x110) {
+        if (rxHeader.StdId == URTC_CAN_ID_QUERY_ACTIVE_TOOL) {
             if (HAL_CAN_GetTxMailboxesFreeLevel(&hcan) > 0) {
                 CAN_TxHeaderTypeDef txH;
                 uint8_t txD[6];
@@ -161,7 +162,7 @@ void Handle_CAN_GlobalCommands_PreErrorGate(void) {
                 // 6th byte: last_reset_cause (RCC flags latched at boot) -
                 // bit0 set = the independent watchdog reset the board.
                 txD[5] = last_reset_cause;
-                txH.StdId = 0x111;
+                txH.StdId = URTC_CAN_ID_ACTIVE_TOOL_RESP;
                 txH.IDE = CAN_ID_STD;
                 txH.RTR = CAN_RTR_DATA;
                 txH.DLC = 6;
@@ -183,7 +184,7 @@ void Handle_CAN_GlobalCommands_PreErrorGate(void) {
         // to actually match its own documented behavior (CANBUS.TXT) -
         // read-only diagnostics stay available exactly when something's
         // already gone wrong, same reasoning as 0x110 just above.
-        if (rxHeader.StdId == 0x190) {
+        if (rxHeader.StdId == URTC_CAN_ID_FRAM_QUERY) {
             if (HAL_CAN_GetTxMailboxesFreeLevel(&hcan) > 0) {
                 CAN_TxHeaderTypeDef txH;
                 uint8_t txD[8] = {0};
@@ -198,7 +199,7 @@ void Handle_CAN_GlobalCommands_PreErrorGate(void) {
                     ? recovered_state.drill_speed : recovered_state.laser_power;
                 txD[6] = recovered_state.drill_direction || recovered_state.laser_interlock;
                 txD[7] = recovered_state.layer_fan_power;
-                txH.StdId = 0x191;
+                txH.StdId = URTC_CAN_ID_FRAM_STATE_RESP;
                 txH.IDE = CAN_ID_STD;
                 txH.RTR = CAN_RTR_DATA;
                 txH.DLC = 8;
@@ -219,14 +220,14 @@ void Handle_CAN_GlobalCommands_PreErrorGate(void) {
         // below, for the same reason as 0x190 just above - this is
         // configuration/diagnostic, not an actuation command, so there's
         // no reason to gate it behind a fault clearing.
-        if (rxHeader.StdId == 0x1A0 && rxHeader.DLC >= 1 && rxData[0] <= 6) {
+        if (rxHeader.StdId == URTC_CAN_ID_SET_EXPANSION_TYPE && rxHeader.DLC >= 1 && rxData[0] <= 6) {
             expansion_board_type = rxData[0];
         }
-        if (rxHeader.StdId == 0x1A0 || rxHeader.StdId == 0x1A1) {
+        if (rxHeader.StdId == URTC_CAN_ID_SET_EXPANSION_TYPE || rxHeader.StdId == URTC_CAN_ID_EXPANSION_TYPE_RESP) {
             if (HAL_CAN_GetTxMailboxesFreeLevel(&hcan) > 0) {
                 CAN_TxHeaderTypeDef txH;
                 uint8_t txD[1] = {expansion_board_type};
-                txH.StdId = 0x1A1;
+                txH.StdId = URTC_CAN_ID_EXPANSION_TYPE_RESP;
                 txH.IDE = CAN_ID_STD;
                 txH.RTR = CAN_RTR_DATA;
                 txH.DLC = 1;
@@ -252,14 +253,14 @@ void Handle_CAN_GlobalCommands_PreErrorGate(void) {
         // read something other than 0x1F" apart from "jumpers read
         // 0x1F but nothing's configured yet", which a bare selection
         // value on its own couldn't distinguish.
-        if (rxHeader.StdId == 0x1A2 && rxHeader.DLC >= 1 && rxData[0] <= 25) {
+        if (rxHeader.StdId == URTC_CAN_ID_SET_FREE_TOOL && rxHeader.DLC >= 1 && rxData[0] <= 25) {
             free_tool_selection = rxData[0];
         }
-        if (rxHeader.StdId == 0x1A2 || rxHeader.StdId == 0x1A3) {
+        if (rxHeader.StdId == URTC_CAN_ID_SET_FREE_TOOL || rxHeader.StdId == URTC_CAN_ID_FREE_TOOL_CONFIG_RESP) {
             if (HAL_CAN_GetTxMailboxesFreeLevel(&hcan) > 0) {
                 CAN_TxHeaderTypeDef txH;
                 uint8_t txD[2] = {raw_id_pin_value, free_tool_selection};
-                txH.StdId = 0x1A3;
+                txH.StdId = URTC_CAN_ID_FREE_TOOL_CONFIG_RESP;
                 txH.IDE = CAN_ID_STD;
                 txH.RTR = CAN_RTR_DATA;
                 txH.DLC = 2;
@@ -279,14 +280,14 @@ void Handle_CAN_GlobalCommands_PreErrorGate(void) {
         // device_serial_number is a real F-RAM-backed, host-assigned
         // label purely for telling multiple otherwise-identical URTC
         // boards apart on the same CAN bus.
-        if (rxHeader.StdId == 0x1A4 && rxHeader.DLC >= 1) {
+        if (rxHeader.StdId == URTC_CAN_ID_SET_DEVICE_SERIAL && rxHeader.DLC >= 1) {
             device_serial_number = rxData[0];
         }
-        if (rxHeader.StdId == 0x1A4 || rxHeader.StdId == 0x1A5) {
+        if (rxHeader.StdId == URTC_CAN_ID_SET_DEVICE_SERIAL || rxHeader.StdId == URTC_CAN_ID_PERIPHERAL_INFO_RESP) {
             if (HAL_CAN_GetTxMailboxesFreeLevel(&hcan) > 0) {
                 CAN_TxHeaderTypeDef txH;
                 uint8_t txD[2] = {URTC_PERIPHERAL_TYPE, device_serial_number};
-                txH.StdId = 0x1A5;
+                txH.StdId = URTC_CAN_ID_PERIPHERAL_INFO_RESP;
                 txH.IDE = CAN_ID_STD;
                 txH.RTR = CAN_RTR_DATA;
                 txH.DLC = 2;
@@ -309,17 +310,17 @@ void Handle_CAN_GlobalCommands_PreErrorGate(void) {
         // REG_MLX_SENSOR_VARIANT over the I2C bridge - this board's own
         // direct sensor support (expansion_board_type==6) just reads
         // mlx_sensor_variant directly, no relay needed for that path.
-        if (rxHeader.StdId == 0x1A6 && rxHeader.DLC >= 1 && rxData[0] <= 3) {
+        if (rxHeader.StdId == URTC_CAN_ID_SET_MLX_VARIANT && rxHeader.DLC >= 1 && rxData[0] <= 3) {
             mlx_sensor_variant = rxData[0];
             if (expansion_board_type == 3 || expansion_board_type == 4) {
                 ExpansionI2C_SlaveWriteRegister(0x14, &rxData[0], 1); // REG_MLX_SENSOR_VARIANT, see slave_common.h - rxData[0] holds the same value just assigned to mlx_sensor_variant above, without that variable's volatile qualifier
             }
         }
-        if (rxHeader.StdId == 0x1A6 || rxHeader.StdId == 0x1A7) {
+        if (rxHeader.StdId == URTC_CAN_ID_SET_MLX_VARIANT || rxHeader.StdId == URTC_CAN_ID_MLX_VARIANT_RESP) {
             if (HAL_CAN_GetTxMailboxesFreeLevel(&hcan) > 0) {
                 CAN_TxHeaderTypeDef txH;
                 uint8_t txD[1] = {mlx_sensor_variant};
-                txH.StdId = 0x1A7;
+                txH.StdId = URTC_CAN_ID_MLX_VARIANT_RESP;
                 txH.IDE = CAN_ID_STD;
                 txH.RTR = CAN_RTR_DATA;
                 txH.DLC = 1;
@@ -337,13 +338,13 @@ void Handle_CAN_GlobalCommands_PreErrorGate(void) {
         // the sensor-variant query just above. See
         // BlackBox_HandleReadbackRequest()'s own doc comment
         // (firmware_blackbox.c) for the full protocol.
-        if (rxHeader.StdId == 0x1A8 && rxHeader.DLC >= 1) {
+        if (rxHeader.StdId == URTC_CAN_ID_BLACKBOX_QUERY && rxHeader.DLC >= 1) {
             BlackBox_HandleReadbackRequest(rxData[0]);
         }
 
         // Lifetime thermal counters (0x1AA query / 0x1AB answer) - read-only,
         // answered whatever the active tool or error state, like 0x110.
-        if (rxHeader.StdId == 0x1AA) {
+        if (rxHeader.StdId == URTC_CAN_ID_THERMAL_STATS_QUERY) {
             ThermalStats_HandleQuery();
         }
 

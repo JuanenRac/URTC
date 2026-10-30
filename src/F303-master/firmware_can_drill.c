@@ -5,9 +5,10 @@
 // =============================================================================
 #include "firmware_common.h"
 #include "firmware_can_drill.h"
+#include "urtc_can_ids.h"
 
 void Handle_CAN_Drill(void) {
-                if (rxHeader.StdId == 0x140 && rxHeader.DLC >= 2 && !boot_sequence_active) {
+                if (rxHeader.StdId == URTC_CAN_ID_DRILL_CMD && rxHeader.DLC >= 2 && !boot_sequence_active) {
                     drill_speed = rxData[0];
                     drill_last_kick_tick = HAL_GetTick();
                     HAL_GPIO_WritePin(DRILL_FRIN_PORT, DRILL_FRIN_PIN, (rxData[1] == 0x01) ? GPIO_PIN_SET : GPIO_PIN_RESET);

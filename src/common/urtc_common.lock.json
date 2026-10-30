@@ -1,0 +1,10 @@
+{
+  "format": 1,
+  "urtc_common_version": "0.0.9",
+  "files": {
+    "urtc_can_ids.h": {
+      "from": "generated/urtc_can_ids.h",
+      "sha256": "9a29fab65f58cd113073bf693ab914308da1bbff82bb318a08421fbeb69f7bd3"
+    }
+  }
+}

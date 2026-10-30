@@ -18,11 +18,12 @@
 // =============================================================================
 #include "firmware_common.h"
 #include "firmware_can_weldpulse.h"
+#include "urtc_can_ids.h"
 
 void Handle_CAN_WeldPulse(void) {
     if (weld_pulse_active) return; // ignore a new fire command while a pulse is already running - not queued, just dropped
 
-    if (rxHeader.StdId == 0x1C0 && rxHeader.DLC >= 3 && !boot_sequence_active
+    if (rxHeader.StdId == URTC_CAN_ID_SPOT_WELD_CMD && rxHeader.DLC >= 3 && !boot_sequence_active
         && active_tool == TOOL_SPOT_WELDER) {
         if (rxData[0] != 0x01) return; // only an explicit fire command starts a pulse - anything else on this ID is ignored, not treated as a malformed-but-tolerated variant
         // Contact sensor gate - doc #4's own "ensure pressure before
@@ -60,7 +61,7 @@ void Handle_CAN_WeldPulse(void) {
         weld_pulse_start_tick = HAL_GetTick();
         weld_pulse_active = 1;
         HAL_GPIO_WritePin(T12_PWM_PORT, T12_PWM_PIN, GPIO_PIN_SET);
-    } else if (rxHeader.StdId == 0x200 && rxHeader.DLC >= 3 && !boot_sequence_active
+    } else if (rxHeader.StdId == URTC_CAN_ID_ULTRASONIC_WELD_CMD && rxHeader.DLC >= 3 && !boot_sequence_active
                && active_tool == TOOL_ULTRASONIC_WELDER) {
         if (rxData[0] != 0x01) return;
         // No contact-sensor gate - doc #15 doesn't call for one the way

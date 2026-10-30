@@ -10,6 +10,7 @@
 #include "health_profile.h"
 #include "hsi_trim.h"
 #include "pid_control.h"
+#include "urtc_can_ids.h"
 
 #define HEALTH_PERIOD_MS 1000u
 #define PID_FRAM_ADDR 992u
@@ -124,9 +125,9 @@ uint8_t Features_Running(void) { return running_mask; }
 uint8_t Features_Active(uint8_t feature_bit) { return (uint8_t)((running_mask & feature_bit) != 0); }
 
 void Features_HandleCommand(void) {
-    if (rxHeader.StdId == 0x1AE) {
+    if (rxHeader.StdId == URTC_CAN_ID_SET_FEATURES) {
         uint8_t mask;
-        if (!(rxHeader.StdId == 0x1AE && rxHeader.DLC == 5 && Feat_ParseCommand((uint8_t)rxHeader.DLC, rxData, &mask))) return; // anything else is ignored, like every magic-protected command
+        if (!(rxHeader.StdId == URTC_CAN_ID_SET_FEATURES && rxHeader.DLC == 5 && Feat_ParseCommand((uint8_t)rxHeader.DLC, rxData, &mask))) return; // anything else is ignored, like every magic-protected command
         FeatConfig_t next;
         Feat_ConfigBlank(&next);
         next.mask = mask;
@@ -134,12 +135,12 @@ void Features_HandleCommand(void) {
         if (FRAM_WriteBytes(FEAT_CONFIG_FRAM_ADDR, (const uint8_t *)&next, sizeof(next))) {
             read_persisted(); // report what the chip really holds, not what was asked
         }
-    } else if (rxHeader.StdId != 0x1AF) {
+    } else if (rxHeader.StdId != URTC_CAN_ID_FEATURES_RESP) {
         return;
     }
     uint8_t out[3];
     Feat_EncodeResponse(Feat_ConfigMask(&persisted), running_mask, out);
-    send_frame(0x1AF, out, 3);
+    send_frame(URTC_CAN_ID_FEATURES_RESP, out, 3);
 }
 
 // ---- service: health frame and oscillator trim ------------------------------------------------
@@ -176,7 +177,7 @@ void Features_Service(void) {
     loop_max_ms = 0;
     uint8_t out[8];
     Health_Encode(&h, out);
-    send_frame(0x1B8, out, 8);
+    send_frame(URTC_CAN_ID_HEALTH_PROFILE, out, 8);
 }
 
 // ---- stepper ramps ---------------------------------------------------------------------------------------
@@ -201,12 +202,12 @@ static void send_pid_state(void) {
     out[4] = (uint8_t)(gain_kd_x100 >> 8); out[5] = (uint8_t)gain_kd_x100;
     out[6] = (running_mask & FEAT_THERMAL_PID) ? pid_state : PID_STATE_OFF_VALUE;
     out[7] = last_duty;
-    send_frame(0x1BA, out, 8);
+    send_frame(URTC_CAN_ID_PID_STATE_RESP, out, 8);
 }
 
 void Features_HandlePidCommand(void) {
-    if (rxHeader.StdId == 0x1B9) {
-        if (!(rxHeader.StdId == 0x1B9 && rxHeader.DLC == 7) || !(running_mask & FEAT_THERMAL_PID)) { send_pid_state(); return; }
+    if (rxHeader.StdId == URTC_CAN_ID_PID_CONFIG) {
+        if (!(rxHeader.StdId == URTC_CAN_ID_PID_CONFIG && rxHeader.DLC == 7) || !(running_mask & FEAT_THERMAL_PID)) { send_pid_state(); return; }
         uint16_t kp = (uint16_t)((rxData[0] << 8) | rxData[1]);
         uint16_t ki = (uint16_t)((rxData[2] << 8) | rxData[3]);
         uint16_t kd = (uint16_t)((rxData[4] << 8) | rxData[5]);
@@ -233,7 +234,7 @@ void Features_HandlePidCommand(void) {
         default:
             break;
         }
-    } else if (rxHeader.StdId != 0x1BA) {
+    } else if (rxHeader.StdId != URTC_CAN_ID_PID_STATE_RESP) {
         return;
     }
     send_pid_state();

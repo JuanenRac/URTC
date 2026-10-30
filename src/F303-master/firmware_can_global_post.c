@@ -13,6 +13,7 @@
 #include "firmware_expansion_spi.h"
 #include "firmware_multinode.h"
 #include "firmware_features.h"
+#include "urtc_can_ids.h"
 
 void Handle_CAN_GlobalCommands_PostErrorGate(void) {
         // Expansion connector SPI passthrough (0x180/0x181) - generic byte
@@ -28,7 +29,7 @@ void Handle_CAN_GlobalCommands_PostErrorGate(void) {
         // inherently full-duplex - every byte sent is also a byte
         // received, even if the caller only cares about one direction for
         // a given transaction).
-        if (rxHeader.StdId == 0x180 && rxHeader.DLC >= 2) {
+        if (rxHeader.StdId == URTC_CAN_ID_EXPANSION_SPI_REQ && rxHeader.DLC >= 2) {
             uint8_t n = rxData[0];
             if (n > 7) n = 7;
             if (n > (rxHeader.DLC - 1)) n = rxHeader.DLC - 1;
@@ -41,7 +42,7 @@ void Handle_CAN_GlobalCommands_PostErrorGate(void) {
             HAL_GPIO_WritePin(EXP_SPI_CS_PORT, EXP_SPI_CS_PIN, GPIO_PIN_SET);
             if (HAL_CAN_GetTxMailboxesFreeLevel(&hcan) > 0) {
                 CAN_TxHeaderTypeDef txH;
-                txH.StdId = 0x181;
+                txH.StdId = URTC_CAN_ID_EXPANSION_SPI_RESP;
                 txH.IDE = CAN_ID_STD;
                 txH.RTR = CAN_RTR_DATA;
                 txH.DLC = n + 1;
@@ -62,12 +63,12 @@ void Handle_CAN_GlobalCommands_PostErrorGate(void) {
         // whatever's on the expansion connector), so txD[0]=1 means a
         // stall/error condition on either driver, txD[0]=0 means both
         // clear.
-        if (rxHeader.StdId == 0x182) {
+        if (rxHeader.StdId == URTC_CAN_ID_EXPANSION_DIAG0_REQ) {
             if (HAL_CAN_GetTxMailboxesFreeLevel(&hcan) > 0) {
                 CAN_TxHeaderTypeDef txH;
                 uint8_t txD[1];
                 txD[0] = (HAL_GPIO_ReadPin(TMC_DIAG0_PORT, TMC_DIAG0_PIN) == GPIO_PIN_SET) ? 1 : 0;
-                txH.StdId = 0x183;
+                txH.StdId = URTC_CAN_ID_EXPANSION_DIAG0_RESP;
                 txH.IDE = CAN_ID_STD;
                 txH.RTR = CAN_RTR_DATA;
                 txH.DLC = 1;
@@ -87,7 +88,7 @@ void Handle_CAN_GlobalCommands_PostErrorGate(void) {
         // way a motor/heater/laser command would be, but there's no
         // strong reason to except it either, so it stays consistent with
         // "most things wait until the fault clears".
-        if (rxHeader.StdId == 0x192 && rxHeader.DLC == 4 &&
+        if (rxHeader.StdId == URTC_CAN_ID_ERASE_FRAM && rxHeader.DLC == 4 &&
             rxData[0] == 0xE3 && rxData[1] == 0xA5 && rxData[2] == 0xE0 && rxData[3] == 0xFF) {
             uint8_t blank[sizeof(SavedState_t)];
             memset(blank, 0xFF, sizeof(blank)); // an arbitrary but definite pattern (no special hardware meaning for F-RAM the way it has for Flash/EEPROM - chosen purely so the magic/checksum check below is guaranteed to fail on the next boot)
@@ -98,7 +99,7 @@ void Handle_CAN_GlobalCommands_PostErrorGate(void) {
             if (HAL_CAN_GetTxMailboxesFreeLevel(&hcan) > 0) {
                 CAN_TxHeaderTypeDef txH;
                 uint8_t txD[8] = {0}; // had_valid_recovered_state=0, everything else zeroed - confirms the erase to whatever's listening for 0x191
-                txH.StdId = 0x191;
+                txH.StdId = URTC_CAN_ID_FRAM_STATE_RESP;
                 txH.IDE = CAN_ID_STD;
                 txH.RTR = CAN_RTR_DATA;
                 txH.DLC = 8;
@@ -120,7 +121,7 @@ void Handle_CAN_GlobalCommands_PostErrorGate(void) {
         // Global synchronous command 0x100: Lighting and OLED screen.
         // DLC 8 carries both the status LED color (bytes 0-2) and the ring
         // LED color (bytes 4-6, see below) in one frame.
-        if (rxHeader.StdId == 0x100 && rxHeader.DLC == 8) {
+        if (rxHeader.StdId == URTC_CAN_ID_GLOBAL_STATUS && rxHeader.DLC == 8) {
             led_state_pixel.R = rxData[0];
             led_state_pixel.G = rxData[1];
             led_state_pixel.B = rxData[2];

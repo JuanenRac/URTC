@@ -20,19 +20,17 @@
 
 #include <stdint.h>
 
-#define URTC_CAN_ID_VERSION_PATCH 0x7E9u // companion of 0x7F9, sent by whichever side answered 0x7F8
-#define URTC_CAN_ID_SLAVE_APP_PATCH 0x222u // companion of the 0x221 answer for REG_APP_VERSION of the expansion slave
+#include "urtc_can_ids.h" // the identifiers and constants come from the shared specification
+
+#define URTC_CAN_ID_VERSION_PATCH URTC_CAN_ID_VERSION_PATCH_RESPONSE // companion of 0x7F9, sent by whichever side answered 0x7F8
 #define URTC_SLAVE_APP_VERSION_REG 0x01u // REG_APP_VERSION of the slave application
 #define URTC_SLAVE_APP_VERSION_LEN 10u // its length: byte 0 responder, 1..4 hardware id, 5..6 major, 7..8 minor, 9 patch
 #define URTC_SLAVE_APP_PATCH_FRAME_DLC 3u // the master sends 3 bytes; a host that reads 2 (the first form of the frame) still gets the patch
 #define URTC_SLAVE_APP_PATCH_FRAME_MIN_DLC 2u
 
-#define URTC_PATCH_UNKNOWN      0xFFu // the patch number is not known (legacy metadata, blank board)
-#define URTC_MINOR_PATCH_FLAG   0x80u // in the high byte of a minor field: a patch number follows in bits 6..0
-#define URTC_PATCH_MAX          0x7Fu
+#define URTC_MINOR_PATCH_FLAG   URTC_PATCH_FLAG // in the high byte of a minor field: a patch number follows in bits 6..0
 
-#define URTC_PATCH_FLAG_END_UPDATE_PATCH 0x01u // 0x7E9 flags bit 0: this bootloader reads the patch from the minor field of 0x7F4 / 0x214
-#define URTC_SLAVE_VERSION_EXT_MARKER    0xE1u // first byte of the slave extended version register; never a status code
+#define URTC_PATCH_FLAG_END_UPDATE_PATCH URTC_PATCH_FLAG_ACCEPTS_IN_END_UPDATE // 0x7E9 flags bit 0: this bootloader reads the patch from the minor field of 0x7F4 / 0x214
 
 #define URTC_VERSION_PATCH_FRAME_DLC 3u
 #define URTC_SLAVE_VERSION_EXT_LEN   4u

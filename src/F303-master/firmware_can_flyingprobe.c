@@ -36,13 +36,14 @@
 #include "firmware_can_flyingprobe.h"
 #include "firmware_ads1115.h"
 #include "firmware_expansion_i2c.h"
+#include "urtc_can_ids.h"
 
 #define REG_APP_ADS_CONFIGURE 0x20
 #define REG_APP_ADS_TRIGGER   0x21
 #define REG_APP_ADS_READ      0x22
 
 void Handle_CAN_FlyingProbe(void) {
-    if (rxHeader.StdId == 0x240 && rxHeader.DLC == 2 && !boot_sequence_active) {
+    if (rxHeader.StdId == URTC_CAN_ID_ADS1115_CONFIG && rxHeader.DLC == 2 && !boot_sequence_active) {
         uint16_t cfg = ((uint16_t)rxData[0] << 8) | rxData[1];
         if (expansion_board_type == 5) {
             ADS1115_Direct_Configure(cfg);
@@ -55,14 +56,14 @@ void Handle_CAN_FlyingProbe(void) {
             ExpansionI2C_SlaveWriteRegister(REG_APP_ADS_CONFIGURE, rxData, 2);
         }
 
-    } else if (rxHeader.StdId == 0x241 && !boot_sequence_active) {
+    } else if (rxHeader.StdId == URTC_CAN_ID_ADS1115_TRIGGER && !boot_sequence_active) {
         if (expansion_board_type == 5) {
             ADS1115_Direct_TriggerConversion();
         } else {
             ExpansionI2C_SlaveWriteRegister(REG_APP_ADS_TRIGGER, rxData, 0);
         }
 
-    } else if (rxHeader.StdId == 0x242) {
+    } else if (rxHeader.StdId == URTC_CAN_ID_ADS1115_RESULT) {
         uint8_t result[2];
         uint8_t got_result = 0;
         if (expansion_board_type == 5) {
@@ -75,7 +76,7 @@ void Handle_CAN_FlyingProbe(void) {
         }
         if (got_result && HAL_CAN_GetTxMailboxesFreeLevel(&hcan) > 0) {
             CAN_TxHeaderTypeDef txH;
-            txH.StdId = 0x242;
+            txH.StdId = URTC_CAN_ID_ADS1115_RESULT;
             txH.IDE = CAN_ID_STD;
             txH.RTR = CAN_RTR_DATA;
             txH.DLC = 2;

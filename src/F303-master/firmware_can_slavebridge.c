@@ -30,6 +30,7 @@
 #include "firmware_expansion_i2c.h"
 #include "urtc_version_wire.h"
 #include "urtc_slave_regs.h"
+#include "urtc_can_ids.h"
 
 // Slave register numbers - duplicated here rather than shared via a
 // common header, since the slave is a genuinely separate chip/project
@@ -66,7 +67,7 @@ static void SendCanResponse(uint32_t id, const uint8_t *data, uint8_t len) {
 
 void Handle_CAN_SlaveBridge(void) {
     // ---- OTA relay (Flasher -> this board -> slave's own bootloader) ----
-    if (rxHeader.StdId == 0x210 && rxHeader.DLC == 4) {
+    if (rxHeader.StdId == URTC_CAN_ID_SLAVE_ENTER_BOOTLOADER && rxHeader.DLC == 4) {
         // Enter slave bootloader - relayed to the SLAVE'S OWN application-
         // mode REG_ENTER_BOOTLOADER, same magic-payload requirement as
         // the main board's own CAN 0x7F0 (see slave_common.h's own
@@ -76,7 +77,7 @@ void Handle_CAN_SlaveBridge(void) {
         // check its destination already makes correctly.
         ExpansionI2C_SlaveWriteRegister(REG_APP_ENTER_BOOTLOADER, rxData, 4);
 
-    } else if (rxHeader.StdId == 0x211 && rxHeader.DLC == 8) {
+    } else if (rxHeader.StdId == URTC_CAN_ID_SLAVE_START_UPDATE && rxHeader.DLC == 8) {
         // Resets any partial accumulation left behind by an aborted/retried
         // sequence (bus glitch, Flasher restart) before this update's own
         // real 0x212 chunks start landing - without this, stale bytes from
@@ -86,7 +87,7 @@ void Handle_CAN_SlaveBridge(void) {
         hmac_chunks_received = 0;
         ExpansionI2C_SlaveWriteRegister(REG_BOOT_START_UPDATE, rxData, 8);
 
-    } else if (rxHeader.StdId == 0x212 && rxHeader.DLC == 8) {
+    } else if (rxHeader.StdId == URTC_CAN_ID_SLAVE_HMAC_CHUNK && rxHeader.DLC == 8) {
         // Same 4-frames-of-8-bytes accumulation as the main board's own
         // bootloader HMAC chunk handling (CAN_ID_HMAC_CHUNK, bootloader_protocol.c) -
         // REG_HMAC_EXPECTED expects the complete 32-byte signature in one
@@ -102,7 +103,7 @@ void Handle_CAN_SlaveBridge(void) {
             }
         }
 
-    } else if (rxHeader.StdId == 0x213 && rxHeader.DLC >= 1) {
+    } else if (rxHeader.StdId == URTC_CAN_ID_SLAVE_DATA && rxHeader.DLC >= 1) {
         // Firmware data - each CAN frame relayed as its own I2C
         // transaction. REG_DATA's own handler (slaveboot_protocol.c's
         // HandleData) accumulates across multiple calls exactly like
@@ -110,16 +111,16 @@ void Handle_CAN_SlaveBridge(void) {
         // needs one.
         ExpansionI2C_SlaveWriteRegister(REG_BOOT_DATA, rxData, rxHeader.DLC);
 
-    } else if (rxHeader.StdId == 0x214 && rxHeader.DLC == 8) {
+    } else if (rxHeader.StdId == URTC_CAN_ID_SLAVE_END_UPDATE && rxHeader.DLC == 8) {
         ExpansionI2C_SlaveWriteRegister(REG_BOOT_END_UPDATE, rxData, 8);
 
-    } else if (rxHeader.StdId == 0x215) {
+    } else if (rxHeader.StdId == URTC_CAN_ID_SLAVE_STATUS) {
         // Status query - request can arrive with any DLC (same "DLC:any"
         // convention as the main board's own 0x7F8), response is always
         // 1 byte.
         uint8_t status;
         if (ExpansionI2C_SlaveReadRegister(REG_BOOT_STATUS, &status, 1)) {
-            SendCanResponse(0x215, &status, 1);
+            SendCanResponse(URTC_CAN_ID_SLAVE_STATUS, &status, 1);
         }
         // A failed I2C transaction (slave not present/not responding,
         // e.g. this is actually a BASIC expansion board with no slave
@@ -128,13 +129,13 @@ void Handle_CAN_SlaveBridge(void) {
         // timeout is what surfaces that to the person, not a fabricated
         // error byte pretending to be real slave data.
 
-    } else if (rxHeader.StdId == 0x216) {
+    } else if (rxHeader.StdId == URTC_CAN_ID_SLAVE_PROGRESS) {
         uint8_t progress;
         if (ExpansionI2C_SlaveReadRegister(REG_BOOT_PROGRESS, &progress, 1)) {
-            SendCanResponse(0x216, &progress, 1);
+            SendCanResponse(URTC_CAN_ID_SLAVE_PROGRESS, &progress, 1);
         }
 
-    } else if (rxHeader.StdId == 0x217) {
+    } else if (rxHeader.StdId == URTC_CAN_ID_SLAVE_VERSION_RESP_1) {
         // Bootloader version query - REG_QUERY_VERSION's own 10-byte
         // response doesn't fit one CAN frame, split across 0x217 (first
         // 8 bytes) and 0x218 (last 2) - same 2-response-ID split the
@@ -142,7 +143,7 @@ void Handle_CAN_SlaveBridge(void) {
         // for the same reason.
         uint8_t version[10];
         if (ExpansionI2C_SlaveReadRegister(REG_BOOT_QUERY_VERSION, version, 10)) {
-            SendCanResponse(0x217, version, 8);
+            SendCanResponse(URTC_CAN_ID_SLAVE_VERSION_RESP_1, version, 8);
             // Optional PATCH extension: a slave bootloader that has it answers
             // REG_BOOT_QUERY_VERSION_EXT starting with a marker byte; an older
             // one answers with its 1-byte status instead, so the first byte is
@@ -156,21 +157,21 @@ void Handle_CAN_SlaveBridge(void) {
             }
             uint8_t part2[5];
             uint8_t part2_len = urtc_slave_version_part2_build(part2, &version[8], have_ext ? ext : 0);
-            SendCanResponse(0x218, part2, part2_len);
+            SendCanResponse(URTC_CAN_ID_SLAVE_VERSION_RESP_2, part2, part2_len);
         }
 
-    } else if (rxHeader.StdId == 0x219) {
+    } else if (rxHeader.StdId == URTC_CAN_ID_SLAVE_VERIFY_FAIL_REASON) {
         // Verify-fail-reason query - only meaningful right after 0x215
         // above reports STATUS_VERIFY_FAIL; same "any DLC request, 1 byte
         // response" convention as 0x215/0x216.
         uint8_t reason;
         if (ExpansionI2C_SlaveReadRegister(REG_BOOT_VERIFY_FAIL_REASON, &reason, 1)) {
-            SendCanResponse(0x219, &reason, 1);
+            SendCanResponse(URTC_CAN_ID_SLAVE_VERIFY_FAIL_REASON, &reason, 1);
         }
 
     // ---- Application register access (advanced-board tools, e.g. Paste
     // Jetting's own local PWM) ----
-    } else if (rxHeader.StdId == 0x220 && rxHeader.DLC >= 2) {
+    } else if (rxHeader.StdId == URTC_CAN_ID_SLAVE_REG_WRITE && rxHeader.DLC >= 2) {
         // Write - byte[0] is the slave's own application register
         // number (REG_PWM_*, REG_ADS_*, REG_MLX_* - see slave_common.h),
         // byte[1..] is that register's own payload, relayed as-is.
@@ -180,7 +181,7 @@ void Handle_CAN_SlaveBridge(void) {
             ExpansionI2C_SlaveWriteRegister(rxData[0], &rxData[1], rxHeader.DLC - 1);
         }
 
-    } else if (rxHeader.StdId == 0x221 && rxHeader.DLC == 2) {
+    } else if (rxHeader.StdId == URTC_CAN_ID_SLAVE_REG_READ && rxHeader.DLC == 2) {
         // Read - byte[0] is the register to read, byte[1] is how many
         // bytes to read back (caller's own responsibility to ask for the
         // right length for whichever register it named - this bridge
@@ -198,7 +199,7 @@ void Handle_CAN_SlaveBridge(void) {
         uint8_t response[URTC_SLAVE_APP_VERSION_LEN > 8 ? URTC_SLAVE_APP_VERSION_LEN : 8];
         uint8_t is_version = (reg == URTC_SLAVE_APP_VERSION_REG);
         if (ExpansionI2C_SlaveReadRegister(reg, response, is_version ? (uint8_t)URTC_SLAVE_APP_VERSION_LEN : len)) {
-            SendCanResponse(0x221, response, len);
+            SendCanResponse(URTC_CAN_ID_SLAVE_REG_READ, response, len);
             if (is_version) {
                 // Accepted when the slave sends one (1..127); a slave application
                 // from before the field reads 0 there, which is ignored, so the

@@ -13,9 +13,10 @@
 // =============================================================================
 #include "firmware_common.h"
 #include "firmware_can_soldering.h"
+#include "urtc_can_ids.h"
 
 void Handle_CAN_SolderingIron(void) {
-                if (rxHeader.StdId == 0x130 && rxHeader.DLC >= 2) {
+                if (rxHeader.StdId == URTC_CAN_ID_SOLDER_SETPOINT && rxHeader.DLC >= 2) {
                     // Not gated on boot_sequence_active - same reasoning as
                     // the 3D printer hotend's own 0x170 handler and Hot Air
                     // Rework's 0x1E0: pre-warming during the ~5s splash is
@@ -42,7 +43,7 @@ void Handle_CAN_SolderingIron(void) {
                 // command has one: a corrupted or malformed frame landing on
                 // this ID by chance shouldn't be able to silently discard a
                 // real tracked position.
-                if (rxHeader.StdId == 0x131 && rxHeader.DLC == 4 &&
+                if (rxHeader.StdId == URTC_CAN_ID_SOLDER_FEEDER_RESET && rxHeader.DLC == 4 &&
                     rxData[0] == 0x52 && rxData[1] == 0x53 && rxData[2] == 0x50 && rxData[3] == 0x30) {
                     solder_spool_position = 0;
                 }
@@ -52,7 +53,7 @@ void Handle_CAN_SolderingIron(void) {
                 // 0x1A2/0x1A3 elsewhere in this firmware - answering 0x132
                 // both right after a reset above and as a bare query,
                 // rather than needing a separate response ID.
-                if (rxHeader.StdId == 0x131 || rxHeader.StdId == 0x132) {
+                if (rxHeader.StdId == URTC_CAN_ID_SOLDER_FEEDER_RESET || rxHeader.StdId == URTC_CAN_ID_SOLDER_FEEDER_POS) {
                     if (HAL_CAN_GetTxMailboxesFreeLevel(&hcan) > 0) {
                         CAN_TxHeaderTypeDef txH;
                         uint32_t pos = (uint32_t)solder_spool_position;
@@ -62,7 +63,7 @@ void Handle_CAN_SolderingIron(void) {
                             (uint8_t)((pos >> 8) & 0xFF),
                             (uint8_t)(pos & 0xFF)
                         };
-                        txH.StdId = 0x132;
+                        txH.StdId = URTC_CAN_ID_SOLDER_FEEDER_POS;
                         txH.IDE = CAN_ID_STD;
                         txH.RTR = CAN_RTR_DATA;
                         txH.DLC = 4;

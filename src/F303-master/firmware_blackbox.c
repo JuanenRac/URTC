@@ -34,6 +34,7 @@
 #include "firmware_common.h"
 #include "firmware_blackbox.h"
 #include "firmware_fram.h"
+#include "urtc_can_ids.h"
 
 static BlackBoxSample_t ring[BLACKBOX_SAMPLES];
 static uint8_t write_index = 0;
@@ -118,7 +119,7 @@ static void BlackBox_SendChunkFrames(const uint8_t *data32) {
     for (uint8_t frame = 0; frame < 4; frame++) {
         if (HAL_CAN_GetTxMailboxesFreeLevel(&hcan) == 0) return; // stop rather than send an out-of-order remainder if mailboxes run out mid-transfer - a host seeing fewer than 4 frames for this chunk already knows to treat it as incomplete, same as it would a dropped CAN frame from any other cause
         CAN_TxHeaderTypeDef txH;
-        txH.StdId = 0x1A9;
+        txH.StdId = URTC_CAN_ID_BLACKBOX_CHUNK;
         txH.IDE = CAN_ID_STD;
         txH.RTR = CAN_RTR_DATA;
         txH.DLC = 8;

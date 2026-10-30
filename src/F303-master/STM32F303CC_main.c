@@ -30,6 +30,7 @@
 #include "firmware_blackbox.h"
 #include "firmware_multinode.h"
 #include "firmware_features.h"
+#include "urtc_can_ids.h"
 
 volatile ToolMode_t active_tool;
 
@@ -617,7 +618,7 @@ int main(void) {
             if (!MultiNode_SingleHeadTxAllowed()) {
                 // nothing: this head is not the active one
             } else if (active_tool == TOOL_SOLDERING_IRON || active_tool == TOOL_HOTAIR_REWORK) {
-                txH.StdId = 0x135;
+                txH.StdId = URTC_CAN_ID_SOLDER_TELEMETRY;
                 txH.DLC = 2;
                 txD[0] = (uint8_t)((current_temperature >> 8) & 0xFF);
                 txD[1] = (uint8_t)(current_temperature & 0xFF);
@@ -631,7 +632,7 @@ int main(void) {
                 // cleanly when none is free, rather than calling blind and
                 // silently dropping a failed send. Not worth a retry here;
                 // this is periodic telemetry, not a one-shot command.
-                txH.StdId = 0x175;
+                txH.StdId = URTC_CAN_ID_PRINTER_HOTEND_TELEMETRY;
                 txH.DLC = 2;
                 txD[0] = (uint8_t)((current_temperature >> 8) & 0xFF);
                 txD[1] = (uint8_t)(current_temperature & 0xFF);
@@ -640,7 +641,7 @@ int main(void) {
                 }
 
                 // Layer fan RPM telemetry (0x177)
-                txH.StdId = 0x177;
+                txH.StdId = URTC_CAN_ID_PRINTER_LAYERFAN_RPM;
                 txH.DLC = 2;
                 txD[0] = (uint8_t)((layer_fan_actual_rpm >> 8) & 0xFF);
                 txD[1] = (uint8_t)(layer_fan_actual_rpm & 0xFF);
@@ -649,7 +650,7 @@ int main(void) {
                 }
 
                 // Hotend fan RPM telemetry (0x179)
-                txH.StdId = 0x179;
+                txH.StdId = URTC_CAN_ID_PRINTER_HOTENDFAN_RPM;
                 txH.DLC = 2;
                 txD[0] = (uint8_t)((hotend_fan_actual_rpm >> 8) & 0xFF);
                 txD[1] = (uint8_t)(hotend_fan_actual_rpm & 0xFF);
@@ -659,7 +660,7 @@ int main(void) {
             }
             // 0x145: vacuum pickup analog/digital sensor telemetry, per CANBUS.TXT
             else if (active_tool == TOOL_VACUUM_PICKUP) {
-                txH.StdId = 0x145;
+                txH.StdId = URTC_CAN_ID_VACUUM_TELEMETRY;
                 txH.DLC = 3;
                 txD[0] = (uint8_t)((sensor_analog_reading >> 8) & 0xFF);
                 txD[1] = (uint8_t)(sensor_analog_reading & 0xFF);
@@ -674,7 +675,7 @@ int main(void) {
             // rather than reusing 0x145 so a host can't mistake which
             // tool actually answered.
             else if (active_tool == TOOL_FLYING_PROBE) {
-                txH.StdId = 0x243;
+                txH.StdId = URTC_CAN_ID_FLYING_PROBE_BASIC;
                 txH.DLC = 2;
                 txD[0] = (uint8_t)((sensor_analog_reading >> 8) & 0xFF);
                 txD[1] = (uint8_t)(sensor_analog_reading & 0xFF);
@@ -684,7 +685,7 @@ int main(void) {
             }
             // 0x147: drill RPM + endstop telemetry
             else if (active_tool == TOOL_DRILL) {
-                txH.StdId = 0x147;
+                txH.StdId = URTC_CAN_ID_DRILL_TELEMETRY;
                 txH.DLC = 3; // extended: byte 2 = endstop
                 __disable_irq();
                 uint16_t drill_rpm_snapshot = drill_actual_rpm; // atomic snapshot, defensive against a mid-read IRQ update
@@ -700,7 +701,7 @@ int main(void) {
             // IDs, placed next to each tool's own command ID (0x160/0x150)
             // the same way 0x140->0x147 and 0x130->0x135 are already paired.
             else if (active_tool == TOOL_LASER_ENGRAVER) {
-                txH.StdId = 0x165;
+                txH.StdId = URTC_CAN_ID_LASER_TELEMETRY;
                 txH.DLC = 1;
                 txD[0] = endstop_triggered;
                 if (HAL_CAN_GetTxMailboxesFreeLevel(&hcan) > 0) {
@@ -708,7 +709,7 @@ int main(void) {
                 }
             }
             else if (active_tool == TOOL_AOI_INSPECTION) {
-                txH.StdId = 0x155;
+                txH.StdId = URTC_CAN_ID_AOI_TELEMETRY;
                 txH.DLC = 1;
                 txD[0] = endstop_triggered;
                 if (HAL_CAN_GetTxMailboxesFreeLevel(&hcan) > 0) {

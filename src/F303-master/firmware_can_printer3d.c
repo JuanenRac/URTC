@@ -5,9 +5,10 @@
 // =============================================================================
 #include "firmware_common.h"
 #include "firmware_can_printer3d.h"
+#include "urtc_can_ids.h"
 
 void Handle_CAN_3DPrinter(void) {
-                if (rxHeader.StdId == 0x170 && rxHeader.DLC >= 6) {
+                if (rxHeader.StdId == URTC_CAN_ID_PRINTER_THERMAL_MOTION && rxHeader.DLC >= 6) {
                     // Hotend temperature, big-endian (MSB | LSB)
                     // Not gated on boot_sequence_active - starting the heater
                     // pre-warming during the splash is fine (no physical
@@ -43,7 +44,7 @@ void Handle_CAN_3DPrinter(void) {
                 // Layer fan (0x173): duty 0-255 towards TIM1_CH1/PA8 at 25kHz,
                 // sharing the same channel as drill/laser (reconfigured to
                 // this tool's exact rate in main()) - independent from TIM3.
-                else if (rxHeader.StdId == 0x173 && rxHeader.DLC >= 1) {
+                else if (rxHeader.StdId == URTC_CAN_ID_PRINTER_LAYERFAN_CMD && rxHeader.DLC >= 1) {
                     layer_fan_duty = rxData[0];
                     uint32_t fan_duty = (layer_fan_duty * 2559) / 255;
                     __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, fan_duty);
@@ -52,7 +53,7 @@ void Handle_CAN_3DPrinter(void) {
                 // Hotend fan (0x178): duty 0-255 towards TIM2_CH1/PA5 at
                 // 25kHz. Separate from the layer fan - cools the heatsink/heat
                 // break, not the printed part.
-                else if (rxHeader.StdId == 0x178 && rxHeader.DLC >= 1) {
+                else if (rxHeader.StdId == URTC_CAN_ID_PRINTER_HOTENDFAN_CMD && rxHeader.DLC >= 1) {
                     hotend_fan_duty = rxData[0];
                     uint32_t hfan_duty = (hotend_fan_duty * 2559) / 255;
                     __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, hfan_duty);

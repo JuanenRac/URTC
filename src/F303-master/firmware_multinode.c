@@ -16,6 +16,7 @@
 #include "firmware_fram.h"
 #include "firmware_multinode.h"
 #include "multinode.h"
+#include "urtc_can_ids.h"
 
 
 static MnNode_t node;               // zeroed: enabled = 0 until MultiNode_Init() reads a valid record
@@ -94,9 +95,9 @@ uint8_t MultiNode_SingleHeadTxAllowed(void) {
 }
 
 void MultiNode_HandleConfigCommand(void) {
-    if (rxHeader.StdId == 0x1AC) {
+    if (rxHeader.StdId == URTC_CAN_ID_SET_MULTINODE) {
         // Four-byte magic (ASCII 'MNOD'), then enable (0 or 1) and the instance number.
-        if (!(rxHeader.StdId == 0x1AC && rxHeader.DLC == 6 &&
+        if (!(rxHeader.StdId == URTC_CAN_ID_SET_MULTINODE && rxHeader.DLC == 6 &&
               rxData[0] == 0x4D && rxData[1] == 0x4E && rxData[2] == 0x4F && rxData[3] == 0x44 &&
               rxData[4] <= 1)) {
             return; // anything else is ignored, like every magic-protected command
@@ -109,13 +110,13 @@ void MultiNode_HandleConfigCommand(void) {
         if (FRAM_WriteBytes(MN_CONFIG_FRAM_ADDR, (const uint8_t *)&next, sizeof(next))) {
             read_persisted(); // report what the chip really holds, not what was asked
         }
-    } else if (rxHeader.StdId != 0x1AD) {
+    } else if (rxHeader.StdId != URTC_CAN_ID_MULTINODE_CONFIG_RESP) {
         return;
     }
     // 0x1AC (after a change) and 0x1AD (a plain query) are both answered with 0x1AD.
     if (HAL_CAN_GetTxMailboxesFreeLevel(&hcan) > 0) {
         MnFrame_t f;
-        f.id = 0x1AD;
+        f.id = URTC_CAN_ID_MULTINODE_CONFIG_RESP;
         f.dlc = 4;
         memset(f.data, 0, sizeof(f.data));
         f.data[0] = Mn_ConfigIsEnabled(&persisted);

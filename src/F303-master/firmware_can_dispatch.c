@@ -37,6 +37,7 @@
 #include "firmware_can_thermalinspection.h"
 #include "firmware_can_dispatch_routing.h"
 #include "firmware_multinode.h"
+#include "urtc_can_ids.h"
 
 // Keeps firmware_can_dispatch_routing.c's own hardcoded tool-ID literals
 // (deliberately NOT #include-ing this file's ToolMode_t, to stay HAL-free
@@ -95,7 +96,7 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan_m) {
         // command a distinct warning pattern on the LEDs to signal the
         // fault externally, rather than the board going dark on the
         // outside the moment it declares itself unsafe.
-        if (system_error_flag && rxHeader.StdId != 0x100) {
+        if (system_error_flag && rxHeader.StdId != URTC_CAN_ID_GLOBAL_STATUS) {
             return;
         }
 

@@ -19,14 +19,15 @@
 #include "firmware_common.h"
 #include "firmware_can_pastejetting.h"
 #include "firmware_expansion_i2c.h"
+#include "urtc_can_ids.h"
 
 #define REG_APP_PWM_CONFIGURE 0x30
 #define REG_APP_PWM_PULSE     0x31
 
 void Handle_CAN_PasteJetting(void) {
-    if (rxHeader.StdId == 0x230 && rxHeader.DLC == 3 && !boot_sequence_active) {
+    if (rxHeader.StdId == URTC_CAN_ID_PASTE_JETTING_CONFIG && rxHeader.DLC == 3 && !boot_sequence_active) {
         ExpansionI2C_SlaveWriteRegister(REG_APP_PWM_CONFIGURE, rxData, 3);
-    } else if (rxHeader.StdId == 0x231 && rxHeader.DLC == 3 && !boot_sequence_active) {
+    } else if (rxHeader.StdId == URTC_CAN_ID_PASTE_JETTING_PULSE && rxHeader.DLC == 3 && !boot_sequence_active) {
         ExpansionI2C_SlaveWriteRegister(REG_APP_PWM_PULSE, rxData, 3);
     }
 }

@@ -5,6 +5,7 @@
 // =============================================================================
 #include "firmware_common.h"
 #include "firmware_interrupts_gpio.h"
+#include "urtc_can_ids.h"
 
 // =============================================================================
 // 10. ASSOCIATED INTERRUPTS AND VECTOR HANDLERS (ISR)
@@ -31,7 +32,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
             uint8_t txDataLocal[1] = {0x01};
             uint32_t mailbox;
             
-            txHead.StdId = 0x095;
+            txHead.StdId = URTC_CAN_ID_IMPACT_EVENT;
             txHead.RTR = CAN_RTR_DATA;
             txHead.IDE = CAN_ID_STD;
             txHead.DLC = 1;
