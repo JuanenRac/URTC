@@ -133,6 +133,30 @@ void run_can_dispatch_tests(int *failures)
         TEST_ASSERT(strcmp(trace, routes[i].expect) == 0, label);
     }
 
+    // Only a standard data frame is a command: an extended frame (whose StdId is left over from the frame before) and a remote request reach no handler.
+    deliver(0x120, TOOL_SOLDERING_IRON, 0);
+    TEST_ASSERT(strcmp(trace, "pre post bridge solder motion ") == 0, "a standard data frame is dispatched");
+    fake_hal_reset_recording();
+    trace_len = 0;
+    trace[0] = 0;
+    memset(&fake_rx_queue[0], 0, sizeof fake_rx_queue[0]);
+    fake_rx_queue[0].hdr.StdId = 0x160;
+    fake_rx_queue[0].hdr.IDE = CAN_ID_EXT;
+    fake_rx_queue[0].hdr.ExtId = 0x18FF0001u;
+    fake_rx_queue[0].hdr.DLC = 2;
+    fake_rx_queue_count = 1;
+    active_tool = TOOL_LASER_ENGRAVER;
+    system_error_flag = 0;
+    HAL_CAN_RxFifo0MsgPendingCallback(&hcan);
+    TEST_ASSERT(trace[0] == 0, "an extended frame reaches no handler, even with the StdId of a command left over");
+    memset(&fake_rx_queue[0], 0, sizeof fake_rx_queue[0]);
+    fake_rx_queue[0].hdr.StdId = 0x160;
+    fake_rx_queue[0].hdr.RTR = CAN_RTR_REMOTE;
+    fake_rx_queue[0].hdr.DLC = 2;
+    fake_rx_queue_count = 1;
+    HAL_CAN_RxFifo0MsgPendingCallback(&hcan);
+    TEST_ASSERT(trace[0] == 0, "a remote request reaches no handler");
+
     // The diagnostics that must work during a fault run first; an unassigned jumper value reaches no tool.
     deliver(0x120, (ToolMode_t)31, 0);
     TEST_ASSERT(strcmp(trace, "pre post bridge ") == 0, "an unassigned tool id reaches no tool handler");

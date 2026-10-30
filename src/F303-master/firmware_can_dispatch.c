@@ -78,6 +78,13 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan_m) {
 
         can_led_tick = HAL_GetTick();
 
+        // Only a standard data frame is a command of this protocol. For an extended frame the HAL fills the extended identifier and leaves StdId as it was
+        // (the identifier of the frame before), and a remote request carries whatever the mailbox held: either would be taken for a repeat of the previous
+        // command, including one that actuates and one that feeds a watchdog. Anything else is ignored (the bus activity above still counts).
+        if (rxHeader.IDE != CAN_ID_STD || rxHeader.RTR != CAN_RTR_DATA) {
+            return;
+        }
+
         // Several tool heads on one bus (off unless the persistent switch is on; see
         // firmware_multinode.c). Returns 0 at once while the switch is off, so the
         // single-head path below is exactly what it always was. When the switch is on, a

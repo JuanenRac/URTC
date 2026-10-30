@@ -61,6 +61,8 @@ typedef struct { void *Instance; struct { uint32_t Prescaler, Reload; } Init; } 
 #define TIM_CHANNEL_1 0u
 #define CAN_ID_STD    0u
 #define CAN_RTR_DATA  0u
+#define CAN_ID_EXT    4u
+#define CAN_RTR_REMOTE 2u
 
 typedef struct {
     uint32_t StdId, ExtId, IDE, RTR, DLC;
