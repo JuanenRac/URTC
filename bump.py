@@ -104,6 +104,8 @@ def main(argv: list[str] | None = None) -> int:
         print(run("bump_manifest_version.py", "--sync"))
     if sync_components():
         print("urtc.project.json components[] synchronised")
+    if (ROOT / "tools" / "version_checklist_state.py").exists() and (ROOT / "VERSION_CHECKLIST.txt").exists():
+        print(run("tools/version_checklist_state.py"))
     return 0
 
 
