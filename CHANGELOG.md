@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **The free-tool text of `docs/EEPROM.TXT` and `docs/ECOVIA.TXT` follows the specification:** the jumper readings 0-24 name the 25 tool profiles (not 12), the selection of the free register is 1-25 (26-255 and a blank F-RAM mean no tool), `0x1A2` is only the write and needs at least one byte, and the query is `0x1A3`, whose payload is ignored. Text only: the firmware is unchanged.
+
 - **The version checklist keeps its table of versions by itself:** `tools/version_checklist_state.py` writes, between two marker lines of `VERSION_CHECKLIST.txt`, the project version and every firmware component with the file that holds it, from `urtc.project.json`; `bump.py` runs it after raising a version and `--check` tells when the block is out of date.
 
 - **The lights of Project status follow the evidence of the manifest:** the manifest says how far the repository has been shown to work (`evidence`: `host-test`, `simulator`, `bench` or `field`) and the validator fails when a light is above what that evidence and the maturity allow (`tools/status_lights.py`), so a green that never ran on real hardware cannot come back.

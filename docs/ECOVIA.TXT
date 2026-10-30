@@ -88,8 +88,8 @@ ID4   ID3   ID2   ID1   ID0  |  ID (HEX)  |  ASSIGNED TOOL / MODULE FUNCTION
   invalid, a board reading 0x1F falls back to exactly the same
   safe/inert TOOL_INVALID state as any of the plain unassigned IDs
   above. See `docs/EEPROM.TXT` section 5 for the complete mechanism, and
-  `docs/CANBUS.TXT`'s `0x1A2`/`0x1A3` for the CAN commands that read and
-  write this register.
+  `docs/CANBUS.TXT`'s `0x1A2` (write, DLC 1 or more) and `0x1A3` (query
+  and answer) for the CAN commands that write and read this register.
 
 * Several of the 13 newer tools (0x0C-0x18) need more than this board's
   own onboard peripherals to work - an expansion board of some kind,

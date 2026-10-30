@@ -290,11 +290,11 @@ via 0x1A2.
 5. Free tool configuration (ID-jumper address 0x1F)
 -----------------------------------------------------------------------------
 The 5-bit ID-jumper matrix (see PINOUT.TXT and ECOVIA.TXT) has 32
-possible readings (0-31). 0-11 map directly to one of the 12 currently
-supported tool profiles; 0x1F (11111b, all 5 jumpers installed) is
-reserved as the "free configuration" address rather than a 13th direct
-tool mapping - readings 12-30 remain simply invalid, same as before this
-feature existed.
+possible readings (0-31). 0-24 (0x00-0x18) map directly to one of the 25
+currently supported tool profiles; 0x1F (11111b, all 5 jumpers installed)
+is reserved as the "free configuration" address rather than a 26th direct
+tool mapping - readings 25-30 (0x19-0x1E) remain simply invalid, same as
+before this feature existed.
 
 When Identify_PhysicalTool() reads 0x1F at boot, it doesn't pick a fixed
 tool - it reads free_tool_selection from this same F-RAM (this is why
@@ -305,17 +305,19 @@ from there:
     (TOOL_INVALID, the "CHECK ID JUMPERS" OLED screen, every actuator
     forced to its safe default) as any other unrecognized ID-jumper
     reading.
-  - free_tool_selection = 1-12: resolves to that tool (stored as id+1 -
+  - free_tool_selection = 1-25: resolves to that tool (stored as id+1 -
     see this field's own row in section 1 above for why), exactly as if
     the jumpers had been set to that tool's own direct address.
-  - free_tool_selection = 13-255, or the F-RAM itself is missing/blank/
+  - free_tool_selection = 26-255, or the F-RAM itself is missing/blank/
     corrupted: treated the same as 0 - no tool selected, safe/error
     state.
 
 free_tool_selection is set via CAN (0x1A2, see CANBUS.TXT) - the Flasher
-is the only tool that writes it; the Tester can read it (0x1A2 with no
-payload, or 0x1A3 directly) but doesn't offer a way to change it, the
-same asymmetry already used for the OTA update process itself. The
+is the only tool that writes it; the Tester can read it (with the query
+0x1A3, whose payload is ignored) but doesn't offer a way to change it,
+the same asymmetry already used for the OTA update process itself.
+0x1A2 is only the write: it needs a payload of at least 1 byte (DLC 1
+or more; the selection is byte 0) and is never used to ask. The
 response to either ID carries the raw ID-jumper reading (0-31) alongside
 the current free_tool_selection value, not just the selection alone -
 this lets a reader tell "the jumpers read something other than 0x1F, so
