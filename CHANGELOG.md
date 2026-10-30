@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented here.
 
+## [Unreleased]
+
+- **The lights of Project status follow the evidence of the manifest:** the manifest says how far the repository has been shown to work (`evidence`: `host-test`, `simulator`, `bench` or `field`) and the validator fails when a light is above what that evidence and the maturity allow (`tools/status_lights.py`), so a green that never ran on real hardware cannot come back.
+
 ## [0.4.2] - The CAN identifiers as named macros, extended and remote frames ignored, the release workflow telling the flasher and the web studio, and the universal README
 
 - **Fixed: an extended or remote CAN frame is no longer taken for a command.** The receive callback acted on `rxHeader.StdId` without looking at the frame type; for an extended frame the HAL leaves `StdId` as it was (the identifier of the frame before) and a remote request carries whatever the mailbox held, so either could repeat the previous command, including one that actuates and one that feeds a communication watchdog. Only a standard data frame is dispatched now (the bus activity LED still counts any frame); a host test sends an extended frame with a leftover identifier of the laser command and a remote request and checks that no handler runs. This is source: a firmware image has to be built to carry it.
