@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented here.
 
-## [Unreleased]
+## [0.4.2] - The CAN identifiers as named macros, extended and remote frames ignored, the release workflow telling the flasher and the web studio, and the universal README
 
 - **Fixed: an extended or remote CAN frame is no longer taken for a command.** The receive callback acted on `rxHeader.StdId` without looking at the frame type; for an extended frame the HAL leaves `StdId` as it was (the identifier of the frame before) and a remote request carries whatever the mailbox held, so either could repeat the previous command, including one that actuates and one that feeds a communication watchdog. Only a standard data frame is dispatched now (the bus activity LED still counts any frame); a host test sends an extended frame with a leftover identifier of the laser command and a remote request and checks that no handler runs. This is source: a firmware image has to be built to carry it.
 - **The firmware names its CAN identifiers with macros:** the 114 identifier literals of the application (comparisons, sends and the companion frames) are now the `URTC_CAN_ID_` macros of `src/common/urtc_can_ids.h`, a copy of the header URTC-COMMON generates from the specification (with its lock file), and `urtc_version_wire.h` takes its identifiers and patch constants from the same header. A test fails on a new literal or on a hand edit of the copy. The behaviour is unchanged: all 38 host suites pass under the sanitizers. This is source: a firmware image has to be built to carry it.
