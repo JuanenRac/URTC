@@ -725,6 +725,35 @@
 #define URTC_SLAVE_APP_REG_PWM_PULSE 0x31u
 #define URTC_SLAVE_APP_REG_PWM_STOP 0x32u
 
+/* --- Frames of the tool rack (URTC-SMART-RACK): see docs/PROTOCOL_TABLE.md --- */
+#define URTC_RACK_CMD_SET_PREHEAT 0x1u  /* Command code of the pre-heat order in the first byte of a reply */
+#define URTC_RACK_TOOL_NONE 0xFFu  /* Tool byte of a reply to a command that carried no tool */
+#define URTC_RACK_REPLY_LENGTH 0x3u  /* Length of the reply payload */
+#define URTC_RACK_ID_FIRST 0x260u  /* first identifier reserved for the rack */
+#define URTC_RACK_ID_LAST 0x26Fu  /* last identifier reserved for the rack */
+#define URTC_RACK_ID_SET_PREHEAT 0x260u  /* Pre-heat order for one tool of the rack */
+#define URTC_DLC_RACK_SET_PREHEAT_MIN 8u
+#define URTC_DLC_RACK_SET_PREHEAT_MAX 8u
+#define URTC_RACK_SET_PREHEAT_TOOL_OFFSET 0u
+#define URTC_RACK_SET_PREHEAT_TARGET_C_OFFSET 1u
+#define URTC_RACK_SET_PREHEAT_SEQUENCE_OFFSET 3u
+#define URTC_RACK_SET_PREHEAT_PADDING_OFFSET 4u
+#define URTC_RACK_ID_REPLY 0x261u  /* Reply of the rack to a command: acknowledgement or refusal with the reason */
+#define URTC_DLC_RACK_REPLY_MIN 3u
+#define URTC_DLC_RACK_REPLY_MAX 3u
+#define URTC_RACK_REPLY_COMMAND_OFFSET 0u
+#define URTC_RACK_REPLY_TOOL_OFFSET 1u
+#define URTC_RACK_REPLY_REASON_OFFSET 2u
+#define URTC_RACK_REPLY_APPLIED 0u  /* acknowledgement: The command was applied */
+#define URTC_RACK_REPLY_REPEAT 1u  /* acknowledgement: The same command again (a repeat): nothing changes, the sender is told it arrived */
+#define URTC_RACK_REPLY_WRONG_LENGTH 2u  /* refusal: The payload does not have the length the command needs */
+#define URTC_RACK_REPLY_TOOL_ABSENT 3u  /* refusal: The slot named has no tool */
+#define URTC_RACK_REPLY_TEMP_OUT_OF_RANGE 4u  /* refusal: The temperature is above the limit of the tool */
+#define URTC_RACK_REPLY_TOOL_INVALID 5u  /* refusal: The tool byte names no tool */
+#define URTC_RACK_REPLY_NOT_HEATABLE 6u  /* refusal: The tool has no heater and takes only 0 */
+#define URTC_RACK_REPLY_HELD_RATE 7u  /* refusal: The command came too soon after the last one accepted for that tool */
+#define URTC_RACK_REPLY_UNKNOWN_COMMAND 8u  /* refusal: The rack does not know the command */
+
 /* --- multinode extension (implemented in the firmware behind a switch that is off by default, tested on the host only): see docs/MULTINODE.md --- */
 #define URTC_MN_VERSION 0x1u  /* Multinode extension version carried by the discovery frames */
 #define URTC_MN_ADDRESS_BITS 0x5u  /* Bits of the node address */

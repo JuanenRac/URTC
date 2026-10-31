@@ -1255,12 +1255,14 @@ Data: 32 bytes total (16 pixels, int16_t each, centi-degrees C - value
       actually answered.
 
 -----------------------------------------------------------------------------
-RESERVED FOR URTC-SMART-RACK (0x260-0x26F) - nothing in this firmware answers them
+URTC-SMART-RACK (0x260-0x26F) - nothing in this firmware answers them
 -----------------------------------------------------------------------------
 The tool rack (URTC-SMART-RACK) will be a node of this bus. Until a board with
 a CAN transceiver exists it talks over a serial link; the identifiers below are
 reserved so that no tool profile takes them, and the layout is fixed here so the
-byte order is not chosen after the hardware.
+byte order is not chosen after the hardware. Both frames are specified in the
+"rack" section of the shared specification, apart from the identifiers of the
+tool head: the head does not answer them.
 
 ID: 0x260 [Host -> Rack]
 Set the pre-heat target of the tool in one rack slot
@@ -1275,9 +1277,26 @@ Data:
         pre-heat by itself after 10 minutes without a tool swap (configurable).
 
 ID: 0x261 [Rack -> Host]
-Reserved for the rack status; not defined yet.
+Reply of the rack to a command: an acknowledgement or a refusal with the reason
+DLC: 3 bytes
+Data:
+  - rxData[0]: the command answered (1 = the pre-heat order; a command the rack
+               does not know is returned as it came)
+  - rxData[1]: the tool byte the command carried (255 = it carried none)
+  - rxData[2]: the reason (0 applied, 1 repeat: acknowledgements; 2 wrong length,
+               3 tool absent, 4 temperature out of range, 5 tool invalid, 6 not
+               heatable, 7 held (the command came too soon), 8 unknown command:
+               refusals; the rack never sends 255, and a code above 8 makes the
+               frame malformed)
+  Note: these are the same three bytes as the payload of the acknowledgement
+        (0x81) and the refusal (0x82) frames of the serial link of the rack; on
+        CAN the kind is told by the reason. There is no sequence number in the
+        CAN reply: the sender matches it with its order by the command and the
+        tool. A gateway forwards this frame towards the network and refuses it
+        towards the bus.
 
-0x262-0x26F: free inside this reserved block.
+0x262-0x26F: free inside this reserved block (a periodic rack status, if one
+is ever defined, would take 0x262).
 
 =============================================================================
 CAN BOOTLOADER PROTOCOL - see the README's "Building & Flashing" section
@@ -3815,3 +3834,61 @@ Several tool heads on one bus. Status: implemented in the firmware behind a swit
 | 0x460-0x47F | NODE_CMD | host to node | 2-8 | One command to one node without selecting it |
 | 0x480-0x49F | NODE_RESP | node to host | 2-8 | The answer of one node to NODE_CMD |
 [[ END GENERATED multinode ]]
+
+K. Tool rack frames (0x260-0x261)
+
+[[ BEGIN GENERATED rack sha256=9e0a66c53e706bad8ff80d5c2bcd3c8ebe267f0faee98c5f5cce2ee37e1e9981 ]]
+Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
+
+Frames of the tool rack (URTC-SMART-RACK). The two CAN frames of the tool rack: the pre-heat order the host sends and the reply the rack gives to a command, an acknowledgement or a refusal with its reason. They sit in the block of identifiers 0x260 to 0x26F reserved for the rack, apart from the messages above: the tool head does not answer them, and a gateway forwards the reply towards the network and refuses the order and the reply towards the bus. The reply is the same three bytes as the payload of the acknowledgement (0x81) and refusal (0x82) frames of the serial link of the rack; on CAN the kind is told by the reason. There is no sequence number in the CAN reply: a sender matches it with its order by the command and the tool.
+
+| ID | Name | Direction | DLC | Title |
+|---|---|---|---|---|
+| 0x260 | SET_PREHEAT | host to rack | 8 | Pre-heat order for one tool of the rack |
+| 0x261 | REPLY | rack to host | 3 | Reply of the rack to a command: acknowledgement or refusal with the reason |
+
+0x260 SET_PREHEAT - Pre-heat order for one tool of the rack
+
+| Byte | Width | Type | Field | Values | Note |
+|---|---|---|---|---|---|
+| 0 | 1 | u8 | tool |  |  |
+| 1 | 2 | u16 | target_c | 0..65535, C |  |
+| 3 | 1 | u8 | sequence |  |  |
+| 4 | 4 | bytes | padding | fixed 00000000 |  |
+
+Example soldering iron to 250 C: data 0000FA0400000000 (tool=0, target_c=250, sequence=4)
+
+Note: Handled by the rack only; the tool head ignores it.
+
+0x261 REPLY - Reply of the rack to a command: acknowledgement or refusal with the reason
+
+| Byte | Width | Type | Field | Values | Note |
+|---|---|---|---|---|---|
+| 0 | 1 | u8 | command |  |  |
+| 1 | 1 | u8 | tool |  |  |
+| 2 | 1 | u8 | reason | 0..8 |  |
+
+Example applied on tool 0: data 010000 (command=1, tool=0, reason=0)
+
+Example tool absent in the slot: data 010003 (command=1, tool=0, reason=3)
+
+Example temperature out of range on tool 10: data 010A04 (command=1, tool=10, reason=4)
+
+Example unknown command, no tool: data 40FF08 (command=64, tool=255, reason=8)
+
+Note: The rack never sends 255 as the reason; a reason above 8 is a malformed frame.
+
+Reasons of the reply (byte 2 of 0x261):
+
+| Code | Name | Kind | Meaning |
+|---|---|---|---|
+| 0 | APPLIED | acknowledgement | The command was applied |
+| 1 | REPEAT | acknowledgement | The same command again (a repeat): nothing changes, the sender is told it arrived |
+| 2 | WRONG_LENGTH | refusal | The payload does not have the length the command needs |
+| 3 | TOOL_ABSENT | refusal | The slot named has no tool |
+| 4 | TEMP_OUT_OF_RANGE | refusal | The temperature is above the limit of the tool |
+| 5 | TOOL_INVALID | refusal | The tool byte names no tool |
+| 6 | NOT_HEATABLE | refusal | The tool has no heater and takes only 0 |
+| 7 | HELD_RATE | refusal | The command came too soon after the last one accepted for that tool |
+| 8 | UNKNOWN_COMMAND | refusal | The rack does not know the command |
+[[ END GENERATED rack ]]
