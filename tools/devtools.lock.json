@@ -12,6 +12,6 @@
     "tools/make_architecture.py": "9df7d6c00af0f1178c44eae8e849c31218bae196984ec718a7fdc63daa2e2fa9",
     "tools/make_structure.py": "27615e9b6374cbb6cc21b52d52bad4e9db1c9307319a8910b4b75c4ecb9fe5c8",
     "tools/pretty_run.py": "1698bfec531568afaf5319f0a220e9bf7c0087f39cbf5e6e88e7035bfc1327c5",
-    "tools/status_lights.py": "7632d02c2e210dd1a373860998c89be0a341ac8930247a6dff7ad0a8ea5fb129"
+    "tools/status_lights.py": "7e71dd24c828a07a3b842446dbab7921784df1e5538a463e88a1f33181550019"
   }
 }
