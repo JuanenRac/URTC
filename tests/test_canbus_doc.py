@@ -7,7 +7,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 DOC = ROOT / "docs" / "CANBUS.TXT"
 BEGIN = re.compile(r"^\[\[ BEGIN GENERATED (?P<name>[a-z0-9_]+) sha256=(?P<digest>[0-9a-f]{64}) \]\]$", re.M)
-EXPECTED = {"summary", "index", "layouts", "tools", "enums", "constants", "magic", "registers", "procedures", "multinode"}
+EXPECTED = {"summary", "index", "layouts", "tools", "enums", "constants", "magic", "registers", "procedures", "multinode", "rack"}
 
 
 def blocks(text):
