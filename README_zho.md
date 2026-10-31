@@ -390,7 +390,7 @@ URTC 的闪存被拆分为两个独立部分，因此板卡可以通过它已经
 <!-- urtc-section:compatibility -->
 ### 要求与兼容性
 
-哪些版本的 URTC 程序可以配合使用、各自使用哪个协议版本，列在 URTC-COMMON 生成的兼容性表中：[docs/COMPATIBILITY.md](https://github.com/JuanenRac/URTC/blob/main/docs/COMPATIBILITY.md)。
+哪些版本的 URTC 程序可以配合使用、各自使用哪个协议版本，列在 URTC-COMMON 生成的兼容性表中：[docs/COMPATIBILITY.md](https://github.com/JuanenRac/URTC/blob/main/docs/COMPATIBILITY.md)。带有 `tools/changelog_section.py` 的仓库（固件、刷写器、测试器和更新器）的发布说明，就是该版本的 CHANGELOG 小节后面接上这张表：`python tools/changelog_section.py VERSION --compat`。
 <!-- /urtc-section:compatibility -->
 
 ## 🧪 测试

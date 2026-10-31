@@ -400,7 +400,7 @@ locally also exists: [URTC Web Studio](https://github.com/JuanenRac/URTC-WEB-STU
 <!-- urtc-section:compatibility -->
 ### Requirements & compatibility
 
-Which versions of the URTC programs work together, and which protocol version each one speaks, is listed in the compatibility table that URTC-COMMON generates: [docs/COMPATIBILITY.md](https://github.com/JuanenRac/URTC/blob/main/docs/COMPATIBILITY.md).
+Which versions of the URTC programs work together, and which protocol version each one speaks, is listed in the compatibility table that URTC-COMMON generates: [docs/COMPATIBILITY.md](https://github.com/JuanenRac/URTC/blob/main/docs/COMPATIBILITY.md). The notes of a release of the repositories that carry `tools/changelog_section.py` (the firmware, the flasher, the tester and the updater) are the section of the CHANGELOG of that version followed by this table: `python tools/changelog_section.py VERSION --compat`.
 <!-- /urtc-section:compatibility -->
 
 ## 🧪 Testing
