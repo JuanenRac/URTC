@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented here.
 
+## [Unreleased]
+
+- **One executor for the host tests of the firmware, shared with the other firmware repositories:** `tools/run_host_tests.py` (the same text in `URTC`, `URTC-SMART-RACK` and `URTC-VISION-TOOL`, kept in the shared set) builds and runs the suites that `tools/host_tests.json` lists. Where `cmake` and `ctest` are installed (CI and WSL) CMake builds every suite and `ctest` runs it, with at most two compilations at the same time; elsewhere it compiles and runs each suite itself, with the same flags. The sanitizers, the static analysis, the coverage floor and the run through WSL are options of the same tool. `build_firmware.sh` and `build_firmware.bat` call it, so the order of the suites, the flags and the floor are written once.
+- **The 38 suites are data:** the list that lived in the Python of `tools/run_host_tests.py` is now `tools/host_tests.json`; nothing changes in what is built, run, analysed or measured.
+
 ## [0.4.3] - The free-tool text of the EEPROM and ECOVIA notes follows the specification, the version checklist keeps its table of versions by itself, the CAN reference documents the reply of the tool rack and the shared set carries the test launchers
 
 - **The free-tool text of `docs/EEPROM.TXT` and `docs/ECOVIA.TXT` follows the specification:** the jumper readings 0-24 name the 25 tool profiles (not 12), the selection of the free register is 1-25 (26-255 and a blank F-RAM mean no tool), `0x1A2` is only the write and needs at least one byte, and the query is `0x1A3`, whose payload is ignored. Text only: the firmware is unchanged.

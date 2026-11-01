@@ -100,5 +100,31 @@ class RealBoardTests(unittest.TestCase):
         self.assertEqual(status, 0)
 
 
+class BuildOnlyTests(unittest.TestCase):
+    def test_build_only_prints_the_command_that_runs_the_board_and_does_not_fuzz(self):
+        import contextlib
+        import io
+        import json
+        original = fuzz.build
+        fuzz.build = lambda binary: ["/somewhere/virtual_board"]
+        out = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(out):
+                status = fuzz.main(["--build-only", "--build-dir", tempfile.mkdtemp()])
+        finally:
+            fuzz.build = original
+        self.assertEqual(status, 0)
+        line = out.getvalue().strip().splitlines()[-1]
+        self.assertEqual(json.loads(line.removeprefix("VIRTUAL_BOARD_COMMAND=")), ["/somewhere/virtual_board"])
+
+    def test_without_a_compiler_build_only_says_skipped(self):
+        original = fuzz.build
+        fuzz.build = lambda binary: None
+        try:
+            self.assertEqual(fuzz.main(["--build-only", "--build-dir", tempfile.mkdtemp()]), 2)
+        finally:
+            fuzz.build = original
+
+
 if __name__ == "__main__":
     unittest.main()

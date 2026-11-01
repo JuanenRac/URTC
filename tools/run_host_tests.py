@@ -4,30 +4,39 @@
 # Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
 # GPL-3.0-or-later - see LICENSE
 # =============================================================================
-"""Compiles and runs every host logic suite of the firmware (tests/test_*.c) with the host C compiler.
+"""Builds and runs the host logic suites of a firmware (C programs that test the logic with the host C compiler) and measures them.
 
-One list of suites for every entry point: build_firmware.sh and build_firmware.bat both call this tool, so a build
-on Windows runs the same suites as a build on Linux.
+One executor for every firmware repository: what changes from one to the next is the data file ``tools/host_tests.json`` (the suites, their sources, their
+compiler flags and whether they need a Linux host), never this code. The two build scripts of a repository (build_firmware.sh and build_firmware.bat) call this
+tool, so a build on Windows runs the same suites as a build on Linux.
 
     python tools/run_host_tests.py                 all suites
     python tools/run_host_tests.py --list          the suites and what they compile
-    python tools/run_host_tests.py --only NAME     one suite
+    python tools/run_host_tests.py --only NAME     one suite (repeatable)
     python tools/run_host_tests.py --build-dir DIR where the test binaries go (default: build/)
+    python tools/run_host_tests.py --runner R      ctest (CMake builds every suite and ctest runs them), direct (one compiler call and one run per suite) or auto
+    python tools/run_host_tests.py --jobs N        compilations at the same time under ctest (default 2, or the variable URTC_HOST_JOBS)
     python tools/run_host_tests.py --no-analyze    skip the static analysis that follows the suites
     python tools/run_host_tests.py --coverage-floor 80   also build the suites with gcov counters and fail when they execute less
                                                    than that percentage of the lines of the firmware sources they compile
 
-After the suites pass, every firmware source they compile (not the tests and not the fake HAL) is compiled once more
-with gcc's -fanalyzer (null dereference, use after free, double free, leaks, out-of-bounds writes and the like). Any
-warning fails the run; it is skipped, with a note, when the host compiler is not gcc 10 or newer.
+The runner is ``auto`` unless ``--runner`` or the variable URTC_HOST_RUNNER says otherwise: ctest when cmake, make and ctest are found on a Linux host, direct
+everywhere else. Both run the same compiler commands and the same binaries; the result is the same.
 
-The suites that use the fake HAL map a fake flash in the low 2 GiB and run under the address and undefined-behaviour
-sanitizers, which needs a 64-bit Linux host: on Windows this tool runs itself inside WSL when it is installed, and
-otherwise says that the suites were skipped (exit status 2), never that they passed.
+The data file is an object with ``suites`` (each: ``name``, ``test``, ``sources``, ``includes``; optional ``std``, ``sanitize``, ``extra``, ``libs``,
+``unsanitize``, ``defines``, ``warn``) and these optional keys: ``needs_linux_host`` (true when the suites map memory a 64-bit Linux host gives them: on Windows the
+tool then runs itself inside WSL), ``analyze`` (run gcc's -fanalyzer on every firmware source afterwards), ``coverage_prefix`` (the folder of the firmware sources the
+coverage counts, ``src/``) with ``coverage_exclude`` (folders under it that are not firmware: a companion program, a virtual environment), ``warn`` and ``sanitize_flags`` (the flags every suite gets unless it says its own). A source written ``glob:PATTERN`` is every file the
+pattern matches under the repository. ``sanitize`` is true, false or ``env:NAME`` (on when that variable is 1: how CI turns the sanitizers on for a repository whose
+developers build without them).
+
+With the sanitizers the suites run under the address and undefined-behaviour checks. When the host cannot run the suites the tool says that they were skipped
+(exit status 2), never that they passed.
 """
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
 import shutil
@@ -37,17 +46,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-MASTER = "src/F303-master"
-BOOT = f"{MASTER}/boot"
-MEL = f"{MASTER}/melexis_mlx90640"
-SLAVEBOOT = "src/F303-slave/boot"
+CONFIG = ROOT / "tools" / "host_tests.json"
+DEFAULT_SANITIZE = ["-fsanitize=address,undefined", "-fno-sanitize-recover=all"]
+DEFAULT_WARN = ["-Wall", "-Wextra", "-Wno-unused-parameter"]
 FAKE_HAL = "tests/host_hal"
-SANITIZE = ["-fsanitize=address,undefined", "-fno-sanitize-recover=all"]
-WARN = ["-Wall", "-Wextra", "-Wno-unused-parameter"]
-FAKE_HAL_WARN = ["-Wno-cpp", "-Wno-int-to-pointer-cast"]
-FAKE_STATE = f"{FAKE_HAL}/fake_state.c"  # the shared state firmware_common.h declares, defined once for the suites that link real handlers
-TOOL_HANDLERS = tuple(f"{MASTER}/firmware_can_{name}.c" for name in (
-    "soldering", "hotair", "laser", "drill", "uvcuring", "electromagnet", "aoi", "printer3d", "pastejetting", "crimping", "weldpulse", "flyingprobe", "motion"))
+DEFAULT_JOBS = 2
 
 
 @dataclass(frozen=True)
@@ -57,125 +60,67 @@ class Suite:
     sources: tuple[str, ...]
     includes: tuple[str, ...]
     std: str = "gnu11"
-    sanitize: bool = True
+    sanitize: bool | str = True
     extra: tuple[str, ...] = ()
     libs: tuple[str, ...] = ()
     unsanitize: tuple[str, ...] = ()   # checks of the sanitizers that stay off for this suite (given after them, so they win)
     defines: tuple[str, ...] = ()      # -D options (a source whose main() the suite calls under another name)
+    warn: tuple[str, ...] | None = None  # the warning flags of this suite when they are not the ones of the file
+    sanitize_flags: tuple[str, ...] = tuple(DEFAULT_SANITIZE)
+
+    @property
+    def sanitized(self) -> bool:
+        """Whether the sanitizers are on for this suite: true, false, or the value of the variable the file names."""
+        if isinstance(self.sanitize, str):
+            return os.environ.get(self.sanitize.removeprefix("env:"), "0") == "1"
+        return bool(self.sanitize)
 
 
-# every source of the master application (not the bootloader): the whole firmware, for the suite that runs its main() from the power-up
-APPLICATION = tuple(
-    [p.relative_to(ROOT).as_posix() for p in sorted((ROOT / MASTER).glob("*.c"))]
-    + [f"{MASTER}/melexis_mlx90640/{name}" for name in ("MLX90640_API.c", "firmware_mlx90640_app.c", "firmware_mlx90640_transport.c")]
-    + [f"{MASTER}/melexis_mlx90641/{name}" for name in ("firmware_mlx90641_app.c", "firmware_mlx90641_transport.c")]
-    + [f"{MASTER}/melexis_mlx90642/{name}" for name in ("MLX90642.c", "firmware_mlx90642_app.c", "firmware_mlx90642_transport.c")]
-)
+def expand(root: Path, entry: str) -> list[str]:
+    """One source of the file: itself, or the files a ``glob:`` pattern matches (sorted, relative to the repository)."""
+    if not entry.startswith("glob:"):
+        return [entry]
+    return sorted(p.relative_to(root).as_posix() for p in root.glob(entry[len("glob:"):]) if p.is_file())
 
 
-SUITES = (
-    Suite("mlx90640_api", "tests/test_mlx90640_api.c", ("tests/fake_mlx90640_i2c.c", f"{MEL}/MLX90640_API.c"), ("tests", MEL), std="c11", sanitize=False, libs=("-lm",)),
-    Suite("can_dispatch_routing", "tests/test_can_dispatch_routing.c", (f"{MASTER}/firmware_can_dispatch_routing.c",), ("tests", MASTER), std="c11", sanitize=False),
-    Suite("thermal_guard", "tests/test_thermal_guard.c", (f"{MASTER}/thermal_guard.c",), ("tests", MASTER), std="c11", sanitize=False),
-    Suite("version_wire", "tests/test_version_wire.c", (), ("tests", "src/common"), std="c11"),
-    Suite("thermal_stats", "tests/test_thermal_stats.c", (f"{MASTER}/thermal_stats.c",), ("tests", MASTER), std="c11", sanitize=False),
-    Suite("bootloader_crypto", "tests/test_bootloader_crypto.c", (f"{FAKE_HAL}/fake_hal.c", f"{BOOT}/bootloader_crypto.c"), ("tests", FAKE_HAL, BOOT), extra=tuple(FAKE_HAL_WARN)),
-    Suite("bootloader_update", "tests/test_bootloader_update.c",
-          (f"{FAKE_HAL}/fake_hal.c", f"{BOOT}/bootloader_protocol.c", f"{BOOT}/bootloader_flash.c", f"{BOOT}/bootloader_crypto.c"),
-          ("tests", FAKE_HAL, BOOT, "src/common"), extra=tuple(FAKE_HAL_WARN)),
-    Suite("slaveboot_crypto", "tests/test_slaveboot_crypto.c", (f"{FAKE_HAL}/fake_hal.c", f"{SLAVEBOOT}/slaveboot_crypto.c"), ("tests", FAKE_HAL, SLAVEBOOT), extra=tuple(FAKE_HAL_WARN)),
-    Suite("slaveboot_update", "tests/test_slaveboot_update.c",
-          (f"{FAKE_HAL}/fake_hal.c", f"{SLAVEBOOT}/slaveboot_protocol.c", f"{SLAVEBOOT}/slaveboot_flash.c", f"{SLAVEBOOT}/slaveboot_crypto.c"),
-          ("tests", FAKE_HAL, SLAVEBOOT, "src/common"), extra=tuple(FAKE_HAL_WARN)),
-    Suite("can_global_pre", "tests/test_can_global_pre.c", (f"{FAKE_HAL}/fake_hal.c", f"{MASTER}/firmware_can_global_pre.c"), ("tests", FAKE_HAL, MASTER, "src/common")),
-    Suite("telemetry_watchdog", "tests/test_telemetry_watchdog.c", (f"{FAKE_HAL}/fake_hal.c", f"{MASTER}/firmware_telemetry_watchdog.c"), ("tests", FAKE_HAL, MASTER, "src/common")),
-    Suite("can_slavebridge", "tests/test_can_slavebridge.c", (f"{FAKE_HAL}/fake_hal.c", f"{MASTER}/firmware_can_slavebridge.c"), ("tests", FAKE_HAL, MASTER, "src/common")),
-    Suite("can_dispatch", "tests/test_can_dispatch.c",
-          (f"{FAKE_HAL}/fake_hal.c", f"{MASTER}/firmware_can_dispatch.c", f"{MASTER}/firmware_can_dispatch_routing.c"), ("tests", FAKE_HAL, MASTER, "src/common")),
-    Suite("multinode", "tests/test_multinode.c",
-          (f"{FAKE_HAL}/fake_hal.c", f"{MASTER}/multinode.c", f"{MASTER}/firmware_multinode.c", f"{MASTER}/firmware_fram.c",
-           f"{MASTER}/firmware_can_dispatch.c", f"{MASTER}/firmware_can_dispatch_routing.c"), ("tests", FAKE_HAL, MASTER, "src/common")),
-    Suite("motion_profile", "tests/test_motion_profile.c", (f"{MASTER}/motion_profile.c",), ("tests", MASTER), std="c11"),
-    Suite("pid_control", "tests/test_pid_control.c", (f"{MASTER}/pid_control.c",), ("tests", MASTER), std="c11", libs=("-lm",)),
-    Suite("health_hsi", "tests/test_health_hsi.c", (f"{MASTER}/health_profile.c", f"{MASTER}/hsi_trim.c"), ("tests", MASTER), std="c11"),
-    Suite("features", "tests/test_features.c",
-          (f"{FAKE_HAL}/fake_hal.c", f"{MASTER}/fw_features.c", f"{MASTER}/firmware_features.c", f"{MASTER}/firmware_fram.c", f"{MASTER}/pid_control.c",
-           f"{MASTER}/health_profile.c", f"{MASTER}/hsi_trim.c", f"{MASTER}/motion_profile.c"), ("tests", FAKE_HAL, MASTER, "src/common")),
-    Suite("can_tools", "tests/test_can_tools.c", (f"{FAKE_HAL}/fake_hal.c", FAKE_STATE, *TOOL_HANDLERS), ("tests", FAKE_HAL, MASTER, "src/common"), extra=tuple(FAKE_HAL_WARN)),
-    Suite("blackbox", "tests/test_blackbox.c", (f"{FAKE_HAL}/fake_hal.c", FAKE_STATE, f"{MASTER}/firmware_blackbox.c", f"{MASTER}/firmware_fram.c"), ("tests", FAKE_HAL, MASTER, "src/common"), extra=tuple(FAKE_HAL_WARN)),
-    Suite("control_thermal", "tests/test_control_thermal.c",
-          (f"{FAKE_HAL}/fake_hal.c", FAKE_STATE, f"{MASTER}/firmware_control_thermal.c", f"{MASTER}/thermal_guard.c", f"{MASTER}/firmware_thermal_stats.c", f"{MASTER}/thermal_stats.c",
-           f"{MASTER}/firmware_features.c", f"{MASTER}/fw_features.c", f"{MASTER}/firmware_fram.c", f"{MASTER}/pid_control.c", f"{MASTER}/health_profile.c",
-           f"{MASTER}/hsi_trim.c", f"{MASTER}/motion_profile.c"), ("tests", FAKE_HAL, MASTER, "src/common"), extra=tuple(FAKE_HAL_WARN), libs=("-lm",)),
-    Suite("identify", "tests/test_identify.c",
-          (f"{FAKE_HAL}/fake_hal.c", FAKE_STATE, f"{MASTER}/firmware_identify.c", f"{MASTER}/firmware_fram.c", f"{MASTER}/firmware_persistence.c"),
-          ("tests", FAKE_HAL, MASTER, "src/common"), extra=tuple(FAKE_HAL_WARN)),
-    Suite("can_global_post", "tests/test_can_global_post.c",
-          (f"{FAKE_HAL}/fake_hal.c", FAKE_STATE, f"{MASTER}/firmware_can_global_post.c", f"{MASTER}/firmware_fram.c"),
-          ("tests", FAKE_HAL, MASTER, "src/common"), extra=tuple(FAKE_HAL_WARN)),
-    Suite("sensors_inspection", "tests/test_sensors_inspection.c",
-          (f"{FAKE_HAL}/fake_hal.c", FAKE_STATE, f"{MASTER}/firmware_control_sensors.c", f"{MASTER}/firmware_can_thermalinspection.c",
-           f"{MASTER}/firmware_thermal_stats.c", f"{MASTER}/thermal_stats.c", f"{MASTER}/firmware_fram.c"),
-          ("tests", FAKE_HAL, MASTER, "src/common"), extra=tuple(FAKE_HAL_WARN)),
-    Suite("expansion_bus", "tests/test_expansion_bus.c",
-          (f"{FAKE_HAL}/fake_hal.c", FAKE_STATE, f"{FAKE_HAL}/fake_i2c_bus.c", f"{MASTER}/firmware_expansion_i2c.c", f"{MASTER}/firmware_ads1115.c", f"{MASTER}/firmware_expansion_spi.c"),
-          ("tests", FAKE_HAL, MASTER, "src/common"), extra=tuple(FAKE_HAL_WARN)),
-    Suite("led", "tests/test_led.c", (f"{FAKE_HAL}/fake_hal.c", FAKE_STATE, f"{MASTER}/firmware_led.c"), ("tests", FAKE_HAL, MASTER, "src/common"), extra=tuple(FAKE_HAL_WARN)),
-    Suite("oled_render", "tests/test_oled_render.c",
-          (f"{FAKE_HAL}/fake_hal.c", FAKE_STATE, f"{MASTER}/firmware_oled_driver.c", f"{MASTER}/firmware_render.c", f"{MASTER}/firmware_font.c"),
-          ("tests", FAKE_HAL, MASTER, "src/common"), extra=tuple(FAKE_HAL_WARN)),
-    Suite("interrupts", "tests/test_interrupts.c",
-          (f"{FAKE_HAL}/fake_hal.c", FAKE_STATE, f"{MASTER}/firmware_interrupts_can.c", f"{MASTER}/firmware_interrupts_fault.c", f"{MASTER}/firmware_interrupts_gpio.c",
-           f"{MASTER}/firmware_interrupts_timer.c", f"{MASTER}/firmware_multinode_platform.c"), ("tests", FAKE_HAL, MASTER, "src/common"), extra=tuple(FAKE_HAL_WARN)),
-    Suite("init", "tests/test_init.c",
-          (f"{FAKE_HAL}/fake_hal.c", FAKE_STATE, f"{MASTER}/firmware_init_clocks.c", f"{MASTER}/firmware_init_can.c", f"{MASTER}/firmware_init_buses.c",
-           f"{MASTER}/firmware_init_timers.c", f"{MASTER}/firmware_init_gpio.c"), ("tests", FAKE_HAL, MASTER, "src/common"), extra=tuple(FAKE_HAL_WARN)),
-    Suite("mlx_bus", "tests/test_mlx_bus.c",
-          (f"{FAKE_HAL}/fake_hal.c", FAKE_STATE, f"{FAKE_HAL}/fake_i2c_bus.c", f"{MASTER}/firmware_expansion_i2c.c", f"{MEL}/firmware_mlx90640_transport.c",
-           f"{MASTER}/melexis_mlx90641/firmware_mlx90641_transport.c", f"{MASTER}/melexis_mlx90642/firmware_mlx90642_transport.c",
-           f"{MASTER}/melexis_mlx90642/MLX90642.c", f"{MASTER}/melexis_mlx90642/firmware_mlx90642_app.c"),
-          ("tests", FAKE_HAL, MASTER, MEL, f"{MASTER}/melexis_mlx90641", f"{MASTER}/melexis_mlx90642", "src/common"), extra=tuple(FAKE_HAL_WARN)),
-    Suite("mlx_api", "tests/test_mlx_api.c",
-          ("tests/fake_mlx90640_i2c.c", f"{MEL}/MLX90640_API.c", f"{MEL}/firmware_mlx90640_app.c", f"{MASTER}/melexis_mlx90641/firmware_mlx90641_app.c"),
-          ("tests", FAKE_HAL, MASTER, MEL, f"{MASTER}/melexis_mlx90641", "src/common"),
-          # Melexis's extraction shifts a negative signed value to the left (MLX90640_API.c, the supply-voltage parameters): undefined in the C standard,
-          # an arithmetic shift in gcc and in the ARM build; that one check is off for this suite, the others stay on
-          extra=tuple(FAKE_HAL_WARN), libs=("-lm",), unsanitize=("-fno-sanitize=shift-base",)),
-    # the expansion slave carries its own copy of the two Melexis drivers: the same tests run on those copies
-    Suite("mlx_api_slave", "tests/test_mlx_api.c",
-          ("tests/fake_mlx90640_i2c.c", "src/F303-slave/melexis_mlx90640/MLX90640_API.c", f"{MEL}/firmware_mlx90640_app.c", f"{MASTER}/melexis_mlx90641/firmware_mlx90641_app.c"),
-          ("tests", FAKE_HAL, MASTER, "src/F303-slave/melexis_mlx90640", f"{MASTER}/melexis_mlx90641", "src/common"),
-          extra=tuple(FAKE_HAL_WARN), libs=("-lm",), unsanitize=("-fno-sanitize=shift-base",)),
-    Suite("mlx_bus_slave", "tests/test_mlx_bus.c",
-          (f"{FAKE_HAL}/fake_hal.c", FAKE_STATE, f"{FAKE_HAL}/fake_i2c_bus.c", f"{MASTER}/firmware_expansion_i2c.c", f"{MEL}/firmware_mlx90640_transport.c",
-           f"{MASTER}/melexis_mlx90641/firmware_mlx90641_transport.c", f"{MASTER}/melexis_mlx90642/firmware_mlx90642_transport.c",
-           "src/F303-slave/melexis_mlx90642/MLX90642.c", f"{MASTER}/melexis_mlx90642/firmware_mlx90642_app.c"),
-          ("tests", FAKE_HAL, MASTER, MEL, f"{MASTER}/melexis_mlx90641", "src/F303-slave/melexis_mlx90642", "src/common"), extra=tuple(FAKE_HAL_WARN)),
-    Suite("slave", "tests/test_slave.c",
-          (f"{FAKE_HAL}/fake_hal.c", f"{FAKE_HAL}/fake_i2c_bus.c", "src/F303-slave/slave_main.c", "src/F303-slave/slave_i2c_link.c", "src/F303-slave/slave_pwm.c",
-           "src/F303-slave/slave_i2c_sensors.c", "src/F303-slave/melexis_mlx90640/MLX90640_API.c", "src/F303-slave/melexis_mlx90642/MLX90642.c"),
-          ("tests", FAKE_HAL, "src/F303-slave", "src/F303-slave/melexis_mlx90640", "src/F303-slave/melexis_mlx90641", "src/F303-slave/melexis_mlx90642", "src/common", MASTER),
-          extra=tuple(FAKE_HAL_WARN), libs=("-lm",), unsanitize=("-fno-sanitize=shift-base",), defines=("-Dmain=slave_main_entry",)),
-    Suite("bootloader_boot", "tests/test_bootloader_boot.c",
-          (f"{FAKE_HAL}/fake_hal.c", f"{BOOT}/bootloader_main.c", f"{BOOT}/bootloader_oled.c", f"{BOOT}/bootloader_protocol.c", f"{BOOT}/bootloader_flash.c", f"{BOOT}/bootloader_crypto.c"),
-          ("tests", FAKE_HAL, BOOT, "src/common"), extra=tuple(FAKE_HAL_WARN), defines=("-Dmain=bootloader_main_entry",)),
-    Suite("slaveboot_main", "tests/test_slaveboot_main.c",
-          (f"{FAKE_HAL}/fake_hal.c", f"{SLAVEBOOT}/slaveboot_main.c", f"{SLAVEBOOT}/slaveboot_protocol.c", f"{SLAVEBOOT}/slaveboot_flash.c", f"{SLAVEBOOT}/slaveboot_crypto.c"),
-          ("tests", FAKE_HAL, SLAVEBOOT, "src/common"), extra=tuple(FAKE_HAL_WARN), defines=("-Dmain=slaveboot_main_entry",)),
-    Suite("firmware_main", "tests/test_firmware_main.c", (f"{FAKE_HAL}/fake_hal.c", *APPLICATION),
-          ("tests", FAKE_HAL, MASTER, MEL, f"{MASTER}/melexis_mlx90641", f"{MASTER}/melexis_mlx90642", "src/common"),
-          extra=tuple(FAKE_HAL_WARN), libs=("-lm",), unsanitize=("-fno-sanitize=shift-base",), defines=("-Dmain=firmware_main_entry",)),
-    Suite("persistence", "tests/test_persistence.c",
-          (f"{FAKE_HAL}/fake_hal.c", f"{MASTER}/firmware_persistence.c", f"{MASTER}/firmware_fram.c"), ("tests", FAKE_HAL, MASTER, "src/common")),
-)
+def load_config(root: Path = ROOT) -> dict:
+    data = json.loads((root / "tools" / "host_tests.json").read_text(encoding="utf-8"))
+    if not isinstance(data, dict) or not isinstance(data.get("suites"), list) or not data["suites"]:
+        raise ValueError("tools/host_tests.json must be an object with a non-empty list under 'suites'")
+    return data
 
+
+def build_suites(data: dict, root: Path = ROOT) -> tuple[Suite, ...]:
+    warn_default = tuple(data.get("warn", DEFAULT_WARN))
+    sanitize_default = tuple(data.get("sanitize_flags", DEFAULT_SANITIZE))
+    suites = []
+    for raw in data["suites"]:
+        sources: list[str] = []
+        for entry in raw.get("sources", []):
+            for item in expand(root, entry):
+                if item not in sources and item != raw["test"]:
+                    sources.append(item)
+        suites.append(Suite(
+            name=raw["name"], test=raw["test"], sources=tuple(sources), includes=tuple(raw.get("includes", ())),
+            std=raw.get("std", "gnu11"), sanitize=raw.get("sanitize", True), extra=tuple(raw.get("extra", ())),
+            libs=tuple(raw.get("libs", ())), unsanitize=tuple(raw.get("unsanitize", ())), defines=tuple(raw.get("defines", ())),
+            warn=tuple(raw["warn"]) if "warn" in raw else warn_default, sanitize_flags=sanitize_default))
+    return tuple(suites)
+
+
+SETTINGS = load_config() if CONFIG.is_file() else {"suites": []}
+NEEDS_LINUX = bool(SETTINGS.get("needs_linux_host", False))
+ANALYZE = bool(SETTINGS.get("analyze", False))
+COVERAGE_PREFIX = str(SETTINGS.get("coverage_prefix", "src/"))
+COVERAGE_EXCLUDE = tuple(SETTINGS.get("coverage_exclude", ()))
+SUITES = build_suites(SETTINGS) if SETTINGS["suites"] else ()
 
 _GCOV_FILE = re.compile(r"^File '(.+)'$")
 _GCOV_LINES = re.compile(r"^Lines executed:([0-9.]+)% of (\d+)$")
 
 
 def parse_gcov(output: str) -> dict[str, tuple[int, int]]:
-    """{source file: (executed lines, executable lines)} from the text of ``gcov -n``; only the ``.c`` files under ``src/``."""
+    """{source file: (executed lines, executable lines)} from the text of ``gcov -n``; only the ``.c`` files under the coverage prefix."""
     found: dict[str, tuple[int, int]] = {}
     current: str | None = None
     root = ROOT.as_posix()
@@ -189,7 +134,7 @@ def parse_gcov(output: str) -> dict[str, tuple[int, int]]:
             total = int(match.group(2))
             executed = round(float(match.group(1)) * total / 100)
             short = current[len(root) + 1:] if current.startswith(root + "/") else current
-            if short.endswith(".c") and short.startswith("src/"):
+            if short.endswith(".c") and short.startswith(COVERAGE_PREFIX) and not short.startswith(COVERAGE_EXCLUDE):
                 done, count = found.get(short, (0, 0))
                 found[short] = (max(done, executed), max(count, total))
             current = None
@@ -211,6 +156,10 @@ def coverage_percent(files: dict[str, tuple[int, int]]) -> float:
     return 100.0 * sum(done for done, _ in files.values()) / total if total else 0.0
 
 
+def binary_name(stem: str) -> str:
+    return stem + (".exe" if os.name == "nt" else "")
+
+
 def measure_coverage(selected: list["Suite"], compiler: str, build_dir: Path) -> dict[str, tuple[int, int]]:
     """Builds every suite again with ``--coverage -O0`` (no sanitizers), runs it and reads the counters with gcov."""
     parts: list[dict[str, tuple[int, int]]] = []
@@ -219,7 +168,7 @@ def measure_coverage(selected: list["Suite"], compiler: str, build_dir: Path) ->
         if work.exists():
             shutil.rmtree(work)
         work.mkdir(parents=True)
-        binary = work / "t"
+        binary = work / binary_name("t")
         cmd = [c for c in command(suite, compiler, binary) if not c.startswith(("-fsanitize", "-fno-sanitize"))]
         cmd[1:1] = ["--coverage", "-O0"]
         if subprocess.run(cmd, cwd=work, capture_output=True).returncode != 0:
@@ -233,7 +182,9 @@ def measure_coverage(selected: list["Suite"], compiler: str, build_dir: Path) ->
 
 
 def all_firmware_sources() -> list[str]:
-    return sorted(path.relative_to(ROOT).as_posix() for path in (ROOT / "src").rglob("*.c"))
+    folder = ROOT / COVERAGE_PREFIX.rstrip("/")
+    found = (path.relative_to(ROOT).as_posix() for path in folder.rglob("*.c"))
+    return sorted(name for name in found if not name.startswith(COVERAGE_EXCLUDE))
 
 
 def host_compiler() -> str | None:
@@ -243,11 +194,17 @@ def host_compiler() -> str | None:
     return shutil.which("cc") or shutil.which("gcc")
 
 
-def command(suite: Suite, compiler: str, binary: Path) -> list[str]:
-    cmd = [compiler, f"-std={suite.std}", *WARN, *suite.extra, *suite.defines]
-    if suite.sanitize:
-        cmd += SANITIZE
+def flags(suite: Suite) -> list[str]:
+    """The options that are not paths: the standard, the warnings, the definitions and, where the suite asks, the sanitizers."""
+    cmd = [f"-std={suite.std}", *(suite.warn or ()), *suite.extra, *suite.defines]
+    if suite.sanitized:
+        cmd += suite.sanitize_flags
         cmd += suite.unsanitize
+    return cmd
+
+
+def command(suite: Suite, compiler: str, binary: Path) -> list[str]:
+    cmd = [compiler, *flags(suite)]
     for include in suite.includes:
         cmd.append(f"-I{ROOT / include}")
     cmd += ["-o", str(binary), str(ROOT / suite.test), *[str(ROOT / source) for source in suite.sources], *suite.libs]
@@ -280,7 +237,7 @@ def analysis_sources(selected: list[Suite]) -> list[tuple[Suite, str]]:
 
 
 def analyze_command(suite: Suite, compiler: str, source: str) -> list[str]:
-    cmd = [compiler, f"-std={suite.std}", *WARN, *suite.extra, *suite.defines, "-fanalyzer"]
+    cmd = [compiler, f"-std={suite.std}", *(suite.warn or ()), *suite.extra, *suite.defines, "-fanalyzer"]
     cmd += [f"-I{ROOT / include}" for include in suite.includes]
     return cmd + ["-c", "-o", os.devnull, str(ROOT / source)]
 
@@ -301,15 +258,81 @@ def analyze(selected: list[Suite], compiler: str) -> bool:
 
 
 def run_suite(suite: Suite, compiler: str, build_dir: Path) -> bool:
-    binary = build_dir / f"host_tests_{suite.name}"
+    binary = build_dir / binary_name(f"host_tests_{suite.name}")
     if subprocess.run(command(suite, compiler, binary), cwd=ROOT).returncode != 0:
         print(f"FAIL {suite.name}: did not compile")
         return False
     if subprocess.run([str(binary)], cwd=ROOT).returncode != 0:
         print(f"FAIL {suite.name}: a test failed")
         return False
-    print(f"PASS {suite.name}" + (" (address + undefined sanitizers)" if suite.sanitize else ""))
+    print(f"PASS {suite.name}" + (" (address + undefined sanitizers)" if suite.sanitized else ""))
     return True
+
+
+def cmake_quote(value: str) -> str:
+    return '"' + value.replace("\\", "/").replace('"', '\\"') + '"'
+
+
+def cmake_lists(selected: list[Suite], compiler: str) -> str:
+    """The CMakeLists.txt that makes ctest the executor: one program and one test per suite, with the flags the direct runner would give the compiler."""
+    lines = ["# Written by tools/run_host_tests.py; never edited by hand.", "cmake_minimum_required(VERSION 3.16)",
+             f"set(CMAKE_C_COMPILER {cmake_quote(compiler)})", "project(host_tests C)", "set(CMAKE_C_FLAGS \"\")", "enable_testing()"]
+    for suite in selected:
+        files = " ".join(cmake_quote(str(ROOT / item)) for item in (suite.test, *suite.sources))
+        lines.append(f"add_executable({suite.name} {files})")
+        options = " ".join(cmake_quote(item) for item in flags(suite))
+        lines.append(f"target_compile_options({suite.name} PRIVATE {options})")
+        if suite.sanitized:
+            lines.append(f"target_link_options({suite.name} PRIVATE {' '.join(cmake_quote(item) for item in (*suite.sanitize_flags, *suite.unsanitize))})")
+        if suite.includes:
+            lines.append(f"target_include_directories({suite.name} PRIVATE {' '.join(cmake_quote(str(ROOT / item)) for item in suite.includes)})")
+        if suite.libs:
+            lines.append(f"target_link_libraries({suite.name} PRIVATE {' '.join(cmake_quote(item) for item in suite.libs)})")
+        lines.append(f"add_test(NAME {suite.name} COMMAND {suite.name} WORKING_DIRECTORY {cmake_quote(str(ROOT))})")
+    return "\n".join(lines) + "\n"
+
+
+_CTEST_FAILED = re.compile(r"^\s*\d+ - (\S+)")
+
+
+def failed_tests(output: str) -> list[str]:
+    """The names ctest lists under 'The following tests FAILED'."""
+    names: list[str] = []
+    inside = False
+    for line in output.splitlines():
+        if line.startswith("The following tests FAILED"):
+            inside = True
+        elif inside:
+            match = _CTEST_FAILED.match(line)
+            if match:
+                names.append(match.group(1))
+    return names
+
+
+def run_with_ctest(selected: list[Suite], compiler: str, build_dir: Path, jobs: int) -> list[str]:
+    """Builds every suite with CMake and runs them with ctest. Returns the names of the suites that did not pass (empty: all passed)."""
+    work = build_dir / "ctest"
+    if work.exists():
+        shutil.rmtree(work)
+    work.mkdir(parents=True)
+    (work / "CMakeLists.txt").write_text(cmake_lists(selected, compiler), encoding="utf-8", newline="\n")
+    configure = subprocess.run(["cmake", "-S", str(work), "-B", str(work / "out"), "-G", "Unix Makefiles"], capture_output=True, text=True)
+    if configure.returncode != 0:
+        print(configure.stdout + configure.stderr)
+        print("FAIL cmake could not configure the suites")
+        return [suite.name for suite in selected]
+    built = subprocess.run(["cmake", "--build", str(work / "out"), "--parallel", str(jobs), "--", "--keep-going"], capture_output=True, text=True)
+    if built.returncode != 0:
+        print(built.stdout[-6000:] + built.stderr[-6000:])
+        print("FAIL a suite did not compile")
+    ran = subprocess.run(["ctest", "--output-on-failure"], cwd=work / "out", capture_output=True, text=True)
+    print(ran.stdout, end="")
+    if ran.stderr:
+        print(ran.stderr, end="")
+    failed = failed_tests(ran.stdout)
+    if built.returncode != 0 or ran.returncode != 0:
+        return failed or [suite.name for suite in selected]
+    return []
 
 
 _WINDOWS_PATH = re.compile(r"^([A-Za-z]):[\\/](.*)$")
@@ -340,10 +363,19 @@ def translate_arguments(argv: list[str]) -> list[str]:
 def through_wsl(argv: list[str]) -> int:
     wsl = shutil.which("wsl")
     if wsl is None:
-        print("HOST_TESTS=SKIPPED these suites need a 64-bit Linux host (install WSL, or run this tool on Linux)")
+        print("HOST_TESTS=SKIPPED these suites need a 64-bit Linux host or a host C compiler (install WSL, or run this tool on Linux)")
         return 2
     result = subprocess.run([wsl, "--cd", str(ROOT), "--", "python3", "tools/run_host_tests.py", *translate_arguments(argv)])
     return result.returncode
+
+
+def choose_runner(requested: str) -> str:
+    """ctest where cmake, make and ctest exist on a Linux host (the case in CI and in WSL), direct otherwise; an explicit request is honoured."""
+    if requested != "auto":
+        return requested
+    if sys.platform.startswith("linux") and shutil.which("cmake") and shutil.which("ctest") and shutil.which("make"):
+        return "ctest"
+    return "direct"
 
 
 def main(argv: list[str]) -> int:
@@ -352,15 +384,20 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--only", action="append", help="run only this suite (repeatable)")
     parser.add_argument("--no-analyze", action="store_true", help="do not run the static analysis after the suites")
     parser.add_argument("--build-dir", default=None, help="folder for the test binaries (default: build/)")
+    parser.add_argument("--runner", choices=("auto", "ctest", "direct"), default=os.environ.get("URTC_HOST_RUNNER", "auto"), help="who builds and runs the suites (default: auto)")
+    parser.add_argument("--jobs", type=int, default=int(os.environ.get("URTC_HOST_JOBS", DEFAULT_JOBS)), help="compilations at the same time under ctest")
     parser.add_argument("--coverage-floor", type=float, default=None, help="build the suites with gcov counters and fail under this percentage of executed lines")
     args = parser.parse_args(argv)
     if args.list:
         for suite in SUITES:
-            print(f"{suite.name:22} {suite.test}  [{'sanitizers' if suite.sanitize else 'plain'}]")
+            print(f"{suite.name:22} {suite.test}  [{'sanitizers' if suite.sanitized else 'plain'}]")
         return 0
-    if not sys.platform.startswith("linux"):
-        return through_wsl(argv)
+    if not SUITES:
+        print("HOST_TESTS=FAIL tools/host_tests.json is missing or lists no suite")
+        return 1
     compiler = host_compiler()
+    if not sys.platform.startswith("linux") and (NEEDS_LINUX or compiler is None):
+        return through_wsl(argv)
     if compiler is None:
         print("HOST_TESTS=SKIPPED no host C compiler (cc/gcc) found")
         return 2
@@ -368,16 +405,23 @@ def main(argv: list[str]) -> int:
     if args.only and len(selected) != len(set(args.only)):
         print("HOST_TESTS=FAIL unknown suite name in --only")
         return 1
-    if args.build_dir and _WINDOWS_PATH.match(args.build_dir):
+    if args.build_dir and _WINDOWS_PATH.match(args.build_dir) and sys.platform.startswith("linux"):
         print(f"HOST_TESTS=FAIL --build-dir {args.build_dir} is a Windows path on a Linux host; it would create a folder named like a drive")
+        return 1
+    runner = choose_runner(args.runner)
+    if runner == "ctest" and not (shutil.which("cmake") and shutil.which("ctest")):
+        print("HOST_TESTS=FAIL --runner ctest needs cmake and ctest")
         return 1
     build_dir = Path(args.build_dir) if args.build_dir else ROOT / "build"
     build_dir.mkdir(parents=True, exist_ok=True)
-    failed = [suite.name for suite in selected if not run_suite(suite, compiler, build_dir)]
+    if runner == "ctest":
+        failed = run_with_ctest(selected, compiler, build_dir, max(1, args.jobs))
+    else:
+        failed = [suite.name for suite in selected if not run_suite(suite, compiler, build_dir)]
     if failed:
         print(f"HOST_TESTS=FAIL {', '.join(failed)}")
         return 1
-    if not args.no_analyze:
+    if ANALYZE and not args.no_analyze:
         if is_gcc_with_analyzer(compiler):
             if not analyze(selected, compiler):
                 print("HOST_TESTS=FAIL static analysis")
@@ -401,7 +445,7 @@ def main(argv: list[str]) -> int:
             print(f"COVERAGE=FAIL below the floor of {args.coverage_floor:g}%")
             return 1
         print(f"COVERAGE=PASS floor {args.coverage_floor:g}%")
-    print(f"HOST_TESTS=PASS {len(selected)} suites")
+    print(f"HOST_TESTS=PASS {len(selected)} suites ({runner})")
     return 0
 
 

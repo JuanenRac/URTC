@@ -1,5 +1,6 @@
 """tools/run_host_tests.py is the one list of host C suites: every tests/test_*.c is in it and every file it names exists."""
 import importlib.util
+import os
 import sys
 import unittest
 from pathlib import Path
@@ -79,6 +80,52 @@ class SuiteListTests(unittest.TestCase):
     def test_both_build_scripts_call_the_runner(self):
         for script in ("build_firmware.sh", "build_firmware.bat"):
             self.assertIn("run_host_tests.py", (ROOT / script).read_text(encoding="utf-8"), script)
+
+
+class CtestRunnerTests(unittest.TestCase):
+    def test_the_cmake_file_has_one_program_and_one_test_per_suite_with_the_direct_flags(self):
+        text = runner.cmake_lists(list(runner.SUITES), "cc")
+        self.assertEqual(text.count("add_executable("), len(runner.SUITES))
+        self.assertEqual(text.count("add_test("), len(runner.SUITES))
+        self.assertIn("enable_testing()", text)
+        slave = next(item for item in runner.SUITES if item.name == "slave")
+        self.assertIn('"-Dmain=slave_main_entry"', text)
+        self.assertIn('"-fno-sanitize=shift-base"', text)
+        self.assertIn(f"add_test(NAME {slave.name} COMMAND {slave.name}", text)
+        # a suite without sanitizers gets no link options for them
+        self.assertNotIn("target_link_options(thermal_guard", text)
+        self.assertIn("target_link_options(slave PRIVATE", text)
+
+    def test_the_failed_suites_are_read_from_the_ctest_summary(self):
+        output = "50% tests passed, 1 tests failed out of 2\n\nThe following tests FAILED:\n\t  2 - identify (Failed)\nErrors while running CTest\n"
+        self.assertEqual(runner.failed_tests(output), ["identify"])
+        self.assertEqual(runner.failed_tests("100% tests passed, 0 tests failed out of 2\n"), [])
+
+    def test_a_request_for_a_runner_is_honoured_and_auto_prefers_ctest_only_on_linux_with_cmake(self):
+        self.assertEqual(runner.choose_runner("direct"), "direct")
+        self.assertEqual(runner.choose_runner("ctest"), "ctest")
+        self.assertIn(runner.choose_runner("auto"), {"ctest", "direct"})
+
+    def test_a_glob_source_is_every_matching_file_in_order_and_a_plain_source_is_itself(self):
+        self.assertEqual(runner.expand(ROOT, "tests/test_led.c"), ["tests/test_led.c"])
+        found = runner.expand(ROOT, "glob:tests/host_hal/*.c")
+        self.assertEqual(found, sorted(found))
+        self.assertIn("tests/host_hal/fake_hal.c", found)
+
+    def test_the_sanitizers_can_follow_a_variable(self):
+        suite = runner.Suite("x", "t.c", (), (), sanitize="env:URTC_TEST_SANITIZE_SWITCH")
+        os.environ.pop("URTC_TEST_SANITIZE_SWITCH", None)
+        self.assertFalse(suite.sanitized)
+        os.environ["URTC_TEST_SANITIZE_SWITCH"] = "1"
+        try:
+            self.assertTrue(suite.sanitized)
+            self.assertIn("-fsanitize=address,undefined", runner.command(suite, "cc", Path("out")))
+        finally:
+            del os.environ["URTC_TEST_SANITIZE_SWITCH"]
+
+    def test_the_build_scripts_leave_the_choice_of_runner_to_the_tool(self):
+        for script in ("build_firmware.sh", "build_firmware.bat"):
+            self.assertNotIn("--runner", (ROOT / script).read_text(encoding="utf-8"), script)
 
 
 if __name__ == "__main__":

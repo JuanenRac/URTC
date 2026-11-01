@@ -18,6 +18,7 @@ tool profiles and with the optional features off and on, and checks, for every r
     python tools/fuzz_virtual_board.py                 # build and run
     python tools/fuzz_virtual_board.py --seed 7 --extra 5000
     python tools/fuzz_virtual_board.py --build-dir D   # where the binary goes (default: build/)
+    python tools/fuzz_virtual_board.py --build-only    # only build it and print the command that runs it (urtc-virtual-board --firmware-repo uses it)
 
 On Windows the build and the run go through WSL (the fake flash needs a 64-bit Linux host), like tools/run_host_tests.py.
 Exit status: 0 passed, 1 a check failed, 2 skipped because no host compiler was found.
@@ -25,6 +26,7 @@ Exit status: 0 passed, 1 a check failed, 2 skipped because no host compiler was 
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import random
 import re
@@ -152,6 +154,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--extra", type=int, default=2000, help="frames made here in addition to the corpus")
     parser.add_argument("--build-dir", default=None)
+    parser.add_argument("--build-only", action="store_true",
+                        help="build the virtual board, print the command that runs it (VIRTUAL_BOARD_COMMAND=<JSON list>; arguments after it: tool profile, optional-features mask) and stop")
     args = parser.parse_args(argv)
     if not CORPUS.is_file():
         print("FUZZ=FAIL tests/fuzz/fuzz_corpus.txt is missing", file=sys.stderr)
@@ -162,6 +166,9 @@ def main(argv: list[str] | None = None) -> int:
     if prefix is None:
         print("FUZZ=SKIPPED no host C compiler (install gcc, or WSL on Windows)")
         return 2
+    if args.build_only:
+        print("VIRTUAL_BOARD_COMMAND=" + json.dumps(prefix))
+        return 0
     frames, tx_ids = load_corpus()
     if not tx_ids:
         print("FUZZ=FAIL the corpus has no transmit_ids line", file=sys.stderr)
