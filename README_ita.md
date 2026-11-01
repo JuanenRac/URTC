@@ -59,6 +59,8 @@
 | Test | 🟢 | La suite di test passa nella CI a ogni push. |
 | Hardware reale | 🟠 | Nessuna esecuzione su una scheda reale: la prova al banco è ancora da fare. |
 | Sicurezza | 🟡 | Le versioni sono firmate con Ed25519 e verificate prima dell'uso; la gestione delle chiavi non è stata rivista da nessun altro. |
+| Interfaccia e protocolli | 🟡 | Le rotte o i messaggi offerti sono documentati e provati con un client; non tutti i client li hanno ancora usati |
+| Aggiornamenti | 🟠 | Le immagini si aggiornano sul bus CAN con il bootloader; un aggiornamento firmato, una firma alterata e un id hardware estraneo sono provati con il bootloader compilato per il PC, mai su una scheda |
 | Documentazione | 🟡 | README in otto lingue e documenti di riferimento; le traduzioni non sono state riviste da madrelingua. |
 
 <!-- /urtc-section:status_firmware -->

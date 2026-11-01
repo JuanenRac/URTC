@@ -59,6 +59,8 @@
 | Tests | 🟢 | The test suite passes in the CI on every push. |
 | Real hardware | 🟠 | No run on a real board yet: the bench test is still pending. |
 | Security | 🟡 | Releases are signed with Ed25519 and checked before use; the key handling was not reviewed by anyone else. |
+| Interface and protocols | 🟡 | The routes or messages it offers are documented and tested with a client; not every client has used them yet |
+| Updates | 🟠 | Images are updated over the CAN bus with the bootloader; a signed update, a tampered signature and a foreign hardware id are tested against the bootloader built for the PC, never on a board |
 | Documentation | 🟡 | README in eight languages and reference documents; the translations were not reviewed by native speakers. |
 
 <!-- /urtc-section:status_firmware -->

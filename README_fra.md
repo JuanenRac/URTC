@@ -59,6 +59,8 @@
 | Tests | 🟢 | La suite de tests passe dans la CI à chaque push. |
 | Matériel réel | 🟠 | Pas encore d'essai sur une vraie carte : l'essai au banc reste à faire. |
 | Sécurité | 🟡 | Les versions sont signées en Ed25519 et vérifiées avant usage ; la gestion des clés n'a été relue par personne d'autre. |
+| Interface et protocoles | 🟡 | Les routes ou les messages proposés sont documentés et testés avec un client ; tous les clients ne les ont pas encore utilisés |
+| Mises à jour | 🟠 | Les images sont mises à jour par le bus CAN avec le bootloader ; une mise à jour signée, une signature altérée et un identifiant matériel étranger sont testés avec le bootloader compilé pour le PC, jamais sur une carte |
 | Documentation | 🟡 | README en huit langues et documents de référence ; les traductions n'ont pas été relues par des locuteurs natifs. |
 
 <!-- /urtc-section:status_firmware -->

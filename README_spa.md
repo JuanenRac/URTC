@@ -59,6 +59,8 @@
 | Pruebas | 🟢 | La batería de pruebas pasa en la CI en cada subida. |
 | Hardware real | 🟠 | Aún no se ha ejecutado con una placa real: la prueba de banco sigue pendiente. |
 | Seguridad | 🟡 | Las versiones se firman con Ed25519 y se comprueban antes de usarlas; el manejo de las claves no lo ha revisado nadie más. |
+| Interfaz y protocolos | 🟡 | Las rutas o los mensajes que ofrece están documentados y probados con un cliente; aún no los han usado todos los clientes |
+| Actualizaciones | 🟠 | Las imágenes se actualizan por el bus CAN con el bootloader; una actualización firmada, una firma alterada y un id de hardware ajeno se prueban con el bootloader compilado para el PC, nunca en una placa |
 | Documentación | 🟡 | README en ocho idiomas y documentos de referencia; las traducciones no las ha revisado ningún hablante nativo. |
 
 <!-- /urtc-section:status_firmware -->

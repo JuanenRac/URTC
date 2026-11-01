@@ -59,6 +59,8 @@
 | Tests | 🟢 | Die Testsuite besteht bei jedem Push in der CI. |
 | Echte Hardware | 🟠 | Noch kein Lauf an einer echten Platine: der Bankversuch steht noch aus. |
 | Sicherheit | 🟡 | Releases werden mit Ed25519 signiert und vor der Nutzung geprüft; der Umgang mit den Schlüsseln wurde von niemand anderem geprüft. |
+| Schnittstelle und Protokolle | 🟡 | Die angebotenen Routen oder Nachrichten sind dokumentiert und mit einem Client getestet; noch nicht jeder Client hat sie benutzt |
+| Aktualisierungen | 🟠 | Die Images werden über den CAN-Bus mit dem Bootloader aktualisiert; ein signiertes Update, eine veränderte Signatur und eine fremde Hardware-ID werden gegen den für den PC gebauten Bootloader getestet, nie auf einer Platine |
 | Dokumentation | 🟡 | README in acht Sprachen und Referenzdokumente; die Übersetzungen wurden nicht von Muttersprachlern geprüft. |
 
 <!-- /urtc-section:status_firmware -->
