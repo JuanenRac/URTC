@@ -783,6 +783,38 @@
     "src/F303-master",
     "src/common"
    ]
+  },
+  {
+   "name": "spec_macros_master",
+   "test": "tests/test_spec_macros_master.c",
+   "sources": [],
+   "includes": [
+    "tests",
+    "tests/host_hal",
+    "src/F303-master/boot",
+    "src/common"
+   ],
+   "std": "c11",
+   "extra": [
+    "-Wno-cpp",
+    "-Wno-int-to-pointer-cast"
+   ]
+  },
+  {
+   "name": "spec_macros_slave",
+   "test": "tests/test_spec_macros_slave.c",
+   "sources": [],
+   "includes": [
+    "tests",
+    "tests/host_hal",
+    "src/F303-slave/boot",
+    "src/common"
+   ],
+   "std": "c11",
+   "extra": [
+    "-Wno-cpp",
+    "-Wno-int-to-pointer-cast"
+   ]
   }
  ]
 }

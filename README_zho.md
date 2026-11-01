@@ -19,7 +19,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/License-GPL%203.0-blue.svg" alt="GPL 3.0">
-  <img src="https://img.shields.io/badge/Tests-38%20suites-2ea44f.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-40%20suites-2ea44f.svg" alt="Tests">
   <img src="https://img.shields.io/badge/Hardware-CERN%20OHL--S-orange.svg" alt="CERN OHL-S">
   <img src="https://img.shields.io/badge/Language-C-00599C.svg" alt="C">
   <img src="https://img.shields.io/badge/Platform-STM32F303-003551.svg" alt="STM32">
@@ -332,7 +332,7 @@ URTC 的核心优势在于其极强的多功能性。板卡采用可扩展矩阵
 ## 🔒 安全与防护
 
 - **热失控保护**（`thermal_guard.c`，自应用 0.3.2 起）用于烙铁／热风和 3D 热端：对*实测*温度的 MAXTEMP（T12 449 °C，热端 310 °C）、加热监视（加热器开启时温度必须真正上升——可检测松脱的热敏电阻或烙铁头）以及保温检查（达到目标后，加热器开启时不得长时间下降）。一旦故障即切断加热器、锁定板卡错误，并通过 `0x111` 的第 4 字节报告原因。已在主机上用模拟加热器测试（`tests/test_thermal_guard.c`）。 这些限值从未在真实加热器上测量过，这一切也从未在真实板卡上运行过。
-- **围绕硬件的固件逻辑的主机测试**（`tools/run_host_tests.py`，38 个测试套件）：除引导程序、热保护和分发器外，13 种工具的真实 CAN 处理程序（`firmware_can_*.c`）、加热器控制回路（`firmware_control_thermal.c`：ADC 换算、不可能的读数、设定值上限、迟滞、加热器卡死、保护触发的故障）、故障记录器（`firmware_blackbox.c`，与 URTC-COMMON 由自身模型写出的场景逐字节比对，并检查其 CAN 读出）、由跳线识别工具、错误门之后的命令以及热像仪命令，都针对模拟 HAL（`tests/host_hal/`）编译，并在地址与未定义行为检查器及 `gcc -fanalyzer` 下运行；`--coverage-floor`（CI 中为 `URTC_COVERAGE_FLOOR`）要求执行的行数达到一定比例（全部 78 个固件源文件的行为 95%，其中现在包括应用程序的启动与主循环、OLED 驱动及其画面、状态 LED、中断处理程序、扩展接口的总线、三种热像仪、扩展从机以及两个引导程序的主程序；CI 的下限为 90）。以上均未在开发板上运行过。
+- **围绕硬件的固件逻辑的主机测试**（`tools/run_host_tests.py`，40 个测试套件）：除引导程序、热保护和分发器外，13 种工具的真实 CAN 处理程序（`firmware_can_*.c`）、加热器控制回路（`firmware_control_thermal.c`：ADC 换算、不可能的读数、设定值上限、迟滞、加热器卡死、保护触发的故障）、故障记录器（`firmware_blackbox.c`，与 URTC-COMMON 由自身模型写出的场景逐字节比对，并检查其 CAN 读出）、由跳线识别工具、错误门之后的命令以及热像仪命令，都针对模拟 HAL（`tests/host_hal/`）编译，并在地址与未定义行为检查器及 `gcc -fanalyzer` 下运行；`--coverage-floor`（CI 中为 `URTC_COVERAGE_FLOOR`）要求执行的行数达到一定比例（全部 78 个固件源文件的行为 95%，其中现在包括应用程序的启动与主循环、OLED 驱动及其画面、状态 LED、中断处理程序、扩展接口的总线、三种热像仪、扩展从机以及两个引导程序的主程序；CI 的下限为 90）。以上均未在开发板上运行过。
 - **诊断：** `0x111` 的第 5 字节报告上次复位原因（bit0 = 硬件看门狗触发）；`0x1AA`/`0x1AB` 返回保存在 F-RAM 中的累计计数——热故障次数、最后一次故障代码和加热器总开启时间（自 0.3.3 起）；黑匣子采样也会记录热故障代码。
 - **固件签名：** 引导程序的 HMAC 密钥在构建时从私有文件（`URTC_SIGNING_KEY_FILE`）注入；没有该文件时构建使用*公开开发密钥*并给出提示，`URTC_RELEASE=1` 会拒绝该密钥。`firmware/` 中每个镜像都附带 `<bin>.sha256` 和 `<bin>.manifest.json`（含预先计算的签名），因此 URTC Flasher 和 URTC Web Studio 不包含任何密钥。参见 [`docs/FIRMWARE_SIGNING.TXT`](docs/FIRMWARE_SIGNING.TXT)。 HMAC 使用共享的对称密钥：已发布的应用镜像使用公开的开发密钥签名，因此任何人都可以为使用该密钥构建的板卡签出它会接受的镜像；非对称签名（Ed25519）仍在计划中。 正式发布的每个文件还带有分离式 Ed25519 发布签名（`<文件>.sig`，公钥见 [`docs/RELEASE_SIGNING.md`](docs/RELEASE_SIGNING.md)）；刷写器和 Web Studio 在签名存在时会进行验证。
 - **CAN 总线：** 不验证发送方——任何节点都可以控制工具。使用激光、加热器或焊接设备的安装**必须**配备独立于 MCU 的硬件联锁和封闭总线：[`docs/CAN_THREAT_MODEL.TXT`](docs/CAN_THREAT_MODEL.TXT)。
@@ -395,7 +395,7 @@ URTC 的闪存被拆分为两个独立部分，因此板卡可以通过它已经
 
 ## 🧪 测试
 
-围绕硬件的固件逻辑在电脑上测试：`python tools/run_host_tests.py` 用主机编译器、模拟 HAL 以及 AddressSanitizer 和 UBSan（带 `-fanalyzer`）构建并运行 38 个 C 测试套件（`tests/test_*.c`），涵盖引导程序、热保护、分发器、13 种工具的真实 CAN 处理程序、加热器控制回路和黑匣子等。CI 还会编译并链接四个二进制文件，并在固件源码已执行行的覆盖率低于下限时失败。这一切都没有在板子上运行过：目前没有焊装完成的板子，主机测试也无法证明时序、驱动或功率级能正常工作。
+围绕硬件的固件逻辑在电脑上测试：`python tools/run_host_tests.py` 用主机编译器、模拟 HAL 以及 AddressSanitizer 和 UBSan（带 `-fanalyzer`）构建并运行 40 个 C 测试套件（`tests/test_*.c`），涵盖引导程序、热保护、分发器、13 种工具的真实 CAN 处理程序、加热器控制回路和黑匣子等。CI 还会编译并链接四个二进制文件，并在固件源码已执行行的覆盖率低于下限时失败。这一切都没有在板子上运行过：目前没有焊装完成的板子，主机测试也无法证明时序、驱动或功率级能正常工作。
 
 ## 🏗️ 构建与发布
 
@@ -436,7 +436,7 @@ URTC/
 ├── ani/                                               OLED 的动画
 ├── keys/                                              只有公钥，绝无私钥
 ├── docs/                                              CAN 协议、引脚、签名、威胁模型、数据手册
-├── tests/                                             38 个 C 主机测试套件
+├── tests/                                             40 个 C 主机测试套件
 ├── tools/                                             主机测试运行器、发布工具、共用检查
 ├── images/                                            横幅和本 README 的图片
 ├── .github/                                           CI 工作流以及 Issue 和 Pull Request 模板
