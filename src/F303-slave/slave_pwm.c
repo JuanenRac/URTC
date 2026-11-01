@@ -43,7 +43,7 @@ void PWM_Init(void) {
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
     htim1.Instance = TIM1;
-    htim1.Init.Prescaler = (SystemCoreClock / TIM1_COUNTER_CLOCK_HZ) - 1;
+    htim1.Init.Prescaler = (uint32_t)((SystemCoreClock / TIM1_COUNTER_CLOCK_HZ) - 1u);
     htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
     htim1.Init.Period = 999; // placeholder 1kHz - PWM_Configure overwrites this per-channel-request before any channel actually starts
     htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;

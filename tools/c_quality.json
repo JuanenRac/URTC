@@ -1,0 +1,31 @@
+{
+ "conversion": {
+  "flags": ["-Wconversion"],
+  "max_warnings": 0,
+  "exclude": [
+   {"path": "src/F303-master/melexis_mlx90640/", "reason": "vendored Melexis driver, held byte for byte by check_shared_drivers.py"},
+   {"path": "src/F303-slave/melexis_mlx90640/", "reason": "vendored Melexis driver, held byte for byte by check_shared_drivers.py"},
+   {"path": "src/F303-master/melexis_mlx90642/", "reason": "vendored Melexis driver, held byte for byte by check_shared_drivers.py"},
+   {"path": "src/F303-slave/melexis_mlx90642/", "reason": "vendored Melexis driver, held byte for byte by check_shared_drivers.py"}
+  ]
+ },
+ "cppcheck": {
+  "enable": "warning,performance,portability",
+  "std": "c11",
+  "sources": ["src/F303-master", "src/F303-slave", "src/common"],
+  "includes": ["src/common", "src/F303-master", "src/F303-master/boot", "src/F303-slave", "src/F303-slave/boot"],
+  "exclude": [
+   "src/F303-master/melexis_mlx90640", "src/F303-slave/melexis_mlx90640",
+   "src/F303-master/melexis_mlx90641", "src/F303-slave/melexis_mlx90641",
+   "src/F303-master/melexis_mlx90642", "src/F303-slave/melexis_mlx90642"
+  ],
+  "suppress": [
+   {"id": "oppositeInnerCondition", "file": "src/F303-master/firmware_interrupts_timer.c", "reason": "steps_remaining is volatile and the CAN interrupt can change it between the two tests; the second test is the point"}
+  ]
+ },
+ "comments": {
+  "max_block_lines": 14,
+  "max_long_blocks": 17,
+  "exclude": ["src/F303-master/melexis_mlx90640/", "src/F303-slave/melexis_mlx90640/", "src/F303-master/melexis_mlx90641/", "src/F303-slave/melexis_mlx90641/", "src/F303-master/melexis_mlx90642/", "src/F303-slave/melexis_mlx90642/"]
+ }
+}

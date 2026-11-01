@@ -405,7 +405,7 @@ Which versions of the URTC programs work together, and which protocol version ea
 
 ## 🧪 Testing
 
-The firmware logic around the hardware is tested on a computer: `python tools/run_host_tests.py` builds and runs 40 C test suites (`tests/test_*.c`) with the host compiler, a fake HAL and the sanitizers AddressSanitizer and UBSan with `-fanalyzer`: the bootloaders, the thermal guard, the dispatcher, the real CAN handlers of the 13 tools, the heater control loops and the black box, among others. CI compiles and links the four binaries too and fails below a coverage floor of the executed lines of the firmware sources. None of it has run on a board: no populated board exists, and the host tests cannot show that the timing, the drivers or the power stages work.
+The firmware logic around the hardware is tested on a computer: `python tools/run_host_tests.py` builds and runs 40 C test suites (`tests/test_*.c`) with the host compiler, a fake HAL and the sanitizers AddressSanitizer and UBSan with `-fanalyzer`: the bootloaders, the thermal guard, the dispatcher, the real CAN handlers of the 13 tools, the heater control loops and the black box, among others. CI compiles and links the four binaries too and fails below a coverage floor of the executed lines of the firmware sources. None of it has run on a board: no populated board exists, and the host tests cannot show that the timing, the drivers or the power stages work. `python tools/c_quality.py` adds three checks that the compiler of the board does not make: the host compiler with `-Wconversion` over every source the suites build, cppcheck, and a limit on the length of comment blocks (the vendored sensor drivers are left out, each with its reason in `tools/c_quality.json`).
 
 ## 🏗️ Build & Release
 

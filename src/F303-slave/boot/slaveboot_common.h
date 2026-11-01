@@ -22,6 +22,7 @@
 #define BOOTLOADER_COMMON_H
 
 #include "stm32f3xx_hal.h"
+#include "urtc_flash_layout.h"
 
 // -----------------------------------------------------------------------
 // Shared peripheral handles - defined once in slaveboot_main.c, declared
@@ -47,11 +48,12 @@ extern I2C_HandleTypeDef hi2c1;
 // linked, not assumed - this 18KB leaves roughly 5KB of headroom above
 // that rather than being sized to fit with nothing to spare.
 // -----------------------------------------------------------------------
-#define BOOTLOADER_FLASH_SIZE 18432UL           // 18KB, 9 pages
-#define METADATA_ADDR        0x08004800UL       // 2KB, 1 page
-#define MAIN_APP_ADDR         0x08005000UL      // 54KB, 27 pages
-#define BACKUP_APP_ADDR       0x08012800UL      // 54KB, 27 pages
-#define APP_MAX_SIZE          (54UL * 1024UL)
+// The numbers are written once in src/common/urtc_flash_layout.h.
+#define BOOTLOADER_FLASH_SIZE URTC_SLAVE_BOOTLOADER_SIZE   // 18KB, 9 pages
+#define METADATA_ADDR         URTC_SLAVE_METADATA_ADDR     // 2KB, 1 page
+#define MAIN_APP_ADDR         URTC_SLAVE_MAIN_APP_ADDR     // 54KB, 27 pages
+#define BACKUP_APP_ADDR       URTC_SLAVE_BACKUP_APP_ADDR   // 54KB, 27 pages
+#define APP_MAX_SIZE          URTC_SLAVE_APP_MAX_SIZE
 #define METADATA_MAGIC_VALID 0x55415041UL // "APAU" - same marker as the main board's own bootloader, no reason for these to differ
 
 // -----------------------------------------------------------------------

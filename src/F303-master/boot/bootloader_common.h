@@ -7,6 +7,7 @@
 #define BOOTLOADER_COMMON_H
 
 #include "stm32f3xx_hal.h"
+#include "urtc_flash_layout.h"
 
 // -----------------------------------------------------------------------
 // Shared peripheral handles - defined once in bootloader_main.c, declared
@@ -20,10 +21,11 @@ extern I2C_HandleTypeDef hi2c2;
 // -----------------------------------------------------------------------
 // Flash layout
 // -----------------------------------------------------------------------
-#define MAIN_APP_ADDR        0x08008000UL
-#define BACKUP_APP_ADDR      0x08024000UL
-#define APP_MAX_SIZE         (112UL * 1024UL)
-#define METADATA_ADDR        0x08007800UL
+// The numbers are written once in src/common/urtc_flash_layout.h.
+#define MAIN_APP_ADDR        URTC_MASTER_MAIN_APP_ADDR
+#define BACKUP_APP_ADDR      URTC_MASTER_BACKUP_APP_ADDR
+#define APP_MAX_SIZE         URTC_MASTER_APP_MAX_SIZE
+#define METADATA_ADDR        URTC_MASTER_METADATA_ADDR
 #define METADATA_MAGIC_VALID 0x55415041UL // "APAU" as a magic marker, arbitrary but distinctive
 // FLASH_PAGE_SIZE is already defined by the HAL library itself
 // (stm32f3xx_hal_flash_ex.h) as 0x800 (2048) - the same value this project

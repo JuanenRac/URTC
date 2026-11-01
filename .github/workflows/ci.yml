@@ -54,7 +54,7 @@ jobs:
         if: ${{ hashFiles('build_firmware.sh') != '' }}
         run: |
           sudo apt-get update
-          sudo apt-get install --yes gcc-arm-none-eabi binutils-arm-none-eabi libnewlib-arm-none-eabi libstdc++-arm-none-eabi-newlib
+          sudo apt-get install --yes gcc-arm-none-eabi binutils-arm-none-eabi libnewlib-arm-none-eabi libstdc++-arm-none-eabi-newlib cppcheck
       - name: Compile firmware without a version bump
         if: ${{ hashFiles('build_firmware.sh') != '' }}
         env:

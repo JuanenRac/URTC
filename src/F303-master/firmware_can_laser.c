@@ -26,7 +26,7 @@ void Handle_CAN_Laser(void) {
                     // than exactly 0x01 - can't produce laser PWM even if
                     // that external circuit is slow, miswired, or absent.
                     uint32_t laser_duty = (rxData[1] == 0x01)
-                        ? (laser_power_setpoint * 3199) / 255 // scaled for TIM1's 20kHz period
+                        ? ((uint32_t)laser_power_setpoint * 3199u) / 255u // scaled for TIM1's 20kHz period
                         : 0;
                     __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, laser_duty);
                     

@@ -241,7 +241,7 @@ void Features_HandlePidCommand(void) {
 }
 
 uint8_t ThermalPid_Heater(uint16_t current_c, uint16_t target_c, uint32_t now_ms) {
-    float dt = (now_ms - pid_last_ms) / 1000.0f;
+    float dt = (float)(now_ms - pid_last_ms) / 1000.0f;
     if (pid_last_ms == 0 || dt <= 0.0f || dt > 0.5f) { dt = 0.02f; Pid_Reset(&pid); }
     pid_last_ms = now_ms ? now_ms : 1;
     float duty;

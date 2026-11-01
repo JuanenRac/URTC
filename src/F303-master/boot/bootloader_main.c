@@ -96,7 +96,7 @@ static void MX_CAN_Init(void) {
 
 // Tracks the ~1s heartbeat cadence in main()'s own loops below - purely
 // local to this file, not shared with any module.
-static uint32_t last_heartbeat_tick = 0 - 1000; // forces an immediate heartbeat on the first check, rather than waiting a full 1000ms
+static uint32_t last_heartbeat_tick = 0u - 1000u; // forces an immediate heartbeat on the first check, rather than waiting a full 1000ms
 
 int main(void) {
     HAL_Init();

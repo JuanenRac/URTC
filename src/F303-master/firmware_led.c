@@ -103,7 +103,7 @@ uint8_t Update_StatusLED_SPI_DMA(void) {
     memset(&led_spi_buffer[idx], 0x00, 100); // reset/latch, same reasoning as before
     idx += 100;
 
-    HAL_SPI_Transmit_DMA(&hspi1, led_spi_buffer, idx);
+    HAL_SPI_Transmit_DMA(&hspi1, led_spi_buffer, (uint16_t)idx);
     return 1;
 }
 

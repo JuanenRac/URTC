@@ -209,7 +209,7 @@ static int16_t NTC_Lookup(uint16_t raw_adc) {
             int32_t numerator = (int32_t)((int16_t)raw_adc - adc0) * (t1 - t0);
             int32_t denom = (adc1 - adc0);
             int32_t rounding = (numerator >= 0) ? (denom / 2) : -(denom / 2);
-            return t0 + (numerator + rounding) / denom;
+            return (int16_t)(t0 + (numerator + rounding) / denom);
         }
     }
     return NTC_TABLE[32][1]; // unreachable given the guards above
@@ -241,7 +241,7 @@ void Control_3D_Hotend_PID(void) {
             // while still catching genuine saturation - an open/shorted
             // sensor pins the ADC essentially at the true rail, not just
             // near the top of the legitimate range.
-            current_temperature = NTC_Lookup(raw_adc);
+            current_temperature = (uint16_t)NTC_Lookup((uint16_t)raw_adc);
         } else {
             // A disconnected/shorted sensor is a hardware failure the
             // system needs to react to: without this, current_temperature

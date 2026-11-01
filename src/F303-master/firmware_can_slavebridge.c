@@ -109,7 +109,7 @@ void Handle_CAN_SlaveBridge(void) {
         // HandleData) accumulates across multiple calls exactly like
         // this, so no assembly buffer is needed here the way HMAC above
         // needs one.
-        ExpansionI2C_SlaveWriteRegister(REG_BOOT_DATA, rxData, rxHeader.DLC);
+        ExpansionI2C_SlaveWriteRegister(REG_BOOT_DATA, rxData, (uint8_t)rxHeader.DLC);
 
     } else if (rxHeader.StdId == URTC_CAN_ID_SLAVE_END_UPDATE && rxHeader.DLC == 8) {
         ExpansionI2C_SlaveWriteRegister(REG_BOOT_END_UPDATE, rxData, 8);
@@ -178,7 +178,7 @@ void Handle_CAN_SlaveBridge(void) {
         // Only the registers and payload lengths listed in urtc_slave_regs.h
         // are relayed; anything else is dropped without an answer.
         if (urtc_slave_app_write_allowed(rxData[0], (uint8_t)(rxHeader.DLC - 1))) {
-            ExpansionI2C_SlaveWriteRegister(rxData[0], &rxData[1], rxHeader.DLC - 1);
+            ExpansionI2C_SlaveWriteRegister(rxData[0], &rxData[1], (uint8_t)(rxHeader.DLC - 1));
         }
 
     } else if (rxHeader.StdId == URTC_CAN_ID_SLAVE_REG_READ && rxHeader.DLC == 2) {

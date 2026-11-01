@@ -229,8 +229,8 @@ void OLED_DrawProgressBar_Boot(uint8_t percent) {
     char txt[5];
     uint8_t tp = 0;
     if (percent >= 100) { txt[tp++] = '1'; txt[tp++] = '0'; txt[tp++] = '0'; }
-    else if (percent >= 10) { txt[tp++] = '0' + (percent/10); txt[tp++] = '0' + (percent%10); }
-    else { txt[tp++] = '0' + percent; }
+    else if (percent >= 10) { txt[tp++] = (char)('0' + (percent/10)); txt[tp++] = (char)('0' + (percent%10)); }
+    else { txt[tp++] = (char)('0' + percent); }
     txt[tp++] = '%';
     txt[tp] = 0;
     uint8_t small_buf[30] = {0};

@@ -38,7 +38,7 @@ uint8_t fmt_uint(char *dest, uint32_t value, uint8_t width) {
     if (width > 21) width = 21;
     uint8_t n = 0;
     do {
-        tmp[n++] = '0' + (value % 10);
+        tmp[n++] = (char)('0' + (value % 10));
         value /= 10;
     } while (value > 0);
     uint8_t pad = (n < width) ? (width - n) : 0;
@@ -64,7 +64,7 @@ void OLED_PrintStr(uint8_t page, uint8_t col, const char* str) {
                                             // without this, "v1.0" or "__DATE__" (e.g. "Jul") would
                                             // come out with blank gaps where each lowercase letter was.
         if (c >= 32 && c <= 95) {
-            uint16_t idx = (c - 32) * 5;
+            uint16_t idx = (uint16_t)((c - 32) * 5);
             for (uint8_t i = 0; i < 5; i++) line_buf[len*6 + i] = Font5x7[idx+i];
         } else {
             for (uint8_t i = 0; i < 5; i++) line_buf[len*6 + i] = 0x00;
@@ -98,7 +98,7 @@ void OLED_DrawHorizontalBar(uint8_t page, uint8_t col_start, uint8_t max_width, 
     if (col_start < 128 && (uint16_t)col_start + max_width > 128) {
         max_width = 128 - col_start;
     }
-    uint8_t filled_pixels = (max_width * percent) / 100;
+    uint8_t filled_pixels = (uint8_t)((max_width * percent) / 100);
 
     // Builds the whole bar locally and sends it in one I2C transaction,
     // rather than one transaction per column - each carries full protocol
@@ -148,7 +148,7 @@ void OLED_DrawTempSparkline(uint8_t page, uint8_t col_start, uint8_t width, uint
     if (now - last_sample_tick >= SPARK_SAMPLE_PERIOD_MS || sample_count == 0) {
         last_sample_tick = now;
         history[write_index] = current_value;
-        write_index = (write_index + 1) % SPARK_SAMPLES;
+        write_index = (uint8_t)((write_index + 1) % SPARK_SAMPLES);
         if (sample_count < SPARK_SAMPLES) sample_count++;
     }
 
@@ -165,7 +165,7 @@ void OLED_DrawTempSparkline(uint8_t page, uint8_t col_start, uint8_t width, uint
         // own live graph (HYDRA-UMC-SUITE/URTC-TESTER's _create_live_graph),
         // so an operator reading either one doesn't have to remember two
         // different conventions.
-        uint8_t sample_idx = (col * sample_count) / (width > 1 ? width : 1);
+        uint8_t sample_idx = (uint8_t)((col * sample_count) / (width > 1 ? width : 1));
         if (sample_idx >= sample_count) sample_idx = sample_count > 0 ? sample_count - 1 : 0;
         // history is circular - the OLDEST valid sample is at write_index
         // once the buffer has wrapped (sample_count == SPARK_SAMPLES),
@@ -524,7 +524,7 @@ void OLED_Render_YellowStrip(void) {
             break;
         case TOOL_LASER_ENGRAVER:
             hp = append_str(hero, "LASER PWR: ");
-            hp += fmt_uint(hero+hp, (laser_power_setpoint * 100) / 255, 3);
+            hp += fmt_uint(hero+hp, ((uint32_t)laser_power_setpoint * 100u) / 255u, 3);
             hp += append_str(hero+hp, " %     ");
             hero[hp] = 0;
             break;
@@ -751,7 +751,7 @@ void Render_ToolScreen(void) {
             OLED_DrawTempSparkline(4, 5, 85, current_temperature, 0, 450);
             OLED_PrintStr(5, 5, txt);
             OLED_PrintStr(6, 5, endstop_triggered ? "ENDSTOP: HIT  " : "ENDSTOP: OPEN ");
-            OLED_DrawHorizontalBar(7, 5, 85, (current_temperature * 100) / 450);
+            OLED_DrawHorizontalBar(7, 5, 85, (uint8_t)((current_temperature * 100) / 450));
             OLED_DrawToolIcon(TOOL_SOLDERING_IRON);
             break;
         }
@@ -833,7 +833,7 @@ void Render_ToolScreen(void) {
             txt[tp] = 0;
             OLED_PrintStr(5, 5, txt);
             OLED_PrintStr(6, 5, endstop_triggered ? "ENDSTOP: HIT  " : "ENDSTOP: OPEN ");
-            OLED_DrawHorizontalBar(7, 5, 85, (laser_power_setpoint * 100) / 255);
+            OLED_DrawHorizontalBar(7, 5, 85, (uint8_t)((laser_power_setpoint * 100) / 255));
             OLED_DrawToolIcon(TOOL_LASER_ENGRAVER);
             break;
         case TOOL_3D_PRINTER: {
@@ -853,14 +853,14 @@ void Render_ToolScreen(void) {
             txt[tp] = 0;
             OLED_PrintStr(5, 5, txt);
             tp = append_str(txt, "LFAN:");
-            tp += fmt_uint(txt+tp, (layer_fan_duty * 100) / 255, 3);
+            tp += fmt_uint(txt+tp, ((uint32_t)layer_fan_duty * 100u) / 255u, 3);
             tp += append_str(txt+tp, "%");
             tp += fmt_uint(txt+tp, layer_fan_actual_rpm, 4);
             tp += append_str(txt+tp, "RPM");
             txt[tp] = 0;
             OLED_PrintStr(6, 5, txt);
             tp = append_str(txt, "HFAN:");
-            tp += fmt_uint(txt+tp, (hotend_fan_duty * 100) / 255, 3);
+            tp += fmt_uint(txt+tp, ((uint32_t)hotend_fan_duty * 100u) / 255u, 3);
             tp += append_str(txt+tp, "%");
             tp += fmt_uint(txt+tp, hotend_fan_actual_rpm, 4);
             tp += append_str(txt+tp, "RPM");

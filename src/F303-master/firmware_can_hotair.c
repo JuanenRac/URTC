@@ -35,7 +35,7 @@ void Handle_CAN_HotAirRework(void) {
 
         hotair_blower_duty = rxData[2];
         hotair_blower_last_kick_tick = HAL_GetTick();
-        uint32_t blower_duty = (hotair_blower_duty * 3199) / 255;
+        uint32_t blower_duty = ((uint32_t)hotair_blower_duty * 3199u) / 255u;
         __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, blower_duty);
     }
 }

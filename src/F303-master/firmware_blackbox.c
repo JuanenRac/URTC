@@ -88,7 +88,7 @@ void BlackBox_Sample(void) {
     s->flags = (uint8_t)((endstop_triggered ? 0x01 : 0) | (system_error_flag ? 0x02 : 0) |
                          ((thermal_fault_code & 0x03u) << 2));
 
-    write_index = (write_index + 1) % BLACKBOX_SAMPLES;
+    write_index = (uint8_t)((write_index + 1) % BLACKBOX_SAMPLES);
     if (sample_count < BLACKBOX_SAMPLES) sample_count++;
 
     // Rising-edge detection - flush exactly once per fault occurrence,

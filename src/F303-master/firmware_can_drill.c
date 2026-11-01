@@ -15,7 +15,7 @@ void Handle_CAN_Drill(void) {
                     
                     // drill_speed is 0-255 (full byte) per CANBUS.TXT,
                     // not a 0-100 percentage. Scaled the same way as the laser to cover the full range.
-                    uint32_t duty = (drill_speed * 3199) / 255; // scaled for TIM1's 20kHz period
+                    uint32_t duty = ((uint32_t)drill_speed * 3199u) / 255u; // scaled for TIM1's 20kHz period
                     __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, duty);
                     
                     if (drill_speed > 0) {

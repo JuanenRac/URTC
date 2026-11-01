@@ -83,7 +83,7 @@ Every file of the repository with a line on what it does: the annotated tree tha
 │   │       │                      flash/metadata, OLED, CAN protocol)
 │   │       ├── STM32F303CCTx_BOOTLOADER.ld  Linker script for the bootloader (30K region at 0x08000000)
 │   │       └── README.md          Same technical-reference role as the application's, for the bootloader
-│   ├── common/                   Headers shared by the application, the bootloader and the slave: the boot session mark, the slave registers and the version wire format
+│   ├── common/                   Headers shared by the application, the bootloader and the slave: the boot session mark, the slave registers, the version wire format and the flash layout (urtc_flash_layout.h)
 │   └── F303-slave/               Companion chip (STM32F303CBT6) on the 2 ADVANCED expansion
 │       │                         board variants only - see the Expansion Connector section
 │       │                         above. Own bootloader/application pair, own I2C-based
@@ -156,6 +156,8 @@ Every file of the repository with a line on what it does: the annotated tree tha
 │   ├── release_sign.py          Signs the assets of a release (detached Ed25519 signatures)
 │   ├── run_host_tests.py        Executor of the host test suites (ctest where cmake is installed, shared with the other firmware repositories), with the sanitizers, the analysis and a coverage floor
 │   ├── host_tests.json          The 40 suites: sources, include folders and flags
+│   ├── c_quality.py / c_quality.json  Checks the compiler of the board does not make: `-Wconversion` with the host compiler, cppcheck and the length of comment blocks (what is excluded and why, and the limits, are in the JSON)
+│   ├── gen_build_scripts.py / build_plan.json  Writes the pinned vendor sources, the compiler and linker flags and the HAL modules into build_firmware.sh and build_firmware.bat from one file (`--check` in CI)
 │   ├── bootloader_twin.py / changelog_section.py / fuzz_virtual_board.py The twin of the bootloader (build and drive); the text of one CHANGELOG section for a release; a fuzz run of the virtual board
 │   └── _doc_policy.py / _readme_parity.py / _tracked_names.py Shared checks used by ci_validate.py
 ├── VERSION_CHECKLIST.txt        Mechanical checklist for bumping any of this project's own

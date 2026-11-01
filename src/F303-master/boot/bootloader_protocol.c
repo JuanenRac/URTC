@@ -61,10 +61,10 @@ static void CAN_SendPageAck(uint32_t page_index) {
     if (!CAN_WaitForFreeMailbox()) return; // genuinely no mailbox freed up in time - drop rather than block indefinitely
     CAN_TxHeaderTypeDef txHeader;
     uint8_t txData[4];
-    txData[0] = (page_index >> 24) & 0xFF;
-    txData[1] = (page_index >> 16) & 0xFF;
-    txData[2] = (page_index >> 8) & 0xFF;
-    txData[3] = page_index & 0xFF;
+    txData[0] = (uint8_t)((page_index >> 24) & 0xFFu);
+    txData[1] = (uint8_t)((page_index >> 16) & 0xFFu);
+    txData[2] = (uint8_t)((page_index >> 8) & 0xFFu);
+    txData[3] = (uint8_t)(page_index & 0xFFu);
     uint32_t mailbox;
     txHeader.StdId = CAN_ID_PAGE_ACK;
     txHeader.IDE = CAN_ID_STD;

@@ -16,7 +16,7 @@ void Control_SensorTelemetry(void) {
     // when something's already wrong.
     HAL_ADC_Start(&hadc);
     if(HAL_ADC_PollForConversion(&hadc, 2) == HAL_OK) {
-        sensor_analog_reading = HAL_ADC_GetValue(&hadc);
+        sensor_analog_reading = (uint16_t)HAL_ADC_GetValue(&hadc);
     } else {
         // Same reasoning as the thermal ADC reads in
         // firmware_control_thermal.c: a conversion that can't complete

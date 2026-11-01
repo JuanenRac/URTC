@@ -46,7 +46,7 @@ void Handle_CAN_3DPrinter(void) {
                 // this tool's exact rate in main()) - independent from TIM3.
                 else if (rxHeader.StdId == URTC_CAN_ID_PRINTER_LAYERFAN_CMD && rxHeader.DLC >= 1) {
                     layer_fan_duty = rxData[0];
-                    uint32_t fan_duty = (layer_fan_duty * 2559) / 255;
+                    uint32_t fan_duty = ((uint32_t)layer_fan_duty * 2559u) / 255u;
                     __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, fan_duty);
                     layer_fan_last_kick_tick = HAL_GetTick();
                 }
@@ -55,7 +55,7 @@ void Handle_CAN_3DPrinter(void) {
                 // break, not the printed part.
                 else if (rxHeader.StdId == URTC_CAN_ID_PRINTER_HOTENDFAN_CMD && rxHeader.DLC >= 1) {
                     hotend_fan_duty = rxData[0];
-                    uint32_t hfan_duty = (hotend_fan_duty * 2559) / 255;
+                    uint32_t hfan_duty = ((uint32_t)hotend_fan_duty * 2559u) / 255u;
                     __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, hfan_duty);
                     hotend_fan_last_kick_tick = HAL_GetTick();
                 }

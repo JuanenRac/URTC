@@ -7,6 +7,7 @@
 // dozen .c/.h files by responsibility.
 // =============================================================================
 #include "firmware_common.h"
+#include "urtc_flash_layout.h"
 #include "firmware_thermal_stats.h"
 #include "firmware_init_clocks.h"
 #include "firmware_init_gpio.h"
@@ -207,25 +208,10 @@ uint8_t animation_frame = 0;               // 0/1 - toggles the tool icon's anim
 
 
 int main(void) {
-    // This application lives at 0x08008000, not 0x08000000 (see
-    // STM32F303CCTx_APP.ld) - a bootloader and its metadata page occupy
-    // the space ahead of it. The vector table moved with it, so the core
-    // needs to be told where to find it before anything can rely on an
-    // interrupt firing correctly.
-    // This literal is intentionally duplicated, not shared, across 3
-    // places that must all agree: this line, FLASH's ORIGIN in
-    // STM32F303CCTx_APP.ld (this app's own link address - what actually
-    // places its vector table here), and MAIN_APP_ADDR in
-    // boot/bootloader_common.h (what the bootloader itself uses for the
-    // same SCB->VTOR write before jumping here, and for validating a
-    // flashed image's size against APP_MAX_SIZE). This file doesn't
-    // include bootloader_common.h, so the compiler can't catch these 3
-    // drifting apart on its own - if the bootloader/app partition split
-    // ever needs to move, all 3 need updating together, then verified
-    // against real hardware (a wrong VTOR here means no interrupt of any
-    // kind ever fires again, silently, so this is not a change to make
-    // from a build/link check alone).
-    SCB->VTOR = 0x08008000;
+    // The application does not start at 0x08000000: the bootloader and its metadata page come first, so the vector table is moved to where this image is linked.
+    // The address is written once (src/common/urtc_flash_layout.h) and tests/test_flash_layout.py holds the linker script to it; a wrong value here means that no
+    // interrupt ever fires again, so moving the partition is never a change to verify from a build alone.
+    SCB->VTOR = URTC_MASTER_MAIN_APP_ADDR;
 
     uint32_t tick_heartbeat = 0;
     uint32_t tick_screen = 0;
@@ -586,7 +572,7 @@ int main(void) {
             static uint8_t anim_counter = 0;
             if (++anim_counter >= 3) {        // ~450ms per frame: animation is visible but not frantic
                 anim_counter = 0;
-                animation_frame = (animation_frame + 1) % 4;
+                animation_frame = (uint8_t)((animation_frame + 1) % 4);
             }
             Render_ToolScreen();
             BlackBox_Sample(); // same 150ms cadence as the render above - see firmware_blackbox.c's own header for why this isn't in the render function itself (unrelated concerns, kept in separate files like everything else in this codebase)
@@ -688,7 +674,7 @@ int main(void) {
                 txH.StdId = URTC_CAN_ID_DRILL_TELEMETRY;
                 txH.DLC = 3; // extended: byte 2 = endstop
                 __disable_irq();
-                uint16_t drill_rpm_snapshot = drill_actual_rpm; // atomic snapshot, defensive against a mid-read IRQ update
+                uint16_t drill_rpm_snapshot = (uint16_t)drill_actual_rpm; // atomic snapshot, defensive against a mid-read IRQ update
                 __enable_irq();
                 txD[0] = (uint8_t)((drill_rpm_snapshot >> 8) & 0xFF);
                 txD[1] = (uint8_t)(drill_rpm_snapshot & 0xFF);

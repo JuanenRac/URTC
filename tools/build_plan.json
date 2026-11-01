@@ -1,0 +1,45 @@
+{
+ "about": "The data of the firmware build that build_firmware.sh and build_firmware.bat share. tools/gen_build_scripts.py writes it into both scripts between the BUILD_PLAN markers; --check fails when a script differs.",
+ "pins": {
+  "HAL_REPO": "https://github.com/STMicroelectronics/stm32f3xx_hal_driver.git",
+  "HAL_COMMIT": "953955afe65f89e60e556bbcdba752597f5da65d",
+  "CMSIS_DEVICE_REPO": "https://github.com/STMicroelectronics/cmsis_device_f3.git",
+  "CMSIS_DEVICE_TAG": "v2.3.8",
+  "CMSIS_CORE_REPO": "https://github.com/STMicroelectronics/cmsis_core.git"
+ },
+ "flags": {
+  "cpu": "-mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard",
+  "c_defines": "-DSTM32F303xC -DUSE_HAL_DRIVER",
+  "c_includes": [
+   "{BUILD}/common/CMSIS_Include",
+   "{BUILD}/common/HAL_Include",
+   "{ROOT}/src/common"
+  ],
+  "c_extra": "-O2 -Wall -ffunction-sections -fdata-sections",
+  "cxx_extra": "-fno-exceptions -fno-rtti -fno-unwind-tables -fno-threadsafe-statics -specs=nano.specs -specs=nosys.specs -O2 -Wall",
+  "ld_extra": "-specs=nano.specs -specs=nosys.specs -Wl,--gc-sections"
+ },
+ "hal_modules": [
+  "stm32f3xx_hal",
+  "stm32f3xx_hal_adc",
+  "stm32f3xx_hal_adc_ex",
+  "stm32f3xx_hal_can",
+  "stm32f3xx_hal_cortex",
+  "stm32f3xx_hal_dac",
+  "stm32f3xx_hal_dac_ex",
+  "stm32f3xx_hal_dma",
+  "stm32f3xx_hal_flash",
+  "stm32f3xx_hal_flash_ex",
+  "stm32f3xx_hal_gpio",
+  "stm32f3xx_hal_i2c",
+  "stm32f3xx_hal_i2c_ex",
+  "stm32f3xx_hal_iwdg",
+  "stm32f3xx_hal_pwr",
+  "stm32f3xx_hal_pwr_ex",
+  "stm32f3xx_hal_rcc",
+  "stm32f3xx_hal_rcc_ex",
+  "stm32f3xx_hal_spi",
+  "stm32f3xx_hal_tim",
+  "stm32f3xx_hal_tim_ex"
+ ]
+}

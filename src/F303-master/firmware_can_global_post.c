@@ -32,7 +32,7 @@ void Handle_CAN_GlobalCommands_PostErrorGate(void) {
         if (rxHeader.StdId == URTC_CAN_ID_EXPANSION_SPI_REQ && rxHeader.DLC >= 2) {
             uint8_t n = rxData[0];
             if (n > 7) n = 7;
-            if (n > (rxHeader.DLC - 1)) n = rxHeader.DLC - 1;
+            if (n > (rxHeader.DLC - 1)) n = (uint8_t)(rxHeader.DLC - 1);
             uint8_t response[8];
             response[0] = n;
             HAL_GPIO_WritePin(EXP_SPI_CS_PORT, EXP_SPI_CS_PIN, GPIO_PIN_RESET);

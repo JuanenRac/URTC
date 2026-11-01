@@ -12,7 +12,8 @@
    ],
    "includes": [
     "tests",
-    "src/F303-master/melexis_mlx90640"
+    "src/F303-master/melexis_mlx90640",
+    "src/common"
    ],
    "std": "c11",
    "sanitize": false,
@@ -28,7 +29,8 @@
    ],
    "includes": [
     "tests",
-    "src/F303-master"
+    "src/F303-master",
+    "src/common"
    ],
    "std": "c11",
    "sanitize": false
@@ -41,7 +43,8 @@
    ],
    "includes": [
     "tests",
-    "src/F303-master"
+    "src/F303-master",
+    "src/common"
    ],
    "std": "c11",
    "sanitize": false
@@ -64,7 +67,8 @@
    ],
    "includes": [
     "tests",
-    "src/F303-master"
+    "src/F303-master",
+    "src/common"
    ],
    "std": "c11",
    "sanitize": false
@@ -79,7 +83,8 @@
    "includes": [
     "tests",
     "tests/host_hal",
-    "src/F303-master/boot"
+    "src/F303-master/boot",
+    "src/common"
    ],
    "extra": [
     "-Wno-cpp",
@@ -116,7 +121,8 @@
    "includes": [
     "tests",
     "tests/host_hal",
-    "src/F303-slave/boot"
+    "src/F303-slave/boot",
+    "src/common"
    ],
    "extra": [
     "-Wno-cpp",
@@ -226,7 +232,8 @@
    ],
    "includes": [
     "tests",
-    "src/F303-master"
+    "src/F303-master",
+    "src/common"
    ],
    "std": "c11"
   },
@@ -238,7 +245,8 @@
    ],
    "includes": [
     "tests",
-    "src/F303-master"
+    "src/F303-master",
+    "src/common"
    ],
    "std": "c11",
    "libs": [
@@ -254,7 +262,8 @@
    ],
    "includes": [
     "tests",
-    "src/F303-master"
+    "src/F303-master",
+    "src/common"
    ],
    "std": "c11"
   },
