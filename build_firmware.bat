@@ -129,16 +129,16 @@ if errorlevel 2 (
 REM -----------------------------------------------------------------------
 echo.
 echo === 1b2. C quality ^(implicit conversions, cppcheck, long comments^) and the data both build scripts share ===
-python "%ROOT%	ools\gen_build_scripts.py" --check
+python "%ROOT%\tools\gen_build_scripts.py" --check
 if errorlevel 1 (
-    echo   FAIL the build scripts differ from toolsuild_plan.json - run: python tools\gen_build_scripts.py
+    echo   FAIL the build scripts differ from tools\build_plan.json - run: python tools\gen_build_scripts.py
     set /a FAIL+=1
     goto :summary
 ) else (
-    echo   OK   build_firmware.sh and build_firmware.bat carry the data of toolsuild_plan.json
+    echo   OK   build_firmware.sh and build_firmware.bat carry the data of tools\build_plan.json
     set /a PASS+=1
 )
-python "%ROOT%	ools\c_quality.py"
+python "%ROOT%\tools\c_quality.py"
 if errorlevel 2 (
     echo   WARN C quality checks skipped in part: a tool is not installed ^(see the lines above^)
     set /a WARN+=1
