@@ -122,6 +122,7 @@ uint32_t fake_tick;
 uint32_t fake_tick_step;
 uint32_t fake_rx_queue_count;
 FakeRxFrame fake_rx_queue[8];
+void (*fake_rx_empty_hook)(void);
 static uint8_t *flash_mem;
 static int erase_calls, program_calls;
 
@@ -180,7 +181,12 @@ HAL_StatusTypeDef HAL_FLASH_Program(uint32_t type, uint32_t address, uint64_t da
     return HAL_OK;
 }
 
-uint32_t HAL_CAN_GetRxFifoFillLevel(CAN_HandleTypeDef *h, uint32_t fifo) { (void)h; (void)fifo; return fake_rx_queue_count; }
+uint32_t HAL_CAN_GetRxFifoFillLevel(CAN_HandleTypeDef *h, uint32_t fifo)
+{
+    (void)h; (void)fifo;
+    if (fake_rx_queue_count == 0 && fake_rx_empty_hook) fake_rx_empty_hook();   // a host program that plays a bus fills the queue here
+    return fake_rx_queue_count;
+}
 
 HAL_StatusTypeDef HAL_CAN_GetRxMessage(CAN_HandleTypeDef *h, uint32_t fifo, CAN_RxHeaderTypeDef *hdr, uint8_t *data)
 {

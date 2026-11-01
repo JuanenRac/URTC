@@ -144,6 +144,8 @@ extern uint32_t fake_tick_step;
 int fake_flash_init(void);                    // maps the flash, returns 1 on success
 void fake_flash_erase_all(void);
 extern uint32_t fake_rx_queue_count;
+// Called when the receive FIFO is polled and is empty: a host program that plays a bus (tests/virtual_bootloader.c) queues the next frame there.
+extern void (*fake_rx_empty_hook)(void);
 typedef struct { CAN_RxHeaderTypeDef hdr; uint8_t data[8]; } FakeRxFrame;
 extern FakeRxFrame fake_rx_queue[8];
 
