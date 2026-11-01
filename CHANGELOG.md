@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented here.
 
-## [Unreleased]
+## [0.4.3] - The free-tool text of the EEPROM and ECOVIA notes follows the specification, the version checklist keeps its table of versions by itself, the CAN reference documents the reply of the tool rack and the shared set carries the test launchers
 
 - **The free-tool text of `docs/EEPROM.TXT` and `docs/ECOVIA.TXT` follows the specification:** the jumper readings 0-24 name the 25 tool profiles (not 12), the selection of the free register is 1-25 (26-255 and a blank F-RAM mean no tool), `0x1A2` is only the write and needs at least one byte, and the query is `0x1A3`, whose payload is ignored. Text only: the firmware is unchanged.
 
