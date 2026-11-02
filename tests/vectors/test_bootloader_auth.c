@@ -103,7 +103,8 @@ static void test_select(int *failures)
     for (size_t s = 0; s < SELECT_SCENARIO_COUNT; s++) {
         const select_scenario_t *sc = &SELECT_SCENARIOS[s];
         urtc_bl_node_t node;
-        urtc_bl_node_init(&node, sc->uid[0], sc->uid[1], sc->uid[2]);
+        const uint32_t programmed = sc->has_record ? urtc_bl_serial_from_record(sc->record[0], sc->record[1], sc->record[2]) : 0u;
+        urtc_bl_node_init_prog(&node, sc->uid[0], sc->uid[1], sc->uid[2], programmed);
         if (node.serial != sc->serial) {
             printf("  FAIL: select %s: serial 0x%08X, expected 0x%08X\n", sc->name, (unsigned)node.serial, (unsigned)sc->serial);
             (*failures)++;
@@ -133,6 +134,90 @@ static void test_select(int *failures)
                 "the serial folds the three words with rotations of 0, 11 and 22 bits");
 }
 
+// A whole bus: every head sees every frame; matching heads answer a probe with one and the same frame, so the host sees one answer.
+static int bus_probe(urtc_bl_node_t *nodes, size_t count, uint8_t nbits, uint32_t prefix)
+{
+    int any = 0;
+    for (size_t i = 0; i < count; i++) {
+        uint8_t frame[6] = {(uint8_t)URTC_BL_OP_PROBE, nbits, 0, 0, 0, 0};
+        urtc_bl_put32(frame + 2, prefix);
+        urtc_bl_reply_t r;
+        urtc_bl_node_on_cmd(&nodes[i], 0, frame, 6, 0, &r);
+        any = any || r.send;
+    }
+    return any;
+}
+
+static size_t bus_enumerate(urtc_bl_node_t *nodes, size_t count, uint8_t nbits, uint32_t prefix, uint32_t *out, size_t room)
+{
+    if (!bus_probe(nodes, count, nbits, prefix)) {
+        return 0;
+    }
+    if (nbits == 32u) {
+        if (room > 0u) {
+            out[0] = prefix;
+        }
+        return 1;
+    }
+    const size_t zero = bus_enumerate(nodes, count, (uint8_t)(nbits + 1u), prefix, out, room);
+    const size_t one = bus_enumerate(nodes, count, (uint8_t)(nbits + 1u), prefix | (1u << (31u - nbits)), out + zero, room > zero ? room - zero : 0u);
+    return zero + one;
+}
+
+static void test_bus(int *failures)
+{
+    for (size_t b = 0; b < BUS_SCENARIO_COUNT; b++) {
+        const bus_scenario_t *sc = &BUS_SCENARIOS[b];
+        urtc_bl_node_t nodes[3];
+        for (size_t i = 0; i < sc->node_count; i++) {
+            const bus_node_t *n = &sc->nodes[i];
+            const uint32_t programmed = n->has_record ? urtc_bl_serial_from_record(n->record[0], n->record[1], n->record[2]) : 0u;
+            urtc_bl_node_init_prog(&nodes[i], n->uid[0], n->uid[1], n->uid[2], programmed);
+        }
+        uint32_t found[8] = {0};
+        const size_t found_count = bus_enumerate(nodes, sc->node_count, 0, 0, found, 8);
+        int ok = found_count == sc->enumerated_count;
+        for (size_t i = 0; ok && i < found_count; i++) {
+            ok = found[i] == sc->enumerated[i];
+        }
+        int duplicate = 0;
+        if (sc->has_select) {
+            uint8_t frame[6] = {(uint8_t)URTC_BL_OP_SELECT, 0, 0, 0, 0, 1};
+            urtc_bl_put32(frame + 1, sc->select_serial);
+            int answered = 0;
+            for (size_t i = 0; i < sc->node_count; i++) {
+                urtc_bl_reply_t r;
+                urtc_bl_node_on_cmd(&nodes[i], 1, frame, 6, 0, &r);
+                answered = answered || r.send;
+            }
+            for (uint8_t part = 0; part < 3u; part++) {
+                const uint8_t ask[2] = {(uint8_t)URTC_BL_OP_UID, part};
+                uint32_t first = 0;
+                int seen = 0;
+                for (size_t i = 0; i < sc->node_count; i++) {
+                    urtc_bl_reply_t r;
+                    urtc_bl_node_on_cmd(&nodes[i], 2, ask, 2, 0, &r);
+                    if (r.send) {
+                        const uint32_t word = urtc_bl_get32(r.data + 2);
+                        duplicate = duplicate || (seen && word != first);
+                        first = word;
+                        seen = 1;
+                    }
+                }
+                duplicate = duplicate || (answered && !seen);   // the bus destroyed the clashing answers
+            }
+        }
+        if (!ok || duplicate != sc->duplicate) {
+            printf("  FAIL: bus %s: enumerated %u (expected %u), duplicate %d (expected %d)\n", sc->name, (unsigned)found_count, (unsigned)sc->enumerated_count, duplicate,
+                   sc->duplicate);
+            (*failures)++;
+        }
+    }
+    TEST_ASSERT(urtc_bl_serial_from_record(URTC_BL_SERIAL_MAGIC, 7u, (uint32_t)~7u) == 7u, "a record with the magic and the complement gives its serial");
+    TEST_ASSERT(urtc_bl_serial_from_record(URTC_BL_SERIAL_MAGIC, 7u, 7u) == 0u && urtc_bl_serial_from_record(1u, 7u, (uint32_t)~7u) == 0u, "a wrong check or magic gives none");
+    TEST_ASSERT(URTC_AUTH_DEFAULT_POLICY == URTC_AUTH_ED25519_ONLY && URTC_AUTH_DEFAULT_POLICY == 0, "the default policy is the strict one, and the value 0");
+}
+
 int main(void)
 {
     int count = 0;
@@ -141,6 +226,7 @@ int main(void)
     test_ed25519(failures);
     test_auth(failures);
     test_select(failures);
+    test_bus(failures);
     if (count == 0) {
         printf("all bootloader authentication tests pass\n");
         return 0;

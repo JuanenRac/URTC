@@ -16,8 +16,12 @@
 //                       UID     04 part               the selected one answers 0x7EB: 04 part word(4), part 0..2 (the 96-bit ID, to catch a duplicate serial)
 //
 // Selection lapses after URTC_BL_SELECT_LAPSE_MS unless repeated, except while an update runs; addressed mode lapses after URTC_BL_ADDRESSED_LAPSE_MS without a
-// command. Time is a free-running 32-bit millisecond counter; differences are taken unsigned, so a wrap is harmless. The identifiers 0x7EA..0x7ED are PROPOSED
-// (free in spec/can_protocol.json, not written into it yet).
+// command. Time is a free-running 32-bit millisecond counter; differences are taken unsigned, so a wrap is harmless. The identifiers 0x7EA..0x7ED are the
+// confirmed block of spec/can_protocol.json.
+//
+// A PROGRAMMABLE serial: three words in the metadata flash (URTC_BL_SERIAL_MAGIC "URS1", the serial, the complement of the serial). When the record is valid it
+// replaces the fold of the unique ID; a blank, damaged or unusable record (wrong magic, wrong check, 0 or 0xFFFFFFFF) leaves the fold in charge. The UID answer is
+// always the real 96-bit ID, so two heads with one programmed serial still differ there and the host refuses to update.
 #ifndef URTC_BL_SELECT_H
 #define URTC_BL_SELECT_H
 
@@ -34,6 +38,7 @@
 #define URTC_BL_OP_RELEASE        3u
 #define URTC_BL_OP_UID            4u
 #define URTC_BL_PRESENT_MARK      0xA5u
+#define URTC_BL_SERIAL_MAGIC      0x55525331u
 #define URTC_BL_SELECT_LAPSE_MS   2000u
 #define URTC_BL_ADDRESSED_LAPSE_MS 10000u
 
@@ -59,16 +64,31 @@ static inline int urtc_bl_serial_is_valid(uint32_t serial) { return serial != 0u
 static inline uint32_t urtc_bl_get32(const uint8_t *p) { return ((uint32_t)p[0] << 24) | ((uint32_t)p[1] << 16) | ((uint32_t)p[2] << 8) | p[3]; }
 static inline void urtc_bl_put32(uint8_t *p, uint32_t v) { p[0] = (uint8_t)(v >> 24); p[1] = (uint8_t)(v >> 16); p[2] = (uint8_t)(v >> 8); p[3] = (uint8_t)v; }
 
-static inline void urtc_bl_node_init(urtc_bl_node_t *n, uint32_t w0, uint32_t w1, uint32_t w2)
+// The programmed serial of a metadata record, or 0 (not a serial) when the record is unusable.
+static inline uint32_t urtc_bl_serial_from_record(uint32_t magic, uint32_t serial, uint32_t check)
+{
+    if (magic != URTC_BL_SERIAL_MAGIC || check != (uint32_t)~serial || !urtc_bl_serial_is_valid(serial)) {
+        return 0u;
+    }
+    return serial;
+}
+
+// `programmed` is 0 when there is no usable record (see urtc_bl_serial_from_record): the fold of the unique ID is used then.
+static inline void urtc_bl_node_init_prog(urtc_bl_node_t *n, uint32_t w0, uint32_t w1, uint32_t w2, uint32_t programmed)
 {
     n->uid[0] = w0;
     n->uid[1] = w1;
     n->uid[2] = w2;
-    n->serial = urtc_bl_serial_from_uid(w0, w1, w2);
+    n->serial = programmed != 0u ? programmed : urtc_bl_serial_from_uid(w0, w1, w2);
     n->addressed = 0;
     n->selected = 0;
     n->last_cmd_ms = 0;
     n->select_ms = 0;
+}
+
+static inline void urtc_bl_node_init(urtc_bl_node_t *n, uint32_t w0, uint32_t w1, uint32_t w2)
+{
+    urtc_bl_node_init_prog(n, w0, w1, w2, 0u);
 }
 
 static inline void urtc_bl_node_lapse(urtc_bl_node_t *n, uint32_t now_ms, int update_busy)

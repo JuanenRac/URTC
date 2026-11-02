@@ -35,6 +35,10 @@ typedef enum {
     URTC_AUTH_HMAC_ONLY = 2       // today's behaviour
 } urtc_auth_policy_t;
 
+// What a bootloader ships with and what a zeroed or unset setting means. The first bootloader of the transition ships with this strict value too (an explicit
+// URTC_AUTH_EITHER or URTC_AUTH_HMAC_ONLY is a deliberate choice); the value is 0 so that a zeroed structure fails closed.
+#define URTC_AUTH_DEFAULT_POLICY URTC_AUTH_ED25519_ONLY
+
 typedef enum {
     URTC_AUTH_OK = 0,
     URTC_AUTH_BAD_ARGS,

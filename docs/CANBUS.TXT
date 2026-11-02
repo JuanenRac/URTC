@@ -1497,7 +1497,8 @@ Data:
   - txData[0]: Bootloader version major (uint8_t)
   - txData[1]: Bootloader version minor (uint8_t)
   - txData[2]: Bootloader version patch (uint8_t)
-Notes: this is bootloader_common.h's own version (BOOTLOADER_VERSION_MAJOR/MINOR/
+Notes: always exactly 3 bytes (a longer frame is not a bootloader version; the
+       fingerprint of the signing key travels on 0x7ED). This is bootloader_common.h's own version (BOOTLOADER_VERSION_MAJOR/MINOR/
        PATCH in the source) - a separate thing from 0x7F9's Firmware
        version major/minor, which describes the installed APPLICATION,
        not the bootloader itself. The application never sends this frame -
@@ -1532,6 +1533,62 @@ Notes: 0x7F9 and 0x7FA are unchanged - 0x7F9 already uses all 8 bytes of a
        the legacy two-component version and the legacy 0x7F4 / 0x214 payload.
        The application's own major.minor.patch is therefore
        (0x7F9 major, 0x7F9 minor, 0x7E9 txData[1]).
+
+ID: 0x7EA [Master -> URTC Tool Head, bootloader only]
+Address one bootloader by its serial number (designed and tested on the host; no bootloader sends or obeys it yet)
+DLC: 6, 6, 1 or 2 bytes, by the operation in txData[0]
+Data:
+  - 01 PROBE   (DLC 6): nbits (0..32), prefix (4 bytes, big-endian). Every
+               bootloader whose serial starts with the first nbits bits of
+               the prefix answers on 0x7EB with the SAME two bytes, so
+               simultaneous answers merge on the bus.
+  - 02 SELECT  (DLC 6): serial (4 bytes), seq. The bootloader with that
+               serial becomes the selected one and answers; the others are
+               deselected.
+  - 03 RELEASE (DLC 1): nobody stays selected.
+  - 04 UID     (DLC 2): part (0..2). The selected bootloader answers with
+               one 32-bit word of its 96-bit unique ID.
+Notes: the serial is the 32-bit fold of the unique ID (w0 ^ rotl(w1, 11) ^
+       rotl(w2, 22)) or, when the metadata holds a valid programmable
+       serial record, that serial, which takes priority. 0 and 0xFFFFFFFF
+       are not serials and such a bootloader takes no part. A frame with an
+       unknown operation or the wrong length is ignored. A bootloader that
+       hears a valid frame here is in addressed mode and obeys 0x7F0 to
+       0x7FF only while selected; with nobody addressing it, it behaves as
+       before. Selection lapses 2 s after the last SELECT and addressed
+       mode 10 s after the last frame (neither while an update runs).
+
+ID: 0x7EB [URTC Tool Head -> Master, bootloader only]
+Answer to the addressing of a bootloader
+DLC: 2 or 6 bytes
+Data:
+  - 01 A5 (DLC 2): answer to PROBE, identical for every matching bootloader.
+  - 02 serial(4) seq (DLC 6): echo of the selection.
+  - 04 part word(4) (DLC 6): one word of the unique ID, big-endian. Two
+    heads that share the selected serial answer with different words; the
+    host then refuses to update.
+Notes: never sent unasked.
+
+ID: 0x7EC [Master -> URTC Tool Head, selected (or only) bootloader]
+One chunk of the Ed25519 signature record
+DLC: 8 bytes
+Data:
+  - txData[0]: index of the chunk (0..10)
+  - txData[1..7]: seven bytes of the record (the last chunk is padded with
+                  zeros)
+Notes: the record is key id (8) + rollback counter (4, big-endian) +
+       signature (64) = 76 bytes, sent after 0x7F1 next to the HMAC chunks.
+
+ID: 0x7ED [URTC Tool Head -> Master, bootloader only, right after its answer to 0x7F8]
+Identifier of the signing key a bootloader trusts
+DLC: 8 bytes
+Data:
+  - txData[0..7]: the first 8 bytes of the SHA-512 of the trusted public key
+Notes: sent only by a bootloader that holds a trusted Ed25519 key. A
+       classic CAN frame carries 8 data bytes at most, so this identifier
+       is where the fingerprint travels and 0x7FA stays at 3 bytes. A host
+       that gets no 0x7ED (an older bootloader, or one without a key) has
+       no data to compare: that is never a difference and never an error.
 
 ID: 0x7FB [Master -> URTC Tool Head, handled by BOTH the application AND
 the bootloader, whichever is currently running]
@@ -1864,18 +1921,18 @@ GENERATED REFERENCE (from the specification in URTC-COMMON)
 
 A. Summary
 
-[[ BEGIN GENERATED summary sha256=22f3b39b05c5e162556e069bc5a6d0dd01766d8a3287fd5e906ba4815037ba2d ]]
+[[ BEGIN GENERATED summary sha256=b1e0cf42ba0cc5e3190ef14801c6cbc1d41df17343509179282124439ea851cb ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 URTC CAN protocol: protocol version 1, byte order big.
-96 identifiers, 25 tool profiles, 20 enumerations, 37 constants, 4 magic payloads, 23 registers of the expansion slave.
+100 identifiers, 25 tool profiles, 20 enumerations, 37 constants, 4 magic payloads, 23 registers of the expansion slave.
 
 Machine-readable specification of the CAN bus protocol of the URTC tool head: every identifier with its direction, length rule and payload layout, the magic payloads, the registers of the expansion slave, the version procedures and the SLCAN subset the host tools rely on. All multi-byte fields are big-endian.
 [[ END GENERATED summary ]]
 
 B. Index of identifiers
 
-[[ BEGIN GENERATED index sha256=fb505b9a976922bcb0e7c84a1de6ec8f168c274bcc9b6fb5baaf20b43e8653b6 ]]
+[[ BEGIN GENERATED index sha256=2c690756c34f7b3029ce3478373f39f20922f85a0283486e98c31e63dda81b6f ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 | ID | Name | Direction | DLC | Tools | Group | Title |
@@ -1960,6 +2017,10 @@ Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_do
 | 0x254 | THERMAL_CAL_CHUNK_REQ | host to board | 1 | 22 | thermal | Request a calibrated temperature chunk |
 | 0x255 | THERMAL_CAL_CHUNK | board to host | 8 | 22 | thermal | Calibrated temperature chunk data |
 | 0x7E9 | VERSION_PATCH_RESPONSE | board to host | 3-8 | any | bootloader | Version patch response |
+| 0x7EA | BOOTLOADER_SELECT | host to board | 6 6 1 2 | any | bootloader | Address one bootloader by its serial number |
+| 0x7EB | BOOTLOADER_SELECT_RESPONSE | board to host | 2 6 6 | any | bootloader | Answer to the addressing of a bootloader |
+| 0x7EC | BOOTLOADER_SIGNATURE_CHUNK | host to board | 8 | any | bootloader | One chunk of the Ed25519 signature record |
+| 0x7ED | BOOTLOADER_KEY_ID | board to host | 8 | any | bootloader | Identifier of the signing key a bootloader trusts |
 | 0x7F0 | ENTER_BOOTLOADER | host to board | 4 | any | bootloader | Enter the bootloader |
 | 0x7F1 | START_UPDATE | host to board | 8 | any | bootloader | Start the firmware update |
 | 0x7F2 | DATA | host to board | 1-8 | any | bootloader | Firmware data |
@@ -1980,7 +2041,7 @@ Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_do
 
 C. Field layouts and examples
 
-[[ BEGIN GENERATED layouts sha256=3e86fb7a69fa96b8f656657f89fea02b289dbb6cecc8d82deb9d09e2075fe691 ]]
+[[ BEGIN GENERATED layouts sha256=ca0defe6bf7cc2b610109b51241553321f23b4d3241cc206e69082cc54f18b6e ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 ### 0x095 IMPACT_EVENT - Impact register (touch probe, maximum priority)
@@ -3220,6 +3281,116 @@ Example bootloader patch 7 accepting the end-update patch: data 010701 (responde
 
 Note: TX-only; nothing on the board listens for it. A board that predates it never sends it: a host that gets 0x7F9 and no 0x7E9 within the grace window treats the patch as unknown.
 
+### 0x7EA BOOTLOADER_SELECT - Address one bootloader by its serial number
+
+host to board; handled by the bootloader; tools: any.
+
+request (probe), DLC 6: Every bootloader whose serial starts with those bits answers 0x7EB with the same two bytes.
+
+| Byte | Width | Type | Field | Values | Note |
+|---|---|---|---|---|---|
+| 0 | 1 | bytes | operation | fixed 01 |  |
+| 1 | 1 | u8 | nbits | 0..32 | How many of the most significant bits of the prefix are compared. |
+| 2 | 4 | u32 | prefix |  |  |
+
+Example ask whether anyone is there: data 010000000000 (operation=01, nbits=0, prefix=0)
+
+request (select), DLC 6: The bootloader with that serial becomes the selected one and answers; the others are deselected.
+
+| Byte | Width | Type | Field | Values | Note |
+|---|---|---|---|---|---|
+| 0 | 1 | bytes | operation | fixed 02 |  |
+| 1 | 4 | u32 | serial |  |  |
+| 5 | 1 | u8 | seq |  |  |
+
+Example select serial 0x01020304: data 020102030407 (operation=02, serial=16909060, seq=7)
+
+request (release), DLC 1: Nobody stays selected.
+
+| Byte | Width | Type | Field | Values | Note |
+|---|---|---|---|---|---|
+| 0 | 1 | bytes | operation | fixed 03 |  |
+
+Example release: data 03 (operation=03)
+
+request (uid), DLC 2: The selected bootloader answers with one word of its 96-bit unique ID; two heads with one serial give different words.
+
+| Byte | Width | Type | Field | Values | Note |
+|---|---|---|---|---|---|
+| 0 | 1 | bytes | operation | fixed 04 |  |
+| 1 | 1 | u8 | part | 0..2 |  |
+
+Example word 1 of the unique ID: data 0401 (operation=04, part=1)
+
+Note: Part of the design of the bootloader identity and image authentication. A frame with an unknown operation or the wrong length is ignored.
+Note: A bootloader that hears any valid frame here is in addressed mode and obeys 0x7F0 to 0x7FF only while it is selected; with nobody addressing it, it behaves as before.
+Note: The serial is the 32-bit fold of the 96-bit unique ID, or the programmable serial of the metadata when there is one (it takes priority). 0 and 0xFFFFFFFF are not serials.
+
+### 0x7EB BOOTLOADER_SELECT_RESPONSE - Answer to the addressing of a bootloader
+
+board to host; handled by the bootloader; tools: any.
+
+response (probe), DLC 2: Identical for every matching bootloader, so simultaneous answers merge on the bus.
+
+| Byte | Width | Type | Field | Values | Note |
+|---|---|---|---|---|---|
+| 0 | 1 | bytes | operation | fixed 01 |  |
+| 1 | 1 | bytes | mark | fixed A5 |  |
+
+Example someone matches: data 01A5 (operation=01, mark=A5)
+
+response (select), DLC 6: Echo of the selection.
+
+| Byte | Width | Type | Field | Values | Note |
+|---|---|---|---|---|---|
+| 0 | 1 | bytes | operation | fixed 02 |  |
+| 1 | 4 | u32 | serial |  |  |
+| 5 | 1 | u8 | seq |  |  |
+
+Example selected: data 020102030407 (operation=02, serial=16909060, seq=7)
+
+response (uid), DLC 6: One word of the unique ID, big-endian.
+
+| Byte | Width | Type | Field | Values | Note |
+|---|---|---|---|---|---|
+| 0 | 1 | bytes | operation | fixed 04 |  |
+| 1 | 1 | u8 | part | 0..2 |  |
+| 2 | 4 | u32 | word |  |  |
+
+Example word 0: data 040011111111 (operation=04, part=0, word=286331153)
+
+Note: Answers only what 0x7EA asked; never sent unasked.
+
+### 0x7EC BOOTLOADER_SIGNATURE_CHUNK - One chunk of the Ed25519 signature record
+
+host to board; handled by the bootloader; tools: any.
+
+request, DLC 8: The record is key id (8) + counter (4) + signature (64) = 76 bytes in 11 frames; the last one is padded with zeros.
+
+| Byte | Width | Type | Field | Values | Note |
+|---|---|---|---|---|---|
+| 0 | 1 | u8 | index | 0..10 |  |
+| 1 | 7 | bytes | data |  |  |
+
+Example first chunk: data 0000000000000000 (index=0, data=00000000000000)
+
+Note: Sent to the selected (or only) bootloader after START_UPDATE, next to the HMAC chunks. The record is described in the design of the bootloader authentication.
+
+### 0x7ED BOOTLOADER_KEY_ID - Identifier of the signing key a bootloader trusts
+
+board to host; handled by the bootloader; tools: any.
+
+response, DLC 8: Eight bytes: a classic CAN frame carries no more, which is why this is not part of 0x7FA.
+
+| Byte | Width | Type | Field | Values | Note |
+|---|---|---|---|---|---|
+| 0 | 8 | bytes | key_id |  | The first 8 bytes of the SHA-512 of the trusted public key. |
+
+Example a key identifier: data 0102030405060708 (key_id=0102030405060708)
+
+Note: Sent by a bootloader that holds a trusted Ed25519 key, right after its answer to 0x7F8. A bootloader without the frame (older, or without a key) sends nothing: tools read that as 'no data', never as a difference.
+Note: With several heads, only the selected one answers 0x7F8 and therefore only its key identifier arrives.
+
 ### 0x7F0 ENTER_BOOTLOADER - Enter the bootloader
 
 host to board; handled by the application; tools: any; answered even while a critical error is declared; needs the magic payload enter_bootloader; the firmware accepts DLC 4.
@@ -3345,7 +3516,7 @@ request, DLC any: The payload is ignored.
 
 Example empty query: data (empty)
 
-Note: Answered by whichever side is running: 0x7F9, then 0x7FA (bootloader only), then 0x7E9 (boards that know their patch).
+Note: Answered by whichever side is running: 0x7F9, then 0x7FA (bootloader only), then 0x7E9 (boards that know their patch), then 0x7ED (a bootloader with a trusted signing key).
 
 ### 0x7F9 VERSION_RESPONSE - Version response
 
@@ -3378,7 +3549,7 @@ response, DLC 3
 
 Example 0.3.9: data 000309 (major=0, minor=3, patch=9)
 
-Note: Sent only by the bootloader, alongside 0x7F9. Released flashers read it only at exactly DLC 3.
+Note: Sent only by the bootloader, alongside 0x7F9, always at exactly 3 bytes (major, minor, patch). The fingerprint of the trusted signing key does not travel here: eleven bytes cannot exist on a classic CAN frame (8 data bytes at most); it is 0x7ED. Released flashers read this frame only at exactly DLC 3.
 
 ### 0x7FB QUERY_ERROR_COUNTERS - Query the CAN error counters
 
@@ -3797,7 +3968,7 @@ slave_application: Registers of the expansion slave application (I2C link bus, a
 
 I. Procedures
 
-[[ BEGIN GENERATED procedures sha256=0052c9b6327cf6e3efd4c4fa5c53ce5c05c4a91895d6b87f121636cbbe8caf25 ]]
+[[ BEGIN GENERATED procedures sha256=96f0c0cdfdaa253ce5a1eab13c06a31477c1a677e5499f63cd9210d267ebe501 ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 version_query: Version query
@@ -3806,6 +3977,7 @@ request 0x7F8 data 00
 answer 0x7F9 (required) from application, bootloader
 answer 0x7FA (optional) from bootloader
 answer 0x7E9 (optional) from application, bootloader, within 300 ms
+answer 0x7ED (optional) from bootloader
 Application major.minor.patch is (0x7F9 major, 0x7F9 minor, 0x7E9 patch). Without 0x7E9 within the grace window the patch is unknown and the legacy two-component form is used.
 
 minor_field: Minor field of the end-of-update frame

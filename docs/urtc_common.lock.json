@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "urtc_common_version": "0.0.8",
+  "urtc_common_version": "0.1.7",
   "files": {
     "COMPATIBILITY.md": {
       "from": "docs/COMPATIBILITY.md",

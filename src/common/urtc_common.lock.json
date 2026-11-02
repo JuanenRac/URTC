@@ -4,15 +4,15 @@
   "files": {
     "urtc_auth.h": {
       "from": "firmware_base/urtc_auth.h",
-      "sha256": "2e929205d78a9c4c6a1a9edc8f775629fc88555a6f38df9f7ddb43b9443ba067"
+      "sha256": "bb44a7cee02c16fdd737928c69292017c5bf7e5b13be89c18b3e37cb84e38a71"
     },
     "urtc_bl_select.h": {
       "from": "firmware_base/urtc_bl_select.h",
-      "sha256": "af735846dd29e22a9fd6d385ea2c189f7d6f1b60c5ef75f067be1a38ae714f65"
+      "sha256": "e58c6e5d9f67a5f3828ec9e5baaae7c49c11d2fd5bb6d9ea8909fdacb11ca046"
     },
     "urtc_can_ids.h": {
       "from": "generated/urtc_can_ids.h",
-      "sha256": "d653a4813e3f8fc10b02cc7583df7fbefa6ec9237f925424313f23b9803eb50d"
+      "sha256": "37580984d2749f60c3cd70c084b0551d464da633333f36dc932fccf40e5f7227"
     },
     "urtc_ed25519.c": {
       "from": "firmware_base/urtc_ed25519.c",

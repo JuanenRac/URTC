@@ -8,7 +8,7 @@
     },
     "bootloader_select_vectors.h": {
       "from": "generated/bootloader_select_vectors.h",
-      "sha256": "19cf99f96a0bc35762515f20dd23fb96ab9c668e6f89a84f18a681818054b458"
+      "sha256": "fab22d55ce38d84b7d86f7bc9a3343a05836e9c1053df2d3899f81d6b5e82089"
     },
     "ed25519_vectors.h": {
       "from": "generated/ed25519_vectors.h",
@@ -24,11 +24,11 @@
     },
     "test_bootloader_auth.c": {
       "from": "tests/c/test_bootloader_auth.c",
-      "sha256": "2aef91647c20d47d32aed07d51f6d16247521480a51a11888ad5eeccc66c4b70"
+      "sha256": "a5046d8b61b76a27418d7bd48634c8ce6b632c183ad03cab0893165eb137cee8"
     },
     "urtc_fw_vectors.h": {
       "from": "generated/urtc_fw_vectors.h",
-      "sha256": "eb0f0651904541bde601488d2a31b2c73967e90e60af80bd6d5a641759810446"
+      "sha256": "4be234fd1392e2e5c8a0c421a71876829eb587e612dc622573390fc02c26b3df"
     },
     "urtc_test.h": {
       "from": "firmware_base/urtc_test.h",
