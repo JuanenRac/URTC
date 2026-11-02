@@ -74,6 +74,18 @@
    "sanitize": false
   },
   {
+   "name": "bootloader_auth",
+   "test": "tests/test_bootloader_auth.c",
+   "sources": [
+    "src/common/urtc_ed25519.c"
+   ],
+   "includes": [
+    "tests/vectors",
+    "src/common"
+   ],
+   "std": "c11"
+  },
+  {
    "name": "bootloader_crypto",
    "test": "tests/test_bootloader_crypto.c",
    "sources": [

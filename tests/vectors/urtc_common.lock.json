@@ -1,14 +1,30 @@
 {
   "format": 1,
-  "urtc_common_version": "0.0.7",
+  "urtc_common_version": "0.1.7",
   "files": {
     "blackbox_vectors.h": {
       "from": "generated/blackbox_vectors.h",
       "sha256": "efd5441c3ec973284a86eb48d867eeb9103a0342ab83e9a82e60df3687cb00ec"
     },
+    "bootloader_select_vectors.h": {
+      "from": "generated/bootloader_select_vectors.h",
+      "sha256": "19cf99f96a0bc35762515f20dd23fb96ab9c668e6f89a84f18a681818054b458"
+    },
+    "ed25519_vectors.h": {
+      "from": "generated/ed25519_vectors.h",
+      "sha256": "59450f928dc5b0d6d337b446c541b529193e535d86861a34ce7d5eadeb1c4892"
+    },
     "multinode_scenarios.h": {
       "from": "generated/multinode_scenarios.h",
       "sha256": "342bef555390e3476e6cba2edcdcb5c50b3db52a25d095c330334f9b2f061df8"
+    },
+    "signed_image_vectors.h": {
+      "from": "generated/signed_image_vectors.h",
+      "sha256": "6798cd113b94c1c228793a267b4395e864e81cfa5d07b963ad4f8293b876138a"
+    },
+    "test_bootloader_auth.c": {
+      "from": "tests/c/test_bootloader_auth.c",
+      "sha256": "2aef91647c20d47d32aed07d51f6d16247521480a51a11888ad5eeccc66c4b70"
     },
     "urtc_fw_vectors.h": {
       "from": "generated/urtc_fw_vectors.h",

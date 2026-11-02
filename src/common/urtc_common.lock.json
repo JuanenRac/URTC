@@ -1,10 +1,26 @@
 {
   "format": 1,
-  "urtc_common_version": "0.1.1",
+  "urtc_common_version": "0.1.7",
   "files": {
+    "urtc_auth.h": {
+      "from": "firmware_base/urtc_auth.h",
+      "sha256": "2e929205d78a9c4c6a1a9edc8f775629fc88555a6f38df9f7ddb43b9443ba067"
+    },
+    "urtc_bl_select.h": {
+      "from": "firmware_base/urtc_bl_select.h",
+      "sha256": "af735846dd29e22a9fd6d385ea2c189f7d6f1b60c5ef75f067be1a38ae714f65"
+    },
     "urtc_can_ids.h": {
       "from": "generated/urtc_can_ids.h",
       "sha256": "d653a4813e3f8fc10b02cc7583df7fbefa6ec9237f925424313f23b9803eb50d"
+    },
+    "urtc_ed25519.c": {
+      "from": "firmware_base/urtc_ed25519.c",
+      "sha256": "2bc1241bf7625ed30e653e4f1fe8cff8a3972e6699d77b7d30e14f57e57ebcb0"
+    },
+    "urtc_ed25519.h": {
+      "from": "firmware_base/urtc_ed25519.h",
+      "sha256": "2aab47618c2e67407dfc27a246668263711e457da36a7d34653a445dd29a5529"
     }
   }
 }

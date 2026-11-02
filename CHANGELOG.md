@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented here.
 
+## [Unreleased]
+
+- **A host suite for the Ed25519 verification and the addressing by serial number of the bootloaders:** `src/common/urtc_ed25519.c`, `urtc_auth.h` and `urtc_bl_select.h` (copies of the shared parts, checked by the lock file) are held to RFC 8032, to the shared vectors of the decision to install a signed image and to the shared scenarios of one bootloader answering the serial-number frames, in the new `bootloader_auth` suite. Nothing is built for the board and no bootloader calls these parts yet.
+
 ## [0.4.4] - Quality checks of the C sources, the flash layout written once, the data of both build scripts from one file, the constants of both bootloaders held to the specification and the twin of the bootloader for host tests
 
 - **Quality checks of the C sources that the compiler of the board does not make:** `tools/c_quality.py` runs the host compiler with `-Wconversion` over every source the host suites build (a budget of zero warnings), cppcheck over the firmware folders (warnings, performance and portability findings, with the one judged finding suppressed and its reason written next to it) and a limit on the number of long comment blocks; what is left out (the vendored sensor drivers, held byte for byte by `check_shared_drivers.py`), the flags and the limits are in `tools/c_quality.json`. `build_firmware.sh` and `build_firmware.bat` run it after the host suites (a missing cppcheck is a warning on a developer machine and a failure when `URTC_CI=1`) and the CI installs cppcheck. Making the sources clean needed explicit casts at about forty places (the PWM scalings, the page arithmetic of the bootloaders, the rendering of numbers, the CAN length bytes); none changes a value, but the bootloader and application sources changed, so the next build of the images takes them. The fake HAL of the host tests now defines the size of a flash page the way the real one does.
