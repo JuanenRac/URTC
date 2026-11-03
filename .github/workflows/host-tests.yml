@@ -1,0 +1,44 @@
+# =============================================================================
+# URTC - host logic tests (manual)
+# Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
+# GPL-3.0-or-later - see LICENSE
+# =============================================================================
+# Started by hand only. It compiles and runs the C host suites of tools/run_host_tests.py (the firmware logic against a fake HAL) on a build machine, so a
+# workstation does not have to. It holds no secret and changes nothing.
+name: Host logic tests (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      only:
+        description: "Run only this suite (empty: all)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  host-tests:
+    name: Compile and run the host suites
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+      - name: Run the host suites
+        env:
+          ONLY: ${{ inputs.only }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes gcc cppcheck
+          if [ -n "$ONLY" ]; then
+            python tools/run_host_tests.py --runner direct --no-analyze --only "$ONLY"
+          else
+            python tools/run_host_tests.py --runner direct --no-analyze
+          fi
