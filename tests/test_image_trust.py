@@ -33,6 +33,27 @@ class TrustFileTests(unittest.TestCase):
             with self.assertRaises(trust.TrustFileError):
                 trust.table_bytes(DOC, "release")
 
+    def test_a_release_without_a_key_holds_the_closed_table_and_never_the_development_key(self):
+        closed = trust.closed_table()
+        self.assertEqual(closed[:8], bytes([0x54, 0x4B, 0x45, 0x59, 1, 0, 0, 0]))      # "TKEY", schema 1, no keys, no flags
+        self.assertEqual(len(closed), 12)
+        release = DOC["flavours"]["release"]["keys"]
+        dev_public = DOC["flavours"]["dev"]["keys"][0]["public"]
+        self.assertNotIn(dev_public, [e["public"] for e in release])
+        if not release:
+            self.assertEqual(trust.bootloader_table(DOC, "release"), closed)
+            offset = int(DOC["targets"]["master"]["table_offset"], 16)
+            self.assertIsNone(trust.check_binary(DOC, bytes(offset) + closed + bytes(50), "master", "release"))
+            self.assertIsNotNone(trust.check_binary(DOC, bytes(offset) + trust.table_bytes(DOC, "dev"), "master", "release"))
+
+    def test_the_generated_headers_of_the_bootloader_match_the_public_file(self):
+        for flavour in ("dev", "release"):
+            path = trust.header_path("master", flavour)
+            self.assertEqual(path.read_bytes().decode("utf-8").splitlines(), trust.header_text(DOC, flavour).splitlines(), path.name)
+        text = trust.header_text(DOC, "dev")
+        self.assertIn(f"URTC_TRUST_TABLE_SIZE {len(trust.table_bytes(DOC, 'dev'))}u", text)
+        self.assertIn(f"URTC_TRUST_MIN_COUNTER {DOC['min_counter']}UL", text)
+
     def test_a_wrong_key_id_or_a_weaker_default_policy_is_refused(self):
         bad = copy.deepcopy(DOC)
         bad["flavours"]["dev"]["keys"][0]["key_id"] = "00" * 8
