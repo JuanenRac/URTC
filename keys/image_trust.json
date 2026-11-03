@@ -5,19 +5,40 @@
   "default_policy": "ed25519_only",
   "min_counter": 0,
   "targets": {
-    "master": {"table_offset": "0x200", "bootloader": "src/F303-master/boot"},
-    "slave": {"table_offset": "0x200", "bootloader": "src/F303-slave/boot"}
+    "master": {
+      "table_offset": "0x200",
+      "bootloader": "src/F303-master/boot"
+    },
+    "slave": {
+      "table_offset": "0x200",
+      "bootloader": "src/F303-slave/boot"
+    }
   },
   "flavours": {
     "dev": {
       "about": "Bench builds. The seed of this key is public (urtc_common.image_sig.DEV_SEED): a bootloader with this table is never an official one.",
       "keys": [
-        {"state": "current", "public": "81f29be04dfa58f37458e6182a027d83f12330265d61bd6bfcedb2ba8833b80c", "key_id": "fe58bb1362df0ea6"}
+        {
+          "state": "current",
+          "public": "81f29be04dfa58f37458e6182a027d83f12330265d61bd6bfcedb2ba8833b80c",
+          "key_id": "fe58bb1362df0ea6"
+        }
       ]
     },
     "release": {
-      "about": "Official builds. Empty until the maintainer provisions the image-signing key (the private half stays outside every repository; add its public half here as current and a second one as next). A release table with no current key cannot be built.",
-      "keys": []
+      "about": "Official builds. The image-signing key (current) and the reserved next key; the private halves stay outside every repository.",
+      "keys": [
+        {
+          "state": "current",
+          "public": "80344f1a557fac5d2426c633342d17ddafd6b2a8bfd35efbe0e7a7acfdcce5f5",
+          "key_id": "97c7dc7915767823"
+        },
+        {
+          "state": "next",
+          "public": "ac856598a0ac8e45c5f3c66c597c83ccb6a9c0424a434222de14e59cd27c367b",
+          "key_id": "1901dcd29e353430"
+        }
+      ]
     }
   }
 }
