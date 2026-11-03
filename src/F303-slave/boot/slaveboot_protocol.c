@@ -23,6 +23,7 @@
 #include "slaveboot_crypto.h"
 #include "slaveboot_flash.h"
 #include "urtc_version_wire.h"
+#include "urtc_slave_confirm.h"
 
 // Defined here, read by the I2C1 interrupt handler's REG_STATUS read path.
 volatile uint8_t current_status = STATUS_LISTENING;
@@ -98,7 +99,7 @@ uint8_t ApplicationIsValid(void) {
         uint32_t crc = 0xFFFFFFFFUL;
         crc = CRC32_Update(crc, (const uint8_t*)MAIN_APP_ADDR, APP_MAX_SIZE);
         adopted.crc32 = CRC32_Finalize(crc);
-        hmac_sha256_flash_region(HMAC_KEY, 32, MAIN_APP_ADDR, APP_MAX_SIZE, adopted.hmac);
+        sha256_flash_region(MAIN_APP_ADDR, APP_MAX_SIZE, adopted.hmac);
         return Metadata_EraseAndWrite(&adopted) ? 1 : 0;
     }
 
@@ -115,6 +116,10 @@ uint8_t ApplicationIsValid(void) {
     if (meta.size == 0 || meta.size > APP_MAX_SIZE) return 0;
 
     if (meta.state == META_STATE_COPY_PENDING) {
+        // The backup slot must still hold the image that was verified and confirmed before the cut: if it does not, the main slot is left alone.
+        uint8_t backup_digest[32];
+        sha256_flash_region(BACKUP_APP_ADDR, meta.size, backup_digest);
+        if (!hmac_constant_time_compare(backup_digest, meta.hmac, 32)) return 0;
         current_status = STATUS_COPYING;
         if (!Flash_CopyRegion(MAIN_APP_ADDR, BACKUP_APP_ADDR, meta.size)) {
             return 0;
@@ -130,9 +135,10 @@ uint8_t ApplicationIsValid(void) {
     crc = CRC32_Finalize(crc);
     if (crc != meta.crc32) return 0;
 
-    uint8_t actual_hmac[32];
-    hmac_sha256_flash_region(HMAC_KEY, 32, MAIN_APP_ADDR, meta.size, actual_hmac);
-    if (!hmac_constant_time_compare(actual_hmac, meta.hmac, 32)) return 0;
+    // At every boot only corruption of the flash has to be caught: a SHA-256 with no key, kept in the metadata.
+    uint8_t actual_digest[32];
+    sha256_flash_region(MAIN_APP_ADDR, meta.size, actual_digest);
+    if (!hmac_constant_time_compare(actual_digest, meta.hmac, 32)) return 0;
 
     return 1;
 }
@@ -190,8 +196,18 @@ uint32_t update_total_size = 0;
 static uint32_t update_declared_hw_id = 0;
 uint32_t update_bytes_received = 0;
 static uint32_t update_running_crc = 0xFFFFFFFFUL;
-static uint8_t  update_expected_hmac[32];
+static uint8_t  update_expected_hmac[32];   // the expected SHA-256 of the image (the name is historic)
 static uint8_t  update_hmac_received = 0;
+// The confirmation by the master (urtc_slave_confirm.h). The nonce is made at START and read by the master from REG_CHALLENGE; what was verified at END is
+// kept here until the confirmation arrives. All of it is cleared by a new START, by a failure and by the first REG_CONFIRM of the session.
+static uint8_t  update_nonce[URTC_SLAVE_CONFIRM_NONCE_SIZE];
+static uint8_t  update_nonce_valid = 0;
+static uint32_t update_session_counter = 0;
+uint8_t  update_awaiting_confirm = 0;
+static uint8_t  await_digest[32];
+static uint16_t await_version_major = 0;
+static uint16_t await_version_minor = 0;
+static uint32_t await_crc = 0;
 static uint8_t  page_buffer[FLASH_PAGE_SIZE];
 static uint32_t page_buffer_fill = 0;
 static uint32_t current_page_index = 0;
@@ -213,6 +229,33 @@ static uint8_t FlushPageBuffer(void) {
             (uint8_t)(((uint64_t)update_bytes_received * 100) / update_total_size) : 0;
     }
     return ok;
+}
+
+static void put32(uint8_t *p, uint32_t v) {
+    p[0] = (uint8_t)(v >> 24); p[1] = (uint8_t)(v >> 16); p[2] = (uint8_t)(v >> 8); p[3] = (uint8_t)v;
+}
+
+// A fresh nonce for every session: the hash of the unique id of the chip, the tick, a counter that only grows while the chip stays powered, the SysTick
+// value and the previous nonce. It is a FRESHNESS value, not a secret and not a random number: the chip has no random source, and the master reads it
+// from REG_CHALLENGE on the same bus. It makes a confirmation recorded in one session useless in the next one (a new START changes it).
+static void MakeChallenge(void) {
+    uint8_t seed[12 + 4 + 4 + 4 + URTC_SLAVE_CONFIRM_NONCE_SIZE];
+    uint8_t hash[32];
+    put32(seed, HAL_GetUIDw0());
+    put32(seed + 4, HAL_GetUIDw1());
+    put32(seed + 8, HAL_GetUIDw2());
+    put32(seed + 12, HAL_GetTick());
+    put32(seed + 16, ++update_session_counter);
+    put32(seed + 20, SysTick->VAL);
+    memcpy(seed + 24, update_nonce, URTC_SLAVE_CONFIRM_NONCE_SIZE);
+    sha256_buffer(seed, sizeof seed, hash);
+    memcpy(update_nonce, hash, URTC_SLAVE_CONFIRM_NONCE_SIZE);
+    update_nonce_valid = 1;
+}
+
+void BuildChallengeResponse(uint8_t out[16]) {
+    if (update_nonce_valid) memcpy(out, update_nonce, URTC_SLAVE_CONFIRM_NONCE_SIZE);
+    else memset(out, 0, URTC_SLAVE_CONFIRM_NONCE_SIZE);
 }
 
 void HandleStartUpdate(uint8_t *data) {
@@ -257,6 +300,8 @@ void HandleStartUpdate(uint8_t *data) {
     update_bytes_received = 0;
     update_running_crc = 0xFFFFFFFFUL;
     update_hmac_received = 0;
+    update_awaiting_confirm = 0;
+    MakeChallenge();
     page_buffer_fill = 0;
     current_page_index = 0;
     update_in_progress = 1;
@@ -267,14 +312,14 @@ void HandleStartUpdate(uint8_t *data) {
 }
 
 void HandleHmacExpected(uint8_t *data) {
-    if (!update_in_progress || update_failed) return;
+    if (!update_in_progress || update_failed || update_awaiting_confirm) return;
     memcpy(update_expected_hmac, data, 32); // REG_HMAC_EXPECTED is always exactly 32 bytes in one transaction - no chunking needed the way CAN's 8-byte frames required
     update_hmac_received = 1;
     update_last_activity_tick = HAL_GetTick();
 }
 
 void HandleData(uint8_t *data, uint32_t len) {
-    if (!update_in_progress || update_failed) return;
+    if (!update_in_progress || update_failed || update_awaiting_confirm) return;
     if (len > 32) return; // REG_DATA's own documented ceiling - guards against a malformed/oversized transaction the same way the main board's own DLC>8 check does for CAN
     update_last_activity_tick = HAL_GetTick();
 
@@ -298,7 +343,7 @@ void HandleData(uint8_t *data, uint32_t len) {
 }
 
 void HandleEndUpdate(uint8_t *data) {
-    if (!update_in_progress || update_failed) return;
+    if (!update_in_progress || update_failed || update_awaiting_confirm) return;
     update_last_activity_tick = HAL_GetTick();
 
     if (page_buffer_fill > 0) {
@@ -334,8 +379,10 @@ void HandleEndUpdate(uint8_t *data) {
         return;
     }
 
+    // Integrity of what arrived: the SHA-256 (no key) of the backup slot against the digest the master sent. WHO vouched for the image is the master's
+    // business: it verifies the Ed25519 record and confirms below (HandleConfirm).
     uint8_t actual_hmac[32];
-    hmac_sha256_flash_region(HMAC_KEY, 32, BACKUP_APP_ADDR, update_total_size, actual_hmac);
+    sha256_flash_region(BACKUP_APP_ADDR, update_total_size, actual_hmac);
     if (!hmac_constant_time_compare(actual_hmac, update_expected_hmac, 32)) {
         current_status = STATUS_VERIFY_FAIL;
         verify_fail_reason = VERIFY_FAIL_REASON_HMAC;
@@ -363,15 +410,65 @@ void HandleEndUpdate(uint8_t *data) {
         }
     }
 
+    // Everything the slave can check alone has passed. Nothing is written to the metadata and the main slot is not touched until the master confirms that
+    // it verified the signature record of THIS image in THIS session; without the confirmation the update fails closed (HandleConfirm, AbortUnconfirmed).
+    memcpy(await_digest, actual_hmac, 32);
+    await_version_major = version_major;
+    await_version_minor = version_minor;
+    await_crc = actual_crc;
+    update_awaiting_confirm = 1;
+    update_last_activity_tick = HAL_GetTick();
+    current_status = STATUS_AWAIT_CONFIRM;
+}
+
+static void FailUpdate(uint8_t reason) {
+    current_status = STATUS_VERIFY_FAIL;
+    verify_fail_reason = reason;
+    update_awaiting_confirm = 0;
+    update_nonce_valid = 0;
+    update_in_progress = 0;
+    update_failed = 1;
+}
+
+void AbortUnconfirmed(void) {
+    if (update_awaiting_confirm) FailUpdate(VERIFY_FAIL_REASON_NOT_CONFIRMED);
+}
+
+void HandleConfirm(uint8_t *data) {
+    if (!update_in_progress || update_failed || !update_awaiting_confirm) return;   // nothing asked for it: ignored
+    // One use: whatever this confirmation turns out to be, the session cannot be confirmed again.
+    update_awaiting_confirm = 0;
+    update_nonce_valid = 0;
+    update_last_activity_tick = HAL_GetTick();
+
+    // The backup slot must still hold what was verified at END: it is read again now, so an image altered after the checks (or after the master's
+    // confirmation was computed) is caught here, not trusted from the first pass.
+    uint8_t now_digest[32];
+    sha256_flash_region(BACKUP_APP_ADDR, update_total_size, now_digest);
+    if (!hmac_constant_time_compare(now_digest, await_digest, 32)) {
+        FailUpdate(VERIFY_FAIL_REASON_HMAC);
+        return;
+    }
+    // The tag the master must have computed: the nonce of this session, this image, this hardware, this version and this size, all taken from the slave's
+    // own state and not from the master.
+    uint8_t message[URTC_SLAVE_CONFIRM_MESSAGE_SIZE];
+    uint8_t expected_tag[URTC_SLAVE_CONFIRM_TAG_SIZE];
+    urtc_slave_confirm_message(message, update_nonce, now_digest, update_declared_hw_id, await_version_major, await_version_minor, update_total_size);
+    sha256_buffer(message, sizeof message, expected_tag);
+    if (!hmac_constant_time_compare(expected_tag, data, URTC_SLAVE_CONFIRM_TAG_SIZE)) {
+        FailUpdate(VERIFY_FAIL_REASON_NOT_CONFIRMED);
+        return;
+    }
+
     FirmwareMetadata_t pending = {0};
     pending.magic = METADATA_MAGIC_VALID;
     pending.state = META_STATE_COPY_PENDING;
     pending.hardware_id = update_declared_hw_id;
-    pending.version_major = version_major;
-    pending.version_minor = version_minor;
+    pending.version_major = await_version_major;
+    pending.version_minor = await_version_minor;
     pending.size = update_total_size;
-    pending.crc32 = actual_crc;
-    memcpy(pending.hmac, actual_hmac, 32);
+    pending.crc32 = await_crc;
+    memcpy(pending.hmac, await_digest, 32);
     if (!Metadata_EraseAndWrite(&pending)) {
         current_status = STATUS_ERROR;
         update_in_progress = 0;
@@ -386,6 +483,16 @@ void HandleEndUpdate(uint8_t *data) {
         // META_STATE_COPY_PENDING and backup is untouched - same recovery
         // path as the main board's own bootloader: next boot's
         // ApplicationIsValid() resumes the copy from backup.
+        current_status = STATUS_ERROR;
+        update_in_progress = 0;
+        update_failed = 1;
+        return;
+    }
+
+    // The copy is read back against the digest that was confirmed; a main slot that differs stays COPY_PENDING, so the next boot repeats the copy.
+    uint8_t main_digest[32];
+    sha256_flash_region(MAIN_APP_ADDR, update_total_size, main_digest);
+    if (!hmac_constant_time_compare(main_digest, await_digest, 32)) {
         current_status = STATUS_ERROR;
         update_in_progress = 0;
         update_failed = 1;

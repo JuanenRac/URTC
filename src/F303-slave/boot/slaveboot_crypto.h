@@ -17,6 +17,10 @@ void hmac_sha256_flash_region(const uint8_t *key, uint32_t key_len,
                               uint32_t flash_addr, uint32_t len,
                               uint8_t out[32]);
 
+// Plain SHA-256 (no key) of a buffer in RAM and of a region of flash; the slave bootloader checks the integrity of images with these.
+void sha256_buffer(const uint8_t *data, uint32_t len, uint8_t out[32]);
+void sha256_flash_region(uint32_t flash_addr, uint32_t len, uint8_t out[32]);
+
 // XOR-accumulate rather than an early-exit compare - an early exit
 // leaks how many leading bytes matched through timing, which matters
 // for a signature check even on a small embedded target listening on a

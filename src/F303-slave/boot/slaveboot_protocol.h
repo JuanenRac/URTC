@@ -45,6 +45,15 @@ void HandleStartUpdate(uint8_t *data);
 void HandleHmacExpected(uint8_t *data);
 void HandleData(uint8_t *data, uint32_t len);
 void HandleEndUpdate(uint8_t *data);
+// REG_CONFIRM, 32 bytes: the master's confirmation (urtc_slave_confirm.h). Only acted on while update_awaiting_confirm is set; it is used once whatever the
+// outcome, so a wrong tag fails the update at once.
+void HandleConfirm(uint8_t *data);
+// 1 between a verified END_UPDATE and the confirmation (or the failure). The main loop of slaveboot_main.c gives up on it after ten seconds with
+// AbortUnconfirmed(): fail closed, reason VERIFY_FAIL_REASON_NOT_CONFIRMED, main slot untouched.
+extern uint8_t update_awaiting_confirm;
+void AbortUnconfirmed(void);
+// REG_CHALLENGE: the 16-byte nonce of the session in progress, or zeros when there is none.
+void BuildChallengeResponse(uint8_t out[16]);
 
 // Called from the I2C1 slave event interrupt handler when the link-bus
 // master reads REG_QUERY_VERSION - fills out[10] with this bootloader's

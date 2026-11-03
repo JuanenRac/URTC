@@ -21,6 +21,7 @@
 #include "slaveboot_flash.h"
 #include "slaveboot_protocol.h"
 #include "test_runner.h"
+#include "urtc_slave_confirm.h"
 #include "urtc_version_wire.h"
 
 extern uint32_t update_total_size, update_bytes_received;  // the progress of the transfer, defined in slaveboot_protocol.c and not in its header
@@ -49,9 +50,29 @@ static void make_image(uint32_t size)
     for (uint32_t i = 0; i < size; i++) image[i] = (uint8_t)((i * 13 + 5) & 0xFF);
 }
 
+// The digest the master sends in REG_HMAC_EXPECTED (the name is historic): the SHA-256 of the image, no key.
 static void sign_image(uint32_t size, uint8_t hmac[32])
 {
-    hmac_sha256_flash_region(HMAC_KEY, 32, image_addr, size, hmac);
+    sha256_flash_region(image_addr, size, hmac);
+}
+
+// The confirmation the master sends in REG_CONFIRM, built the way the master builds it: from the nonce it reads in REG_CHALLENGE, the digest of the image
+// it verified and the values of the END frame. `flip` damages the tag; `digest_of` lets a test confirm another image than the one received.
+static void make_tag(uint32_t size, uint16_t vmaj, uint16_t vminfield, const uint8_t *digest_of, const uint8_t nonce[16], int flip, uint8_t tag[32])
+{
+    uint8_t digest[32], message[URTC_SLAVE_CONFIRM_MESSAGE_SIZE];
+    if (digest_of) memcpy(digest, digest_of, 32); else sha256_buffer(image, size, digest);
+    urtc_slave_confirm_message(message, nonce, digest, THIS_HARDWARE_ID, vmaj, vminfield, size);
+    sha256_buffer(message, sizeof message, tag);
+    if (flip) tag[0] ^= 0x01;
+}
+
+static void confirm_now(uint32_t size, uint16_t vmaj, uint16_t vminfield, int flip)
+{
+    uint8_t nonce[16], tag[32];
+    BuildChallengeResponse(nonce);
+    make_tag(size, vmaj, vminfield, 0, nonce, flip, tag);
+    HandleConfirm(tag);
 }
 
 static void put_be32(uint8_t *p, uint32_t v) { p[0] = (uint8_t)(v >> 24); p[1] = (uint8_t)(v >> 16); p[2] = (uint8_t)(v >> 8); p[3] = (uint8_t)v; }
@@ -113,6 +134,7 @@ static void fresh(void)
     fake_hal_reset_recording();
     update_in_progress = 0;
     update_failed = 0;
+    update_awaiting_confirm = 0;
     current_status = STATUS_LISTENING;
     verify_fail_reason = 0;
     update_progress_percent = 0xFF;
@@ -120,7 +142,7 @@ static void fresh(void)
     fake_tick_step = 0;
 }
 
-typedef struct { int bad_crc; int bad_hmac; int skip_hmac; uint32_t declared_hw; uint32_t size; uint16_t vmaj; uint16_t vmin; uint32_t piece; } Upd;
+typedef struct { int bad_crc; int bad_hmac; int skip_hmac; uint32_t declared_hw; uint32_t size; uint16_t vmaj; uint16_t vmin; uint32_t piece; int no_confirm; int bad_tag; } Upd;
 
 static void run_update(Upd u)
 {
@@ -134,6 +156,9 @@ static void run_update(Upd u)
     uint32_t crc = ref_crc32(image, u.size);
     if (u.bad_crc) crc ^= 1;
     end_update(crc, u.vmaj, u.vmin);
+    // The master confirms after END, unless the test is about the confirmation that does not come. A confirmation sent to an update that already failed
+    // is ignored, as the real master's would be.
+    if (!u.no_confirm) confirm_now(u.size, u.vmaj, u.vmin, u.bad_tag);
 }
 
 static Upd good(uint32_t size, uint16_t vmaj, uint16_t vmin)
@@ -220,6 +245,7 @@ int main(void)
         HandleData(f, n);
     }
     end_update(ref_crc32(image, 1000), 0, urtc_minor_field_pack(1, 0));
+    confirm_now(1000, 0, urtc_minor_field_pack(1, 0), 0);
     TEST_ASSERT(current_status == STATUS_VERIFY_OK && main_slot_equals_image(1000), "the transfer still completes after the rejected STARTs");
 
     // ---- frames outside a transfer / out of bounds -----------------------------------------------------------------------------------------
@@ -267,6 +293,90 @@ int main(void)
     { Upd u = good(1500, 0, urtc_minor_field_pack(2, 0)); u.bad_hmac = 1; run_update(u); }
     TEST_ASSERT(verify_fail_reason == VERIFY_FAIL_REASON_HMAC && main_slot_blank(), "wrong signature: reason 0x03, main slot blank");
     TEST_ASSERT(current_status == STATUS_VERIFY_FAIL && fake_reset_count == 0, "a bad signature never starts the copy or resets");
+
+    // ---- the master's confirmation: the slave installs nothing the master did not confirm -------------------------------------------------------
+    // (a) the confirmation is absent
+    fresh();
+    { Upd u = good(2000, 0, urtc_minor_field_pack(3, 0)); u.no_confirm = 1; run_update(u); }
+    TEST_ASSERT(current_status == STATUS_AWAIT_CONFIRM && update_awaiting_confirm && update_in_progress && !update_failed, "a verified image waits for the master's confirmation");
+    TEST_ASSERT(main_slot_blank() && !Metadata_Read(&meta) && fake_reset_count == 0, "while it waits the main slot and the metadata are untouched and the chip does not reset");
+    { uint8_t tmp[40] = {0}; uint32_t before_bytes = update_bytes_received; HandleData(tmp, 8); HandleHmacExpected(tmp); end_update(0, 0, 0); TEST_ASSERT(update_bytes_received == before_bytes && current_status == STATUS_AWAIT_CONFIRM && update_awaiting_confirm, "data, a new digest or a second END are ignored while it waits"); }
+    AbortUnconfirmed();   // what the main loop does after ten seconds of silence
+    TEST_ASSERT(current_status == STATUS_VERIFY_FAIL && verify_fail_reason == VERIFY_FAIL_REASON_NOT_CONFIRMED && update_failed && !update_in_progress, "no confirmation: the update fails closed with reason NOT_CONFIRMED");
+    confirm_now(2000, 0, urtc_minor_field_pack(3, 0), 0);
+    TEST_ASSERT(current_status == STATUS_VERIFY_FAIL && main_slot_blank() && !Metadata_Read(&meta) && fake_reset_count == 0, "a confirmation that arrives after the failure is ignored: the main slot stays blank");
+    TEST_ASSERT(ApplicationIsValid() == 0 && main_slot_blank(), "after a power cut while it waited, the next boot finds nothing to run and the main slot untouched");
+
+    // a confirmation nobody asked for is ignored
+    fresh();
+    { uint8_t tag[32]; memset(tag, 0x5A, sizeof tag); HandleConfirm(tag); }
+    TEST_ASSERT(current_status == STATUS_LISTENING && !update_failed && fake_reset_count == 0, "REG_CONFIRM outside the waiting state does nothing");
+
+    // (b) the tag is wrong, and the confirmation is used once
+    fresh();
+    { Upd u = good(2000, 0, urtc_minor_field_pack(3, 0)); u.bad_tag = 1; run_update(u); }
+    TEST_ASSERT(current_status == STATUS_VERIFY_FAIL && verify_fail_reason == VERIFY_FAIL_REASON_NOT_CONFIRMED && main_slot_blank() && fake_reset_count == 0, "a wrong tag fails the update at once: NOT_CONFIRMED, main slot blank");
+    confirm_now(2000, 0, urtc_minor_field_pack(3, 0), 0);
+    TEST_ASSERT(current_status == STATUS_VERIFY_FAIL && main_slot_blank() && fake_reset_count == 0, "the right tag sent after a wrong one does not revive the update");
+
+    // (c) replay: a confirmation recorded in one session does not work in the next one, for the very same image
+    fresh();
+    { Upd u = good(2000, 0, urtc_minor_field_pack(3, 0)); u.no_confirm = 1; run_update(u); }
+    uint8_t old_nonce[16], old_tag[32], new_nonce[16];
+    BuildChallengeResponse(old_nonce);
+    make_tag(2000, 0, urtc_minor_field_pack(3, 0), 0, old_nonce, 0, old_tag);
+    { Upd u = good(2000, 0, urtc_minor_field_pack(3, 0)); u.no_confirm = 1; run_update(u); }   // a new START: a new session over the same image
+    BuildChallengeResponse(new_nonce);
+    TEST_ASSERT(memcmp(old_nonce, new_nonce, 16) != 0, "every session has its own nonce");
+    HandleConfirm(old_tag);
+    TEST_ASSERT(current_status == STATUS_VERIFY_FAIL && verify_fail_reason == VERIFY_FAIL_REASON_NOT_CONFIRMED && main_slot_blank() && fake_reset_count == 0, "replaying the confirmation of an earlier session is refused");
+    { uint8_t zero[16] = {0}; BuildChallengeResponse(new_nonce); TEST_ASSERT(memcmp(new_nonce, zero, 16) == 0, "after the failure REG_CHALLENGE reads all zero"); }
+
+    // (d) the confirmation is for another image, another version or another size
+    fresh();
+    {
+        Upd u = good(2000, 0, urtc_minor_field_pack(3, 0)); u.no_confirm = 1; run_update(u);
+        uint8_t nonce[16], other[32], tag[32];
+        BuildChallengeResponse(nonce);
+        sha256_buffer(image, 2000, other);
+        other[5] ^= 0x10;   // the digest of an image that is not the one received
+        make_tag(2000, 0, urtc_minor_field_pack(3, 0), other, nonce, 0, tag);
+        HandleConfirm(tag);
+        TEST_ASSERT(verify_fail_reason == VERIFY_FAIL_REASON_NOT_CONFIRMED && main_slot_blank(), "a confirmation for another image is refused");
+    }
+    fresh();
+    { Upd u = good(2000, 0, urtc_minor_field_pack(3, 0)); u.no_confirm = 1; run_update(u); }
+    confirm_now(2000, 0, urtc_minor_field_pack(3, 1), 0);   // another version than the one in the END frame
+    TEST_ASSERT(verify_fail_reason == VERIFY_FAIL_REASON_NOT_CONFIRMED && main_slot_blank(), "a confirmation for another version is refused");
+
+    // (e) the image is altered after the checks and before (or after) the confirmation
+    fresh();
+    { Upd u = good(2000, 0, urtc_minor_field_pack(3, 0)); u.no_confirm = 1; run_update(u); }
+    { uint8_t zero2[2] = {0, 0}; Flash_WriteVerified(BACKUP_APP_ADDR + 0x100, zero2, 2); }   // bits only go from 1 to 0, as an attacker with write access would do
+    confirm_now(2000, 0, urtc_minor_field_pack(3, 0), 0);   // the master's confirmation of the pristine image
+    TEST_ASSERT(current_status == STATUS_VERIFY_FAIL && verify_fail_reason == VERIFY_FAIL_REASON_HMAC && main_slot_blank() && !Metadata_Read(&meta) && fake_reset_count == 0, "an image altered after the checks is caught when the confirmation arrives: digest mismatch, main slot blank");
+
+    // (f) power cut after the confirmation: the pending copy is resumed only from a backup slot that still holds the verified image
+    fresh();
+    make_image(3000);
+    sign_image(3000, hm);
+    start_update(3000, THIS_HARDWARE_ID);
+    HandleHmacExpected(hm);
+    send_data(3000, 32);
+    fake_flash_fail_erase_nth = 4;
+    end_update(ref_crc32(image, 3000), 0, urtc_minor_field_pack(6, 0));
+    confirm_now(3000, 0, urtc_minor_field_pack(6, 0), 0);
+    fake_flash_fail_erase_nth = 0;
+    { uint8_t zero2[2] = {0, 0}; Flash_WriteVerified(BACKUP_APP_ADDR + 0x200, zero2, 2); }   // the backup slot changes while the chip is off
+    TEST_ASSERT(ApplicationIsValid() == 0, "a pending copy is not resumed from a backup slot that differs from the verified image");
+    Metadata_Read(&meta);
+    TEST_ASSERT(meta.state == META_STATE_COPY_PENDING && main_slot_blank(), "and the main slot is left as it was");
+
+    // the nonce is made at every START and is not all zero
+    fresh();
+    start_update(500, THIS_HARDWARE_ID);
+    { uint8_t n1[16], n2[16], zero[16] = {0}; BuildChallengeResponse(n1); start_update(500, THIS_HARDWARE_ID); BuildChallengeResponse(n2);
+      TEST_ASSERT(memcmp(n1, zero, 16) != 0 && memcmp(n1, n2, 16) != 0, "REG_CHALLENGE holds a different non-zero nonce after every START"); }
 
     // ---- anti-rollback -----------------------------------------------------------------------------------------------------------------------
     fresh();
@@ -329,6 +439,7 @@ int main(void)
     send_data(3000, 32);
     fake_flash_fail_erase_nth = 4; // erases so far: 2 backup pages at START, 1 metadata page; the 4th is the first main-slot page
     end_update(ref_crc32(image, 3000), 0, urtc_minor_field_pack(6, 0));
+    confirm_now(3000, 0, urtc_minor_field_pack(6, 0), 0);
     TEST_ASSERT(current_status == STATUS_ERROR && update_failed, "copy failure is reported and does not claim success");
     Metadata_Read(&meta);
     TEST_ASSERT(meta.state == META_STATE_COPY_PENDING, "interrupted copy leaves the metadata at COPY_PENDING");

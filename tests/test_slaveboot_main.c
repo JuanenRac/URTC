@@ -79,6 +79,14 @@ static void test_link(int *failures)
     uint8_t start[9] = {REG_START_UPDATE, 0, 0, 0x03, 0xE8, 0x03, 0x03, 0xCB, 0x01};      // 1000 bytes for this board
     master_writes(start, 9);
     TEST_ASSERT(update_in_progress == 1 && update_total_size == 1000 && current_status == STATUS_RECEIVING, "a start command of nine bytes begins an update");
+    read_register(REG_CHALLENGE);
+    { uint8_t nonzero = 0; for (int i = 0; i < 16; i++) nonzero |= fake_i2c_slave_tx[i];
+      TEST_ASSERT(fake_i2c_slave_tx_len == 16 && nonzero != 0, "register 9: the sixteen bytes of the nonce of the update that has just started"); }
+    { uint8_t confirm[33]; confirm[0] = REG_CONFIRM; memset(&confirm[1], 0x11, 32);
+      master_writes(confirm, 33);
+      TEST_ASSERT(update_in_progress == 1 && !update_failed && current_status == STATUS_RECEIVING, "register 10 written while the update is still receiving does nothing");
+      master_writes(confirm, 10);
+      TEST_ASSERT(update_in_progress == 1 && !update_failed, "and one that is not 32 bytes long is ignored"); }
     uint8_t data[9] = {REG_DATA, 1, 2, 3, 4, 5, 6, 7, 8};
     master_writes(data, 9);
     TEST_ASSERT(update_bytes_received == 8, "a data command hands its eight bytes to the update");

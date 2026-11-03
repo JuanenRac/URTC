@@ -111,19 +111,22 @@ extern const uint8_t HMAC_KEY[32];
 
 #define REG_STATUS               0x00 // read-only, 1 byte - status codes below
 #define REG_START_UPDATE         0x01 // write-only, 8 bytes: big-endian total size (4) + big-endian HardwareID (4)
-#define REG_HMAC_EXPECTED        0x02 // write-only, 32 bytes: the expected HMAC-SHA256 of the complete image, sent once, before any REG_DATA writes
+#define REG_HMAC_EXPECTED        0x02 // write-only, 32 bytes: the expected SHA-256 (no key) of the complete image, sent once, before REG_END_UPDATE. The name is historic: the slave no longer checks an HMAC
 #define REG_DATA                 0x03 // write-only, up to 32 bytes per transaction, sent sequentially - goes to the BACKUP slot, never main; unlike the main board's own CAN-framed 8-byte-per-frame limit, I2C has no equivalent per-transaction ceiling here, so this moves in much larger pieces
 #define REG_END_UPDATE           0x04 // write-only, 8 bytes: big-endian CRC32 (4) + big-endian VersionMajor (2) + big-endian VersionMinor (2)
 #define REG_PROGRESS             0x05 // read-only, 1 byte: 0-100, 0xFF if not currently updating
 #define REG_QUERY_VERSION        0x06 // read-only, 10 bytes: byte0 (0=application,1=bootloader) + HardwareID (4) + version major (2) + version minor (2, all big-endian) - mirrors the main board's own 0x7F9 response fields, minus the CAN framing they need and this doesn't
 #define REG_VERIFY_FAIL_REASON   0x07 // read-only, 1 byte: one of the VERIFY_FAIL_REASON_* values below, valid to read once REG_STATUS reports STATUS_VERIFY_FAIL - same reason the main board's own CAN_ID_STATUS frame carries as its 2nd byte, exposed here as its own register instead since I2C reads don't share CAN's fixed-DLC framing
 #define REG_QUERY_VERSION_EXT    0x08 // read-only, 4 bytes: URTC_SLAVE_VERSION_EXT_MARKER (0xE1, never a status code) + installed application PATCH (0xFF = unknown) + this bootloader's MINOR + this bootloader's PATCH. A bootloader that predates it answers this register with its 1-byte status instead, which is how the master tells the two apart.
+#define REG_CHALLENGE            0x09 // read-only, 16 bytes: the nonce of the update session in progress (made at REG_START_UPDATE); all zero when there is none. The master binds its confirmation to it
+#define REG_CONFIRM              0x0A // write-only, 32 bytes: the master's confirmation that it verified the signature record of this image (urtc_slave_confirm.h). Accepted only in STATUS_AWAIT_CONFIRM
 
 #define STATUS_LISTENING     0x01 // waiting for REG_START_UPDATE
 #define STATUS_ERASING       0x02 // erasing the backup slot
 #define STATUS_RECEIVING     0x03 // writing firmware data into the backup slot
 #define STATUS_VERIFYING     0x06 // checking size/CRC32/HMAC/HardwareID on the backup slot
 #define STATUS_COPYING       0x07 // backup slot verified - erasing and copying it into the main slot
+#define STATUS_AWAIT_CONFIRM 0x08 // size, CRC32, SHA-256 and rollback checks passed; waiting (ten seconds at most) for the master's REG_CONFIRM. Without it the update fails closed
 #define STATUS_VERIFY_OK     0x04 // copy to main slot complete and read-back verified; about to jump
 #define STATUS_VERIFY_FAIL   0x05 // size, CRC32, HMAC, or HardwareID mismatch on the backup slot - main slot untouched
 #define VERIFY_FAIL_REASON_INCOMPLETE  0x01
@@ -131,6 +134,7 @@ extern const uint8_t HMAC_KEY[32];
 #define VERIFY_FAIL_REASON_HMAC        0x03
 #define VERIFY_FAIL_REASON_HARDWARE_ID 0x04
 #define VERIFY_FAIL_REASON_ROLLBACK    0x05
+#define VERIFY_FAIL_REASON_NOT_CONFIRMED 0x06 // the master did not confirm in time, or its confirmation does not match this session and this image
 #define STATUS_ERROR         0xFF
 
 // -----------------------------------------------------------------------
@@ -152,7 +156,7 @@ typedef struct {
     uint32_t version_minor;
     uint32_t size;
     uint32_t crc32;
-    uint8_t  hmac[32];
+    uint8_t  hmac[32]; // the SHA-256 of the installed application (no key). The name is historic; the size is what the specification calls HMAC_LENGTH
 } FirmwareMetadata_t;
 
 #endif // BOOTLOADER_COMMON_H

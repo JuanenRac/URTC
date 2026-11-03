@@ -160,6 +160,19 @@ void hmac_sha256_flash_region(const uint8_t *key, uint32_t key_len,
     sha256_final(&ctx, out);
 }
 
+// Plain SHA-256, no key: the slave bootloader no longer holds a secret. It checks the integrity of an image and of the installed application with this, and
+// relies on the master (which verifies the Ed25519 record) for who vouched for the image.
+void sha256_buffer(const uint8_t *data, uint32_t len, uint8_t out[32]) {
+    SHA256_CTX ctx;
+    sha256_init(&ctx);
+    sha256_update(&ctx, data, len);
+    sha256_final(&ctx, out);
+}
+
+void sha256_flash_region(uint32_t flash_addr, uint32_t len, uint8_t out[32]) {
+    sha256_buffer((const uint8_t*)flash_addr, len, out);
+}
+
 uint8_t hmac_constant_time_compare(const uint8_t *a, const uint8_t *b, uint32_t len) {
     // XOR-accumulate rather than an early-exit compare - an early exit
     // leaks how many leading bytes matched through timing, which matters

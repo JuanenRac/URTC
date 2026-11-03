@@ -200,7 +200,9 @@
    "test": "tests/test_can_slavebridge.c",
    "sources": [
     "tests/host_hal/fake_hal.c",
-    "src/F303-master/firmware_can_slavebridge.c"
+    "src/F303-master/firmware_can_slavebridge.c",
+    "src/F303-master/firmware_slave_attest.c",
+    "src/common/urtc_ed25519.c"
    ],
    "includes": [
     "tests",

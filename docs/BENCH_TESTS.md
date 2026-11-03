@@ -27,6 +27,7 @@ commit under test (note the commit and the `0x7E9` version in the result).
 | 12 | Hard fault dump and watchdog | not run |
 | 13 | Head telemetry through the rack | not run |
 | 14 | Ed25519 record, trust table and metadata log of the main bootloader | not run |
+| 15 | Expansion slave: confirmation by the master | not run |
 
 ## 1. Slave I2C clock enable order
 
@@ -170,5 +171,16 @@ Steps, all with a main board that has the development bootloader flashed over SW
 8. Measure with the debugger the time of one verification and the stack watermark, and read the size of the three bootloaders in the build log of Actions.
 
 Expected: every refusal leaves the previous application running; the watchdog never fires during a verification (the verifier feeds it every 8 bits of the scalar).
+
+Status: not run on a board.
+
+## 15. Expansion slave: confirmation by the master
+
+1. Update the slave with a valid record: the master verifies it, the slave goes to status 0x08 and then installs; measure the time between the last data frame and the reset, and the time the master spends verifying (the watchdog must not fire and the CAN receive FIFO must not overflow).
+2. Send the same image without the 0x21A frames: after ten seconds 0x215 reports VERIFY_FAIL and 0x219 reports 0x06; the slave application keeps running.
+3. Flip a bit of the image on the wire: refused with 0x03, main slot untouched. Disconnect the link bus between END and the confirmation: refused with 0x06 after ten seconds.
+4. Cut the power of the slave while it waits and after the confirmation, during the copy: the next boot runs the old or the new application, never a damaged one.
+5. Read the size of the slave bootloader in the build log of Actions against the 18432-byte region, and the stack high-water mark of the master during a verification inside the application.
+6. Confirm on the real I2C link that a clock-stretching slave answers the status and challenge reads while it hashes its backup slot.
 
 Status: not run on a board.

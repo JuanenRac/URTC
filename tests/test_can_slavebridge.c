@@ -19,14 +19,19 @@
 #include "firmware_can_slavebridge.h"
 #include "firmware_expansion_i2c.h"
 #include "urtc_version_wire.h"
+#include "firmware_slave_attest.h"
+#include "urtc_slave_confirm.h"
+#include "boot_sig_cases.h"
+#include "boot/urtc_trust_dev.h"
 
+IWDG_HandleTypeDef hiwdg;
 CAN_TypeDef can_regs;
 CAN_HandleTypeDef hcan = { &can_regs };
 CAN_RxHeaderTypeDef rxHeader;
 uint8_t rxData[8];
 
 // ---- scripted I2C slave -----------------------------------------------------
-#define MAX_WRITES 16
+#define MAX_WRITES 512
 typedef struct { uint8_t reg; uint8_t len; uint8_t data[40]; } WriteRecord;
 static WriteRecord writes[MAX_WRITES];
 static int write_count;
@@ -34,8 +39,12 @@ static uint8_t reg_value[256][16];
 static uint8_t reg_readable[256];
 static int read_count;
 
+static int fail_data_writes_from = -1;   // when >= 0: the data writes (register 0x03) after this many succeed no more
+static int data_writes_seen;
+
 uint8_t ExpansionI2C_SlaveWriteRegister(uint8_t reg, const uint8_t *data, uint8_t len)
 {
+    if (reg == 0x03 && fail_data_writes_from >= 0 && data_writes_seen++ >= fail_data_writes_from) return 0;
     if (write_count < MAX_WRITES) {
         writes[write_count].reg = reg;
         writes[write_count].len = len;
@@ -75,6 +84,196 @@ static const FakeTxFrame *tx(uint32_t id)
 {
     for (int i = 0; i < fake_tx_count; i++) if (fake_tx[i].id == id) return &fake_tx[i];
     return 0;
+}
+
+// ---- the master vouches for the slave's image ------------------------------------------------------------------------------------------------------
+// The signed cases of tests/boot_sig_cases.h (throwaway test keys, made by tools/make_boot_sig_cases.py): a patterned image of 1500 bytes for the expansion
+// slave's hardware id, signed with the development key. The module is the real one, the Ed25519 verifier is the real one; only the I2C bus is scripted.
+#define SLAVE_CASE 14      // 1500 bytes, slave hardware id, version 0.2.0, counter 1, development key
+#define MASTER_CASE 1      // the same size and version, for the main board's hardware id
+
+static uint8_t keys_in_use[2][32];
+static uint8_t key_count_in_use;
+
+static const uint8_t *table_in_use;      // when set, the keys come from this trust table, as they do from the bootloader on the board
+static uint32_t table_in_use_length;
+
+void SlaveAttest_LoadTrustFromBootloader(void)
+{
+    if (table_in_use) (void)SlaveAttest_SetKeysFromTable(table_in_use, table_in_use_length);
+    else SlaveAttest_SetKeys((const uint8_t (*)[32])keys_in_use, key_count_in_use);
+}
+
+static void use_dev_key(void) { memcpy(keys_in_use[0], BOOT_SIG_PUBLIC_DEV, 32); key_count_in_use = 1; }
+
+static uint32_t ref_crc32(const uint8_t *d, uint32_t n)
+{
+    uint32_t c = 0xFFFFFFFFu;
+    for (uint32_t i = 0; i < n; i++) {
+        c ^= d[i];
+        for (int k = 0; k < 8; k++) c = (c & 1) ? (c >> 1) ^ 0xEDB88320u : (c >> 1);
+    }
+    return ~c;
+}
+
+typedef struct {
+    int send_record;          // 0: no 0x21A frames
+    int damage_record;        // flip a bit of the signature
+    int damage_data;          // flip a bit of the image in transit
+    int drop_last_frame;      // the last data frame never arrives
+    int start_hardware_id;    // the hardware id of 0x211 (0: the slave's)
+    int slave_waits;          // the scripted slave reports AWAIT_CONFIRM
+    int skip_end;             // no 0x214
+} Scenario;
+
+static uint8_t scenario_nonce[16];
+static uint8_t image_buf[1500];
+
+// Plays the whole exchange of an update through the bridge; the scripted slave answers the status and the nonce.
+static void play(const BootSigCase *c, Scenario s)
+{
+    for (uint32_t i = 0; i < c->size; i++) image_buf[i] = (uint8_t)((i * 13 + 5) & 0xFF);
+    uint32_t crc = ref_crc32(image_buf, c->size);
+    if (s.damage_data) image_buf[700] ^= 0x04;
+    uint8_t record[77];
+    memset(record, 0, sizeof record);
+    memcpy(record, c->record, 76);
+    if (s.damage_record) record[40] ^= 0x01;
+    reg_readable[0x00] = 1; reg_value[0x00][0] = s.slave_waits ? 0x08 : 0x03;
+    reg_readable[0x09] = 1; memcpy(reg_value[0x09], scenario_nonce, 16);
+
+    uint8_t start[8] = { (uint8_t)(c->size >> 24), (uint8_t)(c->size >> 16), (uint8_t)(c->size >> 8), (uint8_t)c->size, 0, 0, 0, 0 };
+    uint32_t hw = s.start_hardware_id ? (uint32_t)s.start_hardware_id : 0x0303CB01u;
+    start[4] = (uint8_t)(hw >> 24); start[5] = (uint8_t)(hw >> 16); start[6] = (uint8_t)(hw >> 8); start[7] = (uint8_t)hw;
+    rx(0x211, 8, start);
+    uint8_t digest_chunk[8] = {0};
+    for (int i = 0; i < 4; i++) rx(0x212, 8, digest_chunk);
+    if (s.send_record) {
+        for (uint8_t i = 0; i < 11; i++) {
+            uint8_t chunk[8];
+            chunk[0] = i;
+            memcpy(&chunk[1], &record[i * 7], 7);
+            rx(0x21A, 8, chunk);
+        }
+    }
+    uint32_t frames = (c->size + 7) / 8;
+    for (uint32_t f = 0; f < frames; f++) {
+        if (s.drop_last_frame && f == frames - 1) break;
+        uint32_t n = c->size - f * 8 < 8 ? c->size - f * 8 : 8;
+        rx(0x213, n, &image_buf[f * 8]);
+    }
+    if (!s.skip_end) {
+        uint8_t end[8] = { (uint8_t)(crc >> 24), (uint8_t)(crc >> 16), (uint8_t)(crc >> 8), (uint8_t)crc,
+                           (uint8_t)(c->major >> 8), (uint8_t)c->major, (uint8_t)(c->minor_field >> 8), (uint8_t)c->minor_field };
+        rx(0x214, 8, end);
+    }
+}
+
+static int find_write(uint8_t reg)
+{
+    for (int i = write_count - 1; i >= 0; i--) if (writes[i].reg == reg) return i;
+    return -1;
+}
+
+static int confirm_matches(const BootSigCase *c, const uint8_t nonce[16])
+{
+    int w = find_write(0x0A);
+    if (w < 0 || writes[w].len != 32) return 0;
+    uint8_t message[URTC_SLAVE_CONFIRM_MESSAGE_SIZE], tag[32];
+    urtc_slave_confirm_message(message, nonce, c->sha256, c->hardware_id, (uint16_t)c->major, (uint16_t)c->minor_field, c->size);
+    SlaveAttest_Sha256(message, sizeof message, tag);
+    return memcmp(tag, writes[w].data, 32) == 0;
+}
+
+static void attest_tests(int *failures)
+{
+    const BootSigCase *slave = &BOOT_SIG_CASES[SLAVE_CASE];
+    Scenario good = { 1, 0, 0, 0, 0, 1, 0 };
+    for (int i = 0; i < 16; i++) scenario_nonce[i] = (uint8_t)(0xA0 + i);
+
+    // a valid record: the slave gets END first and then the confirmation, which carries the right tag
+    clear(); use_dev_key();
+    play(slave, good);
+    TEST_ASSERT(find_write(0x04) >= 0 && find_write(0x0A) > find_write(0x04), "a valid record: END is relayed first and then the confirmation is written to register 0x0A");
+    TEST_ASSERT(confirm_matches(slave, scenario_nonce), "the confirmation is the SHA-256 of the message with the nonce the slave published, the image digest, hardware id, version and size");
+    int slave_registers_written = 1;
+    for (int i = 0; i < write_count; i++) if (writes[i].reg > 0x0A) slave_registers_written = 0;
+    TEST_ASSERT(slave_registers_written, "the record chunks are not relayed to the slave: only its bootloader registers 0x01 to 0x0A are written");
+    int cw = find_write(0x0A);
+    TEST_ASSERT(writes[cw].len == 32, "the confirmation is exactly 32 bytes");
+
+    // the tag follows the session: another nonce, another tag
+    uint8_t first_tag[32];
+    memcpy(first_tag, writes[cw].data, 32);
+    scenario_nonce[0] ^= 0xFF;
+    clear(); use_dev_key();
+    play(slave, good);
+    TEST_ASSERT(confirm_matches(slave, scenario_nonce) && memcmp(first_tag, writes[find_write(0x0A)].data, 32) != 0, "a different nonce gives a different confirmation");
+    scenario_nonce[0] ^= 0xFF;
+
+    // the same END frame again does not confirm a second time
+    {
+        int confirms_before = 0, confirms_after = 0;
+        for (int i = 0; i < write_count; i++) if (writes[i].reg == 0x0A) confirms_before++;
+        uint8_t again[8] = { 0, 0, 0, 0, 0, 0, 0, 2 };
+        rx(0x214, 8, again);
+        for (int i = 0; i < write_count; i++) if (writes[i].reg == 0x0A) confirms_after++;
+        TEST_ASSERT(confirms_before == 1 && confirms_after == 1, "a second END after the update is only relayed, never confirmed again");
+    }
+
+    // nothing is confirmed, but the END frame is still relayed (the slave fails closed by itself)
+    Scenario s;
+    s = good; s.send_record = 0;
+    clear(); use_dev_key(); play(slave, s);
+    TEST_ASSERT(find_write(0x0A) < 0 && find_write(0x04) >= 0, "no record: END is relayed and there is no confirmation");
+    s = good; s.damage_record = 1;
+    clear(); use_dev_key(); play(slave, s);
+    TEST_ASSERT(find_write(0x0A) < 0, "a record with a damaged signature is not confirmed");
+    s = good; s.damage_data = 1;
+    clear(); use_dev_key(); play(slave, s);
+    TEST_ASSERT(find_write(0x0A) < 0, "an image altered in transit does not match the signed digest: no confirmation");
+    s = good; s.drop_last_frame = 1;
+    clear(); use_dev_key(); play(slave, s);
+    TEST_ASSERT(find_write(0x0A) < 0, "an image that is shorter than declared is not confirmed");
+    s = good; s.skip_end = 1;
+    clear(); use_dev_key(); play(slave, s);
+    TEST_ASSERT(find_write(0x0A) < 0 && find_write(0x04) < 0, "without END there is nothing to confirm");
+    s = good; s.start_hardware_id = 0x0303CC01;
+    clear(); use_dev_key(); play(slave, s);
+    TEST_ASSERT(find_write(0x0A) < 0, "an update declared for the main board's hardware id is never confirmed for the slave");
+    clear(); use_dev_key(); play(&BOOT_SIG_CASES[MASTER_CASE], good);
+    TEST_ASSERT(find_write(0x0A) < 0, "a record signed for the main board's hardware id does not vouch for a slave image");
+
+    // keys
+    clear(); key_count_in_use = 0; play(slave, good);
+    TEST_ASSERT(find_write(0x0A) < 0, "a closed trust table (no key) confirms nothing");
+    clear(); memcpy(keys_in_use[0], BOOT_SIG_PUBLIC_OTHER, 32); key_count_in_use = 1; play(slave, good);
+    TEST_ASSERT(find_write(0x0A) < 0, "a record signed by a key that is not in the table is not confirmed");
+    clear(); memcpy(keys_in_use[0], BOOT_SIG_PUBLIC_OTHER, 32); memcpy(keys_in_use[1], BOOT_SIG_PUBLIC_DEV, 32); key_count_in_use = 2; play(slave, good);
+    TEST_ASSERT(find_write(0x0A) >= 0, "the second key of the table (rotation) vouches too");
+
+    // the trust table of the bootloader, parsed by the same rules as the bootloader
+    {
+        uint8_t table[URTC_TRUST_TABLE_SIZE] = { URTC_TRUST_TABLE_BYTES };
+        table_in_use = table; table_in_use_length = sizeof table;
+        clear(); play(slave, good);
+        TEST_ASSERT(find_write(0x0A) >= 0, "the keys read from the development trust table of the bootloader vouch for the test image");
+        table[10] ^= 0x01;   // a bit of the key id: the CRC-32 of the table no longer matches
+        clear(); play(slave, good);
+        TEST_ASSERT(SlaveAttest_KeyCount() == 0 && find_write(0x0A) < 0, "a damaged trust table closes it: no key, no confirmation");
+        table[10] ^= 0x01;
+        table[4] = 2;        // a schema this code does not know
+        clear(); play(slave, good);
+        TEST_ASSERT(SlaveAttest_KeyCount() == 0 && find_write(0x0A) < 0, "an unknown schema closes the table too");
+        table_in_use = 0;
+    }
+
+    // the bus
+    s = good; s.slave_waits = 0;
+    clear(); use_dev_key(); play(slave, s);
+    TEST_ASSERT(find_write(0x0A) < 0, "a slave that never reports AWAIT_CONFIRM gets no confirmation (and the bridge gives up)");
+    clear(); use_dev_key(); fail_data_writes_from = 100; data_writes_seen = 0; play(slave, good); fail_data_writes_from = -1;
+    TEST_ASSERT(find_write(0x0A) < 0, "data that did not reach the slave is not confirmed");
 }
 
 void run_can_slavebridge_tests(int *failures)
@@ -305,6 +504,8 @@ void run_can_slavebridge_tests(int *failures)
     rx(0x321, 8, eight);
     rx(0x222, 8, eight);
     TEST_ASSERT(write_count == 0 && read_count == 0 && fake_tx_count == 0, "identifiers outside the bridge range are ignored");
+
+    attest_tests(failures);
 }
 
 int main(void)

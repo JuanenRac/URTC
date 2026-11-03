@@ -31,6 +31,8 @@
 #include "urtc_version_wire.h"
 #include "urtc_slave_regs.h"
 #include "urtc_can_ids.h"
+#include "firmware_slave_attest.h"
+#include "urtc_slave_confirm.h"
 
 // Slave register numbers - duplicated here rather than shared via a
 // common header, since the slave is a genuinely separate chip/project
@@ -48,9 +50,35 @@
 #define REG_BOOT_QUERY_VERSION  0x06
 #define REG_BOOT_VERIFY_FAIL_REASON 0x07
 #define REG_BOOT_QUERY_VERSION_EXT  0x08
+#define REG_BOOT_CHALLENGE      0x09
+#define REG_BOOT_CONFIRM        0x0A
+#define SLAVE_BOOT_STATUS_AWAIT_CONFIRM 0x08
 #define REG_APP_ENTER_BOOTLOADER 0x02
 
 static uint8_t hmac_chunk_buf[32];
+
+// The slave bootloader holds a verified image until the master confirms that it checked the signature record (urtc_slave_confirm.h). Called after the END
+// frame has been relayed and only when SlaveAttest_Verify said yes: waits (one second at most) until the slave reports that it is waiting, reads the nonce of
+// the session it published, and writes the 32-byte confirmation. In every other case nothing is written and the slave fails closed on its own after ten
+// seconds.
+static void ConfirmToSlave(void) {
+    uint8_t status = 0;
+    uint8_t waiting = 0;
+    for (uint8_t tries = 0; tries < 100u && !waiting; tries++) {
+        if (ExpansionI2C_SlaveReadRegister(REG_BOOT_STATUS, &status, 1) && status == SLAVE_BOOT_STATUS_AWAIT_CONFIRM) {
+            waiting = 1;
+        } else {
+            HAL_Delay(10);
+            HAL_IWDG_Refresh(&hiwdg);
+        }
+    }
+    if (!waiting) return;
+    uint8_t nonce[SLAVE_ATTEST_NONCE_SIZE];
+    uint8_t tag[URTC_SLAVE_CONFIRM_TAG_SIZE];
+    if (!ExpansionI2C_SlaveReadRegister(REG_BOOT_CHALLENGE, nonce, SLAVE_ATTEST_NONCE_SIZE)) return;
+    if (!SlaveAttest_Tag(nonce, tag)) return;
+    ExpansionI2C_SlaveWriteRegister(REG_BOOT_CONFIRM, tag, URTC_SLAVE_CONFIRM_TAG_SIZE);
+}
 static uint8_t hmac_chunks_received = 0;
 
 static void SendCanResponse(uint32_t id, const uint8_t *data, uint8_t len) {
@@ -86,6 +114,17 @@ void Handle_CAN_SlaveBridge(void) {
         // fresh chunks before something re-triggers completion.
         hmac_chunks_received = 0;
         ExpansionI2C_SlaveWriteRegister(REG_BOOT_START_UPDATE, rxData, 8);
+        // The master also follows the update to be able to vouch for it: it hashes what it relays and collects the signature record (0x21A).
+        SlaveAttest_LoadTrustFromBootloader();
+        SlaveAttest_Start(((uint32_t)rxData[0] << 24) | ((uint32_t)rxData[1] << 16) | ((uint32_t)rxData[2] << 8) | rxData[3],
+                          ((uint32_t)rxData[4] << 24) | ((uint32_t)rxData[5] << 16) | ((uint32_t)rxData[6] << 8) | rxData[7]);
+
+    } else if (rxHeader.StdId == URTC_CAN_ID_SLAVE_RECORD_CHUNK && rxHeader.DLC == 8) {
+        // One of the 11 chunks of the 76-byte Ed25519 signature record of the slave's image: the index and 7 bytes of it. Nothing goes to the slave; the
+        // master keeps it and checks it when the END frame arrives.
+        if (rxData[0] < SLAVE_ATTEST_CHUNK_COUNT) {
+            SlaveAttest_RecordChunk(rxData[0], &rxData[1]);
+        }
 
     } else if (rxHeader.StdId == URTC_CAN_ID_SLAVE_HMAC_CHUNK && rxHeader.DLC == 8) {
         // Same 4-frames-of-8-bytes accumulation as the main board's own
@@ -109,10 +148,20 @@ void Handle_CAN_SlaveBridge(void) {
         // HandleData) accumulates across multiple calls exactly like
         // this, so no assembly buffer is needed here the way HMAC above
         // needs one.
-        ExpansionI2C_SlaveWriteRegister(REG_BOOT_DATA, rxData, (uint8_t)rxHeader.DLC);
+        uint8_t relayed = ExpansionI2C_SlaveWriteRegister(REG_BOOT_DATA, rxData, (uint8_t)rxHeader.DLC);
+        SlaveAttest_Data(rxData, (uint8_t)rxHeader.DLC, relayed);
 
     } else if (rxHeader.StdId == URTC_CAN_ID_SLAVE_END_UPDATE && rxHeader.DLC == 8) {
+        // The signature record is checked BEFORE the END frame reaches the slave (the slave waits only ten seconds for the confirmation, and the check
+        // takes a while on this chip); the verdict decides whether the slave is then told to install.
+        uint32_t end_crc = ((uint32_t)rxData[0] << 24) | ((uint32_t)rxData[1] << 16) | ((uint32_t)rxData[2] << 8) | rxData[3];
+        uint16_t end_major = (uint16_t)(((uint16_t)rxData[4] << 8) | rxData[5]);
+        uint16_t end_minor = (uint16_t)(((uint16_t)rxData[6] << 8) | rxData[7]);
+        uint8_t vouched = SlaveAttest_Verify(end_crc, end_major, end_minor);
         ExpansionI2C_SlaveWriteRegister(REG_BOOT_END_UPDATE, rxData, 8);
+        if (vouched) {
+            ConfirmToSlave();
+        }
 
     } else if (rxHeader.StdId == URTC_CAN_ID_SLAVE_STATUS) {
         // Status query - request can arrive with any DLC (same "DLC:any"

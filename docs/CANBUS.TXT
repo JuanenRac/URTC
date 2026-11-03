@@ -960,12 +960,26 @@ Data: Same layout as this board's own CAN_ID_START_UPDATE (0x7F1) -
       Relayed to the slave's own bootloader-mode REG_START_UPDATE.
 
 ID: 0x212 [Master -> URTC Tool Head]
-Slave HMAC-SHA256 signature chunk, x4
+Slave image digest (SHA-256) chunk, x4
 DLC: 8 bytes
 Data: Same 4-frames-of-8-bytes accumulation as this board's own
       CAN_ID_HMAC_CHUNK (0x7F7) - sent sequentially right after 0x211
       and before the first 0x213 frame. Only relayed to the slave's own
       REG_HMAC_EXPECTED once all 4 frames (32 bytes total) have arrived.
+      The 32 bytes are the SHA-256 (no key) of the slave image; the register
+      name is historic. WHO vouched for the image is decided by the master
+      from the Ed25519 record of 0x21A (docs/SLAVE_BOOT_CONFIRMATION.md).
+
+ID: 0x21A [Master -> URTC Tool Head]
+One chunk of the 76-byte Ed25519 signature record of the slave image, x11
+DLC: 8 bytes
+Data: Byte 0 = chunk index (0 to 10), bytes 1-7 = seven bytes of the record
+      (key id 8 + counter 4 + signature 64; the last chunk is padded with
+      zeros). Sent after 0x211 and before 0x214. NOT relayed to the slave:
+      the master keeps it, verifies it when 0x214 arrives and only then
+      tells the slave bootloader to install the image. Without a record that
+      verifies, the slave waits ten seconds and fails closed (0x215 reports
+      VERIFY_FAIL, 0x219 reports 0x06).
 
 ID: 0x213 [Master -> URTC Tool Head]
 Slave firmware data, to its own backup slot
@@ -1825,7 +1839,7 @@ accepted.
   --- Expansion slave bridge (advanced boards only, see dedicated section above) ---
   0x210 -> Enter slave bootloader, magic payload (DLC:4)
   0x211 -> Start slave update, size + HardwareID (DLC:8)
-  0x212 -> Slave HMAC-SHA256 chunk, x4 (DLC:8)
+  0x212 -> Slave image digest (SHA-256) chunk, x4 (DLC:8)
   0x213 -> Slave firmware data (DLC:1-8)
   0x214 -> End slave update / verify (DLC:8)
   0x215 -> Slave bootloader status (DLC:any, or 1 response)
@@ -1833,6 +1847,7 @@ accepted.
   0x217 -> Slave bootloader version, part 1 (DLC:any, or 8 response)
   0x218 -> Slave bootloader version, part 2 (response only, DLC:2, or 5 with the patch extension)
   0x219 -> Slave bootloader verify-fail-reason (DLC:any, or 1 response)
+  0x21A -> Slave image signature record chunk, x11 (DLC:8)
   0x220 -> Write slave application register, generic (DLC:2-8)
   0x221 -> Read slave application register, generic (DLC:2, or up to 8 response)
   0x222 -> Patch number of the slave application, companion of 0x221 (DLC:2, board to host)
@@ -1932,18 +1947,18 @@ GENERATED REFERENCE (from the specification in URTC-COMMON)
 
 A. Summary
 
-[[ BEGIN GENERATED summary sha256=b1e0cf42ba0cc5e3190ef14801c6cbc1d41df17343509179282124439ea851cb ]]
+[[ BEGIN GENERATED summary sha256=87a1d391e5c75ccf9141800616e7a06fb98634ddee5ae2e9a6817316473bd373 ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 URTC CAN protocol: protocol version 1, byte order big.
-100 identifiers, 25 tool profiles, 20 enumerations, 37 constants, 4 magic payloads, 23 registers of the expansion slave.
+101 identifiers, 25 tool profiles, 22 enumerations, 37 constants, 4 magic payloads, 25 registers of the expansion slave.
 
 Machine-readable specification of the CAN bus protocol of the URTC tool head: every identifier with its direction, length rule and payload layout, the magic payloads, the registers of the expansion slave, the version procedures and the SLCAN subset the host tools rely on. All multi-byte fields are big-endian.
 [[ END GENERATED summary ]]
 
 B. Index of identifiers
 
-[[ BEGIN GENERATED index sha256=2c690756c34f7b3029ce3478373f39f20922f85a0283486e98c31e63dda81b6f ]]
+[[ BEGIN GENERATED index sha256=12a754a5fc5733da27f730deb8b2676c60d10716ebe8ee20bf7cb926f8476f4c ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 | ID | Name | Direction | DLC | Tools | Group | Title |
@@ -2004,7 +2019,7 @@ Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_do
 | 0x200 | ULTRASONIC_WELD_CMD | host to board | 3 | 24 | welding | Ultrasonic welder timed pulse |
 | 0x210 | SLAVE_ENTER_BOOTLOADER | host to board | 4 | any | slave_bridge | Enter the expansion slave's bootloader |
 | 0x211 | SLAVE_START_UPDATE | host to board | 8 | any | slave_bridge | Start the slave firmware update |
-| 0x212 | SLAVE_HMAC_CHUNK | host to board | 8 | any | slave_bridge | Slave HMAC-SHA256 signature chunk |
+| 0x212 | SLAVE_HMAC_CHUNK | host to board | 8 | any | slave_bridge | Slave image digest chunk (SHA-256; the name is historic) |
 | 0x213 | SLAVE_DATA | host to board | 1-8 | any | slave_bridge | Slave firmware data |
 | 0x214 | SLAVE_END_UPDATE | host to board | 8 | any | slave_bridge | End the slave update and verify |
 | 0x215 | SLAVE_STATUS | both ways | any / 1 | any | slave_bridge | Slave bootloader status |
@@ -2012,6 +2027,7 @@ Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_do
 | 0x217 | SLAVE_VERSION_RESP_1 | both ways | any / 8 | any | slave_bridge | Slave bootloader version, part 1 |
 | 0x218 | SLAVE_VERSION_RESP_2 | board to host | 2 or 5 | any | slave_bridge | Slave bootloader version, part 2 |
 | 0x219 | SLAVE_VERIFY_FAIL_REASON | both ways | any / 1 | any | slave_bridge | Slave verify-fail reason |
+| 0x21A | SLAVE_RECORD_CHUNK | host to board | 8 | any | slave_bridge | One chunk of the Ed25519 signature record of the slave image |
 | 0x220 | SLAVE_REG_WRITE | host to board | 2-8 | any | slave_bridge | Write a slave application register (generic) |
 | 0x221 | SLAVE_REG_READ | both ways | 2 / 1-8 | any | slave_bridge | Read a slave application register (generic) |
 | 0x222 | SLAVE_APP_PATCH | board to host | 2-3 | any | slave_bridge | Patch number of the slave application (companion of 0x221) |
@@ -2052,7 +2068,7 @@ Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_do
 
 C. Field layouts and examples
 
-[[ BEGIN GENERATED layouts sha256=ca0defe6bf7cc2b610109b51241553321f23b4d3241cc206e69082cc54f18b6e ]]
+[[ BEGIN GENERATED layouts sha256=e509deab2b73ebe50eb7b923843f5d60dd44a88103c2975acd5be7a429a90127 ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 ### 0x095 IMPACT_EVENT - Impact register (touch probe, maximum priority)
@@ -2916,11 +2932,11 @@ Example 1 KiB image: data 000004000303CB01 (total_size=1024, hardware_id=5058022
 
 Note: Same layout as 0x7F1; the slave HardwareID is not the main board one.
 
-### 0x212 SLAVE_HMAC_CHUNK - Slave HMAC-SHA256 signature chunk
+### 0x212 SLAVE_HMAC_CHUNK - Slave image digest chunk (SHA-256; the name is historic)
 
 host to board; handled by the application; tools: any; refused while a critical error is declared; the firmware accepts DLC 8.
 
-request, DLC 8: Four sequential frames, bytes 0-7, 8-15, 16-23 and 24-31 of the signature, right after 0x211 and before the first 0x213.
+request, DLC 8: Four sequential frames, bytes 0-7, 8-15, 16-23 and 24-31 of the SHA-256 (no key) of the slave image, right after 0x211 and before the first 0x213. The slave compares it with the hash of what it received; WHO vouched for the image is decided by the master from the record of 0x21A.
 
 | Byte | Width | Type | Field | Values | Note |
 |---|---|---|---|---|---|
@@ -3054,6 +3070,21 @@ response, DLC 1
 Example CRC32: data 02 (reason=2)
 
 Note: Only meaningful right after 0x215 reports VERIFY_FAIL.
+
+### 0x21A SLAVE_RECORD_CHUNK - One chunk of the Ed25519 signature record of the slave image
+
+host to board; handled by the application; tools: any; refused while a critical error is declared; the firmware accepts DLC 8.
+
+request, DLC 8: The record is key id (8) + counter (4) + signature (64) = 76 bytes in 11 frames; the last one is padded with zeros. Sent after 0x211 and before 0x214, next to the digest chunks of 0x212. The master keeps it, checks it when 0x214 arrives and only then tells the slave bootloader to install the image.
+
+| Byte | Width | Type | Field | Values | Note |
+|---|---|---|---|---|---|
+| 0 | 1 | u8 | index | 0..10 |  |
+| 1 | 7 | bytes | data |  |  |
+
+Example first chunk: data 0000000000000000 (index=0, data=00000000000000)
+
+Note: Without a record that verifies under a key of the trust table of the master's bootloader the slave is never told to install: it waits ten seconds and fails closed (0x215 reports VERIFY_FAIL, 0x219 reports NOT_CONFIRMED). The slave bootloader cannot hold the verifier, so it trusts the master through the bus (docs/SLAVE_BOOT_CONFIRMATION.md).
 
 ### 0x220 SLAVE_REG_WRITE - Write a slave application register (generic)
 
@@ -3678,7 +3709,7 @@ Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_do
 
 E. Enumerations
 
-[[ BEGIN GENERATED enums sha256=102b0c8f31aa6343f4f1439363f519cec7cab49a1fa4360fa7a2684cb5f0ee44 ]]
+[[ BEGIN GENERATED enums sha256=9ab8fa1edb8b36d65e3cb55560050f5494048664b9ca3b3cc0c87584148c7410 ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 tool - Tool profile (prefix TOOL_, value)
@@ -3734,6 +3765,18 @@ verify_fail_reason - Verify-fail reason (prefix VERIFY_FAIL_REASON_, value)
 | 3 | HMAC | HMAC signature mismatch |
 | 4 | HARDWARE_ID | HardwareID mismatch |
 | 5 | ROLLBACK | Rollback rejected |
+
+slave_bootloader_status - Status values only the expansion slave bootloader reports (the others are bootloader_status) (prefix SLAVE_STATUS_, value)
+
+| Value | Name | Title |
+|---|---|---|
+| 8 | AWAIT_CONFIRM | Image verified by the slave; waiting ten seconds for the master's confirmation |
+
+slave_verify_fail_reason - Verify-fail reasons only the expansion slave bootloader reports (the others are verify_fail_reason) (prefix SLAVE_VERIFY_FAIL_REASON_, value)
+
+| Value | Name | Title |
+|---|---|---|
+| 6 | NOT_CONFIRMED | The master did not confirm the image in time, or its confirmation does not match this session and image |
 
 responder - Answering side (prefix RESPONDER_, value)
 
@@ -3940,7 +3983,7 @@ Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_do
 
 H. Registers of the expansion slave
 
-[[ BEGIN GENERATED registers sha256=de3e8ebd2fee5fb190cd15ff76461409aa278d24060424a69999569a6d11a020 ]]
+[[ BEGIN GENERATED registers sha256=d65b1135f874733c8e5b68d3f7defaba1a04572d10314c77663cd35874c75a8b ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 slave_bootloader: Registers of the expansion slave bootloader (I2C link bus, address 0x42)
@@ -3949,13 +3992,15 @@ slave_bootloader: Registers of the expansion slave bootloader (I2C link bus, add
 |---|---|---|---|---|---|
 | 0 | STATUS | read | 1 | 0x215 | Status code |
 | 1 | START_UPDATE | write | 8 | 0x211 | Total size (4) and HardwareID (4), big-endian |
-| 2 | HMAC_EXPECTED | write | 32 | 0x212 | Expected HMAC-SHA256 of the image |
+| 2 | HMAC_EXPECTED | write | 32 | 0x212 | Expected SHA-256 (no key) of the image; the name is historic |
 | 3 | DATA | write | up to 32 | 0x213 | Image bytes, to the backup slot |
 | 4 | END_UPDATE | write | 8 | 0x214 | CRC32 (4), major (2), minor (2), big-endian |
 | 5 | PROGRESS | read | 1 | 0x216 | Progress 0-100, 0xFF if not updating |
 | 6 | QUERY_VERSION | read | 10 | 0x217 | Responder (1), HardwareID (4), major (2), minor (2) |
 | 7 | VERIFY_FAIL_REASON | read | 1 | 0x219 | Verify-fail reason |
 | 8 | QUERY_VERSION_EXT | read | 4 | 0x218 | Marker 0xE1, application patch, bootloader minor, bootloader patch |
+| 9 | CHALLENGE | read | 16 |  | Nonce of the update session in progress (zeros when none); the master reads it and binds its confirmation to it |
+| 10 | CONFIRM | write | 32 |  | The master's confirmation: SHA-256 of the 76-byte message of urtc_slave_confirm.h; accepted only in AWAIT_CONFIRM |
 
 slave_application: Registers of the expansion slave application (I2C link bus, address 0x42)
 

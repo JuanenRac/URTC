@@ -15,12 +15,16 @@ half to keys/image_trust.json: until then an official main bootloader trusts
 nobody and installs nothing (it fails closed). Bench builds carry the
 development table, whose key is public (signing_key_kind "dev").
 
-EXPANSION SLAVE (src/F303-slave/boot/): still CRC32 and an HMAC-SHA256 computed
-with ONE shared symmetric key (sections 1 to 4). HMAC proves only that the
-image was made by someone who holds that key. The slave takes the same
-Ed25519 record once the size of the verifier is measured against its 18 KB
-region (section 7). No populated board exists, so none of this has run on a
-real board.
+EXPANSION SLAVE (src/F303-slave/boot/): the verifier does not fit its 18 KB
+region (measured: 13676 bytes used, about 7 KB short), and its application is
+not moved. So the MASTER verifies the Ed25519 record of the slave image
+(the same trust table as its own bootloader) and the slave checks CRC32, a
+plain SHA-256 (no key) and that the master confirmed that exact image in that
+update session; with no confirmation it installs nothing. The slave trusts the
+master through the link bus; docs/SLAVE_BOOT_CONFIRMATION.md states the limits.
+The HMAC described in sections 1 to 4 below is the OLD scheme of the slave: its
+key constant is still compiled in and no longer used by the update path. No
+populated board exists, so none of this has run on a real board.
 
 1. WHAT THE BOOTLOADERS CHECK
 -------------------------------------------------------------------------------

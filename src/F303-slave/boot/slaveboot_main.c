@@ -35,7 +35,7 @@ I2C_HandleTypeDef hi2c1;
 // response, the largest read.
 // -----------------------------------------------------------------------
 static uint8_t rx_buffer[33];
-static uint8_t tx_buffer[10];
+static uint8_t tx_buffer[16];   // REG_CHALLENGE's 16 bytes are now the longest answer (REG_QUERY_VERSION has 10)
 static uint8_t pending_read_register = 0xFF; // 0xFF = none set yet; a read before any register write has a value to serve reads REG_STATUS by default, chosen deliberately below rather than left undefined
 
 static void MX_GPIO_Init(void) {
@@ -165,6 +165,10 @@ void HAL_I2C_AddrCallback(I2C_HandleTypeDef *hi2c, uint8_t TransferDirection, ui
                 tx_buffer[0] = verify_fail_reason;
                 len = 1;
                 break;
+            case REG_CHALLENGE:
+                BuildChallengeResponse(tx_buffer);
+                len = 16;
+                break;
             default:
                 // An unrecognized pending register (protocol error on the
                 // master's side, or genuinely nothing set yet) gets
@@ -195,6 +199,9 @@ void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef *hi2c) {
                 break;
             case REG_HMAC_EXPECTED:
                 if (bytes_received == 33) HandleHmacExpected(&rx_buffer[1]);
+                break;
+            case REG_CONFIRM:
+                if (bytes_received == 33) HandleConfirm(&rx_buffer[1]);
                 break;
             case REG_DATA:
                 HandleData(&rx_buffer[1], bytes_received - 1);
@@ -263,9 +270,14 @@ int main(void) {
         // board can just retry the whole update.
         if (update_in_progress && !update_failed &&
             (HAL_GetTick() - update_last_activity_tick > 10000)) {
-            update_in_progress = 0;
-            update_failed = 0;
-            current_status = STATUS_LISTENING;
+            if (update_awaiting_confirm) {
+                // The master never confirmed: fail closed. The status says so (VERIFY_FAIL, reason NOT_CONFIRMED) until the next START.
+                AbortUnconfirmed();
+            } else {
+                update_in_progress = 0;
+                update_failed = 0;
+                current_status = STATUS_LISTENING;
+            }
         }
     }
 }
