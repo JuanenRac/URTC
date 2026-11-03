@@ -1,33 +1,30 @@
 # =============================================================================
-# URTC - Firmware release workflow (protected)
+# URTC - Firmware release workflow (verify and publish only)
 # Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
 # GPL-3.0-or-later - see LICENSE
 # =============================================================================
-# Builds the firmware with the production bootloader keys, signs every asset with
-# the key of the releases and publishes an official GitHub release. Nothing here
-# runs on its own: it is started by hand, it can only run from main, and the job
-# waits for the approval that the `release` environment requires before it can
-# read a secret. The keys never are in the repository and are never printed; the
-# files they are written to live in the runner's temporary folder and are
-# removed at the end whatever happened.
+# This workflow signs nothing and builds nothing, and it holds no key. The firmware is built and
+# signed on the maintainer's machine (docs/RELEASE_SIGNING.md); the signed files are uploaded as an
+# unpublished draft release of the tag. This workflow then downloads the draft's files, checks every
+# digest and every signature against the PUBLIC key of keys/registry.json (which must be the key
+# pinned in tools/release_sign.py) and, only when all of it verifies, publishes a release made from
+# the verified files. Anything that does not verify stops the run and nothing is published.
+# Nothing here runs on its own: it is started by hand, it can only run from main, and the job
+# waits for the approval that the `release` environment requires.
 #
-# Needs, in the `release` environment of the repository (Settings > Environments):
-#   URTC_SIGNING_KEYS           the file of the bootloader keys: "master=<64 hex>" and "slave=<64 hex>"
-#   URTC_RELEASE_ED25519_PEM    the Ed25519 private key of the releases (PEM)
-# and, in the same place, required reviewers and a deployment branch limited to main.
-# Optional, as a repository secret: URTC_DISPATCH_TOKEN, a token that may send a repository_dispatch
-# event to URTC-FLASHER and URTC-WEB-STUDIO. When it exists, the last step tells both repositories
-# that a release was published (event type urtc-firmware-released); when it does not, the step is
-# skipped with a notice and the run is not affected.
-# docs/RELEASE_SIGNING.md has the commands, and the way to publish from a machine
-# instead, which needs no secret in GitHub.
+# Needs no secret for the verification. Optional, as a repository secret: URTC_DISPATCH_TOKEN, a
+# token that may send a repository_dispatch event to URTC-FLASHER and URTC-WEB-STUDIO. When it
+# exists, the last step tells both repositories that a release was published (event type
+# urtc-firmware-released); when it does not, the step is skipped with a notice.
+# GitHub shows draft releases only to a token with write access to the contents, so the single job
+# needs it; the draft's files are never trusted, they are verified and re-published as new files.
 name: URTC firmware release
 
 on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "The tag to publish; it must be v followed by the version of urtc.project.json (for example v0.3.9)"
+        description: "The tag to publish; it must be v followed by the version of urtc.project.json (for example v0.3.9), and a draft release of that tag must hold the signed files"
         required: true
         type: string
 
@@ -40,7 +37,7 @@ concurrency:
 
 jobs:
   release:
-    name: Build, sign and publish the firmware release
+    name: Verify the signed files and publish the release
     if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     environment: release
@@ -69,63 +66,43 @@ jobs:
             exit 1
           fi
           if gh release view "${REQUESTED_TAG}" >/dev/null 2>&1; then
-            echo "::error::A release ${REQUESTED_TAG} already exists; a published version is never rebuilt, raise the version first."
+            echo "::error::A release ${REQUESTED_TAG} already exists; a published version is never replaced, raise the version first."
             exit 1
           fi
           python3 tools/changelog_section.py "${version}" --compat > "${RUNNER_TEMP}/notes.md"
-          echo "VERSION=${version}" >> "${GITHUB_ENV}"
-      - name: Check the project baseline
+      - name: Download the signed files from the draft release
         shell: bash
         run: |
           set -euo pipefail
-          URTC_CI=1 python3 tools/ci_validate.py
-          python3 -m unittest discover -s tests -p "test_*.py"
-      - name: Install the ARM GNU Toolchain
-        run: |
-          sudo apt-get update
-          sudo apt-get install --yes gcc-arm-none-eabi binutils-arm-none-eabi libnewlib-arm-none-eabi libstdc++-arm-none-eabi-newlib
-      - name: Put the keys in files that only this job can read
-        shell: bash
-        env:
-          URTC_SIGNING_KEYS: ${{ secrets.URTC_SIGNING_KEYS }}
-          URTC_RELEASE_ED25519_PEM: ${{ secrets.URTC_RELEASE_ED25519_PEM }}
-        run: |
-          set -euo pipefail
-          if [ -z "${URTC_SIGNING_KEYS}" ] || [ -z "${URTC_RELEASE_ED25519_PEM}" ]; then
-            echo "::error::The secrets URTC_SIGNING_KEYS and URTC_RELEASE_ED25519_PEM must be set in the release environment (see docs/RELEASE_SIGNING.md)."
+          drafts="$(gh api "repos/${GH_REPO}/releases" --paginate --jq ".[] | select(.draft and .tag_name == \"${REQUESTED_TAG}\") | .id")"
+          if [ "$(printf '%s\n' "${drafts}" | grep -c .)" != "1" ]; then
+            echo "::error::Exactly one draft release of ${REQUESTED_TAG} must hold the signed files (docs/RELEASE_SIGNING.md); found: $(printf '%s\n' "${drafts}" | grep -c .)."
             exit 1
           fi
-          umask 077
-          keys="${RUNNER_TEMP}/urtc-keys"
-          mkdir -p "${keys}"
-          printf '%s\n' "${URTC_SIGNING_KEYS}" > "${keys}/signing_keys.txt"
-          printf '%s\n' "${URTC_RELEASE_ED25519_PEM}" > "${keys}/urtc_release_ed25519.pem"
-          echo "URTC_SIGNING_KEY_FILE=${keys}/signing_keys.txt" >> "${GITHUB_ENV}"
-          echo "URTC_RELEASE_KEY=${keys}/urtc_release_ed25519.pem" >> "${GITHUB_ENV}"
-      - name: Install the signing package
-        run: python3 -m pip install "cryptography==44.0.3"
-      - name: Build the firmware with the production keys (host tests first)
-        shell: bash
-        env:
-          URTC_RELEASE: "1"
-        run: |
-          set -euo pipefail
-          chmod +x build_firmware.sh
-          ./build_firmware.sh
-      - name: Check the images, sign every asset and list them
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 tools/publish_release_assets.py --sign --list-file "${RUNNER_TEMP}/assets.txt" --tag-file "${RUNNER_TEMP}/tag.txt"
-          if [ "$(sed -n 2p "${RUNNER_TEMP}/tag.txt")" != "official" ]; then
-            echo "::error::The images are not signed with a production key; nothing is published."
+          echo "DRAFT_ID=${drafts}" >> "${GITHUB_ENV}"
+          mkdir -p "${RUNNER_TEMP}/signed"
+          gh api "repos/${GH_REPO}/releases/${drafts}" --jq '.assets[] | "\(.id) \(.name)"' > "${RUNNER_TEMP}/draft_assets.txt"
+          if [ ! -s "${RUNNER_TEMP}/draft_assets.txt" ]; then
+            echo "::error::The draft release of ${REQUESTED_TAG} has no files."
             exit 1
           fi
-          python3 tools/release_sign.py verify $(cat "${RUNNER_TEMP}/assets.txt" | grep -v '\.sig$' | tr '\n' ' ')
-      - name: Publish the release
+          while read -r id name; do
+            case "${name}" in
+              */*|*..*|"") echo "::error::Unexpected file name in the draft."; exit 1 ;;
+            esac
+            gh api -H "Accept: application/octet-stream" "repos/${GH_REPO}/releases/assets/${id}" > "${RUNNER_TEMP}/signed/${name}"
+          done < "${RUNNER_TEMP}/draft_assets.txt"
+      - name: Verify the digests and the signatures against the pinned public key
         shell: bash
         run: |
           set -euo pipefail
+          python3 tools/keys.py verify
+          python3 tools/verify_release_set.py "${RUNNER_TEMP}/signed" --tag "${REQUESTED_TAG}" --list-file "${RUNNER_TEMP}/assets.txt"
+      - name: Publish the release made from the verified files
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "${RUNNER_TEMP}/signed"
           mapfile -t assets < "${RUNNER_TEMP}/assets.txt"
           gh release create "${REQUESTED_TAG}" --target "${GITHUB_SHA}" --title "URTC ${REQUESTED_TAG}" --notes-file "${RUNNER_TEMP}/notes.md" --latest "${assets[@]}"
       - name: Check what was published
@@ -135,16 +112,13 @@ jobs:
           check="${RUNNER_TEMP}/published"
           mkdir -p "${check}"
           gh release download "${REQUESTED_TAG}" --dir "${check}"
-          python3 tools/release_sign.py verify $(ls "${check}" | grep -v '\.sig$' | sed "s#^#${check}/#" | tr '\n' ' ')
-          python3 - <<'PY'
-          import json, os, sys
-          folder = os.path.join(os.environ["RUNNER_TEMP"], "published")
-          index = json.load(open(os.path.join(folder, "firmware_manifest.json"), encoding="utf-8"))
-          bad = [k for k, c in index["components"].items() if k.endswith("_application") and c.get("signing", {}).get("key_kind") != "release"]
-          if bad:
-              sys.exit("applications not signed with a release key: " + ", ".join(bad))
-          print("PUBLISHED_RELEASE=PASS")
-          PY
+          python3 tools/verify_release_set.py "${check}" --tag "${REQUESTED_TAG}"
+          echo "PUBLISHED_RELEASE=PASS"
+      - name: Remove the draft that held the signed files
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api --method DELETE "repos/${GH_REPO}/releases/${DRAFT_ID}"
       - name: Tell the flasher and the web studio that a release was published (when a token is set)
         shell: bash
         env:
@@ -165,8 +139,3 @@ jobs:
               echo "::warning::${target} could not be told about ${REQUESTED_TAG}; the release itself is published."
             fi
           done
-      - name: Remove the key files
-        if: ${{ always() }}
-        shell: bash
-        run: |
-          rm -rf "${RUNNER_TEMP}/urtc-keys"

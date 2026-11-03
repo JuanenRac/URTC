@@ -20,8 +20,8 @@ place it lives in.
 Signs every asset of an official release (the detached `.sig` files, see [`RELEASE_SIGNING.md`](RELEASE_SIGNING.md)). It is embedded in
 `tools/release_sign.py` and in this repository's `docs/RELEASE_SIGNING.md`, in URTC-FLASHER (`flasher_release_signature.py`) and in
 URTC-WEB-STUDIO (`scripts/sync-firmware.mjs` and `src/lib/releaseSignature.ts`). The private half lives outside every repository
-(the file named by `URTC_RELEASE_KEY`, by default `~/.urtc-keys/urtc_release_ed25519.pem`) and, if the maintainer chooses, in the secret
-`URTC_RELEASE_ED25519_PEM` of the protected `release` environment.
+(the file named by `URTC_RELEASE_KEY`, by default `~/.urtc-keys/urtc_release_ed25519.pem`); the signing is done on the maintainer's machine
+and the release workflow only checks the signatures with the public key.
 
 ### The development keys of the bootloaders
 
@@ -30,7 +30,7 @@ Images built without a production key are signed with the public development key
 can build and test. A release build replaces them with the production keys.
 
 The production HMAC keys of the two bootloaders are secrets. They live in `~/.urtc-keys/signing_keys.txt` (the lines `master=` and
-`slave=`) and in the secret `URTC_SIGNING_KEYS` of the release environment, never in a repository. A published image says in its manifest
+`slave=`) on the maintainer's machine, never in a repository or in GitHub. A published image says in its manifest
 which kind of key signed it (`signing_key_kind`).
 
 ## Checking

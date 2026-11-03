@@ -11,6 +11,8 @@ Firmware images are not kept in git: a release build writes them to firmware/
 version. This script checks that the set in the firmware folder is complete
 and consistent with urtc.project.json, then prints the exact
 `gh release create` command. It never runs gh and never changes a tracked file.
+With --draft the command it prints uploads the signed set as an unpublished draft, which
+.github/workflows/release.yml (tools/verify_release_set.py) verifies and publishes.
 
     python tools/publish_release_assets.py [--firmware-dir DIR] [--with-elf]
                                            [--repo OWNER/NAME] [--json]
@@ -193,10 +195,13 @@ def build_plan(root: Path, fw_dir: Path, with_elf: bool, repo: str | None, allow
     }
 
 
-def gh_command(plan: dict) -> str:
+def gh_command(plan: dict, draft: bool = False) -> str:
     head = f'gh release create {plan["tag"]} --repo {plan["repository"]} --title "{plan["title"]}" --notes-file RELEASE_NOTES.md'
     if plan.get("prerelease"):
         head += " --prerelease"
+    if draft:
+        # A draft is not public: it only holds the signed files for the release workflow, which verifies them and publishes.
+        head += " --draft"
     continuation = " " + chr(92) + chr(10)
     return continuation.join([head] + [f'  "{path}"' for path in plan["files"]])
 
@@ -209,6 +214,8 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--allow-dev-key", action="store_true",
                         help="allow images signed with the public development key, as a pre-release only")
     parser.add_argument("--sign", action="store_true", help="write the release signature (<asset>.sig) of every asset with the key of the releases")
+    parser.add_argument("--draft", action="store_true",
+                        help="print the gh command with --draft: the signed set is uploaded unpublished and the release workflow verifies and publishes it")
     parser.add_argument("--json", action="store_true", help="print the plan as JSON instead of text")
     parser.add_argument("--list-file", default=None, metavar="FILE",
                         help="when nothing is wrong, write the assets to FILE, one path per line (for a job that publishes them)")
@@ -227,7 +234,7 @@ def main(argv: list[str]) -> int:
             print(f"  PROBLEM {problem}")
         if not plan["problems"]:
             print()
-            print(gh_command(plan))
+            print(gh_command(plan, args.draft))
     if not plan["problems"]:
         if args.list_file:
             Path(args.list_file).write_text("".join(path + "\n" for path in plan["files"]), encoding="utf-8")

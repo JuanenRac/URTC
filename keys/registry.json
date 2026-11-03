@@ -7,7 +7,7 @@
       "algorithm": "ed25519",
       "role": "Signs every asset of an official release (the .sig files); the flasher, the web studio and the publishing tool check it before they trust a download.",
       "public": "4020c46d76c8ebacb64c5c7b9f3e7c62475afeb133d7421591988174e0f5dc90",
-      "private_half": "Outside every repository (the file named by URTC_RELEASE_KEY, by default ~/.urtc-keys/urtc_release_ed25519.pem) and, if the maintainer chooses, the secret URTC_RELEASE_ED25519_PEM of the protected release environment.",
+      "private_half": "Outside every repository (the file named by URTC_RELEASE_KEY, by default ~/.urtc-keys/urtc_release_ed25519.pem). The release workflow holds no signing key: it only verifies.",
       "embedded_in": [
         {"repo": "URTC", "file": "tools/release_sign.py", "kind": "text", "pattern": "PUBLIC_KEY_HEX\\s*=\\s*\"([0-9a-fA-F]{64})\""},
         {"repo": "URTC", "file": "docs/RELEASE_SIGNING.md", "kind": "text", "pattern": "(?m)^ed25519 ([0-9a-fA-F]{64})$"},
@@ -21,7 +21,7 @@
       "algorithm": "hmac-sha256",
       "role": "The PUBLIC development key of the main bootloader: images built without a production key are signed with it, so they prove nothing about who made them. A production build replaces it with a key that is not in any repository.",
       "public": "2526cc3e9011ec7c49ecd2d2b7f389e359aa246014ff5154a0af8a3c3bf95581",
-      "private_half": "None: this one is published on purpose. The production key of the main bootloader is a secret in ~/.urtc-keys/signing_keys.txt (line master=) and in the secret URTC_SIGNING_KEYS of the release environment; it is never written to a file of a repository.",
+      "private_half": "None: this one is published on purpose. The production key of the main bootloader is a secret in ~/.urtc-keys/signing_keys.txt (line master=) on the maintainer's machine; it is never written to a file of a repository.",
       "embedded_in": [
         {"repo": "URTC", "file": "src/F303-master/boot/bootloader_crypto.c", "kind": "c_array", "array": "HMAC_KEY", "branch": "else"}
       ]

@@ -119,8 +119,9 @@ Leave out `--allow-dev-key` once the images are signed with the production key.
 
 ## Publishing a release
 
-0. For an official release the protected job `.github/workflows/release.yml` does steps 1 to 3
-   (`docs/RELEASE_SIGNING.md`, "Publishing an official release").
+0. For an official release steps 1 to 3 are done on the maintainer's machine, with `--draft` in step 2 so that the
+   signed files are uploaded unpublished; the job `.github/workflows/release.yml` then only verifies them against the
+   public key and publishes (`docs/RELEASE_SIGNING.md`, "Publishing an official release").
 1. `bash build_firmware.sh` (release mode, with `URTC_SIGNING_KEY_FILE` and
    `URTC_RELEASE=1` for a release signed with the private key; see
    `docs/FIRMWARE_SIGNING.TXT`).

@@ -13,8 +13,8 @@ ed25519 4020c46d76c8ebacb64c5c7b9f3e7c62475afeb133d7421591988174e0f5dc90
 ```
 
 The private half lives outside every repository, with an offline copy; it is
-read from a file on the machine that publishes, or from the secret of the
-protected release job described below. The same public key is pinned in `tools/release_sign.py`, in the
+read from a file on the machine that signs; GitHub never holds it (the release workflow only
+verifies with the public key, from `keys/registry.json`). The same public key is pinned in `tools/release_sign.py`, in the
 flasher (`flasher_release_signature.py`) and in the web studio
 (`scripts/sync-firmware.mjs`); a test in each compares it with this page.
 
@@ -58,37 +58,46 @@ An official release has two things a bench pre-release does not: its application
 built with the **production bootloader keys** (`signing_key_kind: "release"` in their
 manifests; a key that is not the public development key), and **every asset has its `.sig`**.
 `tools/publish_release_assets.py` refuses to call a set official unless both are true.
-There are two ways to make one, with the same result.
 
-**From a machine you control (no secret in GitHub).**
+The signing is always **local**: both private keys stay on your machine, and GitHub holds none.
+The workflow `.github/workflows/release.yml` only **verifies and publishes** what you signed.
+
+**1. On your machine (nothing leaves it yet).**
 
 1. Create the bootloader keys once, outside every repository, and keep an offline copy
    (`docs/FIRMWARE_SIGNING.TXT`, section 3): `~/.urtc-keys/signing_keys.txt` with `master=` and
    `slave=` lines of 64 hexadecimal digits, readable by you only. They are different from the
    Ed25519 key of the releases (`~/.urtc-keys/urtc_release_ed25519.pem`).
-2. Raise the versions with `python bump.py` (compiling never does) and write the CHANGELOG
-   section of the new version.
+2. Raise the versions with `python bump.py` (compiling never does), write the CHANGELOG
+   section of the new version, run `URTC_CI=1 py -3 tools/ci_validate.py` and push to `main`.
 3. `URTC_SIGNING_KEY_FILE=~/.urtc-keys/signing_keys.txt URTC_RELEASE=1 ./build_firmware.sh`
-4. `python tools/publish_release_assets.py --sign` and run the `gh release create` command it
-   prints (notes: `python tools/changelog_section.py <version> > RELEASE_NOTES.md`).
+4. `python tools/publish_release_assets.py --sign --draft` signs every asset (`.sig`), checks the
+   set and prints a `gh release create ... --draft` command. Run it: it uploads the signed files
+   as an **unpublished draft** of the tag, which nobody else can see. Only one draft per tag.
+   (`python tools/verify_release_set.py firmware --tag v<version>` repeats on your machine the
+   very check the workflow will make.)
 
-**From GitHub (the protected job).** `.github/workflows/release.yml` does steps 3 and 4 and
-checks the published files afterwards. It is started by hand (`workflow_dispatch` with the tag,
-which must be `v` plus the version of `urtc.project.json`), runs only from `main`, and its job
-uses the `release` environment: the secrets are readable only after a reviewer approves the run.
-Set it up once (Settings, Environments, `release`: required reviewers, deployment branch `main`)
-and give it the two secrets without ever printing them:
+**2. On GitHub.** Actions, "URTC firmware release", Run workflow, branch `main`, the tag
+(`v` plus the version of `urtc.project.json`). The job waits for the approval that the `release`
+environment requires (required reviewer, deployment branch `main`; set up once under Settings,
+Environments). It holds no secret for this and needs none. Then it:
 
-```
-gh secret set URTC_SIGNING_KEYS         --env release --repo JuanenRac/URTC < ~/.urtc-keys/signing_keys.txt
-gh secret set URTC_RELEASE_ED25519_PEM  --env release --repo JuanenRac/URTC < ~/.urtc-keys/urtc_release_ed25519.pem
-```
+1. checks that the tag is the version of the commit and that no release of it exists;
+2. downloads the files of the draft;
+3. checks `keys/registry.json` against the embedded copies of the public key, and that the
+   public key is the one pinned in `tools/release_sign.py`;
+4. runs `tools/verify_release_set.py`: the tag, every digest (`.sha256`, the manifests, the
+   index), the versions, that the application images are signed with a production key, the
+   `.sig` of **every** asset against the public key, and that no file is there that the set does
+   not account for;
+5. only if all of it passes, creates the release from the files it just verified (not from the
+   draft, which could change in between), downloads the published files and verifies them again,
+   and removes the draft.
 
-The job writes the keys to files in the runner's temporary folder (mode 600), passes only the
-file names to the build, and removes the files at the end whatever happened. A version that
-already has a release is never rebuilt. Giving the keys to GitHub is a choice: if the
-repository's settings or the account are compromised, so are they; the first way keeps them on
-your machine.
+If any check fails nothing is published; the draft stays, so you can fix it (delete the draft,
+sign again, upload again) and run the workflow once more. A version that already has a release is
+never replaced. The job has `contents: write` because GitHub shows drafts only to a token that can
+write; no other permission is granted and no action is used that is not pinned by commit.
 
 **Telling the flasher and the web studio.** After the release is published, the job can send a
 `repository_dispatch` event (type `urtc-firmware-released`, with the tag and the commit) to
