@@ -44,22 +44,20 @@ jobs:
           [[ "$MAX_MINUTES" =~ ^[0-9]{1,5}$ ]] || { echo "::error::max_minutes must be a number"; exit 1; }
           now="$(date +%s)"
           stuck=""
+          nl=$'\n'
           for state in queued in_progress; do
-            while IFS=$'	' read -r id created url; do
+            rows="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/firmware-build.yml/runs?status=$state&per_page=50" --jq '.workflow_runs[] | "\(.id) \(.created_at) \(.html_url)"')"
+            while read -r id created url; do
               [ -n "$id" ] || continue
               age=$(( (now - $(date -d "$created" +%s)) / 60 ))
-              if [ "$age" -ge "$MAX_MINUTES" ]; then stuck="$stuck
-- $url ($state, $age minutes)"; fi
-            done < <(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/firmware-build.yml/runs?status=$state&per_page=50" --jq '.workflow_runs[] | [.id, .created_at, .html_url] | @tsv')
+              if [ "$age" -ge "$MAX_MINUTES" ]; then stuck="$stuck- $url ($state, $age minutes)$nl"; fi
+            done <<< "$rows"
           done
           number="$(gh issue list --repo "$GITHUB_REPOSITORY" --label build-stuck --state open --json number --jq '.[0].number // empty')"
           if [ -n "$stuck" ]; then
-            body="$(printf 'A build has been queued or running for %s minutes or more and may be stuck:%b
-
-Cancel it in the Actions tab and start it again.' "$MAX_MINUTES" "$stuck")"
+            body="A build has been queued or running for $MAX_MINUTES minutes or more and may be stuck:$nl$nl$stuck$nl""Cancel it in the Actions tab and start it again."
             echo "::error::stuck builds found"
-            echo "### Stuck builds" >> "$GITHUB_STEP_SUMMARY"; printf '%b
-' "$stuck" >> "$GITHUB_STEP_SUMMARY"
+            { echo "### Stuck builds"; echo "$stuck"; } >> "$GITHUB_STEP_SUMMARY"
             if [ -n "$number" ]; then
               gh issue comment "$number" --repo "$GITHUB_REPOSITORY" --body "$body"
             else
