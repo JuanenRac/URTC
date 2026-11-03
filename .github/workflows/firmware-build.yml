@@ -7,10 +7,12 @@
 # components of this repository with build_firmware.sh in CI mode (URTC_CI=1: no version change, nothing tracked is touched),
 # checks the images, and uploads them with SHA256SUMS and a build manifest as one artifact with a build-provenance attestation.
 #
-# It holds no key and signs nothing. The bootloader key is compiled INTO the images, so a build made here can only carry the
-# PUBLIC development key: it is a bench build (signing_key_kind "dev"), never an official release. An official release is built
-# and signed on the maintainer's machine (docs/RELEASE_SIGNING.md). The signed Ed25519 layer of a bench pre-release is added
-# locally from this artifact. With dry_run on (the default) nothing but the artifact is made; with it off a DRAFT pre-release
+# It holds no key and signs nothing. The main bootloader holds a table of PUBLIC Ed25519 keys (keys/image_trust.json) and the images are
+# signed afterwards, on the maintainer's machine (docs/RELEASE_SIGNING.md). The flavour input picks the table: "dev" (the default) is the bench
+# table, whose seed is public (signing_key_kind "dev"); "release" is the official table, which stays closed (it trusts nobody and installs nothing)
+# until the maintainer puts the public half of the image-signing key in keys/image_trust.json. A build whose bootloader does not hold exactly the
+# table of its flavour fails. The size of the bootloaders is measured with arm-none-eabi-size and the build fails when one leaves less free space in
+# its reserved region than the margin of tools/bootloader_size.json. The signed Ed25519 layer of a pre-release is added locally from this artifact. With dry_run on (the default) nothing but the artifact is made; with it off a DRAFT pre-release
 # named v<version>-bench with the unsigned files is also prepared (its tag can never be the tag of release.yml).
 # A failed build writes the Job Summary and opens (or updates) the issue "build-failed"; a later good build closes it.
 
@@ -29,6 +31,14 @@ on:
         type: string
         required: true
         default: main
+      flavour:
+        description: "Trust table of the bootloader: dev (bench, public key) or release (official, closed until the image key exists)"
+        type: choice
+        required: true
+        default: dev
+        options:
+          - dev
+          - release
 
 permissions:
   contents: read
@@ -118,6 +128,7 @@ jobs:
         env:
           URTC_CI: "1"
           URTC_COVERAGE_FLOOR: "90"
+          URTC_RELEASE: ${{ inputs.flavour == 'release' && '1' || '0' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -129,6 +140,7 @@ jobs:
         shell: bash
         env:
           VERSION: ${{ needs.plan.outputs.version }}
+          FLAVOUR: ${{ inputs.flavour }}
         run: |
           set -euo pipefail
           python3 - <<'PY'
@@ -149,18 +161,26 @@ jobs:
                   sys.exit(f"::error::{image.name} does not carry version {component['version_string']}")
               if key.endswith("_application"):
                   kind = json.loads((out / (image.name + ".manifest.json")).read_text(encoding="utf-8")).get("signing_key_kind")
-                  if kind != "dev":
-                      sys.exit(f"::error::{image.name} has signing_key_kind {kind!r}; a build in Actions must use the public development key only")
+                  if (kind == "dev") != (os.environ["FLAVOUR"] == "dev"):
+                      sys.exit(f"::error::{image.name} has signing_key_kind {kind!r}, which is not the flavour {os.environ['FLAVOUR']!r} of this build")
           print("images ok:", ", ".join(c["files"]["bin"]["filename"] for c in components.values()))
           PY
+          # the main bootloader must hold, at the fixed offset, exactly the trust table of the flavour (release: the closed table while the key does not exist)
+          python3 tools/image_trust.py check build/firmware/URTC_MAIN_BOOTLOADER_v*.bin master "$FLAVOUR"
           mkdir -p out
           cp build/firmware/URTC_*.bin build/firmware/URTC_*.hex build/firmware/URTC_*.bin.sha256 build/firmware/URTC_*.bin.manifest.json build/firmware/firmware_manifest.json out/
           cp build/toolchain.txt out/toolchain.txt.tmp
           {
-            echo "### URTC firmware $VERSION (bench build, development key)"
+            echo "### URTC firmware $VERSION (flavour: $FLAVOUR)"
             (cd out && sha256sum URTC_*.bin | sed 's/^/- /')
             echo "- toolchain: \`$(cat build/toolchain.txt)\`"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Measure the bootloaders
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/bootloader_size.py --summary "$GITHUB_STEP_SUMMARY"
 
       - name: Upload the images
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -186,6 +206,7 @@ jobs:
       VERSION: ${{ needs.plan.outputs.version }}
       SHA: ${{ needs.plan.outputs.sha }}
       GH_TOKEN: ${{ github.token }}
+      FLAVOUR: ${{ inputs.flavour }}
     steps:
       - name: Download the images
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
@@ -210,7 +231,7 @@ jobs:
               "schema": "urtc-build/1", "repository": os.environ["GITHUB_REPOSITORY"], "project": "urtc", "version": os.environ["VERSION"],
               "commit": os.environ["SHA"], "built_on": "github-actions", "run_id": os.environ["GITHUB_RUN_ID"],
               "run_url": f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
-              "toolchain": open("/tmp/toolchain.txt", encoding="utf-8").read().strip(), "signing_key_kind": "dev",
+              "toolchain": open("/tmp/toolchain.txt", encoding="utf-8").read().strip(), "signing_key_kind": os.environ["FLAVOUR"],
               "signed": False, "files": files,
           }, open("build-manifest.json", "w", encoding="utf-8"), indent=2)
           PY
@@ -248,6 +269,7 @@ jobs:
       GH_REPO: ${{ github.repository }}
       ACTOR: ${{ github.actor }}
       OWNER: ${{ github.repository_owner }}
+      FLAVOUR: ${{ inputs.flavour }}
     steps:
       - name: Download the build
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
@@ -266,7 +288,7 @@ jobs:
             exit 1
           fi
           gh release create "$tag" files/* --draft --prerelease --target "$SHA" --title "URTC $VERSION (unsigned bench build)" \
-            --notes "Unsigned bench build made by GitHub Actions with the public development key. Not an official release; do not install it on a board you care about."
+            --notes "Unsigned build made by GitHub Actions (trust table: $FLAVOUR). Not an official release until it is signed on the maintainer's machine; do not install it on a board you care about."
           echo "- draft pre-release \`$tag\` prepared with the unsigned files" >> "$GITHUB_STEP_SUMMARY"
 
   verify:
@@ -295,7 +317,7 @@ jobs:
           python3 - <<'PY'
           import json
           manifest = json.load(open("build-manifest.json", encoding="utf-8"))
-          assert manifest["signed"] is False and manifest["signing_key_kind"] == "dev" and manifest["files"], "unexpected manifest"
+          assert manifest["signed"] is False and manifest["signing_key_kind"] in ("dev", "release") and manifest["files"], "unexpected manifest"
           print("manifest ok:", manifest["project"], manifest["version"], len(manifest["files"]), "files")
           PY
           for file in URTC_* firmware_manifest.json SHA256SUMS; do

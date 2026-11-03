@@ -1,0 +1,17 @@
+{
+  "about": "Margins of the size check of the bootloaders (tools/bootloader_size.py). The size of each region comes from the linker script; the margin is the least free space, in bytes, that a bootloader must keep in it.",
+  "bootloaders": {
+    "main": {
+      "elf_glob": "build/firmware/URTC_MAIN_BOOTLOADER_v*.elf",
+      "linker": "src/F303-master/boot/STM32F303CCTx_BOOTLOADER.ld",
+      "flash_margin_bytes": 1024,
+      "ram_margin_bytes": 4096
+    },
+    "slave": {
+      "elf_glob": "build/firmware/URTC_SLAVE_BOOTLOADER_v*.elf",
+      "linker": "src/F303-slave/boot/STM32F303CBTx_SLAVEBOOT.ld",
+      "flash_margin_bytes": 512,
+      "ram_margin_bytes": 4096
+    }
+  }
+}
