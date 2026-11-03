@@ -69,22 +69,22 @@ extern I2C_HandleTypeDef hi2c2;
 // -----------------------------------------------------------------------
 // CAN protocol (0x7F0-0x7FA) - see CANBUS.TXT for the full wire-level reference
 // -----------------------------------------------------------------------
-#define CAN_ID_ENTER_BOOTLOADER  0x7F0 // sent to the RUNNING APPLICATION (it resets into this bootloader) - handled in the app's firmware, not here
-#define CAN_ID_START_UPDATE      0x7F1 // sent to THIS bootloader: DLC=8, big-endian total firmware size (4 bytes) + big-endian HardwareID (4 bytes)
-#define CAN_ID_DATA              0x7F2 // sent to THIS bootloader: up to 8 bytes of firmware data, sent sequentially - goes to the BACKUP slot, never main
-#define CAN_ID_PAGE_ACK          0x7F3 // sent BY this bootloader after each backup-slot page write: DLC=4, big-endian page index
-#define CAN_ID_END_UPDATE        0x7F4 // sent to THIS bootloader: DLC=8, big-endian CRC32 (4 bytes) + big-endian VersionMajor/Minor (2 bytes each)
-#define CAN_ID_STATUS            0x7F5 // sent BY this bootloader: DLC=1, status codes below
-#define CAN_ID_HEARTBEAT         0x7F6 // sent BY this bootloader every ~1s while listening or updating: DLC=2, status byte + progress percent (0-100, 0xFF if not applicable)
-#define CAN_ID_HMAC_CHUNK        0x7F7 // HMAC chunk of the old bootloaders; this one does not read it (it asks for the Ed25519 record on CAN_ID_IMG_SIG_CHUNK)
-#define CAN_ID_IMG_SIG_CHUNK     0x7EC // sent to THIS bootloader: DLC=8 x11, index (0-10) + 7 bytes of the 76-byte record (key id, counter, signature), after CAN_ID_START_UPDATE
-#define CAN_ID_KEY_ID            0x7ED // sent BY this bootloader right after its answer to CAN_ID_QUERY_VERSION: DLC=8, the id of the key it trusts
-#define CAN_ID_QUERY_VERSION     0x7F8 // sent to either the application or this bootloader, whichever is currently running
-#define CAN_ID_VERSION_RESPONSE  0x7F9 // sent BY whichever answered: DLC=8, byte0 (0=application, 1=bootloader) + HardwareID (4 bytes) + version major (2 bytes) + version minor (1 byte), all big-endian
-#define CAN_ID_BOOTLOADER_VERSION_RESPONSE 0x7FA // sent ONLY by the bootloader, right alongside 0x7F9
-#define CAN_ID_QUERY_ERROR_COUNTERS 0x7FB // sent to either the application or this bootloader, whichever is currently running - same dual-answerable convention as CAN_ID_QUERY_VERSION
-#define CAN_ID_ERROR_COUNTERS_RESPONSE 0x7FC // sent BY whichever answered: DLC=2, TEC (Transmit Error Counter) + REC (Receive Error Counter), read directly from the CAN peripheral's own ESR register
-#define CAN_ID_AUTHORIZE_DOWNGRADE 0x7FD // sent to THIS bootloader: DLC=4, magic payload 0xD0,0x9E,0x12,0xAD - authorizes the CURRENT update attempt only to install an older version than what's running, bypassing HandleEndUpdate's own anti-rollback check just this once
+#define CAN_ID_ENTER_BOOTLOADER  URTC_CAN_ID_ENTER_BOOTLOADER // sent to the RUNNING APPLICATION (it resets into this bootloader) - handled in the app's firmware, not here
+#define CAN_ID_START_UPDATE      URTC_CAN_ID_START_UPDATE // sent to THIS bootloader: DLC=8, big-endian total firmware size (4 bytes) + big-endian HardwareID (4 bytes)
+#define CAN_ID_DATA              URTC_CAN_ID_DATA // sent to THIS bootloader: up to 8 bytes of firmware data, sent sequentially - goes to the BACKUP slot, never main
+#define CAN_ID_PAGE_ACK          URTC_CAN_ID_PAGE_ACK // sent BY this bootloader after each backup-slot page write: DLC=4, big-endian page index
+#define CAN_ID_END_UPDATE        URTC_CAN_ID_END_UPDATE // sent to THIS bootloader: DLC=8, big-endian CRC32 (4 bytes) + big-endian VersionMajor/Minor (2 bytes each)
+#define CAN_ID_STATUS            URTC_CAN_ID_STATUS // sent BY this bootloader: DLC=1, status codes below
+#define CAN_ID_HEARTBEAT         URTC_CAN_ID_HEARTBEAT // sent BY this bootloader every ~1s while listening or updating: DLC=2, status byte + progress percent (0-100, 0xFF if not applicable)
+#define CAN_ID_HMAC_CHUNK        URTC_CAN_ID_HMAC_CHUNK // HMAC chunk of the old bootloaders; this one does not read it (it asks for the Ed25519 record on CAN_ID_IMG_SIG_CHUNK)
+#define CAN_ID_IMG_SIG_CHUNK     URTC_CAN_ID_BOOTLOADER_SIGNATURE_CHUNK // sent to THIS bootloader: DLC=8 x11, index (0-10) + 7 bytes of the 76-byte record (key id, counter, signature), after CAN_ID_START_UPDATE
+#define CAN_ID_KEY_ID            URTC_CAN_ID_BOOTLOADER_KEY_ID // sent BY this bootloader right after its answer to CAN_ID_QUERY_VERSION: DLC=8, the id of the key it trusts
+#define CAN_ID_QUERY_VERSION     URTC_CAN_ID_QUERY_VERSION // sent to either the application or this bootloader, whichever is currently running
+#define CAN_ID_VERSION_RESPONSE  URTC_CAN_ID_VERSION_RESPONSE // sent BY whichever answered: DLC=8, byte0 (0=application, 1=bootloader) + HardwareID (4 bytes) + version major (2 bytes) + version minor (1 byte), all big-endian
+#define CAN_ID_BOOTLOADER_VERSION_RESPONSE URTC_CAN_ID_BOOTLOADER_VERSION_RESPONSE // sent ONLY by the bootloader, right alongside 0x7F9
+#define CAN_ID_QUERY_ERROR_COUNTERS URTC_CAN_ID_QUERY_ERROR_COUNTERS // sent to either the application or this bootloader, whichever is currently running - same dual-answerable convention as CAN_ID_QUERY_VERSION
+#define CAN_ID_ERROR_COUNTERS_RESPONSE URTC_CAN_ID_ERROR_COUNTERS_RESPONSE // sent BY whichever answered: DLC=2, TEC (Transmit Error Counter) + REC (Receive Error Counter), read directly from the CAN peripheral's own ESR register
+#define CAN_ID_AUTHORIZE_DOWNGRADE URTC_CAN_ID_AUTHORIZE_DOWNGRADE // sent to THIS bootloader: DLC=4, magic payload 0xD0,0x9E,0x12,0xAD - authorizes the CURRENT update attempt only to install an older version than what's running, bypassing HandleEndUpdate's own anti-rollback check just this once
 // CAN_ID_READBACK is used bidirectionally, distinguished by DLC - same
 // convention CAN_ID_STATUS already uses for its own DLC=1-vs-2 verify-fail
 // reason. Master->bootloader with any DLC starts the transfer; the very
@@ -93,8 +93,8 @@ extern I2C_HandleTypeDef hi2c2;
 // main-slot bytes, sequential from MAIN_APP_ADDR. This is the last 2 IDs
 // in the entire 11-bit standard CAN ID space (0x7FE/0x7FF) - nothing more
 // fits after these without extended (29-bit) IDs.
-#define CAN_ID_READBACK 0x7FE
-#define CAN_ID_READBACK_PAGE_ACK 0x7FF // sent to THIS bootloader after each 2048-byte page is safely received: DLC=4, big-endian page index - same big-endian-page-index convention as CAN_ID_PAGE_ACK, just the opposite direction (host acking a read instead of the bootloader acking a write)
+#define CAN_ID_READBACK URTC_CAN_ID_READBACK
+#define CAN_ID_READBACK_PAGE_ACK URTC_CAN_ID_READBACK_PAGE_ACK // sent to THIS bootloader after each 2048-byte page is safely received: DLC=4, big-endian page index - same big-endian-page-index convention as CAN_ID_PAGE_ACK, just the opposite direction (host acking a read instead of the bootloader acking a write)
 
 #define STATUS_LISTENING     0x01 // waiting for CAN_ID_START_UPDATE
 #define STATUS_ERASING       0x02 // erasing the backup slot
