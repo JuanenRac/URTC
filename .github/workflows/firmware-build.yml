@@ -50,8 +50,11 @@ jobs:
         shell: bash
         env:
           REF: ${{ inputs.ref }}
+          ACTOR: ${{ github.actor }}
+          OWNER: ${{ github.repository_owner }}
         run: |
           set -euo pipefail
+          [ "$ACTOR" = "$OWNER" ] || { echo "::error::only the owner of the repository ($OWNER) may start this build, not $ACTOR"; exit 1; }
           [[ "$REF" =~ ^[A-Za-z0-9._/-]{1,100}$ ]] || { echo "::error::the ref has characters that a branch, tag or commit does not have"; exit 1; }
 
       - name: Check out this repository
@@ -168,7 +171,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
-      contents: write
+      contents: read
       id-token: write
       attestations: write
     env:
@@ -221,11 +224,34 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+  draft:
+    name: Prepare the draft release (needs the approval of the owner)
+    if: ${{ !inputs.dry_run }}
+    needs: [plan, collect]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: release
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.plan.outputs.version }}
+      SHA: ${{ needs.plan.outputs.sha }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      ACTOR: ${{ github.actor }}
+      OWNER: ${{ github.repository_owner }}
+    steps:
+      - name: Download the build
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: firmware-urtc-${{ needs.plan.outputs.version }}
+          path: files
+
       - name: Prepare the draft pre-release with the unsigned files
-        if: ${{ !inputs.dry_run }}
         shell: bash
         run: |
           set -euo pipefail
+          [ "$ACTOR" = "$OWNER" ] || { echo "::error::only the owner may prepare a release"; exit 1; }
           tag="v$VERSION-bench"
           if gh release view "$tag" >/dev/null 2>&1; then
             echo "::error::the release $tag already exists: raise the version before a new build"
@@ -265,14 +291,14 @@ jobs:
           print("manifest ok:", manifest["project"], manifest["version"], len(manifest["files"]), "files")
           PY
           for file in URTC_* firmware_manifest.json SHA256SUMS; do
-            gh attestation verify "$file" --repo "$GITHUB_REPOSITORY" >/dev/null
+            gh attestation verify "$file" --repo "$GITHUB_REPOSITORY" --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/firmware-build.yml" --source-digest "$GITHUB_SHA" >/dev/null
             echo "attestation ok: $file"
           done
 
   notify:
     name: Tell the owner (issue build-failed)
     if: ${{ always() }}
-    needs: [plan, build, collect, verify]
+    needs: [plan, build, collect, draft, verify]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -280,7 +306,7 @@ jobs:
       contents: read
     env:
       GH_TOKEN: ${{ github.token }}
-      RESULTS: ${{ needs.plan.result }} ${{ needs.build.result }} ${{ needs.collect.result }} ${{ needs.verify.result }}
+      RESULTS: ${{ needs.plan.result }} ${{ needs.build.result }} ${{ needs.collect.result }} ${{ (inputs.dry_run && needs.draft.result == 'skipped') && 'success' || needs.draft.result }} ${{ needs.verify.result }}
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     steps:
       - name: Open, update or close the issue
