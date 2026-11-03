@@ -1,0 +1,302 @@
+# =============================================================================
+# URTC - Manual firmware build (build here, sign locally)
+# Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
+# GPL-3.0-or-later - see LICENSE
+# =============================================================================
+# Started by hand only (workflow_dispatch): it never runs on a push or a pull request. It compiles the four firmware
+# components of this repository with build_firmware.sh in CI mode (URTC_CI=1: no version change, nothing tracked is touched),
+# checks the images, and uploads them with SHA256SUMS and a build manifest as one artifact with a build-provenance attestation.
+#
+# It holds no key and signs nothing. The bootloader key is compiled INTO the images, so a build made here can only carry the
+# PUBLIC development key: it is a bench build (signing_key_kind "dev"), never an official release. An official release is built
+# and signed on the maintainer's machine (docs/RELEASE_SIGNING.md). The signed Ed25519 layer of a bench pre-release is added
+# locally from this artifact. With dry_run on (the default) nothing but the artifact is made; with it off a DRAFT pre-release
+# named v<version>-bench with the unsigned files is also prepared (its tag can never be the tag of release.yml).
+# A failed build writes the Job Summary and opens (or updates) the issue "build-failed"; a later good build closes it.
+
+name: Firmware build (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run: build and check only, no draft pre-release"
+        type: boolean
+        required: true
+        default: true
+      ref:
+        description: "Branch, tag or commit of this repository"
+        type: string
+        required: true
+        default: main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: firmware-build
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    name: Plan the build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      version: ${{ steps.plan.outputs.version }}
+      sha: ${{ steps.plan.outputs.sha }}
+    steps:
+      - name: Check the inputs
+        shell: bash
+        env:
+          REF: ${{ inputs.ref }}
+        run: |
+          set -euo pipefail
+          [[ "$REF" =~ ^[A-Za-z0-9._/-]{1,100}$ ]] || { echo "::error::the ref has characters that a branch, tag or commit does not have"; exit 1; }
+
+      - name: Check out this repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+
+      - name: Work out the version and pin the commit
+        id: plan
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "version=$(python3 -c "import json; print(json.load(open('urtc.project.json', encoding='utf-8'))['version'])")" >> "$GITHUB_OUTPUT"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build the four components
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out the exact commit that was planned
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ needs.plan.outputs.sha }}
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+
+      - name: Make sure the build has no private key to take
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "${URTC_SIGNING_KEY_FILE:-}" ] || [ -n "${URTC_RELEASE:-}" ]; then
+            echo "::error::a signing key or a release mode is set in this job; a build made here must use the public development key"
+            exit 1
+          fi
+          if compgen -G "signing_keys*.txt" >/dev/null; then
+            echo "::error::a signing key file is in the repository"
+            exit 1
+          fi
+
+      - name: Install the ARM GNU toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes gcc-arm-none-eabi binutils-arm-none-eabi libnewlib-arm-none-eabi libstdc++-arm-none-eabi-newlib cppcheck
+
+      - name: Compile the firmware without a version bump
+        env:
+          URTC_CI: "1"
+          URTC_COVERAGE_FLOOR: "90"
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x build_firmware.sh
+          ./build_firmware.sh
+          arm-none-eabi-gcc --version | head -n 1 > build/toolchain.txt
+
+      - name: Check the images and name the files
+        shell: bash
+        env:
+          VERSION: ${{ needs.plan.outputs.version }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, sys
+          from pathlib import Path
+          out = Path("build/firmware")
+          index = json.loads((out / "firmware_manifest.json").read_text(encoding="utf-8"))
+          components = index["components"]
+          if set(components) != {"main_bootloader", "main_application", "slave_bootloader", "slave_application"}:
+              sys.exit("::error::unexpected components: " + ", ".join(sorted(components)))
+          if components["main_application"]["version_string"] != os.environ["VERSION"]:
+              sys.exit("::error::the main application is " + components["main_application"]["version_string"] + ", urtc.project.json says " + os.environ["VERSION"] + " (raise the version BEFORE the build)")
+          for key, component in components.items():
+              image = out / component["files"]["bin"]["filename"]
+              if not image.is_file():
+                  sys.exit(f"::error::{image.name} was not made")
+              if "_v" + component["version_string"] + "." not in image.name:
+                  sys.exit(f"::error::{image.name} does not carry version {component['version_string']}")
+              if key.endswith("_application"):
+                  kind = json.loads((out / (image.name + ".manifest.json")).read_text(encoding="utf-8")).get("signing_key_kind")
+                  if kind != "dev":
+                      sys.exit(f"::error::{image.name} has signing_key_kind {kind!r}; a build in Actions must use the public development key only")
+          print("images ok:", ", ".join(c["files"]["bin"]["filename"] for c in components.values()))
+          PY
+          mkdir -p out
+          cp build/firmware/URTC_*.bin build/firmware/URTC_*.hex build/firmware/URTC_*.bin.sha256 build/firmware/URTC_*.bin.manifest.json build/firmware/firmware_manifest.json out/
+          cp build/toolchain.txt out/toolchain.txt.tmp
+          {
+            echo "### URTC firmware $VERSION (bench build, development key)"
+            (cd out && sha256sum URTC_*.bin | sed 's/^/- /')
+            echo "- toolchain: \`$(cat build/toolchain.txt)\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the images
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: parts
+          path: |
+            out/URTC_*
+            out/firmware_manifest.json
+            out/toolchain.txt.tmp
+          if-no-files-found: error
+          retention-days: 7
+
+  collect:
+    name: Collect, attest and prepare the draft
+    needs: [plan, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    env:
+      VERSION: ${{ needs.plan.outputs.version }}
+      SHA: ${{ needs.plan.outputs.sha }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Download the images
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: parts
+          path: files
+
+      - name: Write SHA256SUMS and the build manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd files
+          mv toolchain.txt.tmp /tmp/toolchain.txt
+          sha256sum URTC_* firmware_manifest.json > SHA256SUMS
+          python3 - <<'PY'
+          import json, os
+          files = []
+          for line in open("SHA256SUMS", encoding="utf-8"):
+              digest, name = line.strip().split("  ", 1)
+              files.append({"name": name, "sha256": digest, "bytes": os.path.getsize(name)})
+          json.dump({
+              "schema": "urtc-build/1", "repository": os.environ["GITHUB_REPOSITORY"], "project": "urtc", "version": os.environ["VERSION"],
+              "commit": os.environ["SHA"], "built_on": "github-actions", "run_id": os.environ["GITHUB_RUN_ID"],
+              "run_url": f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
+              "toolchain": open("/tmp/toolchain.txt", encoding="utf-8").read().strip(), "signing_key_kind": "dev",
+              "signed": False, "files": files,
+          }, open("build-manifest.json", "w", encoding="utf-8"), indent=2)
+          PY
+          cat SHA256SUMS
+
+      - name: Attest the provenance of the files
+        uses: actions/attest-build-provenance@43d14bc2b83dec42d39ecae14e916627a18bb661 # v3
+        with:
+          subject-path: |
+            files/URTC_*
+            files/firmware_manifest.json
+            files/SHA256SUMS
+
+      - name: Upload the build
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: firmware-urtc-${{ needs.plan.outputs.version }}
+          path: files/*
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Prepare the draft pre-release with the unsigned files
+        if: ${{ !inputs.dry_run }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="v$VERSION-bench"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "::error::the release $tag already exists: raise the version before a new build"
+            exit 1
+          fi
+          gh release create "$tag" files/* --draft --prerelease --target "$SHA" --title "URTC $VERSION (unsigned bench build)" \
+            --notes "Unsigned bench build made by GitHub Actions with the public development key. Not an official release; do not install it on a board you care about."
+          echo "- draft pre-release \`$tag\` prepared with the unsigned files" >> "$GITHUB_STEP_SUMMARY"
+
+  verify:
+    name: Verify the artifact as a stranger would
+    needs: [plan, collect]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      attestations: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Download the build
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: firmware-urtc-${{ needs.plan.outputs.version }}
+          path: build
+
+      - name: Check hashes, manifest and attestation
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd build
+          sha256sum -c SHA256SUMS
+          python3 - <<'PY'
+          import json
+          manifest = json.load(open("build-manifest.json", encoding="utf-8"))
+          assert manifest["signed"] is False and manifest["signing_key_kind"] == "dev" and manifest["files"], "unexpected manifest"
+          print("manifest ok:", manifest["project"], manifest["version"], len(manifest["files"]), "files")
+          PY
+          for file in URTC_* firmware_manifest.json SHA256SUMS; do
+            gh attestation verify "$file" --repo "$GITHUB_REPOSITORY" >/dev/null
+            echo "attestation ok: $file"
+          done
+
+  notify:
+    name: Tell the owner (issue build-failed)
+    if: ${{ always() }}
+    needs: [plan, build, collect, verify]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: write
+      contents: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RESULTS: ${{ needs.plan.result }} ${{ needs.build.result }} ${{ needs.collect.result }} ${{ needs.verify.result }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - name: Open, update or close the issue
+        shell: bash
+        run: |
+          set -euo pipefail
+          number="$(gh issue list --repo "$GITHUB_REPOSITORY" --label build-failed --state open --json number --jq '.[0].number // empty')"
+          if [[ " $RESULTS " == *" failure "* || " $RESULTS " == *" cancelled "* ]]; then
+            body="The firmware build failed (plan / build / collect / verify: $RESULTS). Run: $RUN_URL"
+            if [ -n "$number" ]; then
+              gh issue comment "$number" --repo "$GITHUB_REPOSITORY" --body "$body"
+            else
+              gh label create build-failed --repo "$GITHUB_REPOSITORY" --color B60205 --description "A build in GitHub Actions failed" 2>/dev/null || true
+              gh issue create --repo "$GITHUB_REPOSITORY" --label build-failed --title "Firmware build failed" --body "$body"
+            fi
+            echo "### The build failed: issue build-failed updated" >> "$GITHUB_STEP_SUMMARY"
+          elif [ -n "$number" ]; then
+            gh issue close "$number" --repo "$GITHUB_REPOSITORY" --comment "A later build passed: $RUN_URL"
+          fi
