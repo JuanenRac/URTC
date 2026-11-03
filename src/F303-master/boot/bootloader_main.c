@@ -116,6 +116,7 @@ int main(void) {
     hiwdg.Init.Prescaler = IWDG_PRESCALER_32;
     hiwdg.Init.Reload = 999;
     HAL_IWDG_Init(&hiwdg);
+    BlSelect_Init();
 
     uint8_t app_valid = ApplicationIsValid();
 
@@ -150,7 +151,11 @@ int main(void) {
                 if (rxHeader.RTR != CAN_RTR_DATA || rxHeader.IDE != CAN_ID_STD) {
                     continue;
                 }
-                if (rxHeader.StdId == CAN_ID_START_UPDATE && rxHeader.DLC == 8) {
+                if (rxHeader.StdId == URTC_CAN_ID_BOOTLOADER_SELECT) {
+                    BlSelect_OnFrame(rxData, (uint8_t)rxHeader.DLC);
+                } else if (!BlSelect_Accepts((uint16_t)rxHeader.StdId)) {
+                    // another head is addressed: this frame is not for this bootloader
+                } else if (rxHeader.StdId == CAN_ID_START_UPDATE && rxHeader.DLC == 8) {
                     enter_update_mode = 1;
                     HandleStartUpdate(rxData);
                     break;
@@ -190,7 +195,11 @@ int main(void) {
                 if (rxHeader.RTR != CAN_RTR_DATA || rxHeader.IDE != CAN_ID_STD) {
                     continue;
                 }
-                if (rxHeader.StdId == CAN_ID_START_UPDATE && rxHeader.DLC == 8) {
+                if (rxHeader.StdId == URTC_CAN_ID_BOOTLOADER_SELECT) {
+                    BlSelect_OnFrame(rxData, (uint8_t)rxHeader.DLC);
+                } else if (!BlSelect_Accepts((uint16_t)rxHeader.StdId)) {
+                    // another head is addressed: this frame is not for this bootloader
+                } else if (rxHeader.StdId == CAN_ID_START_UPDATE && rxHeader.DLC == 8) {
                     HandleStartUpdate(rxData);
                 } else if (rxHeader.StdId == CAN_ID_IMG_SIG_CHUNK && rxHeader.DLC == 8) {
                     HandleSigChunk(rxData);

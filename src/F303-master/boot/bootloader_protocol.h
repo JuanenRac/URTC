@@ -65,4 +65,11 @@ void HandleData(uint8_t *data, uint32_t dlc);
 // main slot and resets into the new application.
 void HandleEndUpdate(uint8_t *data);
 
+// Addressing by serial number (0x7EA): BlSelect_Accepts says whether a frame
+// with this identifier is for this bootloader now, BlSelect_OnFrame handles a
+// 0x7EA command and sends the 0x7EB answer when there is one.
+void BlSelect_Init(void);
+uint8_t BlSelect_Accepts(uint16_t can_id);
+void BlSelect_OnFrame(const uint8_t *data, uint8_t dlc);
+
 #endif // BOOTLOADER_PROTOCOL_H

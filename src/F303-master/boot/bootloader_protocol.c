@@ -13,6 +13,7 @@
 #include "bootloader_trust.h"
 #include "urtc_auth.h"
 #include "urtc_version_wire.h"
+#include "urtc_bl_select.h"
 
 static uint8_t CAN_WaitForFreeMailbox(void) {
     // 50 attempts x 1ms = 50ms max - a small fraction of the ~800ms IWDG
@@ -869,4 +870,34 @@ void HandleEndUpdate(uint8_t *data) {
     CAN_SendStatus(STATUS_VERIFY_OK);
     HAL_Delay(600); // let the success message actually be seen before resetting
     NVIC_SystemReset();
+}
+
+// ---------------------------------------------------------------------------
+// Addressing this bootloader by its serial number when several heads share a
+// bus (0x7EA commands, 0x7EB answers). With nobody addressing it, or a serial
+// that is blank, every frame is obeyed exactly as before. The serial is the
+// fold of the 96-bit unique ID; the programmable serial record is not read yet.
+// ---------------------------------------------------------------------------
+static urtc_bl_node_t bl_node;
+
+void BlSelect_Init(void) {
+    urtc_bl_node_init(&bl_node, HAL_GetUIDw0(), HAL_GetUIDw1(), HAL_GetUIDw2());
+}
+
+uint8_t BlSelect_Accepts(uint16_t can_id) {
+    return urtc_bl_node_accepts(&bl_node, HAL_GetTick(), can_id, update_in_progress) ? 1u : 0u;
+}
+
+void BlSelect_OnFrame(const uint8_t *data, uint8_t dlc) {
+    urtc_bl_reply_t reply;
+    urtc_bl_node_on_cmd(&bl_node, HAL_GetTick(), data, dlc, update_in_progress, &reply);
+    if (!reply.send || !CAN_WaitForFreeMailbox()) return;
+    CAN_TxHeaderTypeDef txHeader;
+    uint32_t mailbox;
+    txHeader.StdId = reply.id;
+    txHeader.IDE = CAN_ID_STD;
+    txHeader.RTR = CAN_RTR_DATA;
+    txHeader.DLC = reply.dlc;
+    txHeader.TransmitGlobalTime = DISABLE;
+    HAL_CAN_AddTxMessage(&hcan, &txHeader, reply.data, &mailbox);
 }

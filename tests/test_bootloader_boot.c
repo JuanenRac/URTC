@@ -261,6 +261,53 @@ static void install_application(void)
     HAL_FLASH_Lock();
 }
 
+// ---- addressing by serial number (0x7EA / 0x7EB) ----------------------------------------------------------------------------------------------
+static void test_serial_selection(int *failures)
+{
+    uint8_t zero[8] = {0};
+    fake_uid[0] = 0x12345678u; fake_uid[1] = 0; fake_uid[2] = 0;          // the serial is the fold of the unique ID: 0x12345678 here
+
+    boot_world();
+    uint8_t probe_all[8] = {1, 0, 0, 0, 0, 0, 0, 0};                      // PROBE with no bits: every serial matches
+    push(0x7EA, 6, 0, 0, probe_all);
+    push(CAN_ID_QUERY_VERSION, 0, 0, 0, zero);
+    run_boot(900);
+    int probe_answer = first_index(0x7EB);
+    TEST_ASSERT(probe_answer >= 0 && fake_tx[probe_answer].dlc == 2 && fake_tx[probe_answer].data[0] == 1 && fake_tx[probe_answer].data[1] == 0xA5, "a probe is answered with the presence mark on 0x7EB");
+    TEST_ASSERT(count_id(CAN_ID_VERSION_RESPONSE) == 0, "once a head is being addressed, a version query nobody selected this head for is not answered");
+
+    boot_world();
+    uint8_t select_other[8] = {2, 0xDE, 0xAD, 0xBE, 0xEF, 7, 0, 0};
+    push(0x7EA, 6, 0, 0, select_other);
+    push(CAN_ID_QUERY_VERSION, 0, 0, 0, zero);
+    run_boot(900);
+    TEST_ASSERT(count_id(0x7EB) == 0 && count_id(CAN_ID_VERSION_RESPONSE) == 0, "when another serial is selected this head stays silent and ignores the single-head frames");
+
+    boot_world();
+    uint8_t select_own[8] = {2, 0x12, 0x34, 0x56, 0x78, 9, 0, 0};
+    push(0x7EA, 6, 0, 0, select_own);
+    push(CAN_ID_QUERY_VERSION, 0, 0, 0, zero);
+    run_boot(900);
+    int select_answer = first_index(0x7EB);
+    TEST_ASSERT(select_answer >= 0 && fake_tx[select_answer].dlc == 6 && fake_tx[select_answer].data[0] == 2 && fake_tx[select_answer].data[4] == 0x78 && fake_tx[select_answer].data[5] == 9, "selecting this serial is answered with the serial and the sequence byte");
+    TEST_ASSERT(count_id(CAN_ID_VERSION_RESPONSE) == 1, "the selected head answers the version query");
+
+    boot_world();
+    uint8_t release[8] = {3, 0, 0, 0, 0, 0, 0, 0};
+    push(0x7EA, 6, 0, 0, select_other);
+    push(0x7EA, 1, 0, 0, release);
+    push(CAN_ID_QUERY_VERSION, 0, 0, 0, zero);
+    run_boot(900);
+    TEST_ASSERT(count_id(CAN_ID_VERSION_RESPONSE) == 0, "a release leaves nobody selected, and a head that is still addressed answers the single-head frames only while it is selected");
+
+    fake_uid[0] = fake_uid[1] = fake_uid[2] = 0;
+    boot_world();
+    push(0x7EA, 6, 0, 0, select_other);
+    push(CAN_ID_QUERY_VERSION, 0, 0, 0, zero);
+    run_boot(900);
+    TEST_ASSERT(count_id(0x7EB) == 0 && count_id(CAN_ID_VERSION_RESPONSE) == 1, "a head with a blank serial takes no part and obeys every frame as before");
+}
+
 static void test_unsafe_commands(int *failures)
 {
     // the decision itself
@@ -319,6 +366,7 @@ void run_bootloader_boot_tests(int *failures)
 {
     test_display(failures);
     test_main_loop(failures);
+    test_serial_selection(failures);
     test_unsafe_commands(failures);
 }
 
