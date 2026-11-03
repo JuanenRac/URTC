@@ -3,10 +3,11 @@
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
 // GPL-3.0-or-later - see LICENSE
 // =============================================================================
-// boot/bootloader_common.h takes the identifiers of the CAN exchange of the update from src/common/urtc_can_ids.h, which is written from the specification
-// (spec/can_protocol.json) and is what the hosts use. The status codes, the reasons of a failed verification and the hardware identity are still spelled
-// out as numbers of its own there. This file compiles both side by side and fails the build when a number differs, so the bootloader cannot drift from the
-// specification; each pair is checked at compile time (the build stops) and again at run time (the suite names it).
+// boot/bootloader_common.h still spells out the identifiers of the update exchange, the status codes, the reasons of a failed verification and the hardware
+// identity as numbers of its own. src/common/urtc_can_ids.h is written from the specification (spec/can_protocol.json) and is what the hosts use. This file
+// compiles both side by side and fails the build when a number differs, so the bootloader cannot drift from the specification while it keeps its own
+// spelling; each pair is checked at compile time (the build stops) and again at run time (the suite names it). Replacing the numbers of the bootloader by the
+// macros of the header is a change of the bootloader source, and so of its version, to be made with the next build of the images.
 #include <stdint.h>
 #include <stdio.h>
 
