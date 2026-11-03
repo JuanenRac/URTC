@@ -174,8 +174,10 @@ void HandleVersionQuery(void) {
         txH4.RTR = CAN_RTR_DATA;
         txH4.DLC = TRUST_KEY_ID_SIZE;
         txH4.TransmitGlobalTime = DISABLE;
+        uint8_t txD4[TRUST_KEY_ID_SIZE];
+        memcpy(txD4, trust->key_id[0], sizeof(txD4));
         uint32_t mb4;
-        HAL_CAN_AddTxMessage(&hcan, &txH4, trust->key_id[0], &mb4);
+        HAL_CAN_AddTxMessage(&hcan, &txH4, txD4, &mb4);
     }
 }
 

@@ -81,7 +81,7 @@ uint8_t Trust_Parse(const uint8_t *table, uint32_t available, TrustKeys_t *out)
             const uint8_t *entry = table + 8u + i * TRUST_KEY_ENTRY_SIZE;
             uint8_t flags = entry[40];
             uint8_t is_current = (flags & TRUST_FLAG_CURRENT) != 0u ? 1u : 0u;
-            if ((flags & TRUST_FLAG_REVOKED) != 0u || is_current == pass) {
+            if ((flags & TRUST_FLAG_REVOKED) != 0u || is_current == pass || kept >= TRUST_MAX_KEYS) {
                 continue;
             }
             memcpy(out->key_id[kept], entry, TRUST_KEY_ID_SIZE);
