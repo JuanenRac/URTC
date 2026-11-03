@@ -1,0 +1,23 @@
+{
+  "format": 1,
+  "about": "The public trust table of the URTC bootloaders in source form: which public keys a bootloader accepts to sign an application image. Only public values are written here; no secret ever is. tools/image_trust.py builds the table from this file and checks that a compiled bootloader holds exactly that table. The image-signing key is not the key that signs release assets (keys/registry.json).",
+  "schema": 1,
+  "default_policy": "ed25519_only",
+  "min_counter": 0,
+  "targets": {
+    "master": {"table_offset": "0x200", "bootloader": "src/F303-master/boot"},
+    "slave": {"table_offset": "0x200", "bootloader": "src/F303-slave/boot"}
+  },
+  "flavours": {
+    "dev": {
+      "about": "Bench builds. The seed of this key is public (urtc_common.image_sig.DEV_SEED): a bootloader with this table is never an official one.",
+      "keys": [
+        {"state": "current", "public": "81f29be04dfa58f37458e6182a027d83f12330265d61bd6bfcedb2ba8833b80c", "key_id": "fe58bb1362df0ea6"}
+      ]
+    },
+    "release": {
+      "about": "Official builds. Empty until the maintainer provisions the image-signing key (the private half stays outside every repository; add its public half here as current and a second one as next). A release table with no current key cannot be built.",
+      "keys": []
+    }
+  }
+}

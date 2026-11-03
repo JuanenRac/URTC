@@ -52,6 +52,10 @@ skipped, so run it with `--strict` on a machine that has all of them before a re
 2. Change the single constant in each program that embeds it; `tools/keys.py verify --strict` lists the ones that still carry the old value.
 3. Ship the programs with their next versions. If the old private half is lost, the programs have to be updated by hand once.
 
+## The image-signing keys (public trust table)
+
+The keys that authenticate an application image on the bus are a different set from the release key above and are listed in `keys/image_trust.json`, not in the registry: a `dev` table (a public development key, bench builds only) and a `release` table that stays empty until the maintainer provisions the image-signing key. Only public keys are written there. `python tools/image_trust.py validate` checks the file, `python tools/image_trust.py check BIN master|slave dev|release` checks that a compiled bootloader holds exactly that table at its fixed offset, and `python tools/image_trust.py fingerprints release` prints the key ids the local release tool pins before it signs anything.
+
 ## The other ecosystems
 
 HYDRA-UMC and A.R.M.O.R. keep and check their own keys in their own repositories; this registry covers the URTC family only.
