@@ -173,8 +173,17 @@ static uint32_t declared_hw;
 static uint32_t data_length;
 static uint16_t confirmed_major;
 static uint16_t confirmed_minor_field;
+static uint32_t confirmed_counter;
+static uint32_t slave_floor;
+static uint8_t slave_floor_known;
 static uint8_t record[SLAVE_ATTEST_CHUNK_COUNT * SLAVE_ATTEST_CHUNK_BYTES];
 static uint16_t record_chunks;
+
+void SlaveAttest_SetSlaveFloor(uint32_t floor, uint8_t known)
+{
+    slave_floor = floor;
+    slave_floor_known = known ? 1u : 0u;
+}
 
 void SlaveAttest_Start(uint32_t size, uint32_t hardware_id)
 {
@@ -232,6 +241,7 @@ uint8_t SlaveAttest_Verify(uint32_t crc, uint16_t version_major, uint16_t versio
     if (!relay_ok || data_length != declared_size || declared_size == 0u) return 0;
     if (record_chunks != 0x7FFu || trusted_count == 0u) return 0;
     if (declared_hw != (uint32_t)URTC_HARDWARE_ID_SLAVE) return 0;
+    if (!slave_floor_known) return 0;
     attest_sha256_final(&image_hash, image_digest);
 
     uint8_t header28[URTC_AUTH_HEADER_BYTES];
@@ -242,7 +252,7 @@ uint8_t SlaveAttest_Verify(uint32_t crc, uint16_t version_major, uint16_t versio
     ctx.keys = (const uint8_t (*)[URTC_ED25519_PUBLIC_KEY_SIZE])trusted_keys;
     ctx.key_count = trusted_count;
     ctx.hardware_id = (uint32_t)URTC_HARDWARE_ID_SLAVE;
-    ctx.installed_counter = 0;               // the slave keeps no counter: see docs/SLAVE_BOOT_CONFIRMATION.md
+    ctx.installed_counter = slave_floor;     // the floor the slave keeps: a record below it is refused here too (the slave checks it again)
     ctx.installed_version_known = 0;         // the slave applies its own version rule
     urtc_auth_image_t candidate;
     candidate.header28 = header28;
@@ -251,17 +261,23 @@ uint8_t SlaveAttest_Verify(uint32_t crc, uint16_t version_major, uint16_t versio
     candidate.hmac_ok = 0;
     uint32_t new_counter = 0;
     if (urtc_auth_decide(&ctx, &candidate, &new_counter) != URTC_AUTH_OK) return 0;
+    confirmed_counter = new_counter;
     confirmed_major = version_major;
     confirmed_minor_field = version_minor_field;
     verified = 1;
     return 1;
 }
 
+uint32_t SlaveAttest_Counter(void)
+{
+    return verified ? confirmed_counter : 0u;
+}
+
 uint8_t SlaveAttest_Tag(const uint8_t nonce[16], uint8_t tag[32])
 {
     if (!verified) return 0;
     uint8_t message[URTC_SLAVE_CONFIRM_MESSAGE_SIZE];
-    urtc_slave_confirm_message(message, nonce, image_digest, declared_hw, confirmed_major, confirmed_minor_field, declared_size);
+    urtc_slave_confirm_message(message, nonce, image_digest, declared_hw, confirmed_major, confirmed_minor_field, declared_size, confirmed_counter);
     SlaveAttest_Sha256(message, sizeof message, tag);
     return 1;
 }

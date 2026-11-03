@@ -1,35 +1,17 @@
 // =============================================================================
-// URTC Bootloader - SHA-256 / HMAC-SHA256
+// URTC Expansion Slave Bootloader - SHA-256 (no key)
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
 // GPL-3.0-or-later - see LICENSE
 //
-// A from-scratch SHA-256/HMAC implementation (not a library) - verified
-// against the official RFC 4231 HMAC-SHA256 test case 2 before this was
-// ever wired into the update flow below.
+// A from-scratch SHA-256 implementation (not a library), checked on the host
+// against reference digests of patterned buffers around every padding boundary.
+// This bootloader holds no key of any kind: no HMAC, no secret to inject at build
+// time (docs/SLAVE_BOOT_CONFIRMATION.md).
 // =============================================================================
 #include "stm32f3xx_hal.h"
 #include <string.h>
 #include "slaveboot_common.h"
 #include "slaveboot_crypto.h"
-
-// SIGNING KEY - injected at build time, never committed (see
-// docs/FIRMWARE_SIGNING.TXT). build_firmware.sh passes -DURTC_SLAVE_HMAC_KEY_BYTES=...
-// from the private key file named by URTC_SIGNING_KEY_FILE (its "slave" line); a release build
-// (URTC_RELEASE=1) refuses to run without it. Without that define this
-// falls back to the PUBLIC DEVELOPMENT key below: the historic key that
-// was committed to this public repository, so ANYONE can sign images it
-// accepts - fine on a bench, never for a board in the field.
-#ifdef URTC_SLAVE_HMAC_KEY_BYTES
-const uint8_t HMAC_KEY[32] = { URTC_SLAVE_HMAC_KEY_BYTES };
-#else
-#warning "URTC: building with the PUBLIC development signing key - set URTC_SIGNING_KEY_FILE for real boards"
-const uint8_t HMAC_KEY[32] = {
-    0xF6, 0xFC, 0x5E, 0xC3, 0xC7, 0xC0, 0xB8, 0x32,
-    0x5F, 0x08, 0x83, 0x85, 0xCD, 0x10, 0x9E, 0x63,
-    0x7D, 0x45, 0x58, 0xD4, 0x53, 0x5F, 0x61, 0x9C,
-    0xD0, 0x6F, 0x3D, 0xF2, 0xAF, 0xDC, 0x38, 0x1D
-};
-#endif
 
 typedef struct {
     uint32_t state[8];
@@ -90,7 +72,7 @@ static void sha256_update(SHA256_CTX *ctx, const uint8_t data[], uint32_t len) {
             ctx->datalen = 0;
         }
         // A single call here can span the full 54KB backup slot (via
-        // hmac_sha256_flash_region) - comfortably inside the IWDG's ~800ms
+        // sha256_flash_region) - comfortably inside the IWDG's ~800ms
         // window under nominal timing, but LSI's own accuracy is
         // notoriously loose across temperature, and this costs nothing to
         // guard regardless. Every 4096 bytes keeps the refresh frequent
@@ -130,36 +112,6 @@ static void sha256_final(SHA256_CTX *ctx, uint8_t hash[]) {
     }
 }
 
-void hmac_sha256_flash_region(const uint8_t *key, uint32_t key_len,
-                              uint32_t flash_addr, uint32_t len,
-                              uint8_t out[32]) {
-    uint8_t k_ipad[64], k_opad[64];
-    uint8_t key_block[64] = {0};
-    if (key_len > 64) {
-        SHA256_CTX kctx;
-        sha256_init(&kctx);
-        sha256_update(&kctx, key, key_len);
-        sha256_final(&kctx, key_block);
-    } else {
-        memcpy(key_block, key, key_len);
-    }
-    for (int i = 0; i < 64; i++) {
-        k_ipad[i] = key_block[i] ^ 0x36;
-        k_opad[i] = key_block[i] ^ 0x5c;
-    }
-    uint8_t inner_hash[32];
-    SHA256_CTX ctx;
-    sha256_init(&ctx);
-    sha256_update(&ctx, k_ipad, 64);
-    sha256_update(&ctx, (const uint8_t*)flash_addr, len);
-    sha256_final(&ctx, inner_hash);
-
-    sha256_init(&ctx);
-    sha256_update(&ctx, k_opad, 64);
-    sha256_update(&ctx, inner_hash, 32);
-    sha256_final(&ctx, out);
-}
-
 // Plain SHA-256, no key: the slave bootloader no longer holds a secret. It checks the integrity of an image and of the installed application with this, and
 // relies on the master (which verifies the Ed25519 record) for who vouched for the image.
 void sha256_buffer(const uint8_t *data, uint32_t len, uint8_t out[32]) {
@@ -173,7 +125,7 @@ void sha256_flash_region(uint32_t flash_addr, uint32_t len, uint8_t out[32]) {
     sha256_buffer((const uint8_t*)flash_addr, len, out);
 }
 
-uint8_t hmac_constant_time_compare(const uint8_t *a, const uint8_t *b, uint32_t len) {
+uint8_t constant_time_equal(const uint8_t *a, const uint8_t *b, uint32_t len) {
     // XOR-accumulate rather than an early-exit compare - an early exit
     // leaks how many leading bytes matched through timing, which matters
     // for a signature check even on a small embedded target listening on a

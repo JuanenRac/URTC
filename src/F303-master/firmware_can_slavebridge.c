@@ -52,6 +52,8 @@
 #define REG_BOOT_QUERY_VERSION_EXT  0x08
 #define REG_BOOT_CHALLENGE      0x09
 #define REG_BOOT_CONFIRM        0x0A
+#define REG_BOOT_COUNTER_FLOOR  0x0B
+#define REG_BOOT_RECORD_COUNTER 0x0C
 #define SLAVE_BOOT_STATUS_AWAIT_CONFIRM 0x08
 #define REG_APP_ENTER_BOOTLOADER 0x02
 
@@ -113,9 +115,15 @@ void Handle_CAN_SlaveBridge(void) {
         // of hmac_chunk_buf when a new sequence only sends fewer than 4
         // fresh chunks before something re-triggers completion.
         hmac_chunks_received = 0;
+        // The rollback floor of the slave is read BEFORE the START frame goes out: afterwards the slave is erasing its backup slot and does not answer. A slave
+        // that does not answer (an older bootloader, no slave chip) leaves the floor unknown, and an unknown floor means nothing is ever vouched for.
+        uint8_t floor_bytes[4];
+        uint8_t floor_known = ExpansionI2C_SlaveReadRegister(REG_BOOT_COUNTER_FLOOR, floor_bytes, 4);
         ExpansionI2C_SlaveWriteRegister(REG_BOOT_START_UPDATE, rxData, 8);
         // The master also follows the update to be able to vouch for it: it hashes what it relays and collects the signature record (0x21A).
         SlaveAttest_LoadTrustFromBootloader();
+        SlaveAttest_SetSlaveFloor(floor_known ? (((uint32_t)floor_bytes[0] << 24) | ((uint32_t)floor_bytes[1] << 16) | ((uint32_t)floor_bytes[2] << 8) | floor_bytes[3]) : 0u,
+                                  floor_known);
         SlaveAttest_Start(((uint32_t)rxData[0] << 24) | ((uint32_t)rxData[1] << 16) | ((uint32_t)rxData[2] << 8) | rxData[3],
                           ((uint32_t)rxData[4] << 24) | ((uint32_t)rxData[5] << 16) | ((uint32_t)rxData[6] << 8) | rxData[7]);
 
@@ -158,6 +166,12 @@ void Handle_CAN_SlaveBridge(void) {
         uint16_t end_major = (uint16_t)(((uint16_t)rxData[4] << 8) | rxData[5]);
         uint16_t end_minor = (uint16_t)(((uint16_t)rxData[6] << 8) | rxData[7]);
         uint8_t vouched = SlaveAttest_Verify(end_crc, end_major, end_minor);
+        if (vouched) {
+            // The signed counter of the record, before the END frame: the slave binds its check to it. A counter that could not be delivered means no vouching.
+            uint32_t counter = SlaveAttest_Counter();
+            uint8_t counter_bytes[4] = { (uint8_t)(counter >> 24), (uint8_t)(counter >> 16), (uint8_t)(counter >> 8), (uint8_t)counter };
+            if (!ExpansionI2C_SlaveWriteRegister(REG_BOOT_RECORD_COUNTER, counter_bytes, 4)) vouched = 0;
+        }
         ExpansionI2C_SlaveWriteRegister(REG_BOOT_END_UPDATE, rxData, 8);
         if (vouched) {
             ConfirmToSlave();

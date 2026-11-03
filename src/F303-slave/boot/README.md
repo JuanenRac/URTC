@@ -41,7 +41,7 @@ it.
 
 ```
 0x08000000 ─┬─ Bootloader                18 KB   (this)
-0x08004800 ─┼─ Metadata                   2 KB   (version, size, CRC32, HMAC)
+0x08004800 ─┼─ Metadata                   2 KB   (append-only log: version, size, CRC32, SHA-256, rollback counter)
 0x08005000 ─┼─ Main application slot     54 KB   (the application firmware, what actually runs)
 0x08012800 ─┴─ Backup/staging slot       54 KB   (updates land here first, verified, then copied to main)
 0x08020000    (end of flash, 128 KB total)
@@ -123,7 +123,7 @@ path.
 |---|---|
 | `slaveboot_main.c` | Entry point: clock/I2C1/IWDG init, the I2C1 slave "listen mode" interrupt handling (`HAL_I2C_AddrCallback` and friends) that implements the register protocol, and `main()`'s own boot sequence. |
 | `slaveboot_common.h` | Shared types, `#define`s (flash addresses/sizes, the `REG_*` register map, version constants), and `extern` declarations. |
-| `slaveboot_crypto.c` / `.h` | The same from-scratch SHA-256/HMAC-SHA256 implementation as the main board's own bootloader, reused near-verbatim (it's pure algorithm, nothing chip-specific) - RFC 4231-verified. This chip's own `HMAC_KEY` is defined here, deliberately different from the main board's own. |
+| `slaveboot_crypto.c` / `.h` | A from-scratch SHA-256 (no key, no HMAC: this bootloader holds no secret), checked on the host against FIPS 180-4 messages and patterned buffers around every padding boundary. |
 | `slaveboot_flash.c` / `.h` | Page erase/write/verify, the backup-to-main region copy, and metadata read/write - same algorithm as the main board's own, `update_progress_percent` in place of an active CAN heartbeat push. |
 | `slaveboot_protocol.c` / `.h` | The update state machine (`REG_START_UPDATE` through `REG_END_UPDATE`), both startup validation paths, and `JumpToApplication()` itself. |
 

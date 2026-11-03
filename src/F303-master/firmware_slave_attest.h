@@ -31,6 +31,9 @@ uint8_t SlaveAttest_SetKeysFromTable(const uint8_t *table, uint32_t available);
 void SlaveAttest_SetKeys(const uint8_t keys[][URTC_ED25519_PUBLIC_KEY_SIZE], uint8_t count);
 uint8_t SlaveAttest_KeyCount(void);
 
+// The rollback floor the slave reported in its COUNTER_FLOOR register (read before the update starts). When it is not known, Verify never says yes: a master
+// that cannot tell what the slave keeps does not vouch.
+void SlaveAttest_SetSlaveFloor(uint32_t floor, uint8_t known);
 // A new update of the slave begins (0x211): forget the previous one.
 void SlaveAttest_Start(uint32_t declared_size, uint32_t hardware_id);
 // One piece of image data (0x213) and whether the bridge managed to relay it to the slave.
@@ -40,6 +43,8 @@ void SlaveAttest_RecordChunk(uint8_t index, const uint8_t bytes[SLAVE_ATTEST_CHU
 // The end of the update (0x214): may the slave be told to install the image? 1 only when every byte arrived and was relayed, the record is complete and
 // verifies under a trusted key over the header (hardware id of the slave, size, CRC, version) and the SHA-256 of what was relayed.
 uint8_t SlaveAttest_Verify(uint32_t crc, uint16_t version_major, uint16_t version_minor_field);
+// After a successful Verify: the signed counter of the record (the slave is told it before the END frame, and the confirmation is bound to it).
+uint32_t SlaveAttest_Counter(void);
 // After a successful Verify: the 32-byte confirmation for the session whose nonce the slave published in REG_CHALLENGE. Returns 0 when Verify did not succeed.
 uint8_t SlaveAttest_Tag(const uint8_t nonce[16], uint8_t tag[32]);
 

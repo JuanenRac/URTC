@@ -9,11 +9,36 @@
       "public": "4020c46d76c8ebacb64c5c7b9f3e7c62475afeb133d7421591988174e0f5dc90",
       "private_half": "Outside every repository (the file named by URTC_RELEASE_KEY, by default ~/.urtc-keys/urtc_release_ed25519.pem). The release workflow holds no signing key: it only verifies.",
       "embedded_in": [
-        {"repo": "URTC", "file": "tools/release_sign.py", "kind": "text", "pattern": "PUBLIC_KEY_HEX\\s*=\\s*\"([0-9a-fA-F]{64})\""},
-        {"repo": "URTC", "file": "docs/RELEASE_SIGNING.md", "kind": "text", "pattern": "(?m)^ed25519 ([0-9a-fA-F]{64})$"},
-        {"repo": "URTC-FLASHER", "file": "flasher_release_signature.py", "kind": "text", "pattern": "PUBLIC_KEY_HEX\\s*=\\s*\"([0-9a-fA-F]{64})\""},
-        {"repo": "URTC-WEB-STUDIO", "file": "scripts/sync-firmware.mjs", "kind": "text", "pattern": "RELEASE_PUBLIC_KEY_HEX\\s*=\\s*'([0-9a-fA-F]{64})'"},
-        {"repo": "URTC-WEB-STUDIO", "file": "src/lib/releaseSignature.ts", "kind": "text", "pattern": "RELEASE_PUBLIC_KEY_HEX\\s*=\\s*'([0-9a-fA-F]{64})'"}
+        {
+          "repo": "URTC",
+          "file": "tools/release_sign.py",
+          "kind": "text",
+          "pattern": "PUBLIC_KEY_HEX\\s*=\\s*\"([0-9a-fA-F]{64})\""
+        },
+        {
+          "repo": "URTC",
+          "file": "docs/RELEASE_SIGNING.md",
+          "kind": "text",
+          "pattern": "(?m)^ed25519 ([0-9a-fA-F]{64})$"
+        },
+        {
+          "repo": "URTC-FLASHER",
+          "file": "flasher_release_signature.py",
+          "kind": "text",
+          "pattern": "PUBLIC_KEY_HEX\\s*=\\s*\"([0-9a-fA-F]{64})\""
+        },
+        {
+          "repo": "URTC-WEB-STUDIO",
+          "file": "scripts/sync-firmware.mjs",
+          "kind": "text",
+          "pattern": "RELEASE_PUBLIC_KEY_HEX\\s*=\\s*'([0-9a-fA-F]{64})'"
+        },
+        {
+          "repo": "URTC-WEB-STUDIO",
+          "file": "src/lib/releaseSignature.ts",
+          "kind": "text",
+          "pattern": "RELEASE_PUBLIC_KEY_HEX\\s*=\\s*'([0-9a-fA-F]{64})'"
+        }
       ]
     },
     {
@@ -21,28 +46,29 @@
       "algorithm": "hmac-sha256",
       "role": "The PUBLIC development HMAC key for the main board, kept only for the bootloaders of the earlier generation: the current main bootloader holds no HMAC key at all and verifies an Ed25519 record against the public trust table (keys/image_trust.json).",
       "public": "2526cc3e9011ec7c49ecd2d2b7f389e359aa246014ff5154a0af8a3c3bf95581",
-      "private_half": "None: this one is published on purpose. The line master= of the secret file only feeds the HMAC that bootloaders of the earlier generation check; it is never written to a file of a repository.",
+      "private_half": "None: this one is published on purpose. The line master= of the secret file only feeds the HMAC that bootloaders of the earlier generation check; it is never written to a file of a repository. The expansion slave bootloader holds no key at all.",
       "embedded_in": [
-        {"repo": "URTC", "file": "firmware_signing.py", "kind": "text", "pattern": "MASTER_DEV_HMAC_KEY_HEX\\s*=\\s*\"([0-9a-fA-F]{64})\""}
-      ]
-    },
-    {
-      "id": "urtc-slave-bootloader-hmac-development",
-      "algorithm": "hmac-sha256",
-      "role": "The PUBLIC development key of the expansion slave bootloader (same rule as the main one).",
-      "public": "f6fc5ec3c7c0b8325f088385cd109e637d4558d4535f619cd06f3df2afdc381d",
-      "private_half": "None for this one. The production key of the slave bootloader is the line slave= of the same secret file.",
-      "embedded_in": [
-        {"repo": "URTC", "file": "src/F303-slave/boot/slaveboot_crypto.c", "kind": "c_array", "array": "HMAC_KEY", "branch": "else"}
+        {
+          "repo": "URTC",
+          "file": "firmware_signing.py",
+          "kind": "text",
+          "pattern": "MASTER_DEV_HMAC_KEY_HEX\\s*=\\s*\"([0-9a-fA-F]{64})\""
+        }
       ]
     }
   ],
   "secrets_not_stored_here": [
-    "The production HMAC keys of the two bootloaders (master= and slave=).",
-    "The private half of the release signature key."
+    "The production HMAC key of the main board for bench bootloaders of the earlier generation (the line master= of the secret file).",
+    "The private half of the release signature key and the private half of the image signature key."
   ],
   "other_ecosystems": [
-    {"ecosystem": "HYDRA-UMC", "where": "documented and verified by that ecosystem's own repositories; this registry lists only the URTC family"},
-    {"ecosystem": "A.R.M.O.R.", "where": "documented and verified by that ecosystem's own repositories; this registry lists only the URTC family"}
+    {
+      "ecosystem": "HYDRA-UMC",
+      "where": "documented and verified by that ecosystem's own repositories; this registry lists only the URTC family"
+    },
+    {
+      "ecosystem": "A.R.M.O.R.",
+      "where": "documented and verified by that ecosystem's own repositories; this registry lists only the URTC family"
+    }
   ]
 }

@@ -183,4 +183,9 @@ Status: not run on a board.
 5. Read the size of the slave bootloader in the build log of Actions against the 18432-byte region, and the stack high-water mark of the master during a verification inside the application.
 6. Confirm on the real I2C link that a clock-stretching slave answers the status and challenge reads while it hashes its backup slot.
 
+7. Rollback counter of the slave: install an image signed with counter N, then try an older signed image (counter below N, also with a newer version) and confirm it is refused with reason ROLLBACK and the main slot untouched; read the floor from register `0x0B` over the link bus. [HW]
+8. Cut the power of the slave at several instants while the metadata record is appended (just before, during and just after) and check on every boot that the floor read back is the old or the new one, never zero. [HW]
+9. Fill the 28 slots of the metadata page on a real chip (28 updates, or a test build that appends faster) and cut the power during the erase of the full page: record what the floor falls back to and how long the page stays blank. [HW]
+10. Read the size of the slave bootloader in the build log of Actions after the HMAC routine and key were removed and the metadata log and the counter were added, against the 18432-byte region. [HW]
+
 Status: not run on a board.

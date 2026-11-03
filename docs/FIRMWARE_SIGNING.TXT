@@ -23,8 +23,11 @@ plain SHA-256 (no key) and that the master confirmed that exact image in that
 update session; with no confirmation it installs nothing. The slave trusts the
 master through the link bus; docs/SLAVE_BOOT_CONFIRMATION.md states the limits.
 The HMAC described in sections 1 to 4 below is the OLD scheme of the slave: its
-key constant is still compiled in and no longer used by the update path. No
-populated board exists, so none of this has run on a real board.
+key and its HMAC routine are gone from the slave bootloader, and the build
+flag and the "slave=" line of the key file that served it are ignored. The
+slave keeps a signed rollback counter of its own (an append-only log) that the
+master reads and checks too. No populated board exists, so none of this has
+run on a real board.
 
 1. WHAT THE BOOTLOADERS CHECK
 -------------------------------------------------------------------------------

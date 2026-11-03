@@ -169,6 +169,10 @@ void HAL_I2C_AddrCallback(I2C_HandleTypeDef *hi2c, uint8_t TransferDirection, ui
                 BuildChallengeResponse(tx_buffer);
                 len = 16;
                 break;
+            case REG_COUNTER_FLOOR:
+                BuildCounterFloorResponse(tx_buffer);
+                len = 4;
+                break;
             default:
                 // An unrecognized pending register (protocol error on the
                 // master's side, or genuinely nothing set yet) gets
@@ -202,6 +206,9 @@ void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef *hi2c) {
                 break;
             case REG_CONFIRM:
                 if (bytes_received == 33) HandleConfirm(&rx_buffer[1]);
+                break;
+            case REG_RECORD_COUNTER:
+                if (bytes_received == 5) HandleRecordCounter(&rx_buffer[1]);
                 break;
             case REG_DATA:
                 HandleData(&rx_buffer[1], bytes_received - 1);

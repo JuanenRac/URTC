@@ -84,16 +84,14 @@ extern I2C_HandleTypeDef hi2c1;
 #define BOOTLOADER_VERSION_PATCH 0
 
 // -----------------------------------------------------------------------
-// HMAC-SHA256 signing key - deliberately different from the main board's
-// own HMAC_KEY (bootloader_crypto.c's own comment on that one already
-// says as much: change it before relying on it). A firmware image signed
-// for the main board must never verify successfully against this chip's
-// key, or vice versa - two different keys is what keeps a mismatched
-// image from an all-too-easy accidental cross-flash from ever passing
-// verification on the wrong board. Same placeholder-until-you-change-it
-// status as the main board's own key.
+// No signing key. This bootloader holds no secret of any kind: the master
+// verifies the Ed25519 record of the image and confirms it (urtc_slave_confirm.h);
+// the slave only checks integrity (CRC-32, SHA-256), the version rule and the
+// rollback counter below.
 // -----------------------------------------------------------------------
-extern const uint8_t HMAC_KEY[32];
+// The lowest signed counter this build accepts, whatever the metadata says: a floor compiled in, so that erasing the metadata page does not reopen
+// the counters already retired by an earlier release. The floor that is kept in flash can only be higher.
+#define URTC_SLAVE_COUNTER_FLOOR 0UL
 
 // -----------------------------------------------------------------------
 // I2C LINK protocol (register-style, not CAN framed) - the main board's
@@ -120,6 +118,8 @@ extern const uint8_t HMAC_KEY[32];
 #define REG_QUERY_VERSION_EXT    0x08 // read-only, 4 bytes: URTC_SLAVE_VERSION_EXT_MARKER (0xE1, never a status code) + installed application PATCH (0xFF = unknown) + this bootloader's MINOR + this bootloader's PATCH. A bootloader that predates it answers this register with its 1-byte status instead, which is how the master tells the two apart.
 #define REG_CHALLENGE            0x09 // read-only, 16 bytes: the nonce of the update session in progress (made at REG_START_UPDATE); all zero when there is none. The master binds its confirmation to it
 #define REG_CONFIRM              0x0A // write-only, 32 bytes: the master's confirmation that it verified the signature record of this image (urtc_slave_confirm.h). Accepted only in STATUS_AWAIT_CONFIRM
+#define REG_COUNTER_FLOOR        0x0B // read-only, 4 bytes, big-endian: the rollback floor this slave keeps (the higher of the compiled floor and the counter of the installed image). The master reads it before it verifies the record, and refuses a record below it
+#define REG_RECORD_COUNTER       0x0C // write-only, 4 bytes, big-endian: the signed counter of the record the master verified for this session. Sent before REG_END_UPDATE is relayed; the confirmation is bound to it and a counter below the floor is refused
 
 #define STATUS_LISTENING     0x01 // waiting for REG_START_UPDATE
 #define STATUS_ERASING       0x02 // erasing the backup slot
@@ -138,12 +138,12 @@ extern const uint8_t HMAC_KEY[32];
 #define STATUS_ERROR         0xFF
 
 // -----------------------------------------------------------------------
-// Firmware metadata (single 2K page, one struct, one "state" field) -
-// identical layout to the main board's own FirmwareMetadata_t (same field
-// order, same sizes) so the same struct definition, the same
-// SavedState_Checksum-style CRC-8 pattern, and the same signing-tool
-// logic can be reused nearly verbatim, differing only in which
-// THIS_HARDWARE_ID and HMAC_KEY end up embedded in a given signed image.
+// Firmware metadata: an APPEND-ONLY LOG in the metadata page (same layout as
+// the main board's bootloader). A record is the generation, the metadata and a
+// CRC-32; a new state is written after the last record and nothing is erased
+// until the 28 slots are full, so the rollback counter survives every normal
+// update and a power cut leaves the previous record intact. The newest valid
+// record is the state.
 // -----------------------------------------------------------------------
 #define META_STATE_APP_VALID     1
 #define META_STATE_COPY_PENDING  2
@@ -156,7 +156,17 @@ typedef struct {
     uint32_t version_minor;
     uint32_t size;
     uint32_t crc32;
-    uint8_t  hmac[32]; // the SHA-256 of the installed application (no key). The name is historic; the size is what the specification calls HMAC_LENGTH
+    uint32_t counter;    // the rollback floor: the signed counter of the installed image. An image below it is refused
+    uint8_t  sha256[32]; // the SHA-256 of the installed application (no key)
 } FirmwareMetadata_t;
+
+typedef struct {
+    uint32_t generation;
+    FirmwareMetadata_t meta;
+    uint32_t crc;        // CRC-32 (zlib) of the generation and the metadata
+} MetaRecord_t;
+
+#define META_RECORD_SIZE  72u
+#define META_RECORD_SLOTS (2048u / META_RECORD_SIZE)
 
 #endif // BOOTLOADER_COMMON_H

@@ -1947,11 +1947,11 @@ GENERATED REFERENCE (from the specification in URTC-COMMON)
 
 A. Summary
 
-[[ BEGIN GENERATED summary sha256=87a1d391e5c75ccf9141800616e7a06fb98634ddee5ae2e9a6817316473bd373 ]]
+[[ BEGIN GENERATED summary sha256=d29e70f2e84b4719f4849a9833c734c65abaedf9d3f0386ecee81d364b8a7b5e ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 URTC CAN protocol: protocol version 1, byte order big.
-101 identifiers, 25 tool profiles, 22 enumerations, 37 constants, 4 magic payloads, 25 registers of the expansion slave.
+101 identifiers, 25 tool profiles, 22 enumerations, 37 constants, 4 magic payloads, 27 registers of the expansion slave.
 
 Machine-readable specification of the CAN bus protocol of the URTC tool head: every identifier with its direction, length rule and payload layout, the magic payloads, the registers of the expansion slave, the version procedures and the SLCAN subset the host tools rely on. All multi-byte fields are big-endian.
 [[ END GENERATED summary ]]
@@ -3983,7 +3983,7 @@ Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_do
 
 H. Registers of the expansion slave
 
-[[ BEGIN GENERATED registers sha256=d65b1135f874733c8e5b68d3f7defaba1a04572d10314c77663cd35874c75a8b ]]
+[[ BEGIN GENERATED registers sha256=23756f6c5f1536038119f437ebc803011c14d8d4533ff8b671b8645857b8860d ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 slave_bootloader: Registers of the expansion slave bootloader (I2C link bus, address 0x42)
@@ -4000,7 +4000,9 @@ slave_bootloader: Registers of the expansion slave bootloader (I2C link bus, add
 | 7 | VERIFY_FAIL_REASON | read | 1 | 0x219 | Verify-fail reason |
 | 8 | QUERY_VERSION_EXT | read | 4 | 0x218 | Marker 0xE1, application patch, bootloader minor, bootloader patch |
 | 9 | CHALLENGE | read | 16 |  | Nonce of the update session in progress (zeros when none); the master reads it and binds its confirmation to it |
-| 10 | CONFIRM | write | 32 |  | The master's confirmation: SHA-256 of the 76-byte message of urtc_slave_confirm.h; accepted only in AWAIT_CONFIRM |
+| 10 | CONFIRM | write | 32 |  | The master's confirmation: SHA-256 of the 80-byte message of urtc_slave_confirm.h (it includes the rollback counter of the record); accepted only in AWAIT_CONFIRM |
+| 11 | COUNTER_FLOOR | read | 4 |  | The rollback floor the slave keeps (big-endian): an image whose signed counter is below it is refused. The master reads it before it verifies |
+| 12 | RECORD_COUNTER | write | 4 |  | The signed counter of the record the master verified for this session (big-endian), sent before the END frame; without it the slave never accepts the confirmation |
 
 slave_application: Registers of the expansion slave application (I2C link bus, address 0x42)
 

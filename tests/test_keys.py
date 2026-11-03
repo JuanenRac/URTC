@@ -53,7 +53,9 @@ class VerifyTests(unittest.TestCase):
             sys.path.pop(0)
         by_id = {k["id"]: k["public"] for k in REG["keys"]}
         self.assertEqual(firmware_signing.dev_key("master").hex(), by_id["urtc-main-bootloader-hmac-development"])
-        self.assertEqual(firmware_signing.dev_key("slave").hex(), by_id["urtc-slave-bootloader-hmac-development"])
+        self.assertNotIn("urtc-slave-bootloader-hmac-development", by_id)   # the expansion slave bootloader holds no key any more
+        with self.assertRaises(firmware_signing.SigningKeyError):
+            firmware_signing.dev_key("slave")
 
     def _tree(self, directory: Path, value: str) -> None:
         for loc in RELEASE["embedded_in"]:

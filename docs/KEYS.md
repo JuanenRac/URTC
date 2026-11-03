@@ -13,7 +13,6 @@ place it lives in.
 |---|---|---|
 | `urtc-release-ed25519` | Ed25519 | `4020c46d76c8ebacb64c5c7b9f3e7c62475afeb133d7421591988174e0f5dc90` |
 | `urtc-main-bootloader-hmac-development` | HMAC-SHA256 | `2526cc3e9011ec7c49ecd2d2b7f389e359aa246014ff5154a0af8a3c3bf95581` |
-| `urtc-slave-bootloader-hmac-development` | HMAC-SHA256 | `f6fc5ec3c7c0b8325f088385cd109e637d4558d4535f619cd06f3df2afdc381d` |
 
 ### `urtc-release-ed25519`
 
@@ -30,11 +29,11 @@ The main bootloader holds no secret and no HMAC key: it trusts the public Ed2551
 reference), so a bootloader built with it proves nothing about who made an image; the official table is empty until the maintainer creates
 the image-signing key, which is not the key that signs release assets. Its private half stays outside every repository.
 
-The two HMAC keys in the table above are the public development keys of the bootloaders of the earlier generation: the main one lives in
-`firmware_signing.py` (only to keep producing the HMAC those bootloaders check), the slave one in the `#else` branch of `slaveboot_crypto.c`.
-They prove nothing about who made an image: they exist so that anybody can build and test.
+The HMAC key in the table above is the public development key of the main bootloader of the earlier generation. It lives in `firmware_signing.py`
+(only to keep producing the HMAC those bootloaders check). It proves nothing about who made an image: it exists so that anybody can build and test.
+The expansion slave bootloader holds no key of any kind: its update path installs an image only when the main board confirms it.
 
-The production HMAC keys are secrets. They live in `~/.urtc-keys/signing_keys.txt` (the lines `master=` and `slave=`) on the maintainer's
+The production HMAC key for those bench bootloaders is a secret. It lives in `~/.urtc-keys/signing_keys.txt` (the line `master=`; an old `slave=` line is ignored) on the maintainer's
 machine, never in a repository or in GitHub. A published image says in its manifest which kind of key signed it (`signing_key_kind`).
 
 ## Checking

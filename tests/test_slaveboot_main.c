@@ -87,6 +87,20 @@ static void test_link(int *failures)
       TEST_ASSERT(update_in_progress == 1 && !update_failed && current_status == STATUS_RECEIVING, "register 10 written while the update is still receiving does nothing");
       master_writes(confirm, 10);
       TEST_ASSERT(update_in_progress == 1 && !update_failed, "and one that is not 32 bytes long is ignored"); }
+    read_register(REG_COUNTER_FLOOR);
+    TEST_ASSERT(fake_i2c_slave_tx_len == 4 && fake_i2c_slave_tx[0] == 0 && fake_i2c_slave_tx[1] == 0 && fake_i2c_slave_tx[2] == 0 && fake_i2c_slave_tx[3] == (uint8_t)URTC_SLAVE_COUNTER_FLOOR, "register 11: the four bytes of the rollback floor (the compiled floor with nothing installed)");
+    { uint8_t counter[5] = {REG_RECORD_COUNTER, 0, 0, 0, 9};
+      master_writes(counter, 5);
+      uint8_t short_counter[4] = {REG_RECORD_COUNTER, 0, 0, 9};
+      master_writes(short_counter, 4);
+      TEST_ASSERT(update_in_progress == 1 && !update_failed, "register 12 takes exactly four bytes while the update is receiving; a short write is ignored"); }
+    read_register(REG_COUNTER_FLOOR);
+    TEST_ASSERT(fake_i2c_slave_tx_len == 4 && fake_i2c_slave_tx[0] == 0 && fake_i2c_slave_tx[1] == 0 && fake_i2c_slave_tx[2] == 0 && fake_i2c_slave_tx[3] == (uint8_t)URTC_SLAVE_COUNTER_FLOOR, "register 11: the four bytes of the rollback floor (the compiled floor with nothing installed)");
+    { uint8_t counter[5] = {REG_RECORD_COUNTER, 0, 0, 0, 9};
+      master_writes(counter, 5);
+      uint8_t short_counter[4] = {REG_RECORD_COUNTER, 0, 0, 9};
+      master_writes(short_counter, 4);
+      TEST_ASSERT(update_in_progress == 1 && !update_failed, "register 12 takes exactly four bytes while the update is receiving; a short write is ignored"); }
     uint8_t data[9] = {REG_DATA, 1, 2, 3, 4, 5, 6, 7, 8};
     master_writes(data, 9);
     TEST_ASSERT(update_bytes_received == 8, "a data command hands its eight bytes to the update");

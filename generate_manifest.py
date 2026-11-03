@@ -250,31 +250,22 @@ def main():
         },
     }
 
-    # Signatures: computed HERE, at build time, by whoever holds the signing
-    # key (see firmware_signing.py / docs/FIRMWARE_SIGNING.TXT). The
-    # flashing tools only transport the published hmac_sha256 - they never
-    # need, and never ship, the key itself.
+    # Signatures: nothing here needs a secret. The main application keeps a LEGACY HMAC for bench boards that still run an old bootloader (and a release
+    # build without the private key publishes none); the expansion slave application has none at all. What authenticates an official image is the Ed25519
+    # record made apart from the build (docs/SIGNATURE_SEPARATION.md in URTC-COMMON), which travels as <bin>.imgsig and not in this manifest.
     build_date = manifest["generated_at"]
     signing_info = {}
     for comp_key, board in (("main_application", "master"), ("slave_application", "slave")):
         comp = manifest["components"][comp_key]
         bin_path = os.path.join(fw_dir, comp["files"]["bin"]["filename"])
-        key, kind = firmware_signing.load_key(board)
-        comp["signing"] = {
-            "algorithm": "HMAC-SHA256",
-            "key_kind": kind,
-            "key_id": firmware_signing.key_id(key),
-            "hmac_sha256": firmware_signing.hmac_file(board, bin_path),
-        }
-        signing_info[comp_key] = kind
+        comp["signing"] = firmware_signing.application_signing(board, bin_path)
+        signing_info[comp_key] = comp["signing"]["key_kind"]
     manifest["signing_summary"] = signing_info
     if "dev" in signing_info.values():
         manifest["notes"].append(
-            "key_kind \"dev\" means these application images are signed with the PUBLIC "
-            "development key that also lives in this repository: they only install on "
-            "a board whose bootloader was built the same way, and they authenticate "
-            "nothing. A release (URTC_RELEASE=1) is signed with a private key instead - "
-            "see docs/FIRMWARE_SIGNING.TXT."
+            "key_kind \"dev\" means these images were built for the PUBLIC development trust table that also lives in this repository: they only install on "
+            "a board whose bootloader was built the same way and authenticate nothing. A release (URTC_RELEASE=1) is built for the release table "
+            "(keys/image_trust.json) and is signed apart from the build - see docs/FIRMWARE_SIGNING.TXT."
         )
 
     # Per-image sidecars next to every .bin: <bin>.sha256 (sha256sum
@@ -296,11 +287,10 @@ def main():
             "sha256": b["sha256"],
         }
         if "signing" in comp:
-            sidecar.update({
-                "hmac_sha256": comp["signing"]["hmac_sha256"],
-                "signing_key_kind": comp["signing"]["key_kind"],
-                "signing_key_id": comp["signing"]["key_id"],
-            })
+            sidecar["signing_key_kind"] = comp["signing"]["key_kind"]
+            if "hmac_sha256" in comp["signing"]:
+                sidecar["hmac_sha256"] = comp["signing"]["hmac_sha256"]
+                sidecar["signing_key_id"] = comp["signing"]["key_id"]
         with open(bin_path + ".manifest.json", "w", encoding="utf-8") as f:
             json.dump(sidecar, f, indent=2)
             f.write("\n")

@@ -48,6 +48,11 @@ void HandleEndUpdate(uint8_t *data);
 // REG_CONFIRM, 32 bytes: the master's confirmation (urtc_slave_confirm.h). Only acted on while update_awaiting_confirm is set; it is used once whatever the
 // outcome, so a wrong tag fails the update at once.
 void HandleConfirm(uint8_t *data);
+// REG_RECORD_COUNTER, 4 bytes big-endian: the signed counter of the record the master verified. Before the END frame only.
+void HandleRecordCounter(uint8_t *data);
+// The rollback floor (REG_COUNTER_FLOOR) and its 4-byte big-endian answer.
+uint32_t Counter_Floor(void);
+void BuildCounterFloorResponse(uint8_t out[4]);
 // 1 between a verified END_UPDATE and the confirmation (or the failure). The main loop of slaveboot_main.c gives up on it after ten seconds with
 // AbortUnconfirmed(): fail closed, reason VERIFY_FAIL_REASON_NOT_CONFIRMED, main slot untouched.
 extern uint8_t update_awaiting_confirm;

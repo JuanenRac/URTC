@@ -41,6 +41,13 @@ static uint32_t ref_crc32(const uint8_t *d, uint32_t n)
     return ~c;
 }
 
+// The signed counter of the record, as the master reads it from the record and sends it (REG_RECORD_COUNTER) before the END frame. `g_send_counter` 0 is a
+// master that never sends it; `g_tag_counter_delta` makes the confirmation cover another counter than the one that was sent.
+static uint32_t g_counter = 1;
+static int g_send_counter = 1;
+static uint32_t g_tag_counter_delta = 0;
+static uint32_t seed_counter = 0;   // the counter that seed_metadata() stores
+
 static uint8_t *image;          // low-memory copy of the test image (HMAC takes a 32-bit address)
 static uint32_t image_addr;
 #define IMG_MAX 4096
@@ -62,7 +69,7 @@ static void make_tag(uint32_t size, uint16_t vmaj, uint16_t vminfield, const uin
 {
     uint8_t digest[32], message[URTC_SLAVE_CONFIRM_MESSAGE_SIZE];
     if (digest_of) memcpy(digest, digest_of, 32); else sha256_buffer(image, size, digest);
-    urtc_slave_confirm_message(message, nonce, digest, THIS_HARDWARE_ID, vmaj, vminfield, size);
+    urtc_slave_confirm_message(message, nonce, digest, THIS_HARDWARE_ID, vmaj, vminfield, size, g_counter + g_tag_counter_delta);
     sha256_buffer(message, sizeof message, tag);
     if (flip) tag[0] ^= 0x01;
 }
@@ -104,6 +111,11 @@ static void end_update(uint32_t crc, uint16_t vmaj, uint16_t vminfield)
     f[5] = (uint8_t)vmaj;
     f[6] = (uint8_t)(vminfield >> 8);
     f[7] = (uint8_t)vminfield;
+    if (g_send_counter) {
+        uint8_t c[4];
+        put_be32(c, g_counter);
+        HandleRecordCounter(c);
+    }
     HandleEndUpdate(f);
 }
 
@@ -117,6 +129,7 @@ static void seed_metadata(uint32_t state, uint32_t vmaj, uint32_t vminfield, uin
     m.version_major = vmaj;
     m.version_minor = vminfield;
     m.size = size;
+    m.counter = seed_counter;
     Metadata_EraseAndWrite(&m);
 }
 
@@ -140,6 +153,10 @@ static void fresh(void)
     update_progress_percent = 0xFF;
     fake_tick = 0;
     fake_tick_step = 0;
+    g_counter = 1;
+    g_send_counter = 1;
+    g_tag_counter_delta = 0;
+    seed_counter = 0;
 }
 
 typedef struct { int bad_crc; int bad_hmac; int skip_hmac; uint32_t declared_hw; uint32_t size; uint16_t vmaj; uint16_t vmin; uint32_t piece; int no_confirm; int bad_tag; } Upd;
@@ -187,6 +204,17 @@ int main(void)
     uint32_t split = CRC32_Update(CRC32_Update(0xFFFFFFFFu, image, 333), image + 333, 667);
     TEST_ASSERT(CRC32_Finalize(split) == ref_crc32(image, 1000), "CRC32 is incremental across split calls");
 
+    // The confirmation against the vector of the Python reference (URTC-COMMON, image_sig.slave_confirm_tag): the same inputs, the same 32 bytes.
+    {
+        static const uint8_t want[32] = {0xa6, 0x37, 0x03, 0x27, 0x64, 0xca, 0x87, 0x6c, 0x2b, 0xba, 0x6c, 0xa3, 0x2e, 0x53, 0xec, 0x8d, 0xab, 0x46, 0x43, 0x42, 0xa9, 0xbe, 0x65, 0xd5, 0x24, 0x82, 0xa4, 0x0d, 0x82, 0x1f, 0x95, 0x7f};
+        uint8_t nonce_v[16], digest_v[32], message_v[URTC_SLAVE_CONFIRM_MESSAGE_SIZE], tag_v[32];
+        for (int i = 0; i < 16; i++) nonce_v[i] = (uint8_t)i;
+        sha256_buffer((const uint8_t *)"abc", 3, digest_v);
+        urtc_slave_confirm_message(message_v, nonce_v, digest_v, 0x0303CB01u, 0, 0x8105, 1500, 7);
+        sha256_buffer(message_v, sizeof message_v, tag_v);
+        TEST_ASSERT(sizeof message_v == 80 && memcmp(tag_v, want, 32) == 0, "the confirmation of the C header equals the vector of the Python reference");
+    }
+
     // ---- happy path on a blank board ------------------------------------------------------------------------------------------------
     fresh();
     run_update(good(3000, 0, urtc_minor_field_pack(5, 1)));
@@ -197,6 +225,7 @@ int main(void)
     TEST_ASSERT(Metadata_Read(&meta) && meta.state == META_STATE_APP_VALID && meta.size == 3000 && meta.hardware_id == THIS_HARDWARE_ID, "metadata is APP_VALID with size and hardware id");
     TEST_ASSERT(meta.version_major == 0 && urtc_minor_field_minor(meta.version_minor) == 5 && urtc_minor_field_patch(meta.version_minor) == 1, "metadata keeps the version with its patch number");
     TEST_ASSERT(meta.crc32 == ref_crc32(image, 3000), "metadata stores the CRC32");
+    TEST_ASSERT(meta.counter == 1 && Counter_Floor() == 1, "metadata stores the signed counter of the record, which is now the rollback floor");
     TEST_ASSERT(fake_reset_count == 1, "a successful update resets into the new application");
     TEST_ASSERT(update_progress_percent == 100, "progress ends at 100");
     TEST_ASSERT(fake_iwdg_refreshes > 0, "watchdog refreshed during the update");
@@ -363,7 +392,7 @@ int main(void)
     start_update(3000, THIS_HARDWARE_ID);
     HandleHmacExpected(hm);
     send_data(3000, 32);
-    fake_flash_fail_erase_nth = 4;
+    fake_flash_fail_erase_nth = 3;   // erases so far: 2 backup pages at START; the metadata is appended to a blank page with no erase; the 3rd is the first main-slot page
     end_update(ref_crc32(image, 3000), 0, urtc_minor_field_pack(6, 0));
     confirm_now(3000, 0, urtc_minor_field_pack(6, 0), 0);
     fake_flash_fail_erase_nth = 0;
@@ -414,6 +443,101 @@ int main(void)
     run_update(good(1500, 0, urtc_minor_field_pack(1, 0)));
     TEST_ASSERT(current_status == STATUS_VERIFY_OK, "the version check only looks at an installed (APP_VALID) application");
 
+    // ---- anti-rollback by signed counter: the slave keeps the floor and refuses a record below it -----------------------------------------------------------
+    // (a) a lower counter is refused even for a NEWER version (what the version rule alone could not catch)
+    fresh();
+    seed_counter = 5;
+    seed_metadata(META_STATE_APP_VALID, 0, urtc_minor_field_pack(4, 2), 3000);
+    g_counter = 4;
+    run_update(good(1500, 0, urtc_minor_field_pack(9, 0)));
+    TEST_ASSERT(current_status == STATUS_VERIFY_FAIL && verify_fail_reason == VERIFY_FAIL_REASON_ROLLBACK && main_slot_blank() && fake_reset_count == 0, "a counter below the floor is refused with ROLLBACK even when the version is newer");
+    Metadata_Read(&meta);
+    TEST_ASSERT(meta.counter == 5 && Counter_Floor() == 5, "and the floor is untouched");
+    // (b) an equal counter is allowed (re-flashing the same release), a higher one raises the floor
+    fresh();
+    seed_counter = 5;
+    seed_metadata(META_STATE_APP_VALID, 0, urtc_minor_field_pack(4, 2), 3000);
+    g_counter = 5;
+    run_update(good(1500, 0, urtc_minor_field_pack(4, 2)));
+    TEST_ASSERT(current_status == STATUS_VERIFY_OK && Counter_Floor() == 5, "a counter equal to the floor installs and keeps it");
+    fresh();
+    seed_counter = 5;
+    seed_metadata(META_STATE_APP_VALID, 0, urtc_minor_field_pack(4, 2), 3000);
+    g_counter = 9;
+    run_update(good(1500, 0, urtc_minor_field_pack(4, 3)));
+    TEST_ASSERT(current_status == STATUS_VERIFY_OK && Counter_Floor() == 9, "a higher counter installs and becomes the floor");
+    {   // replay of an older, genuinely signed image after the floor moved up
+        fake_hal_reset_recording();
+        g_counter = 6;
+        update_in_progress = 0; update_failed = 0; update_awaiting_confirm = 0; current_status = STATUS_LISTENING;
+        run_update(good(1500, 0, urtc_minor_field_pack(4, 3)));
+        TEST_ASSERT(verify_fail_reason == VERIFY_FAIL_REASON_ROLLBACK && Counter_Floor() == 9, "replaying an older signed image after the floor moved up is refused");
+    }
+    // (c) the master never sent the counter, or confirmed another one: nothing installs
+    fresh();
+    g_send_counter = 0;
+    run_update(good(1500, 0, urtc_minor_field_pack(2, 0)));
+    TEST_ASSERT(verify_fail_reason == VERIFY_FAIL_REASON_NOT_CONFIRMED && main_slot_blank() && fake_reset_count == 0, "a master that never sent the counter cannot have the image installed (fail closed)");
+    fresh();
+    g_tag_counter_delta = 1;
+    run_update(good(1500, 0, urtc_minor_field_pack(2, 0)));
+    TEST_ASSERT(verify_fail_reason == VERIFY_FAIL_REASON_NOT_CONFIRMED && main_slot_blank(), "a confirmation that covers another counter than the one sent is refused");
+    fresh();
+    { uint8_t c[4] = {0, 0, 0, 7}; HandleRecordCounter(c); }
+    TEST_ASSERT(!update_in_progress && current_status == STATUS_LISTENING, "a counter outside an update is ignored");
+    // (d) the floor in the answer register is big-endian
+    fresh();
+    seed_counter = 0x01020304u;
+    seed_metadata(META_STATE_APP_VALID, 0, urtc_minor_field_pack(1, 0), 100);
+    { uint8_t cc[4]; BuildCounterFloorResponse(cc); TEST_ASSERT(cc[0] == 1 && cc[1] == 2 && cc[2] == 3 && cc[3] == 4, "REG_COUNTER_FLOOR answers four bytes, big-endian"); }
+    // (e) a power cut while the record is appended never lowers the floor: the half-written record fails its CRC and the previous one stays the state
+    for (int cut = 1; cut <= 36; cut++) {
+        fresh();
+        seed_counter = 5;
+        seed_metadata(META_STATE_APP_VALID, 0, urtc_minor_field_pack(4, 2), 3000);
+        FirmwareMetadata_t next;
+        Metadata_Read(&next);
+        next.counter = 9;
+        next.state = META_STATE_COPY_PENDING;
+        fake_flash_fail_program_nth = 36 + cut;   // the seed above took 36 half-word programs (72 bytes); the cut falls inside the next record
+        (void)Metadata_EraseAndWrite(&next);
+        fake_flash_fail_program_nth = 0;
+        if (!(Metadata_Read(&meta) && meta.counter == 5 && meta.state == META_STATE_APP_VALID && Counter_Floor() == 5)) {
+            TEST_ASSERT(0, "a power cut at any half-word of the appended record leaves the previous record, and the floor, intact");
+            break;
+        }
+    }
+    // (f) the pending record already carries the new floor: after a cut during the copy the floor is the new one, and the resume keeps it
+    fresh();
+    make_image(3000);
+    sign_image(3000, hm);
+    start_update(3000, THIS_HARDWARE_ID);
+    HandleHmacExpected(hm);
+    send_data(3000, 32);
+    fake_flash_fail_erase_nth = 3;
+    g_counter = 8;
+    end_update(ref_crc32(image, 3000), 0, urtc_minor_field_pack(6, 0));
+    confirm_now(3000, 0, urtc_minor_field_pack(6, 0), 0);
+    fake_flash_fail_erase_nth = 0;
+    TEST_ASSERT(Counter_Floor() == 8, "the floor moves in the same record that says the copy is pending");
+    TEST_ASSERT(ApplicationIsValid() == 1, "the interrupted copy resumes");
+    Metadata_Read(&meta);
+    TEST_ASSERT(meta.state == META_STATE_APP_VALID && meta.counter == 8 && Counter_Floor() == 8, "and the finished record keeps the counter");
+    // (g) the log: records are appended and the page is only erased when its 28 slots are full; the counter survives the page being recycled
+    fresh();
+    seed_counter = 11;
+    for (int i = 0; i < 40; i++) seed_metadata(META_STATE_APP_VALID, 0, urtc_minor_field_pack(1, (uint32_t)(i + 1) & 0x7F), 100 + (uint32_t)i);
+    Metadata_Read(&meta);
+    TEST_ASSERT(meta.size == 139 && meta.counter == 11 && Counter_Floor() == 11, "after 40 records (the 28-slot page recycled once) the newest is the state and the counter is still there");
+    fresh();
+    seed_metadata(META_STATE_APP_VALID, 0, urtc_minor_field_pack(1, 0), 100);
+    fake_flash_fail_erase_nth = 1;
+    seed_counter = 3;
+    seed_metadata(META_STATE_APP_VALID, 0, urtc_minor_field_pack(1, 1), 101);
+    fake_flash_fail_erase_nth = 0;
+    Metadata_Read(&meta);
+    TEST_ASSERT(meta.counter == 3 && meta.size == 101, "appending to a page that still has room erases nothing (an erase failure injected at the first erase is never reached)");
+
     // ---- flash error paths -----------------------------------------------------------------------------------------------------------------------
     fresh();
     fake_flash_fail_erase_nth = 1;
@@ -437,7 +561,7 @@ int main(void)
     start_update(3000, THIS_HARDWARE_ID);
     HandleHmacExpected(hm);
     send_data(3000, 32);
-    fake_flash_fail_erase_nth = 4; // erases so far: 2 backup pages at START, 1 metadata page; the 4th is the first main-slot page
+    fake_flash_fail_erase_nth = 3; // erases so far: 2 backup pages at START; the metadata is appended with no erase; the 3rd is the first main-slot page
     end_update(ref_crc32(image, 3000), 0, urtc_minor_field_pack(6, 0));
     confirm_now(3000, 0, urtc_minor_field_pack(6, 0), 0);
     TEST_ASSERT(current_status == STATUS_ERROR && update_failed, "copy failure is reported and does not claim success");
@@ -470,6 +594,7 @@ int main(void)
     Metadata_Read(&meta);
     TEST_ASSERT(meta.state == META_STATE_APP_VALID && meta.hardware_id == THIS_HARDWARE_ID && meta.size == APP_MAX_SIZE, "the adopted image gets full metadata");
     TEST_ASSERT(urtc_minor_field_patch(meta.version_minor) == FIRMWARE_VERSION_PATCH, "adopted metadata carries the current patch number");
+    TEST_ASSERT(meta.counter == URTC_SLAVE_COUNTER_FLOOR && Counter_Floor() == URTC_SLAVE_COUNTER_FLOOR, "an adopted image gets the compiled floor, not a counter nobody signed");
     TEST_ASSERT(ApplicationIsValid() == 1, "the adopted image validates again on the next boot");
     { uint8_t z[2] = { 0, 0 }; Flash_WriteVerified(MAIN_APP_ADDR + 0x1000, z, 2); }
     TEST_ASSERT(ApplicationIsValid() == 0, "a modified application fails the CRC32 check");
@@ -480,7 +605,7 @@ int main(void)
     TEST_ASSERT(ApplicationIsValid() == 1, "a freshly flashed application validates");
     Metadata_Read(&meta);
     FirmwareMetadata_t bad = meta;
-    bad.hmac[0] ^= 0xFF;
+    bad.sha256[0] ^= 0xFF;
     Metadata_EraseAndWrite(&bad);
     TEST_ASSERT(ApplicationIsValid() == 0, "valid CRC but wrong stored signature: rejected");
     bad = meta;

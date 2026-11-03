@@ -124,6 +124,8 @@ typedef struct {
     int start_hardware_id;    // the hardware id of 0x211 (0: the slave's)
     int slave_waits;          // the scripted slave reports AWAIT_CONFIRM
     int skip_end;             // no 0x214
+    int floor_unreadable;     // the slave does not answer REG_COUNTER_FLOOR (an older bootloader)
+    uint32_t slave_floor;     // the floor the scripted slave reports
 } Scenario;
 
 static uint8_t scenario_nonce[16];
@@ -141,6 +143,8 @@ static void play(const BootSigCase *c, Scenario s)
     if (s.damage_record) record[40] ^= 0x01;
     reg_readable[0x00] = 1; reg_value[0x00][0] = s.slave_waits ? 0x08 : 0x03;
     reg_readable[0x09] = 1; memcpy(reg_value[0x09], scenario_nonce, 16);
+    reg_readable[0x0B] = s.floor_unreadable ? 0 : 1;
+    reg_value[0x0B][0] = (uint8_t)(s.slave_floor >> 24); reg_value[0x0B][1] = (uint8_t)(s.slave_floor >> 16); reg_value[0x0B][2] = (uint8_t)(s.slave_floor >> 8); reg_value[0x0B][3] = (uint8_t)s.slave_floor;
 
     uint8_t start[8] = { (uint8_t)(c->size >> 24), (uint8_t)(c->size >> 16), (uint8_t)(c->size >> 8), (uint8_t)c->size, 0, 0, 0, 0 };
     uint32_t hw = s.start_hardware_id ? (uint32_t)s.start_hardware_id : 0x0303CB01u;
@@ -180,7 +184,7 @@ static int confirm_matches(const BootSigCase *c, const uint8_t nonce[16])
     int w = find_write(0x0A);
     if (w < 0 || writes[w].len != 32) return 0;
     uint8_t message[URTC_SLAVE_CONFIRM_MESSAGE_SIZE], tag[32];
-    urtc_slave_confirm_message(message, nonce, c->sha256, c->hardware_id, (uint16_t)c->major, (uint16_t)c->minor_field, c->size);
+    urtc_slave_confirm_message(message, nonce, c->sha256, c->hardware_id, (uint16_t)c->major, (uint16_t)c->minor_field, c->size, c->counter);
     SlaveAttest_Sha256(message, sizeof message, tag);
     return memcmp(tag, writes[w].data, 32) == 0;
 }
@@ -188,7 +192,7 @@ static int confirm_matches(const BootSigCase *c, const uint8_t nonce[16])
 static void attest_tests(int *failures)
 {
     const BootSigCase *slave = &BOOT_SIG_CASES[SLAVE_CASE];
-    Scenario good = { 1, 0, 0, 0, 0, 1, 0 };
+    Scenario good = { 1, 0, 0, 0, 0, 1, 0, 0, 0 };
     for (int i = 0; i < 16; i++) scenario_nonce[i] = (uint8_t)(0xA0 + i);
 
     // a valid record: the slave gets END first and then the confirmation, which carries the right tag
@@ -197,8 +201,12 @@ static void attest_tests(int *failures)
     TEST_ASSERT(find_write(0x04) >= 0 && find_write(0x0A) > find_write(0x04), "a valid record: END is relayed first and then the confirmation is written to register 0x0A");
     TEST_ASSERT(confirm_matches(slave, scenario_nonce), "the confirmation is the SHA-256 of the message with the nonce the slave published, the image digest, hardware id, version and size");
     int slave_registers_written = 1;
-    for (int i = 0; i < write_count; i++) if (writes[i].reg > 0x0A) slave_registers_written = 0;
-    TEST_ASSERT(slave_registers_written, "the record chunks are not relayed to the slave: only its bootloader registers 0x01 to 0x0A are written");
+    for (int i = 0; i < write_count; i++) if (writes[i].reg > 0x0C) slave_registers_written = 0;
+    TEST_ASSERT(slave_registers_written, "the record chunks are not relayed to the slave: only its bootloader registers 0x01 to 0x0C are written");
+    {
+        int wc = find_write(0x0C);
+        TEST_ASSERT(wc >= 0 && wc < find_write(0x04) && writes[wc].len == 4 && writes[wc].data[3] == (uint8_t)slave->counter && writes[wc].data[0] == 0 && writes[wc].data[1] == 0 && writes[wc].data[2] == 0, "the signed counter of the record is written to register 0x0C before the END frame is relayed");
+    }
     int cw = find_write(0x0A);
     TEST_ASSERT(writes[cw].len == 32, "the confirmation is exactly 32 bytes");
 
@@ -243,6 +251,17 @@ static void attest_tests(int *failures)
     TEST_ASSERT(find_write(0x0A) < 0, "an update declared for the main board's hardware id is never confirmed for the slave");
     clear(); use_dev_key(); play(&BOOT_SIG_CASES[MASTER_CASE], good);
     TEST_ASSERT(find_write(0x0A) < 0, "a record signed for the main board's hardware id does not vouch for a slave image");
+
+    // the rollback floor of the slave
+    s = good; s.slave_floor = slave->counter;
+    clear(); use_dev_key(); play(slave, s);
+    TEST_ASSERT(find_write(0x0A) >= 0, "a record whose counter equals the floor of the slave is confirmed");
+    s = good; s.slave_floor = slave->counter + 1;
+    clear(); use_dev_key(); play(slave, s);
+    TEST_ASSERT(find_write(0x0A) < 0 && find_write(0x0C) < 0 && find_write(0x04) >= 0, "a record below the floor the slave reports is never confirmed: the master refuses before the slave does, and END is still relayed");
+    s = good; s.floor_unreadable = 1;
+    clear(); use_dev_key(); play(slave, s);
+    TEST_ASSERT(find_write(0x0A) < 0 && find_write(0x0C) < 0, "a slave that does not report its floor (an older bootloader) gets no confirmation: an unknown floor vouches for nothing");
 
     // keys
     clear(); key_count_in_use = 0; play(slave, good);

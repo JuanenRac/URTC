@@ -301,21 +301,18 @@ version_or_bump() {
 mkdir -p "$FIRMWARE_OUT"
 
 # -----------------------------------------------------------------------
-step "3b. Firmware signing keys (docs/FIRMWARE_SIGNING.TXT)"
+step "3b. Trust table flavour (docs/FIRMWARE_SIGNING.TXT)"
 # -----------------------------------------------------------------------
-# The bootloaders get their HMAC key injected here from the PRIVATE file
-# named by URTC_SIGNING_KEY_FILE - it is never committed. Without it the
-# build uses the PUBLIC development key (bench boards only); URTC_RELEASE=1
-# refuses to build without a private key.
+# No bootloader holds a secret: the main one is compiled with a PUBLIC trust table (the bench table, or keys/image_trust.json with URTC_RELEASE=1) and the
+# expansion slave one holds no key at all. Nothing is injected here.
 if SIGNING_KINDS="$(python3 "$ROOT/firmware_signing.py" check)"; then
-    pass "signing keys: $SIGNING_KINDS"
-    case "$SIGNING_KINDS" in *dev*) warn "PUBLIC development signing key in use - these images are for bench boards only, never a release" ;; esac
+    pass "trust table: $SIGNING_KINDS"
+    case "$SIGNING_KINDS" in *dev*) warn "PUBLIC development trust table in use - these images are for bench boards only, never a release" ;; esac
 else
-    fail "signing keys unavailable (see the message above) - nothing built"
+    fail "trust table flavour unavailable (see the message above) - nothing built"
     echo ""; echo "$PASS passed, $WARN warnings, $FAIL failed"; exit 1
 fi
 MASTER_KEY_FLAGS="$(python3 "$ROOT/firmware_signing.py" cflags master)" || exit 1
-SLAVE_KEY_FLAGS="$(python3 "$ROOT/firmware_signing.py" cflags slave)" || exit 1
 
 # The firmware directory is a single coherent build set, never a history of
 # mixed component versions. Preserve non-generated material, but remove every
@@ -406,7 +403,7 @@ SRC="$ROOT/src/F303-slave/boot"
 # pattern too - filename convention URTC_SLAVE_BOOTLOADER_v{MAJOR}.{MINOR}.
 # {PATCH} replaces the old unversioned URTC_SLAVE_BOOTLOADER name.
 SLAVE_BOOT_VER=$(version_or_bump "$SRC/slaveboot_common.h" BOOTLOADER_VERSION)
-compile_dir "$SRC" "$OUT" "$SLAVE_KEY_FLAGS"
+compile_dir "$SRC" "$OUT"
 SLAVE_BOOT_NAME="URTC_SLAVE_BOOTLOADER_v${SLAVE_BOOT_VER}"
 arm-none-eabi-gcc $LDCOMMON -T"$SRC/STM32F303CBTx_SLAVEBOOT.ld" \
     "$BUILD/app_slave/startup.o" "$BUILD/app_slave/system_stm32f3xx.o" \

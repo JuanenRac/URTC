@@ -4,7 +4,7 @@
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
 // GPL-3.0-or-later - see LICENSE
 //
-// The security-critical logic here (CRC32/HMAC/HardwareID verification,
+// The security-critical logic here (CRC32/SHA-256/HardwareID verification,
 // anti-rollback, the backup-then-copy A/B sequence, resuming an
 // interrupted copy on the next boot) is deliberately the same algorithm
 // as the main board's own bootloader_protocol.c - none of that reasoning
@@ -60,6 +60,20 @@ void BuildVersionExtResponse(uint8_t out[4]) {
         BOOTLOADER_VERSION_MINOR, BOOTLOADER_VERSION_PATCH);
 }
 
+// The rollback floor of this slave: the compiled floor or the counter of the installed image, whichever is higher. An image whose signed counter is
+// below it is refused. REG_COUNTER_FLOOR serves it to the master, which reads it before it verifies a record.
+uint32_t Counter_Floor(void) {
+    FirmwareMetadata_t meta;
+    uint32_t floor = URTC_SLAVE_COUNTER_FLOOR;
+    if (Metadata_Read(&meta) && meta.counter > floor) floor = meta.counter;
+    return floor;
+}
+
+void BuildCounterFloorResponse(uint8_t out[4]) {
+    uint32_t floor = Counter_Floor();
+    out[0] = (uint8_t)(floor >> 24); out[1] = (uint8_t)(floor >> 16); out[2] = (uint8_t)(floor >> 8); out[3] = (uint8_t)floor;
+}
+
 // -----------------------------------------------------------------------
 // Validates the MAIN slot and, if a copy from backup was left unfinished
 // by an interrupted previous session, resumes and completes it before
@@ -99,7 +113,8 @@ uint8_t ApplicationIsValid(void) {
         uint32_t crc = 0xFFFFFFFFUL;
         crc = CRC32_Update(crc, (const uint8_t*)MAIN_APP_ADDR, APP_MAX_SIZE);
         adopted.crc32 = CRC32_Finalize(crc);
-        sha256_flash_region(MAIN_APP_ADDR, APP_MAX_SIZE, adopted.hmac);
+    adopted.counter = URTC_SLAVE_COUNTER_FLOOR;
+        sha256_flash_region(MAIN_APP_ADDR, APP_MAX_SIZE, adopted.sha256);
         return Metadata_EraseAndWrite(&adopted) ? 1 : 0;
     }
 
@@ -119,7 +134,7 @@ uint8_t ApplicationIsValid(void) {
         // The backup slot must still hold the image that was verified and confirmed before the cut: if it does not, the main slot is left alone.
         uint8_t backup_digest[32];
         sha256_flash_region(BACKUP_APP_ADDR, meta.size, backup_digest);
-        if (!hmac_constant_time_compare(backup_digest, meta.hmac, 32)) return 0;
+        if (!constant_time_equal(backup_digest, meta.sha256, 32)) return 0;
         current_status = STATUS_COPYING;
         if (!Flash_CopyRegion(MAIN_APP_ADDR, BACKUP_APP_ADDR, meta.size)) {
             return 0;
@@ -138,7 +153,7 @@ uint8_t ApplicationIsValid(void) {
     // At every boot only corruption of the flash has to be caught: a SHA-256 with no key, kept in the metadata.
     uint8_t actual_digest[32];
     sha256_flash_region(MAIN_APP_ADDR, meta.size, actual_digest);
-    if (!hmac_constant_time_compare(actual_digest, meta.hmac, 32)) return 0;
+    if (!constant_time_equal(actual_digest, meta.sha256, 32)) return 0;
 
     return 1;
 }
@@ -202,6 +217,9 @@ static uint8_t  update_hmac_received = 0;
 // kept here until the confirmation arrives. All of it is cleared by a new START, by a failure and by the first REG_CONFIRM of the session.
 static uint8_t  update_nonce[URTC_SLAVE_CONFIRM_NONCE_SIZE];
 static uint8_t  update_nonce_valid = 0;
+// The signed counter of the record the master verified, from REG_RECORD_COUNTER; the confirmation is bound to it and it is checked against the floor.
+static uint32_t update_record_counter = 0;
+static uint8_t  update_counter_received = 0;
 static uint32_t update_session_counter = 0;
 uint8_t  update_awaiting_confirm = 0;
 static uint8_t  await_digest[32];
@@ -301,6 +319,8 @@ void HandleStartUpdate(uint8_t *data) {
     update_running_crc = 0xFFFFFFFFUL;
     update_hmac_received = 0;
     update_awaiting_confirm = 0;
+    update_counter_received = 0;
+    update_record_counter = 0;
     MakeChallenge();
     page_buffer_fill = 0;
     current_page_index = 0;
@@ -315,6 +335,14 @@ void HandleHmacExpected(uint8_t *data) {
     if (!update_in_progress || update_failed || update_awaiting_confirm) return;
     memcpy(update_expected_hmac, data, 32); // REG_HMAC_EXPECTED is always exactly 32 bytes in one transaction - no chunking needed the way CAN's 8-byte frames required
     update_hmac_received = 1;
+    update_last_activity_tick = HAL_GetTick();
+}
+
+// REG_RECORD_COUNTER, 4 bytes big-endian. Only before the END frame: after it the counter is already part of what was checked.
+void HandleRecordCounter(uint8_t *data) {
+    if (!update_in_progress || update_failed || update_awaiting_confirm) return;
+    update_record_counter = ((uint32_t)data[0] << 24) | ((uint32_t)data[1] << 16) | ((uint32_t)data[2] << 8) | data[3];
+    update_counter_received = 1;
     update_last_activity_tick = HAL_GetTick();
 }
 
@@ -383,9 +411,19 @@ void HandleEndUpdate(uint8_t *data) {
     // business: it verifies the Ed25519 record and confirms below (HandleConfirm).
     uint8_t actual_hmac[32];
     sha256_flash_region(BACKUP_APP_ADDR, update_total_size, actual_hmac);
-    if (!hmac_constant_time_compare(actual_hmac, update_expected_hmac, 32)) {
+    if (!constant_time_equal(actual_hmac, update_expected_hmac, 32)) {
         current_status = STATUS_VERIFY_FAIL;
         verify_fail_reason = VERIFY_FAIL_REASON_HMAC;
+        update_in_progress = 0;
+        update_failed = 1;
+        return;
+    }
+
+    // Anti-rollback by counter: the record the master verified carries a signed counter, and an image below the floor this slave keeps is refused
+    // however well it is signed. The master sends the counter before END; if it did not, the confirmation below cannot match and the update fails closed.
+    if (update_counter_received && update_record_counter < Counter_Floor()) {
+        current_status = STATUS_VERIFY_FAIL;
+        verify_fail_reason = VERIFY_FAIL_REASON_ROLLBACK;
         update_in_progress = 0;
         update_failed = 1;
         return;
@@ -445,18 +483,27 @@ void HandleConfirm(uint8_t *data) {
     // confirmation was computed) is caught here, not trusted from the first pass.
     uint8_t now_digest[32];
     sha256_flash_region(BACKUP_APP_ADDR, update_total_size, now_digest);
-    if (!hmac_constant_time_compare(now_digest, await_digest, 32)) {
+    if (!constant_time_equal(now_digest, await_digest, 32)) {
         FailUpdate(VERIFY_FAIL_REASON_HMAC);
         return;
     }
-    // The tag the master must have computed: the nonce of this session, this image, this hardware, this version and this size, all taken from the slave's
-    // own state and not from the master.
+    // The tag the master must have computed: the nonce of this session, this image, this hardware, this version, this size and the counter of the record,
+    // all taken from the slave's own state and not from the master. A master that never sent the counter cannot have the tag accepted.
+    if (!update_counter_received) {
+        FailUpdate(VERIFY_FAIL_REASON_NOT_CONFIRMED);
+        return;
+    }
     uint8_t message[URTC_SLAVE_CONFIRM_MESSAGE_SIZE];
     uint8_t expected_tag[URTC_SLAVE_CONFIRM_TAG_SIZE];
-    urtc_slave_confirm_message(message, update_nonce, now_digest, update_declared_hw_id, await_version_major, await_version_minor, update_total_size);
+    urtc_slave_confirm_message(message, update_nonce, now_digest, update_declared_hw_id, await_version_major, await_version_minor, update_total_size, update_record_counter);
     sha256_buffer(message, sizeof message, expected_tag);
-    if (!hmac_constant_time_compare(expected_tag, data, URTC_SLAVE_CONFIRM_TAG_SIZE)) {
+    if (!constant_time_equal(expected_tag, data, URTC_SLAVE_CONFIRM_TAG_SIZE)) {
         FailUpdate(VERIFY_FAIL_REASON_NOT_CONFIRMED);
+        return;
+    }
+    // Checked again here, at the last moment before anything is written: the floor is what is in the metadata NOW.
+    if (update_record_counter < Counter_Floor()) {
+        FailUpdate(VERIFY_FAIL_REASON_ROLLBACK);
         return;
     }
 
@@ -468,7 +515,8 @@ void HandleConfirm(uint8_t *data) {
     pending.version_minor = await_version_minor;
     pending.size = update_total_size;
     pending.crc32 = await_crc;
-    memcpy(pending.hmac, await_digest, 32);
+    pending.counter = update_record_counter;   // the new floor travels in the same record that says the copy is pending: one append, no window without it
+    memcpy(pending.sha256, await_digest, 32);
     if (!Metadata_EraseAndWrite(&pending)) {
         current_status = STATUS_ERROR;
         update_in_progress = 0;
@@ -492,7 +540,7 @@ void HandleConfirm(uint8_t *data) {
     // The copy is read back against the digest that was confirmed; a main slot that differs stays COPY_PENDING, so the next boot repeats the copy.
     uint8_t main_digest[32];
     sha256_flash_region(MAIN_APP_ADDR, update_total_size, main_digest);
-    if (!hmac_constant_time_compare(main_digest, await_digest, 32)) {
+    if (!constant_time_equal(main_digest, await_digest, 32)) {
         current_status = STATUS_ERROR;
         update_in_progress = 0;
         update_failed = 1;
