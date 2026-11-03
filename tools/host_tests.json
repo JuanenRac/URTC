@@ -110,7 +110,9 @@
     "tests/host_hal/fake_hal.c",
     "src/F303-master/boot/bootloader_protocol.c",
     "src/F303-master/boot/bootloader_flash.c",
-    "src/F303-master/boot/bootloader_crypto.c"
+    "src/F303-master/boot/bootloader_crypto.c",
+    "src/F303-master/boot/bootloader_trust.c",
+    "src/F303-master/boot/bootloader_ed25519.c"
    ],
    "includes": [
     "tests",
@@ -121,6 +123,10 @@
    "extra": [
     "-Wno-cpp",
     "-Wno-int-to-pointer-cast"
+   ],
+   "defines": [
+    "-DURTC_HOST_TEST",
+    "-DURTC_TRUST_DEV"
    ]
   },
   {
@@ -712,7 +718,9 @@
     "src/F303-master/boot/bootloader_oled.c",
     "src/F303-master/boot/bootloader_protocol.c",
     "src/F303-master/boot/bootloader_flash.c",
-    "src/F303-master/boot/bootloader_crypto.c"
+    "src/F303-master/boot/bootloader_crypto.c",
+    "src/F303-master/boot/bootloader_trust.c",
+    "src/F303-master/boot/bootloader_ed25519.c"
    ],
    "includes": [
     "tests",
@@ -725,8 +733,24 @@
     "-Wno-int-to-pointer-cast"
    ],
    "defines": [
-    "-Dmain=bootloader_main_entry"
+    "-Dmain=bootloader_main_entry",
+    "-DURTC_HOST_TEST",
+    "-DURTC_TRUST_DEV"
    ]
+  },
+  {
+   "name": "bootloader_trust_release",
+   "test": "tests/test_bootloader_trust_release.c",
+   "sources": [
+    "src/F303-master/boot/bootloader_trust.c",
+    "src/common/urtc_ed25519.c"
+   ],
+   "includes": [
+    "tests",
+    "src/F303-master/boot",
+    "src/common"
+   ],
+   "std": "c11"
   },
   {
    "name": "slaveboot_main",

@@ -192,8 +192,8 @@ int main(void) {
                 }
                 if (rxHeader.StdId == CAN_ID_START_UPDATE && rxHeader.DLC == 8) {
                     HandleStartUpdate(rxData);
-                } else if (rxHeader.StdId == CAN_ID_HMAC_CHUNK && rxHeader.DLC == 8) {
-                    HandleHmacChunk(rxData);
+                } else if (rxHeader.StdId == CAN_ID_IMG_SIG_CHUNK && rxHeader.DLC == 8) {
+                    HandleSigChunk(rxData);
                 } else if (rxHeader.StdId == CAN_ID_DATA) {
                     HandleData(rxData, rxHeader.DLC);
                 } else if (rxHeader.StdId == CAN_ID_END_UPDATE && rxHeader.DLC == 8) {

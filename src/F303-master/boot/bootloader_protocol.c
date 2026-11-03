@@ -10,6 +10,8 @@
 #include "bootloader_crypto.h"
 #include "bootloader_flash.h"
 #include "bootloader_oled.h"
+#include "bootloader_trust.h"
+#include "urtc_auth.h"
 #include "urtc_version_wire.h"
 
 static uint8_t CAN_WaitForFreeMailbox(void) {
@@ -161,6 +163,20 @@ void HandleVersionQuery(void) {
         uint32_t mb2;
         HAL_CAN_AddTxMessage(&hcan, &txH2, txD2, &mb2);
     }
+
+    // The identifier of the key this bootloader trusts (the current one), so that a flashing tool can compare it with the key that signed the image before it
+    // sends anything. A bootloader that trusts nobody sends nothing: the tool reads "no data", never a difference.
+    const TrustKeys_t *trust = Trust_Active();
+    if (trust->count > 0u && CAN_WaitForFreeMailbox()) {
+        CAN_TxHeaderTypeDef txH4;
+        txH4.StdId = CAN_ID_KEY_ID;
+        txH4.IDE = CAN_ID_STD;
+        txH4.RTR = CAN_RTR_DATA;
+        txH4.DLC = TRUST_KEY_ID_SIZE;
+        txH4.TransmitGlobalTime = DISABLE;
+        uint32_t mb4;
+        HAL_CAN_AddTxMessage(&hcan, &txH4, trust->key_id[0], &mb4);
+    }
 }
 
 // Error counter query (0x7FB) response, sent as 0x7FC - shared between
@@ -238,7 +254,7 @@ uint8_t ApplicationIsValid(void) {
         // the initial stack pointer: genuinely erased flash reads as
         // 0xFFFFFFFF, not a valid RAM address. A real vector table (from
         // JTAG, or adopted here before) has a real MSP inside this chip's
-        // actual 48KB RAM. If it passes, compute its CRC/HMAC right now and
+        // actual 48KB RAM. If it passes, compute its CRC/SHA-256 right now and
         // adopt it as the trusted baseline.
         uint32_t app_stack = *(volatile uint32_t*)MAIN_APP_ADDR;
         if (!StackPointerInValidRAM(app_stack)) return 0;
@@ -253,12 +269,11 @@ uint8_t ApplicationIsValid(void) {
         uint32_t crc = 0xFFFFFFFFUL;
         crc = CRC32_Update(crc, (const uint8_t*)MAIN_APP_ADDR, APP_MAX_SIZE);
         adopted.crc32 = CRC32_Finalize(crc);
-        hmac_sha256_flash_region(HMAC_KEY, 32, MAIN_APP_ADDR, APP_MAX_SIZE, adopted.hmac);
+        adopted.counter = Trust_MinCounter();
+        sha256_flash_region(MAIN_APP_ADDR, APP_MAX_SIZE, adopted.sha256);
         return Metadata_EraseAndWrite(&adopted) ? 1 : 0;
-        // Note: this adopted HMAC won't match a real signed build's HMAC on
-        // the next actual OTA update attempt's comparison basis - that's
-        // fine, since HMAC here only ever gates a NEW incoming image
-        // against the KEY, not against this adopted baseline.
+        // The adopted digest is only a baseline for the damage check at
+        // every start; a NEW incoming image is judged by its signature.
     }
 
     // Validated before anything below reads meta.size or meta.hardware_id,
@@ -292,9 +307,9 @@ uint8_t ApplicationIsValid(void) {
     crc = CRC32_Finalize(crc);
     if (crc != meta.crc32) return 0;
 
-    uint8_t actual_hmac[32];
-    hmac_sha256_flash_region(HMAC_KEY, 32, MAIN_APP_ADDR, meta.size, actual_hmac);
-    if (!hmac_constant_time_compare(actual_hmac, meta.hmac, 32)) return 0;
+    uint8_t actual_digest[32];
+    sha256_flash_region(MAIN_APP_ADDR, meta.size, actual_digest);
+    if (!digest_constant_time_compare(actual_digest, meta.sha256, 32)) return 0;
 
     return 1;
 }
@@ -371,14 +386,19 @@ void JumpToApplication(void) {
 // -----------------------------------------------------------------------
 // Update flow - all writes during an update go to the BACKUP slot only.
 // The main slot is never touched until backup has fully passed size, CRC32,
-// HMAC-SHA256, and HardwareID verification.
+// Ed25519 signature, and HardwareID verification.
 // -----------------------------------------------------------------------
 uint32_t update_total_size = 0;
 static uint32_t update_declared_hw_id = 0;
 uint32_t update_bytes_received = 0;
 static uint32_t update_running_crc = 0xFFFFFFFFUL;
-static uint8_t  update_expected_hmac[32];
-static uint8_t  update_hmac_chunks_received = 0;
+// The 76-byte record (key id, counter, signature) arrives in 11 chunks of 7 bytes; the last chunk carries 6 and a pad byte.
+#define SIG_RECORD_SIZE   76u
+#define SIG_CHUNK_BYTES   7u
+#define SIG_CHUNK_COUNT   11u
+#define SIG_ALL_CHUNKS    0x7FFu
+static uint8_t  update_record[SIG_CHUNK_COUNT * SIG_CHUNK_BYTES];
+static uint16_t update_record_chunks = 0;
 static uint8_t  page_buffer[FLASH_PAGE_SIZE];
 static uint32_t page_buffer_fill = 0;
 static uint32_t current_page_index = 0;
@@ -413,6 +433,25 @@ static uint8_t FlushPageBuffer(void) {
         OLED_DrawProgressBar_Boot(pct);
     }
     return ok;
+}
+
+// The 28 bytes of image header that the signature covers, rebuilt from the frames of this update (src/urtc_common/image_header.py is the reference): the
+// hardware id and the length of START_UPDATE, the CRC and the version of END_UPDATE. The patch is the one of the minor field, or 0 when the flasher
+// did not send it; the fourth version component (the build) is 0 until the end frame can carry it.
+static void BuildImageHeader(uint8_t out[URTC_AUTH_HEADER_BYTES], uint16_t major, uint16_t minor_field, uint32_t crc) {
+    uint8_t patch = urtc_minor_field_patch(minor_field);
+    memset(out, 0, URTC_AUTH_HEADER_BYTES);
+    out[0] = 'U'; out[1] = 'R'; out[2] = 'I'; out[3] = 'H';
+    out[4] = 1;   // header version
+    out[5] = 32;  // header size
+    out[8] = (uint8_t)(update_declared_hw_id >> 24); out[9] = (uint8_t)(update_declared_hw_id >> 16);
+    out[10] = (uint8_t)(update_declared_hw_id >> 8); out[11] = (uint8_t)update_declared_hw_id;
+    out[12] = (uint8_t)(major >> 8); out[13] = (uint8_t)major;
+    out[14] = urtc_minor_field_minor(minor_field);
+    out[15] = (uint8_t)((patch == URTC_PATCH_UNKNOWN) ? 0u : patch);
+    out[20] = (uint8_t)(update_total_size >> 24); out[21] = (uint8_t)(update_total_size >> 16);
+    out[22] = (uint8_t)(update_total_size >> 8); out[23] = (uint8_t)update_total_size;
+    out[24] = (uint8_t)(crc >> 24); out[25] = (uint8_t)(crc >> 16); out[26] = (uint8_t)(crc >> 8); out[27] = (uint8_t)crc;
 }
 
 void HandleStartUpdate(uint8_t *data) {
@@ -476,7 +515,8 @@ void HandleStartUpdate(uint8_t *data) {
     // page_buffer_fill regardless), but keeps stale bytes out of RAM.
     update_bytes_received = 0;
     update_running_crc = 0xFFFFFFFFUL;
-    update_hmac_chunks_received = 0;
+    memset(update_record, 0, sizeof(update_record));
+    update_record_chunks = 0;
     page_buffer_fill = 0;
     current_page_index = 0;
     update_in_progress = 1;
@@ -616,11 +656,12 @@ void HandleReadbackStart(void) {
     }
 }
 
-void HandleHmacChunk(uint8_t *data) {
+void HandleSigChunk(uint8_t *data) {
     if (!update_in_progress || update_failed) return;
-    if (update_hmac_chunks_received >= 4) return; // already have all 32 bytes
-    memcpy(&update_expected_hmac[update_hmac_chunks_received * 8], data, 8);
-    update_hmac_chunks_received++;
+    uint8_t index = data[0];
+    if (index >= SIG_CHUNK_COUNT) return;
+    memcpy(&update_record[index * SIG_CHUNK_BYTES], data + 1, SIG_CHUNK_BYTES);
+    update_record_chunks = (uint16_t)(update_record_chunks | (1u << index));
     update_last_activity_tick = HAL_GetTick();
 }
 
@@ -671,7 +712,7 @@ void HandleEndUpdate(uint8_t *data) {
         }
     }
 
-    if (update_bytes_received != update_total_size || update_hmac_chunks_received != 4) {
+    if (update_bytes_received != update_total_size || update_record_chunks != SIG_ALL_CHUNKS) {
         CAN_SendVerifyFailReason(VERIFY_FAIL_REASON_INCOMPLETE);
         update_in_progress = 0;
         update_failed = 1;
@@ -699,14 +740,42 @@ void HandleEndUpdate(uint8_t *data) {
         return;
     }
 
-    uint8_t actual_hmac[32];
-    hmac_sha256_flash_region(HMAC_KEY, 32, BACKUP_APP_ADDR, update_total_size, actual_hmac);
-    if (!hmac_constant_time_compare(actual_hmac, update_expected_hmac, 32)) {
-        // CRC32 passed but the signature didn't - the image isn't corrupt,
-        // but it also isn't provably from this project's own build process.
-        // Same rejection as any other verification failure: main slot was
-        // never touched, so there's nothing to recover.
-        CAN_SendVerifyFailReason(VERIFY_FAIL_REASON_HMAC);
+    // Authentication: the Ed25519 record must verify, under a key of the trust table, over the header that the frames of this update describe, the SHA-256
+    // of the image in the backup slot and the rollback counter (urtc_auth.h). Nothing is believed before it does. A table with no key (the official build
+    // until the image-signing key exists) trusts nobody, so nothing installs.
+    uint8_t actual_digest[32];
+    sha256_flash_region(BACKUP_APP_ADDR, update_total_size, actual_digest);
+    uint8_t header28[URTC_AUTH_HEADER_BYTES];
+    BuildImageHeader(header28, version_major, version_minor, actual_crc);
+
+    FirmwareMetadata_t current_meta;
+    uint8_t have_current = Metadata_Read(&current_meta);
+    uint32_t counter_floor = Trust_MinCounter();
+    if (have_current && current_meta.counter > counter_floor) counter_floor = current_meta.counter;
+
+    const TrustKeys_t *trust = Trust_Active();
+    urtc_auth_context_t auth;
+    memset(&auth, 0, sizeof(auth));
+    auth.policy = URTC_AUTH_DEFAULT_POLICY;
+    auth.keys = (const uint8_t (*)[URTC_ED25519_PUBLIC_KEY_SIZE])trust->keys;
+    auth.key_count = trust->count;
+    auth.hardware_id = THIS_HARDWARE_ID;
+    auth.installed_counter = counter_floor;
+    // The version rule is applied below with the comparison that tolerates a legacy flasher (no patch number); urtc_auth_decide does the rest.
+    auth.installed_version_known = 0;
+    urtc_auth_image_t candidate;
+    candidate.header28 = header28;
+    candidate.payload_sha256 = actual_digest;
+    candidate.record = update_record;
+    candidate.hmac_ok = 0;
+    uint32_t new_counter = counter_floor;
+    urtc_auth_status_t verdict = urtc_auth_decide(&auth, &candidate, &new_counter);
+    if (verdict != URTC_AUTH_OK) {
+        uint8_t reason = VERIFY_FAIL_REASON_SIGNATURE;
+        if (verdict == URTC_AUTH_HARDWARE_MISMATCH) reason = VERIFY_FAIL_REASON_HARDWARE_ID;
+        if (verdict == URTC_AUTH_ROLLBACK_COUNTER) reason = VERIFY_FAIL_REASON_ROLLBACK;
+        // CRC32 passed but the record did not: the image isn't corrupt, but nobody the bootloader trusts vouched for it. The main slot was never touched.
+        CAN_SendVerifyFailReason(reason);
         update_in_progress = 0;
         update_failed = 1;
         OLED_ClearAll_Boot();
@@ -714,20 +783,11 @@ void HandleEndUpdate(uint8_t *data) {
         return;
     }
 
-    // Anti-rollback: a cryptographically valid image is still rejected if
-    // it declares a version older than what's already running, UNLESS this
-    // exact attempt was explicitly authorized via HandleAuthorizeDowngrade
-    // (0x7FD's own magic payload) - see that function's own comment for why
-    // a deliberate downgrade needs its own explicit opt-in rather than a
-    // bare flag. Without this check at all, a validly-signed-at-the-time
-    // image with a since-discovered vulnerability could be replayed
-    // indefinitely - HMAC alone only proves "signed with this project's
-    // key," not "not superseded." Only enforced when there's an existing
-    // valid version to roll back from - a blank board or one recovering
-    // from corrupted metadata has nothing to compare against, so any
-    // validly-signed image is accepted as it always was.
-    FirmwareMetadata_t current_meta;
-    if (Metadata_Read(&current_meta) && current_meta.state == META_STATE_APP_VALID) {
+    // Anti-rollback by version: a validly signed image is still rejected if it declares a version older than what's already running, UNLESS this exact
+    // attempt was explicitly authorized via HandleAuthorizeDowngrade (0x7FD's own magic payload). The signed counter above is never overridable. Only
+    // enforced when there's an existing valid version to roll back from - a blank board or one recovering from corrupted metadata has nothing to compare
+    // against. The version is part of what the record signs, so it cannot be changed without breaking the signature.
+    if (have_current && current_meta.state == META_STATE_APP_VALID) {
         // The minor field may carry the PATCH number in its high byte (see
         // urtc_version_wire.h); the patch only takes part when both sides know it.
         if (urtc_version_is_older(version_major, version_minor,
@@ -747,8 +807,8 @@ void HandleEndUpdate(uint8_t *data) {
     // flag's own declaration comment.
     update_downgrade_authorized = 0;
 
-    // Backup slot is now fully verified: size matched, CRC32 matched, HMAC
-    // matched, HardwareID was checked before a single byte was written.
+    // Backup slot is now fully verified: size matched, CRC32 matched, the
+    // signature verified, HardwareID was checked before a single byte was written.
     // Record the copy as pending BEFORE touching the main slot - if power
     // is lost partway through the copy below, the next boot's
     // ApplicationIsValid() finds this state and resumes from backup
@@ -762,7 +822,8 @@ void HandleEndUpdate(uint8_t *data) {
     pending.version_minor = version_minor;
     pending.size = update_total_size;
     pending.crc32 = actual_crc;
-    memcpy(pending.hmac, actual_hmac, 32);
+    pending.counter = new_counter;
+    memcpy(pending.sha256, actual_digest, 32);
     if (!Metadata_EraseAndWrite(&pending)) {
         CAN_SendStatus(STATUS_ERROR);
         update_in_progress = 0;

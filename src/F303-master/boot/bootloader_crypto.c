@@ -1,35 +1,18 @@
 // =============================================================================
-// URTC Bootloader - SHA-256 / HMAC-SHA256
+// URTC Bootloader - SHA-256
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
 // GPL-3.0-or-later - see LICENSE
 //
-// A from-scratch SHA-256/HMAC implementation (not a library) - verified
-// against the official RFC 4231 HMAC-SHA256 test case 2 before this was
-// ever wired into the update flow below.
+// A from-scratch SHA-256 (not a library), checked against FIPS 180-4 digests
+// around every padding boundary (tests/test_bootloader_crypto.c). There is no
+// key in this file: the digest of an image is what the Ed25519 record signs,
+// and the digest of the installed application is what the metadata keeps to
+// notice a damaged flash.
 // =============================================================================
 #include "stm32f3xx_hal.h"
 #include <string.h>
 #include "bootloader_common.h"
 #include "bootloader_crypto.h"
-
-// SIGNING KEY - injected at build time, never committed (see
-// docs/FIRMWARE_SIGNING.TXT). build_firmware.sh passes -DURTC_HMAC_KEY_BYTES=...
-// from the private key file named by URTC_SIGNING_KEY_FILE; a release build
-// (URTC_RELEASE=1) refuses to run without it. Without that define this
-// falls back to the PUBLIC DEVELOPMENT key below: the historic key that
-// was committed to this public repository, so ANYONE can sign images it
-// accepts - fine on a bench, never for a board in the field.
-#ifdef URTC_HMAC_KEY_BYTES
-const uint8_t HMAC_KEY[32] = { URTC_HMAC_KEY_BYTES };
-#else
-#warning "URTC: building with the PUBLIC development signing key - set URTC_SIGNING_KEY_FILE for real boards"
-const uint8_t HMAC_KEY[32] = {
-    0x25, 0x26, 0xCC, 0x3E, 0x90, 0x11, 0xEC, 0x7C,
-    0x49, 0xEC, 0xD2, 0xD2, 0xB7, 0xF3, 0x89, 0xE3,
-    0x59, 0xAA, 0x24, 0x60, 0x14, 0xFF, 0x51, 0x54,
-    0xA0, 0xAF, 0x8A, 0x3C, 0x3B, 0xF9, 0x55, 0x81
-};
-#endif
 
 typedef struct {
     uint32_t state[8];
@@ -90,7 +73,7 @@ static void sha256_update(SHA256_CTX *ctx, const uint8_t data[], uint32_t len) {
             ctx->datalen = 0;
         }
         // A single call here can span the full 112KB backup slot (via
-        // hmac_sha256_flash_region) - comfortably inside the IWDG's ~800ms
+        // sha256_flash_region) - comfortably inside the IWDG's ~800ms
         // window under nominal timing, but LSI's own accuracy is
         // notoriously loose across temperature, and this costs nothing to
         // guard regardless. Every 4096 bytes keeps the refresh frequent
@@ -130,42 +113,17 @@ static void sha256_final(SHA256_CTX *ctx, uint8_t hash[]) {
     }
 }
 
-void hmac_sha256_flash_region(const uint8_t *key, uint32_t key_len,
-                              uint32_t flash_addr, uint32_t len,
-                              uint8_t out[32]) {
-    uint8_t k_ipad[64], k_opad[64];
-    uint8_t key_block[64] = {0};
-    if (key_len > 64) {
-        SHA256_CTX kctx;
-        sha256_init(&kctx);
-        sha256_update(&kctx, key, key_len);
-        sha256_final(&kctx, key_block);
-    } else {
-        memcpy(key_block, key, key_len);
-    }
-    for (int i = 0; i < 64; i++) {
-        k_ipad[i] = key_block[i] ^ 0x36;
-        k_opad[i] = key_block[i] ^ 0x5c;
-    }
-    uint8_t inner_hash[32];
+void sha256_flash_region(uint32_t flash_addr, uint32_t len, uint8_t out[32]) {
     SHA256_CTX ctx;
     sha256_init(&ctx);
-    sha256_update(&ctx, k_ipad, 64);
     sha256_update(&ctx, (const uint8_t*)flash_addr, len);
-    sha256_final(&ctx, inner_hash);
-
-    sha256_init(&ctx);
-    sha256_update(&ctx, k_opad, 64);
-    sha256_update(&ctx, inner_hash, 32);
     sha256_final(&ctx, out);
 }
 
-uint8_t hmac_constant_time_compare(const uint8_t *a, const uint8_t *b, uint32_t len) {
-    // XOR-accumulate rather than an early-exit compare - an early exit
-    // leaks how many leading bytes matched through timing, which matters
-    // for a signature check even on a small embedded target listening on a
-    // shared bus. Costs nothing extra here since len is always 32.
+uint8_t digest_constant_time_compare(const uint8_t *a, const uint8_t *b, uint32_t len) {
+    // XOR-accumulate rather than an early-exit compare, so the time does not
+    // tell how many leading bytes matched.
     uint8_t diff = 0;
-    for (uint32_t i = 0; i < len; i++) diff |= a[i] ^ b[i];
+    for (uint32_t i = 0; i < len; i++) diff |= (uint8_t)(a[i] ^ b[i]);
     return diff == 0;
 }

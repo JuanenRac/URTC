@@ -23,7 +23,7 @@
 #     themselves.
 #
 # CLI (used by build_firmware.sh/.bat):
-#   python3 firmware_signing.py cflags master|slave   -> -D... or nothing
+#   python3 firmware_signing.py cflags master|slave   -> -D... or nothing (master: -DURTC_TRUST_DEV for the bench table, nothing for the release one)
 #   python3 firmware_signing.py check                  -> exit 1 if a release
 #                                                         build has no keys
 #   python3 firmware_signing.py hmac master|slave FILE -> hex HMAC of FILE
@@ -34,6 +34,10 @@ import re
 import sys
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
+# The PUBLIC development HMAC key of the main board. The main bootloader no longer holds any HMAC key (it verifies an Ed25519 record against a table of
+# public keys, src/F303-master/boot/bootloader_trust.h); this value only lets the release tooling keep producing the HMAC that bootloaders of the earlier
+# generation (bench boards) still check.
+MASTER_DEV_HMAC_KEY_HEX = "2526cc3e9011ec7c49ecd2d2b7f389e359aa246014ff5154a0af8a3c3bf95581"
 _SOURCES = {
     "master": (os.path.join(ROOT, "src", "F303-master", "boot", "bootloader_crypto.c"), "URTC_HMAC_KEY_BYTES"),
     "slave": (os.path.join(ROOT, "src", "F303-slave", "boot", "slaveboot_crypto.c"), "URTC_SLAVE_HMAC_KEY_BYTES"),
@@ -47,6 +51,8 @@ class SigningKeyError(Exception):
 def dev_key(board):
     """The PUBLIC development key of `board`, read from its bootloader's own
     #else branch - the one place it is written down."""
+    if board == "master":
+        return bytes.fromhex(MASTER_DEV_HMAC_KEY_HEX)
     path, _macro = _SOURCES[board]
     with open(path, encoding="utf-8") as f:
         text = f.read()
@@ -102,7 +108,17 @@ def key_id(key):
     return hashlib.sha256(b"URTC-KEY-ID:" + key).hexdigest()[:16]
 
 
+def trust_flavour(env=None):
+    """Which trust table the main bootloader is built with: "release" for an official build (URTC_RELEASE=1), otherwise the public "dev" table."""
+    env = os.environ if env is None else env
+    return "release" if env.get("URTC_RELEASE", "0") == "1" else "dev"
+
+
 def cflags(board, env=None):
+    if board == "master":
+        # no key is injected: the flavour picks the public table the bootloader is compiled with (release: the file keys/image_trust.json, closed until the
+        # image-signing key exists; dev: the bench table, whose key is public)
+        return "-DURTC_TRUST_DEV" if trust_flavour(env) == "dev" else ""
     key, kind = load_key(board, env)
     if kind == "dev":
         return ""
@@ -124,7 +140,7 @@ def main(argv):
         if argv[1] == "cflags" and len(argv) == 3:
             print(cflags(argv[2]))
         elif argv[1] == "check" and len(argv) == 2:
-            kinds = {board: load_key(board)[1] for board in _SOURCES}
+            kinds = {"master": trust_flavour(), "slave": load_key("slave")[1]}
             if "dev" in kinds.values():
                 print("WARNING: signing with the PUBLIC development key(s) - images are only for bench boards built with the same dev bootloader", file=sys.stderr)
             print(" ".join(f"{b}={k}" for b, k in kinds.items()))

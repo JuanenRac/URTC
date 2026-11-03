@@ -60,18 +60,11 @@ extern I2C_HandleTypeDef hi2c2;
 #define BOOTLOADER_VERSION_PATCH 6
 
 // -----------------------------------------------------------------------
-// HMAC-SHA256 signing key - shared between this bootloader and whatever
-// build/signing tool prepares a firmware image for a CAN update. A real
-// CSPRNG-generated value (see bootloader_crypto.c's own definition and
-// comment) - not the old human-readable placeholder, but still a
-// compiled-in default that's committed to a public repo, so treat it as
-// non-confidential and rotate it (with the signing tools' own copy kept
-// in sync) before relying on this for real production security.
-// Declared here, defined once in bootloader_crypto.c - a static array in
-// this header would otherwise get its own private copy compiled into
-// every .c file that includes it.
+// Image authentication: the bootloader holds no secret. An application is
+// installed only when an Ed25519 record (CAN_ID_IMG_SIG_CHUNK) verifies under
+// a PUBLIC key of the trust table (bootloader_trust.h); with an empty table
+// nothing installs. See docs/FIRMWARE_SIGNING.TXT.
 // -----------------------------------------------------------------------
-extern const uint8_t HMAC_KEY[32];
 
 // -----------------------------------------------------------------------
 // CAN protocol (0x7F0-0x7FA) - see CANBUS.TXT for the full wire-level reference
@@ -83,7 +76,9 @@ extern const uint8_t HMAC_KEY[32];
 #define CAN_ID_END_UPDATE        0x7F4 // sent to THIS bootloader: DLC=8, big-endian CRC32 (4 bytes) + big-endian VersionMajor/Minor (2 bytes each)
 #define CAN_ID_STATUS            0x7F5 // sent BY this bootloader: DLC=1, status codes below
 #define CAN_ID_HEARTBEAT         0x7F6 // sent BY this bootloader every ~1s while listening or updating: DLC=2, status byte + progress percent (0-100, 0xFF if not applicable)
-#define CAN_ID_HMAC_CHUNK        0x7F7 // sent to THIS bootloader: DLC=8 x4, sent sequentially right after CAN_ID_START_UPDATE and before the first CAN_ID_DATA frame
+#define CAN_ID_HMAC_CHUNK        0x7F7 // HMAC chunk of the old bootloaders; this one does not read it (it asks for the Ed25519 record on CAN_ID_IMG_SIG_CHUNK)
+#define CAN_ID_IMG_SIG_CHUNK     0x7EC // sent to THIS bootloader: DLC=8 x11, index (0-10) + 7 bytes of the 76-byte record (key id, counter, signature), after CAN_ID_START_UPDATE
+#define CAN_ID_KEY_ID            0x7ED // sent BY this bootloader right after its answer to CAN_ID_QUERY_VERSION: DLC=8, the id of the key it trusts
 #define CAN_ID_QUERY_VERSION     0x7F8 // sent to either the application or this bootloader, whichever is currently running
 #define CAN_ID_VERSION_RESPONSE  0x7F9 // sent BY whichever answered: DLC=8, byte0 (0=application, 1=bootloader) + HardwareID (4 bytes) + version major (2 bytes) + version minor (1 byte), all big-endian
 #define CAN_ID_BOOTLOADER_VERSION_RESPONSE 0x7FA // sent ONLY by the bootloader, right alongside 0x7F9
@@ -110,13 +105,22 @@ extern const uint8_t HMAC_KEY[32];
 #define STATUS_VERIFY_FAIL   0x05 // size, CRC32, HMAC, or HardwareID mismatch on the backup slot - main slot untouched
 #define VERIFY_FAIL_REASON_INCOMPLETE  0x01
 #define VERIFY_FAIL_REASON_CRC32       0x02
-#define VERIFY_FAIL_REASON_HMAC        0x03
+#define VERIFY_FAIL_REASON_HMAC        0x03 // the wire value of "the signature did not verify" (an Ed25519 record here, an HMAC in the old bootloaders)
+#define VERIFY_FAIL_REASON_SIGNATURE   VERIFY_FAIL_REASON_HMAC
 #define VERIFY_FAIL_REASON_HARDWARE_ID 0x04
 #define VERIFY_FAIL_REASON_ROLLBACK    0x05
 #define STATUS_ERROR         0xFF
 
 // -----------------------------------------------------------------------
-// Firmware metadata (single 2K page, one struct, one "state" field).
+// Firmware metadata: an append-only log of records in one 2K page.
+//
+// Every change appends a record (generation, state, CRC-32); nothing is erased
+// to make one. The valid record with the highest generation is the state. A
+// record cut by a power loss has a wrong CRC and is ignored, so the previous
+// one stays in force. The page is erased only when it is full, and then the
+// newest state is written first. A board that loses the page that way
+// falls back to the compiled-in floor of the rollback counter
+// (URTC_TRUST_MIN_COUNTER) and adopts the application as a first boot.
 // -----------------------------------------------------------------------
 #define META_STATE_APP_VALID     1
 #define META_STATE_COPY_PENDING  2
@@ -129,8 +133,18 @@ typedef struct {
     uint32_t version_minor;
     uint32_t size;
     uint32_t crc32;
-    uint8_t  hmac[32];
+    uint32_t counter;     // the floor of the signed rollback counter: an image below it is refused
+    uint8_t  sha256[32];  // SHA-256 of the installed application (no key: it detects a damaged flash, the signature was checked at the installation)
 } FirmwareMetadata_t;
+
+typedef struct {
+    uint32_t generation;
+    FirmwareMetadata_t meta;
+    uint32_t crc;         // CRC-32 (zlib) of the generation and the metadata
+} MetaRecord_t;
+
+#define META_RECORD_SIZE  72u
+#define META_RECORD_SLOTS (2048u / META_RECORD_SIZE)
 
 // Defined in bootloader_protocol.c - declared here since Flash_CopyRegion
 // (in bootloader_flash.c) calls this during a long copy to keep the

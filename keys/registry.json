@@ -19,11 +19,11 @@
     {
       "id": "urtc-main-bootloader-hmac-development",
       "algorithm": "hmac-sha256",
-      "role": "The PUBLIC development key of the main bootloader: images built without a production key are signed with it, so they prove nothing about who made them. A production build replaces it with a key that is not in any repository.",
+      "role": "The PUBLIC development HMAC key for the main board, kept only for the bootloaders of the earlier generation: the current main bootloader holds no HMAC key at all and verifies an Ed25519 record against the public trust table (keys/image_trust.json).",
       "public": "2526cc3e9011ec7c49ecd2d2b7f389e359aa246014ff5154a0af8a3c3bf95581",
-      "private_half": "None: this one is published on purpose. The production key of the main bootloader is a secret in ~/.urtc-keys/signing_keys.txt (line master=) on the maintainer's machine; it is never written to a file of a repository.",
+      "private_half": "None: this one is published on purpose. The line master= of the secret file only feeds the HMAC that bootloaders of the earlier generation check; it is never written to a file of a repository.",
       "embedded_in": [
-        {"repo": "URTC", "file": "src/F303-master/boot/bootloader_crypto.c", "kind": "c_array", "array": "HMAC_KEY", "branch": "else"}
+        {"repo": "URTC", "file": "firmware_signing.py", "kind": "text", "pattern": "MASTER_DEV_HMAC_KEY_HEX\\s*=\\s*\"([0-9a-fA-F]{64})\""}
       ]
     },
     {

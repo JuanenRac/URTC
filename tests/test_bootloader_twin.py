@@ -21,11 +21,30 @@ class HelperTests(unittest.TestCase):
         self.assertEqual(twin.minor_field(5, None), 5)
         self.assertEqual(twin.minor_field(5, 0x80), 5)
 
-    def test_the_signature_is_the_hmac_of_the_image_with_the_development_key(self):
-        image = twin.test_image(64)
-        self.assertEqual(len(twin.sign(image)), 32)
-        self.assertEqual(twin.sign(image), twin.sign(image))
-        self.assertNotEqual(twin.sign(image), twin.sign(image, bytes(32)))
+    def test_a_signed_case_is_a_76_byte_record_and_an_unknown_one_is_an_error(self):
+        record = twin.signed_record(3000, 0, twin.minor_field(5, 1), 5)
+        self.assertEqual(len(record), 76)
+        self.assertEqual(int.from_bytes(record[8:12], "big"), 5)
+        self.assertNotEqual(record, twin.signed_record(3000, 0, twin.minor_field(5, 1), 5, key="other"))
+        with self.assertRaises(KeyError):
+            twin.signed_record(3001, 0, 0, 0)
+
+    def test_the_record_travels_in_eleven_frames_of_an_index_and_seven_bytes(self):
+        sent = []
+
+        class Recorder(twin.Twin):
+            def __init__(self):
+                pass
+
+            def send(self, can_id, data=b""):
+                sent.append((can_id, data))
+
+        record = bytes(range(76))
+        Recorder().send_signature(record)
+        self.assertEqual([i for i, _ in sent], [twin.SIG_CHUNK] * 11)
+        self.assertTrue(all(len(d) == 8 and d[0] == n for n, (_, d) in enumerate(sent)))
+        self.assertEqual(b"".join(d[1:] for _, d in sent)[:76], record)
+        self.assertEqual(sent[10][1][7], 0)      # the pad byte
 
     def test_the_test_image_is_not_a_valid_application(self):
         image = twin.test_image(16)
@@ -88,9 +107,9 @@ class RealBootloaderTests(unittest.TestCase):
         with twin.Twin(self.prefix) as board:
             board.take(twin.STATUS, 4.0)
             board.start_update(len(image))
-            board.send_signature(twin.sign(image))
+            board.send_signature(twin.signed_record(1500, 0, twin.minor_field(2, 0), 1))
             board.send_data(image)
-            reason = twin.verify_failure(board.end_update(twin.crc32(image) ^ 1, 0, 2))
+            reason = twin.verify_failure(board.end_update(twin.crc32(image) ^ 1, 0, 2, 0))
             self.assertEqual(reason, twin.FAIL_CRC32)
             identity = board.installed_version()
             self.assertTrue(identity is None or identity[1:] == (0, 0))
@@ -100,9 +119,9 @@ class RealBootloaderTests(unittest.TestCase):
         with twin.Twin(self.prefix) as board:
             board.take(twin.STATUS, 4.0)
             board.start_update(len(image))
-            board.send_signature(twin.sign(image), chunks=3)
+            board.send_signature(twin.signed_record(1500, 0, twin.minor_field(2, 0), 1), chunks=10)
             board.send_data(image)
-            self.assertEqual(twin.verify_failure(board.end_update(twin.crc32(image), 0, 2)), twin.FAIL_INCOMPLETE)
+            self.assertEqual(twin.verify_failure(board.end_update(twin.crc32(image), 0, 2, 0)), twin.FAIL_INCOMPLETE)
 
     def test_a_size_above_the_slot_is_refused_before_anything_is_erased(self):
         with twin.Twin(self.prefix) as board:

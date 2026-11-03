@@ -56,7 +56,7 @@ void run_spec_macros_master_tests(int *failures)
 
     SAME(THIS_HARDWARE_ID, URTC_HARDWARE_ID_MAIN);
     SAME(FLASH_PAGE_SIZE, URTC_FLASH_PAGE_SIZE);
-    SAME(sizeof(((FirmwareMetadata_t *)0)->hmac), URTC_HMAC_LENGTH);
+    SAME(sizeof(((FirmwareMetadata_t *)0)->sha256), URTC_HMAC_LENGTH);
     SAME(URTC_HMAC_LENGTH, URTC_HMAC_CHUNK_COUNT * 8u);
 }
 

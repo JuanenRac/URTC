@@ -28,6 +28,14 @@ SECTIONS
     . = ALIGN(4);
   } >FLASH
 
+  /* The trust table: the public keys that may sign an application, at a fixed offset (0x200) of the binary so that a tool reads it without disassembling
+   * anything (tools/image_trust.py check). It follows the vector table, which ends well below this offset; the linker stops if it ever does not. */
+  .trust_keys :
+  {
+    . = ORIGIN(FLASH) + 0x200;
+    KEEP(*(.trust_keys))
+  } >FLASH
+
   .text :
   {
     . = ALIGN(4);

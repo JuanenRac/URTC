@@ -35,7 +35,7 @@ void HandleAuthorizeDowngrade(uint8_t *data);
 uint8_t DowngradeIsAuthorized(void);
 void HandleReadbackStart(void);
 
-// Checks the main slot's metadata (size/CRC32/HMAC/HardwareID) against its
+// Checks the main slot's metadata (size/CRC32/SHA-256/HardwareID) against its
 // actual flash contents. Also handles first-boot bootstrapping: a blank
 // metadata page with a plausible-looking application already in the main
 // slot gets its metadata reconstructed and adopted, rather than being
@@ -52,15 +52,15 @@ void JumpToApplication(void);
 // slot, resets all per-update state.
 void HandleStartUpdate(uint8_t *data);
 
-// CAN_ID_HMAC_CHUNK (0x7F7) - receives one of the 4 8-byte chunks making
-// up the expected 32-byte HMAC-SHA256 for this update.
-void HandleHmacChunk(uint8_t *data);
+// CAN_ID_IMG_SIG_CHUNK (0x7EC) - receives one of the 11 chunks (index and
+// 7 bytes) of the 76-byte Ed25519 record: key id, counter, signature.
+void HandleSigChunk(uint8_t *data);
 
 // CAN_ID_DATA (0x7F2) - receives up to 8 bytes of firmware data, buffered
 // and written to the backup slot one page at a time.
 void HandleData(uint8_t *data, uint32_t dlc);
 
-// CAN_ID_END_UPDATE (0x7F4) - verifies size/CRC32/HMAC-SHA256/HardwareID/
+// CAN_ID_END_UPDATE (0x7F4) - verifies size/CRC32/Ed25519 record/HardwareID/
 // anti-rollback on the backup slot, and if all pass, copies it into the
 // main slot and resets into the new application.
 void HandleEndUpdate(uint8_t *data);

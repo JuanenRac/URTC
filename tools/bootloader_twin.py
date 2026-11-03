@@ -6,13 +6,13 @@
 # =============================================================================
 """Builds and drives the twin of the bootloader: the real C of the master's bootloader, compiled for the host.
 
-The twin (tests/virtual_bootloader.c) is bootloader_main.c, bootloader_protocol.c, bootloader_flash.c and bootloader_crypto.c unchanged, behind an SLCAN-style
+The twin (tests/virtual_bootloader.c) is bootloader_main.c, bootloader_protocol.c, bootloader_flash.c, bootloader_crypto.c, bootloader_trust.c and the Ed25519 verifier unchanged, behind an SLCAN-style
 text port: one line per frame on standard input, one line per transmitted frame on standard output. A host tool talks to it as to an adapter, so a test of
 the flasher can exercise the code that runs on the chip instead of a Python model of it. The fake flash only lets bits go from 1 to 0 until a page is erased,
 the clock is the real time of the wait (plus ``W<ms>`` lines, which the twin alone understands), and a jump into the application ends the run with a ``J`` line.
 
     python tools/bootloader_twin.py --build-only      # build it, print VIRTUAL_BOARD_COMMAND=<JSON list> (urtc-virtual-board --firmware-repo ... --bootloader uses it)
-    python tools/bootloader_twin.py --check           # build it and run a signed update, a refused one and a power cut through it
+    python tools/bootloader_twin.py --check           # build it and run a signed update, refused ones and a stalled transfer through it
 
 On Windows the build and the run go through WSL (the fake flash maps memory a 64-bit Linux gives). Exit status: 0 passed, 1 a check failed, 2 skipped because no
 host compiler was found.
@@ -20,8 +20,6 @@ host compiler was found.
 from __future__ import annotations
 
 import argparse
-import hashlib
-import hmac
 import json
 import os
 import queue
@@ -39,24 +37,24 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import fuzz_virtual_board as _fvb  # noqa: E402  (the builder of the application's virtual board: same flags, same WSL path rule)
-import firmware_signing  # noqa: E402
 
 BOOT = "src/F303-master/boot"
 SOURCES = (
     "tests/virtual_bootloader.c", "tests/host_hal/fake_hal.c", f"{BOOT}/bootloader_oled.c", f"{BOOT}/bootloader_protocol.c",
-    f"{BOOT}/bootloader_flash.c", f"{BOOT}/bootloader_crypto.c",
+    f"{BOOT}/bootloader_flash.c", f"{BOOT}/bootloader_crypto.c", f"{BOOT}/bootloader_trust.c", f"{BOOT}/bootloader_ed25519.c",
 )
 INCLUDES = ["tests", "tests/host_hal", BOOT, "src/common"]
 FLAGS = [*_fvb.FLAGS, "-Wno-cpp", "-Wno-int-to-pointer-cast", "-Wl,--wrap=JumpToApplication"]
-DEFINES: list[str] = []
+DEFINES: list[str] = ["-DURTC_TRUST_DEV"]   # the bench table: its key's seed is public, so the signed cases of tests/boot_sig_cases.json install
 
 # the identifiers of the update exchange (docs/CANBUS.TXT, src/F303-master/boot/bootloader_common.h)
-START, DATA, PAGE_ACK, END, STATUS, HEARTBEAT, HMAC_CHUNK = 0x7F1, 0x7F2, 0x7F3, 0x7F4, 0x7F5, 0x7F6, 0x7F7
+START, DATA, PAGE_ACK, END, STATUS, HEARTBEAT, SIG_CHUNK, KEY_ID = 0x7F1, 0x7F2, 0x7F3, 0x7F4, 0x7F5, 0x7F6, 0x7EC, 0x7ED
 QUERY_VERSION, VERSION_RESPONSE = 0x7F8, 0x7F9
 HARDWARE_ID = 0x0303CC01
 APP_MAX_SIZE = 112 * 1024
 STATUS_LISTENING, STATUS_ERASING, STATUS_RECEIVING, STATUS_VERIFY_OK, STATUS_VERIFY_FAIL, STATUS_VERIFYING, STATUS_COPYING = 1, 2, 3, 4, 5, 6, 7
-FAIL_INCOMPLETE, FAIL_CRC32, FAIL_HMAC, FAIL_HARDWARE_ID, FAIL_ROLLBACK = 1, 2, 3, 4, 5
+FAIL_INCOMPLETE, FAIL_CRC32, FAIL_SIGNATURE, FAIL_HARDWARE_ID, FAIL_ROLLBACK = 1, 2, 3, 4, 5
+CASES_FILE = ROOT / "tests" / "boot_sig_cases.json"
 FRAME_LINE = re.compile(r"^t([0-7][0-9A-F]{2})([0-8])((?:[0-9A-F]{2}){0,8})$")
 
 Frame = tuple[int, bytes]
@@ -92,9 +90,13 @@ def crc32(image: bytes) -> int:
     return zlib.crc32(image) & 0xFFFFFFFF
 
 
-def sign(image: bytes, key: bytes | None = None) -> bytes:
-    """The signature the bootloader expects: HMAC-SHA256 of the image with the key it was built with (the public development key by default)."""
-    return hmac.new(key or firmware_signing.dev_key("master"), image, hashlib.sha256).digest()
+def signed_record(size: int, major: int, minor_field: int, counter: int, key: str = "dev", hardware_id: int = HARDWARE_ID) -> bytes:
+    """The 76-byte Ed25519 record (key id, counter, signature) of the patterned test image of ``size`` bytes with this version, from the cases that
+    tools/make_boot_sig_cases.py wrote with throwaway test keys. Raises KeyError when there is no such case."""
+    for case in json.loads(CASES_FILE.read_text(encoding="utf-8"))["cases"]:
+        if (case["size"], case["major"], case["minor_field"], case["counter"], case["key"], case["hardware_id"]) == (size, major, minor_field, counter, key, hardware_id):
+            return bytes.fromhex(case["record"])
+    raise KeyError(f"no signed case for {size} bytes, version {major}/{minor_field:#06x}, counter {counter}, key {key}")
 
 
 def test_image(size: int) -> bytes:
@@ -199,9 +201,11 @@ class Twin:
         self.send(START, size.to_bytes(4, "big") + hardware_id.to_bytes(4, "big"))
         return self.statuses_until({STATUS_RECEIVING, STATUS_VERIFY_FAIL, 0xFF}, 15.0)
 
-    def send_signature(self, signature: bytes, chunks: int = 4) -> None:
+    def send_signature(self, record: bytes, chunks: int = 11) -> None:
+        """The record in frames of an index and seven bytes (the last one holds six and a pad byte)."""
+        padded = record + bytes(1)
         for i in range(chunks):
-            self.send(HMAC_CHUNK, signature[i * 8:(i + 1) * 8])
+            self.send(SIG_CHUNK, bytes([i]) + padded[i * 7:(i + 1) * 7])
 
     def send_data(self, image: bytes) -> list[int]:
         """The image in frames of eight bytes; returns the page indices the bootloader acknowledged (a whole page each; the partial last one is flushed by END)."""
@@ -237,9 +241,10 @@ def verify_failure(statuses: list[Frame]) -> int | None:
 
 
 def run_checks(prefix: list[str]) -> list[str]:
-    """A signed update, a refused one and a power cut through the real bootloader; returns the problems found."""
+    """A signed update, refused ones and a stalled transfer through the real bootloader; returns the problems found."""
     problems: list[str] = []
     image = test_image(3000)
+    record = signed_record(3000, 0, minor_field(5, 1), 5)
 
     with Twin(prefix) as twin:
         if twin.take(STATUS, 4.0) is None:
@@ -247,7 +252,7 @@ def run_checks(prefix: list[str]) -> list[str]:
         statuses = twin.start_update(len(image))
         if not statuses or statuses[-1][1][:1] != bytes([STATUS_RECEIVING]):
             problems.append(f"START did not reach RECEIVING: {statuses}")
-        twin.send_signature(sign(image))
+        twin.send_signature(record)
         acks = twin.send_data(image)
         if acks != [0]:
             problems.append(f"page acknowledgements {acks}, expected [0] before the end of a 3000-byte image (the partial page is flushed by END)")
@@ -266,19 +271,45 @@ def run_checks(prefix: list[str]) -> list[str]:
                 break
         if identity is None or identity[0] != HARDWARE_ID or identity[1] != 0 or identity[2] != 5:
             problems.append(f"after the update the bootloader reports {identity}, expected the new application (0.5)")
+        key_id = twin.take(KEY_ID, 2.0)
+        if key_id is None or key_id[1] != record[:8]:
+            problems.append(f"the bootloader did not announce the id of its key on 0x7ED: {key_id}")
+
+        # the rollback counter is signed and the floor is 5 now: a newer version signed with a lower counter is refused, with a higher one it installs
+        twin.start_update(len(image))
+        twin.send_signature(signed_record(3000, 0, minor_field(6, 0), 4))
+        twin.send_data(image)
+        reason = verify_failure(twin.end_update(crc32(image), 0, 6, 0))
+        if reason != FAIL_ROLLBACK:
+            problems.append(f"a counter below the floor gave reason {reason}, expected {FAIL_ROLLBACK}")
+        twin.start_update(len(image))
+        twin.send_signature(signed_record(3000, 0, minor_field(6, 0), 9))
+        twin.send_data(image)
+        statuses = twin.end_update(crc32(image), 0, 6, 0)
+        if [f[1][0] for f in statuses if f[1]][-1:] != [STATUS_VERIFY_OK]:
+            problems.append(f"a higher counter did not install: {statuses}")
 
     with Twin(prefix) as twin:
         twin.take(STATUS, 4.0)
         twin.start_update(len(image))
-        signature = bytearray(sign(image))
-        signature[31] ^= 1
-        twin.send_signature(bytes(signature))
+        flipped = bytearray(record)
+        flipped[40] ^= 1
+        twin.send_signature(bytes(flipped))
         twin.send_data(image)
         reason = verify_failure(twin.end_update(crc32(image), 0, 5, 1))
-        if reason != FAIL_HMAC:
-            problems.append(f"a flipped bit in the signature gave reason {reason}, expected {FAIL_HMAC}")
+        if reason != FAIL_SIGNATURE:
+            problems.append(f"a flipped bit in the signature gave reason {reason}, expected {FAIL_SIGNATURE}")
         if twin.installed_version() is not None and twin.installed_version()[1:] != (0, 0):
             problems.append("a refused update changed the installed identity")
+
+    with Twin(prefix) as twin:
+        twin.take(STATUS, 4.0)
+        twin.start_update(len(image))
+        twin.send_signature(signed_record(3000, 0, minor_field(5, 1), 5, key="other"))
+        twin.send_data(image)
+        reason = verify_failure(twin.end_update(crc32(image), 0, 5, 1))
+        if reason != FAIL_SIGNATURE:
+            problems.append(f"a record of a key the table does not hold gave reason {reason}, expected {FAIL_SIGNATURE}")
 
     with Twin(prefix) as twin:
         twin.take(STATUS, 4.0)
@@ -289,7 +320,7 @@ def run_checks(prefix: list[str]) -> list[str]:
     with Twin(prefix) as twin:
         twin.take(STATUS, 4.0)
         twin.start_update(len(image))
-        twin.send_signature(sign(image))
+        twin.send_signature(record)
         for offset in range(0, 800, 8):
             twin.send(DATA, image[offset:offset + 8])
         twin.wait(10_500)
@@ -306,7 +337,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--build-dir", default=None)
     parser.add_argument("--build-only", action="store_true",
                         help="build the twin, print the command that runs it (VIRTUAL_BOARD_COMMAND=<JSON list>) and stop")
-    parser.add_argument("--check", action="store_true", help="build it and run a signed update, refused ones and a power cut through it")
+    parser.add_argument("--check", action="store_true", help="build it and run a signed update, refused ones and a stalled transfer through it")
     args = parser.parse_args(argv)
     build_dir = Path(args.build_dir) if args.build_dir else ROOT / "build"
     build_dir.mkdir(parents=True, exist_ok=True)
@@ -322,7 +353,7 @@ def main(argv: list[str] | None = None) -> int:
         print("\n".join(problems), file=sys.stderr)
         print(f"TWIN=FAIL {len(problems)} problem(s)", file=sys.stderr)
         return 1
-    print("TWIN=PASS the real bootloader took a signed update, refused a bad signature and a foreign board, and left a stalled transfer")
+    print("TWIN=PASS the real bootloader took a signed update, refused a bad signature, an unknown key, a counter below the floor and a foreign board, and left a stalled transfer")
     return 0
 
 

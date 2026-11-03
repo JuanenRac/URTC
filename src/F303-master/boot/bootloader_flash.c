@@ -75,7 +75,7 @@ uint8_t Flash_ErasePages(uint32_t start_addr, uint32_t num_pages) {
 // reporting success. Flash cells that write but don't actually hold their
 // value ("stuck" from wear or degradation) are a real, if uncommon, failure
 // mode - this catches it at write time instead of finding out only when
-// the CRC/HMAC check (or worse, execution) fails later.
+// the CRC/SHA-256 check (or worse, execution) fails later.
 uint8_t Flash_WriteVerified(uint32_t addr, const uint8_t *buf, uint32_t len) {
     HAL_FLASH_Unlock();
     __HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_EOP | FLASH_FLAG_WRPERR | FLASH_FLAG_PGERR);
@@ -152,41 +152,88 @@ uint8_t Flash_CopyRegion(uint32_t dest_addr, uint32_t src_addr, uint32_t total_l
     return 1;
 }
 
-uint8_t Metadata_Read(FirmwareMetadata_t *out) {
-    memcpy(out, (const void*)METADATA_ADDR, sizeof(FirmwareMetadata_t));
-    return out->magic == METADATA_MAGIC_VALID;
+// ---- metadata: an append-only log (see FirmwareMetadata_t in bootloader_common.h) ------------------------------------------------------------
+_Static_assert(sizeof(MetaRecord_t) == META_RECORD_SIZE, "a metadata record is 72 bytes");
+
+static const MetaRecord_t *meta_slot(uint32_t index) {
+    return (const MetaRecord_t*)(METADATA_ADDR + index * META_RECORD_SIZE);
 }
 
-// Writes without erasing first - callers are responsible for that (STM32F3
-// flash requires an erased page before programming; writing without one
-// causes a PGERR fault). Static and single-caller today
-// (Metadata_EraseAndWrite, right below, which does erase first), but
-// worth flagging explicitly for any future caller added within this file.
-static uint8_t Metadata_Write(const FirmwareMetadata_t *meta) {
-    return Flash_WriteVerified(METADATA_ADDR, (const uint8_t*)meta, sizeof(FirmwareMetadata_t));
-    // Note: caller is responsible for erasing the metadata page first - see
-    // Metadata_ErraseAndWrite below, which every call site actually uses.
+static uint32_t meta_record_crc(const MetaRecord_t *record) {
+    return CRC32_Finalize(CRC32_Update(0xFFFFFFFFUL, (const uint8_t*)record, META_RECORD_SIZE - 4u));
 }
 
-uint8_t Metadata_EraseAndWrite(const FirmwareMetadata_t *meta) {
-    // Skip the erase+write entirely if the page already holds exactly
-    // this content - this page's flash has the same ~10,000-cycle
-    // erase/write endurance as any other, and a boot sequence that ends
-    // up calling this with unchanged data (nothing here currently does,
-    // but future logic might) shouldn't spend a cycle on a no-op.
-    FirmwareMetadata_t current;
-    if (Metadata_Read(&current) && memcmp(&current, meta, sizeof(FirmwareMetadata_t)) == 0) {
-        return 1;
+static uint8_t meta_slot_blank(const MetaRecord_t *record) {
+    const uint8_t *bytes = (const uint8_t*)record;
+    for (uint32_t i = 0; i < META_RECORD_SIZE; i++) {
+        if (bytes[i] != 0xFF) return 0;
     }
-    FLASH_EraseInitTypeDef eraseInit;
-    uint32_t pageError;
-    eraseInit.TypeErase = FLASH_TYPEERASE_PAGES;
-    eraseInit.PageAddress = METADATA_ADDR;
-    eraseInit.NbPages = 1;
-    HAL_FLASH_Unlock();
-    __HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_EOP | FLASH_FLAG_WRPERR | FLASH_FLAG_PGERR);
-    HAL_StatusTypeDef res = HAL_FLASHEx_Erase(&eraseInit, &pageError);
-    HAL_FLASH_Lock();
-    if (res != HAL_OK || pageError != 0xFFFFFFFF) return 0;
-    return Metadata_Write(meta);
+    return 1;
+}
+
+// The slot of the valid record with the highest generation, or -1. A record cut by a power loss fails its CRC and is not a candidate.
+static int32_t meta_find_newest(void) {
+    int32_t best = -1;
+    uint32_t best_generation = 0;
+    for (uint32_t i = 0; i < META_RECORD_SLOTS; i++) {
+        const MetaRecord_t *record = meta_slot(i);
+        if (record->meta.magic != METADATA_MAGIC_VALID || record->generation == 0xFFFFFFFFUL) continue;
+        if (meta_record_crc(record) != record->crc) continue;
+        if (best < 0 || record->generation > best_generation) {
+            best = (int32_t)i;
+            best_generation = record->generation;
+        }
+    }
+    return best;
+}
+
+uint8_t Metadata_Read(FirmwareMetadata_t *out) {
+    int32_t newest = meta_find_newest();
+    if (newest < 0) {
+        memset(out, 0, sizeof(*out));
+        return 0;
+    }
+    memcpy(out, &meta_slot((uint32_t)newest)->meta, sizeof(*out));
+    return 1;
+}
+
+// Appends the state as a new record; nothing is erased unless the page is full (then it is erased and the new record is the first of a fresh log).
+// The name is kept from the single-record page this replaced.
+uint8_t Metadata_EraseAndWrite(const FirmwareMetadata_t *meta) {
+    uint32_t generation = 1;
+    int32_t newest = meta_find_newest();
+    if (newest >= 0) {
+        const MetaRecord_t *latest = meta_slot((uint32_t)newest);
+        // Skip the write entirely if the log already ends with exactly this state - the page has the same endurance as any other.
+        if (memcmp(&latest->meta, meta, sizeof(*meta)) == 0) {
+            return 1;
+        }
+        generation = latest->generation + 1u;
+    }
+    uint32_t slot = META_RECORD_SLOTS;
+    for (uint32_t i = 0; i < META_RECORD_SLOTS; i++) {
+        if (meta_slot_blank(meta_slot(i))) {
+            slot = i;
+            break;
+        }
+    }
+    if (slot == META_RECORD_SLOTS) {
+        FLASH_EraseInitTypeDef eraseInit;
+        uint32_t pageError;
+        eraseInit.TypeErase = FLASH_TYPEERASE_PAGES;
+        eraseInit.PageAddress = METADATA_ADDR;
+        eraseInit.NbPages = 1;
+        HAL_FLASH_Unlock();
+        __HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_EOP | FLASH_FLAG_WRPERR | FLASH_FLAG_PGERR);
+        HAL_StatusTypeDef res = HAL_FLASHEx_Erase(&eraseInit, &pageError);
+        HAL_FLASH_Lock();
+        if (res != HAL_OK || pageError != 0xFFFFFFFF) return 0;
+        slot = 0;
+    }
+    MetaRecord_t record;
+    memset(&record, 0, sizeof(record));
+    record.generation = generation;
+    record.meta = *meta;
+    record.crc = meta_record_crc(&record);
+    return Flash_WriteVerified((uint32_t)(METADATA_ADDR + slot * META_RECORD_SIZE), (const uint8_t*)&record, META_RECORD_SIZE);
 }
