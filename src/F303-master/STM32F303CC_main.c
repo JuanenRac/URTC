@@ -584,21 +584,12 @@ int main(void) {
             txH.IDE = CAN_ID_STD;
             txH.TransmitGlobalTime = DISABLE;
 
-            // Gated by active_tool - sends the temperature telemetry frame
-            // only for the tool that actually owns current_temperature at
-            // the moment (soldering iron, Hot Air Rework - which shares
-            // this exact same thermal loop, see CANBUS.TXT's own 0x1E0 -
-            // or 3D printer hotend), rather than on a flat timer
-            // regardless of which tool is active. DLC 2 now, not 3 - the
-            // 3rd byte used to report endstop_triggered here, but neither
-            // tool actually has a real value for it any more: soldering
-            // iron's own PB3 now drives the wire feeder's STEP output
-            // (see CONN_MOT, doc #16), and Hot Air Rework never populated
-            // this byte with a real reading in the first place (found
-            // while making this change - TOOL_HOTAIR_REWORK was never in
-            // Control_EndstopTelemetry()'s own tool list to begin with,
-            // so this byte was always whatever stale value some earlier
-            // tool happened to leave behind, not a real endstop).
+            // Gated by active_tool - sends the temperature telemetry frame only
+            // for the tool that owns current_temperature (soldering iron, Hot Air
+            // Rework, which shares the thermal loop - see CANBUS.TXT 0x1E0 - or
+            // the 3D printer hotend), not on a flat timer. DLC 2: neither tool
+            // has a real endstop value for a 3rd byte any more (the iron's PB3
+            // now drives the wire feeder STEP, see CONN_MOT).
             // With several heads on the bus (switch on), only the selected one sends
             // single-head telemetry; with the switch off this is always true.
             if (!MultiNode_SingleHeadTxAllowed()) {

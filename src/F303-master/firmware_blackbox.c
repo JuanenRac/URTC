@@ -129,24 +129,15 @@ static void BlackBox_SendChunkFrames(const uint8_t *data32) {
     }
 }
 
-// Answers one 32-byte slice of the flushed BlackBoxRecord_t sitting in
-// F-RAM at BLACKBOX_FRAM_ADDR - a raw, byte-for-byte export, not a
-// validated read: this firmware does no magic/checksum/version check on
-// the way out, exactly like reading the F-RAM chip directly with an
-// external tool would give you. A host reconstructs BlackBoxRecord_t from
-// the concatenated chunks itself and is free to validate `magic` and
-// `checksum` (BlackBox_Checksum's own CRC-8/SMBUS, same algorithm) before
-// trusting the samples.
+// Answers one 32-byte slice of the flushed BlackBoxRecord_t in F-RAM at
+// BLACKBOX_FRAM_ADDR: a raw export with no magic/checksum/version check, like
+// reading the chip with an external tool. The host rebuilds the record from
+// the chunks and validates `magic` and `checksum` (BlackBox_Checksum, CRC-8/SMBUS).
 //
-// [chunk_index] out of BLACKBOX_CHUNK_COUNT range, or the F-RAM read
-// itself failing (chip missing/unresponsive), both mean no response at
-// all - a host can't tell "no fault ever flushed yet" apart from "F-RAM
-// hardware fault" from silence alone, but a dedicated status query isn't
-// worth adding for a diagnostic-only command already independently
-// verifiable via a direct F-RAM dump (see this file's own header
-// comment). The last chunk is short (678 bytes is not a multiple of 32);
-// the unused tail of `chunk` is left zeroed rather than reading past the
-// record into whatever F-RAM holds next.
+// A chunk_index out of range, or a failed F-RAM read, gets no response at
+// all; a dedicated status query is not worth it for a diagnostic command.
+// The last chunk is short (678 bytes is not a multiple of 32); the unused
+// tail of `chunk` stays zeroed.
 void BlackBox_HandleReadbackRequest(uint8_t chunk_index) {
     if (chunk_index >= BLACKBOX_CHUNK_COUNT) return;
     uint8_t chunk[BLACKBOX_CHUNK_BYTES] = {0};

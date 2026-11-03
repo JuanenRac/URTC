@@ -6,28 +6,17 @@
 #include "firmware_common.h"
 #include "firmware_expansion_spi.h"
 
-// Bit-banged SPI transfer for CONN_EXPANSION's EXP_SPI_* pins - see the pin
-// definitions above and PINOUT_CONNECTORS.TXT's CONN_EXPANSION note for why
-// this is software-timed rather than a hardware SPI peripheral.
+// Bit-banged SPI transfer for CONN_EXPANSION's EXP_SPI_* pins - software-timed
+// rather than a hardware SPI peripheral (see PINOUT_CONNECTORS.TXT).
 //
-// Implements SPI Mode 3 (CPOL=1, CPHA=1) specifically - confirmed against
-// the TMC5160/TMC5160A datasheet's own SPI Interface section (section 4.2:
-// "the node latching the data from SDI on the rising edge of SCK and
-// driving data to SDO following the falling edge... Hint: Usually this SPI
-// timing is referred to as SPI MODE 3"), not assumed. Getting this wrong
-// wouldn't cause a hard fault or an obviously broken symptom - it would
-// just silently fail to communicate, or read back garbage that looks
-// plausible enough to be confusing. Clock idles HIGH between transfers,
-// matching Mode 3 - the caller is responsible for asserting EXP_SPI_CS_PIN
-// low before the first byte of a transaction and releasing it high after
-// the last one; this function only handles the 8-bit shift itself.
+// SPI Mode 3 (CPOL=1, CPHA=1), per the TMC5160 datasheet SPI Interface
+// section: latch SDI on the rising edge, drive SDO after the falling edge.
+// A wrong mode fails silently or reads plausible garbage. The clock idles
+// HIGH; the caller asserts EXP_SPI_CS_PIN low before the first byte and
+// releases it after the last one. This function only shifts 8 bits.
 //
-// Timing is intentionally not cycle-counted the way the WS2812B driver
-// above is - unlike WS2812B's protocol-defined bit timing, SPI is
-// edge-triggered rather than time-triggered: the slave samples relative to
-// the clock edges this function generates, not against a wall-clock
-// deadline, so a plain small delay between edges (not a precise one) is
-// sufficient and correct.
+// Timing is not cycle-counted like the WS2812B driver: SPI is edge-triggered,
+// so a plain small delay between edges is enough.
 static void ExpansionSPI_Delay(void) {
     for (volatile uint32_t d = 0; d < 20; d++);
 }

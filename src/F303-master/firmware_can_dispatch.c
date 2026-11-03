@@ -120,21 +120,13 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan_m) {
             return;
         }
 
-        // Real tool-ID -> handler routing decision now lives in the pure,
-        // host-tested CanDispatch_RouteForTool() (see
-        // firmware_can_dispatch_routing.c/.h and
-        // tests/test_can_dispatch_routing.c) - this switch only calls the
-        // real, HAL-touching handlers, exactly as before this split.
-        // TOOL_CONFORMAL_COATING (doc #5) and TOOL_PRESSFIT_INSERTER
-        // (doc #11) deliberately have no case here, not an oversight -
-        // both tools' own actuator (spray valve solenoid; press-fit
-        // linear actuator) and sensor (pressure-reached) are
-        // documented as physically "installed in mainboard of robot",
-        // outside this board's own scope entirely. This board's role
-        // for both is limited to identification (the ID jumper reading
-        // already handles that) and status LEDs (handled generically
-        // for every tool via 0x100, not per-tool) - there's no
-        // URTC-side command for either tool to actually respond to.
+        // The tool-ID -> handler routing decision lives in the host-tested
+        // CanDispatch_RouteForTool() (firmware_can_dispatch_routing.c/.h); this
+        // switch only calls the HAL-touching handlers.
+        // TOOL_CONFORMAL_COATING and TOOL_PRESSFIT_INSERTER have no case on
+        // purpose: their actuator and sensor are installed in the robot's
+        // mainboard, outside this board. Here they are limited to
+        // identification (ID jumper) and the generic status LEDs (0x100).
         switch (CanDispatch_RouteForTool((uint8_t)active_tool)) {
             case CAN_ROUTE_SOLDERING_AND_MOTION:
                 Handle_CAN_SolderingIron();

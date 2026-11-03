@@ -239,20 +239,12 @@ void Handle_CAN_GlobalCommands_PreErrorGate(void) {
 
         // Set/query free tool configuration (0x1A2/0x1A3) - the register
         // Identify_PhysicalTool() consults when the ID-jumper reading is
-        // 0x1F/11111b (see that function's own comment, and EEPROM.TXT).
-        // 0=no tool selected, 1-25=one of the 25 currently supported tool
-        // profiles (stored as id+1, not the raw 0-24 ToolMode_t value -
-        // see the SavedState_t field's own comment for why). Same
-        // positioning/persistence reasoning as
-        // 0x1A0 just above: configuration, not actuation, so it isn't
-        // gated behind the error block below, and persists via the
-        // normal SavedState_MaybeSave() path rather than a forced
-        // immediate write. Response carries the raw ID-jumper reading
-        // (0-31) alongside the current selection, not just the
-        // selection alone - lets a reader (the Tester) tell "jumpers
-        // read something other than 0x1F" apart from "jumpers read
-        // 0x1F but nothing's configured yet", which a bare selection
-        // value on its own couldn't distinguish.
+        // 0x1F (see EEPROM.TXT). 0=no tool, 1-25=one of the 25 tool profiles
+        // (stored as id+1, see the SavedState_t field). Configuration, not
+        // actuation, like 0x1A0: not gated behind the error block below, and
+        // saved through SavedState_MaybeSave(). The response carries the raw
+        // jumper reading (0-31) next to the selection, so a reader can tell
+        // "jumpers not 0x1F" from "0x1F but nothing configured yet".
         if (rxHeader.StdId == URTC_CAN_ID_SET_FREE_TOOL && rxHeader.DLC >= 1 && rxData[0] <= 25) {
             free_tool_selection = rxData[0];
         }

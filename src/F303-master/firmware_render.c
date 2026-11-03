@@ -118,23 +118,14 @@ void OLED_DrawHorizontalBar(uint8_t page, uint8_t col_start, uint8_t max_width, 
     OLED_WriteData(bar_buffer, max_width);
 }
 
-// Rolling temperature trend sparkline (planned: "gráficas de
-// temperatura en tiempo real en el OLED") - confined to ONE 8px-tall
-// page, the only genuinely free page left on the soldering iron's tool
-// screen (page 4, between the tool-name/divider above and the temp
-// text/endstop/progress-bar below - confirmed unused by grepping every
-// OLED_SetCursor(4, ...) call in this file: there are none). A coarse
-// trend line, not a labeled axis chart - 8 vertical pixels is only ever
-// going to show "rising/falling/flat", which is exactly what a glance at
-// this screen actually needs (the precise number is already right there
-// as text on page 5).
+// Rolling temperature trend sparkline, confined to ONE 8px-tall page: page 4,
+// the only free page on the soldering iron's tool screen (no
+// OLED_SetCursor(4, ...) call exists in this file). A coarse trend line
+// (rising/falling/flat); the precise number is the text on page 5.
 //
-// Call this every render tick with the CURRENT instantaneous value
-// (Render_ToolScreen already does, at its own 150ms cadence) - internally
-// rate-limited to one real history sample every ~2s via its own static
-// state, so the visible trend spans roughly a minute (SPARK_SAMPLES x
-// SPARK_SAMPLE_PERIOD_MS) instead of being dominated by noise between
-// consecutive 150ms render calls.
+// Call it every render tick (Render_ToolScreen does, every 150ms) with the
+// CURRENT value; it keeps one history sample every ~2s, so the trend spans
+// about a minute (SPARK_SAMPLES x SPARK_SAMPLE_PERIOD_MS).
 #define SPARK_SAMPLES 32
 #define SPARK_SAMPLE_PERIOD_MS 2000
 
