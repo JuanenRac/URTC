@@ -34,7 +34,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: firmware-build
+  group: firmware-build-${{ inputs.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -288,8 +288,10 @@ jobs:
         run: |
           set -euo pipefail
           number="$(gh issue list --repo "$GITHUB_REPOSITORY" --label build-failed --state open --json number --jq '.[0].number // empty')"
-          if [[ " $RESULTS " == *" failure "* || " $RESULTS " == *" cancelled "* ]]; then
-            body="The firmware build failed (plan / build / collect / verify: $RESULTS). Run: $RUN_URL"
+          bad=""
+          for r in $RESULTS; do [ "$r" = "success" ] || bad="$bad $r"; done
+          if [ -n "$bad" ]; then
+            body="The firmware build failed (plan / build / collect / verify: $RESULTS; anything but success counts as a failure: failure, timed out, cancelled or skipped). Run: $RUN_URL"
             if [ -n "$number" ]; then
               gh issue comment "$number" --repo "$GITHUB_REPOSITORY" --body "$body"
             else
@@ -300,3 +302,11 @@ jobs:
           elif [ -n "$number" ]; then
             gh issue close "$number" --repo "$GITHUB_REPOSITORY" --comment "A later build passed: $RUN_URL"
           fi
+
+      - name: The notice itself failed
+        if: ${{ failure() }}
+        shell: bash
+        run: |
+          echo "::error::The build did not pass (${RESULTS}) and the issue build-failed could not be written. Run: ${RUN_URL}"
+          echo "### The build did not pass and the issue could not be written" >> "$GITHUB_STEP_SUMMARY"
+          echo "Results: ${RESULTS}. Run: ${RUN_URL}" >> "$GITHUB_STEP_SUMMARY"
