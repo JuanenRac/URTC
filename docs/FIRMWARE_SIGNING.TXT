@@ -5,25 +5,33 @@
 
 STATUS (read this first)
 -------------------------------------------------------------------------------
-The bootloaders check CRC32 and an HMAC-SHA256 computed with ONE shared
-symmetric key. HMAC proves only that the image was made by someone who holds
-that key; it does not prove who that person is. The application images
-published as release assets are signed with the PUBLIC DEVELOPMENT KEY
-(`signing_key_kind: dev` in the release manifest), and that key is public, so anyone can sign an image that a board built
-with that key will accept. Release-key signing (URTC_SIGNING_KEY_FILE with
-URTC_RELEASE=1) exists in the build script, but no published release uses it
-yet. Asymmetric signatures (Ed25519) are planned, not implemented. No populated
-board exists, so none of this has run on a real board.
+MAIN BOARD (src/F303-master/boot/): the bootloader holds NO secret. It installs
+an application only when an Ed25519 record verifies under one of the PUBLIC
+keys of its trust table (section 6). The record is made on the maintainer's
+machine after the build, so the image is built without any key, and the build
+in Actions is the one that can be shipped. The official (release) table is
+EMPTY until the maintainer creates the image-signing key and adds its public
+half to keys/image_trust.json: until then an official main bootloader trusts
+nobody and installs nothing (it fails closed). Bench builds carry the
+development table, whose key is public (signing_key_kind "dev").
+
+EXPANSION SLAVE (src/F303-slave/boot/): still CRC32 and an HMAC-SHA256 computed
+with ONE shared symmetric key (sections 1 to 4). HMAC proves only that the
+image was made by someone who holds that key. The slave takes the same
+Ed25519 record once the size of the verifier is measured against its 18 KB
+region (section 7). No populated board exists, so none of this has run on a
+real board.
 
 1. WHAT THE BOOTLOADERS CHECK
 -------------------------------------------------------------------------------
 Before a CAN-OTA update is copied into the application slot, the main board
-bootloader (src/F303-master/boot/) and the expansion slave bootloader
-(src/F303-slave/boot/) verify:
+bootloader (src/F303-master/boot/) verifies the CRC32 of the image (catches
+transfer corruption) and the Ed25519 record of section 6. The expansion slave
+bootloader (src/F303-slave/boot/) verifies:
 
-  * CRC32 of the image (catches transfer corruption), and
+  * CRC32 of the image, and
   * HMAC-SHA256 of the whole image with the board's 32-byte signing key,
-    sent by the host in 4 CAN chunks (0x7F7 / slave equivalent).
+    sent by the host in 4 CAN chunks (the slave equivalent of 0x7F7).
 
 HMAC is symmetric: whoever COMPUTES the signature must hold the same key the
 bootloader holds. So the security of the whole chain is "who holds the key".
@@ -87,30 +95,84 @@ URTC-FLASHER and URTC-WEB-STUDIO:
   * only for an image WITHOUT a published signature (your own build of a
     branch, on a bench board) ask for a key at run time.
 
-5. WHY NOT Ed25519 (YET) - AND THE PLAN
+5. SIZE OF THE VERIFIER AND THE SLAVE
 -------------------------------------------------------------------------------
-An asymmetric signature (Ed25519) would put only the PUBLIC key in the
-bootloader and remove the shared secret entirely. Measured flash budget of
-the current bootloaders (build 2026-10):
+Before the verifier went into the main bootloader the repository carried two
+estimates that disagreed (5-8 KB in docs/BOOTLOADER_AUTH.md of URTC-COMMON,
+10-16 KB here). The real number comes from the build of the main bootloader:
+the log of the build in Actions prints the size of every bootloader
+("URTC_MAIN_BOOTLOADER_v...bin/.hex/.elf built (N bytes text)", from
+arm-none-eabi-size), so the difference between the size before and after this
+change is the cost of the verifier, the table and the metadata log. The code
+region of the main bootloader is 30 KB (0x08000000-0x080077FF; the 2 KB page
+at 0x08007800 holds the metadata) and the slave's is 18 KB
+(0x08000000-0x080047FF; its metadata page is at 0x08004800).
 
-  main bootloader   code region 30 KB (0x08000000-0x080077FF; the 2 KB page at
-                    0x08007800 holds the metadata), image ~18 KB -> ~12 KB free
-  slave bootloader  code region 18 KB (0x08000000-0x080047FF; the metadata page
-                    is at 0x08004800), image ~13.6 KB -> ~4.4 KB free
+For the slave there are three routes, in this order:
 
-A compact Ed25519 verifier (e.g. Monocypher's crypto_ed25519_check with its
-SHA-512) needs roughly 10-16 KB of Thumb-2 code: it fits the main board only
-at the small end of that range (about 12 KB are free), and it does NOT fit
-the slave without moving the slave application's start address
-(0x08005000), which changes the flash layout, the slave application linker
-script and every host tool that knows that address. Doing that without a real
-board to validate it on risks bricking hardware that cannot be recovered
-except over SWD, so it is planned for the first hardware bring-up:
+  1. add the verifier if it fits in the 18 KB region;
+  2. if it does not, move the slave application from 0x08005000 to 0x08006000
+     (the layout header src/common/urtc_flash_layout.h, the slave linker
+     scripts, the layout test and every host tool that knows that address);
+  3. if it still does not fit, the master verifies and the slave only checks
+     a SHA-256 over the internal link.
 
-  1. measure the real verifier size with -Os on both chips;
-  2. move the slave application to 0x08006000 (or 0x08007000) if needed;
-  3. replace the 4x8-byte HMAC chunks with 8x8-byte signature chunks (new
-     CAN offsets, old ones kept answering "unsupported" for one release);
-  4. sign with the private key at build time exactly where firmware_signing.py
-     computes the HMAC today - the tools already only transport signatures,
-     so they need no new secret.
+Nothing about the slave is decided by an estimate: it waits for the measured
+size.
+
+6. THE MAIN BOARD: TRUST TABLE AND Ed25519 RECORD
+-------------------------------------------------------------------------------
+Trust table (src/F303-master/boot/bootloader_trust.[ch]). The linker places the
+section .trust_keys at offset 0x200 of the binary, so a tool reads it without
+disassembling anything (python tools/image_trust.py check BIN master FLAVOUR).
+Little endian: "TKEY", schema 1, number of keys (0 to 2), table flags 0, then
+per key: key id (8, the first bytes of the SHA-512 of the key), public key
+(32), state (1 current, 2 next, 4 revoked), 3 zero bytes; CRC-32 of all of it.
+Any doubt (a bad CRC, an unknown schema or state, a key id that is not the
+hash of its key, padding that is not zero) closes the table: the bootloader
+then trusts nobody. A revoked key stays in the table and is never trusted.
+The table is generated from keys/image_trust.json (python tools/image_trust.py
+headers writes src/F303-master/boot/urtc_trust_{dev,release}.h; --check
+compares them). Two flavours, picked by the compiler flag the build script
+passes (firmware_signing.py cflags master): -DURTC_TRUST_DEV for a bench build,
+nothing (URTC_RELEASE=1) for an official one. The release table is the closed
+one (no key) while the maintainer has not provisioned the image-signing key.
+
+Record (the same bytes as URTC-COMMON docs/BOOTLOADER_AUTH.md). The host sends
+76 bytes, key id (8), rollback counter (4, big-endian) and signature (64), as
+11 frames on 0x7EC after 0x7F1 and before 0x7F4. The signature covers the
+domain "URTC-IMG-SIG-V1", the first 28 bytes of the image header, the SHA-256
+of the image and the counter. Until the header is in the image itself the
+bootloader builds those 28 bytes from the frames of the update: the hardware
+id and length of 0x7F1, the CRC-32 and the version of 0x7F4 (patch 0 when the
+flasher sends none, build number 0). So a changed image, version, hardware or
+counter breaks the signature. The policy is ed25519_only: there is no
+alternative path and no HMAC key in the bootloader.
+
+Rollback. The counter is signed; the bootloader keeps a floor in its metadata
+(and a floor compiled in, URTC_TRUST_MIN_COUNTER, from the public file) and
+refuses an image whose counter is below it (reason 0x05). After a good install
+the floor is the counter of the image. Nothing overrides the counter, not even
+the authorised downgrade of 0x7FD, which lifts only the version ordering.
+
+Metadata. One 2 KB page holds an append-only log of 72-byte records
+(generation, state, CRC-32); nothing is erased to make a record, the valid
+record with the highest generation is the state, and a record cut by a power
+loss fails its CRC and is ignored, so the previous state stays in force. The
+page is erased only when its 28 records are used, and a cut right then loses
+the log: the board starts as a first boot with the floor compiled in. There is
+no room for a second page (the layout is exactly 256 KB), so an A/B pair of
+pages is not possible on this chip without taking a page from the application.
+
+Revocation and rotation. A new bootloader flashed over SWD carries the new
+table: it can raise the compiled floor of the counter and mark a key revoked
+(flag 4). There is no remote command that revokes or changes a key. Rotation:
+the table holds the current and the next key; release with the current one
+until the fleet has the bootloader that holds the next one.
+
+Recovery image (golden). It is kept on the host, not on the board: there is no
+flash for a third slot. The host reinstalls it by the normal path.
+
+Bench build with a real key. A bench build never uses a real key: its table
+holds the public development key (seed published in URTC-COMMON), and the
+bootloader built that way is never an official one.

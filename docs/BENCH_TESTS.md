@@ -26,6 +26,7 @@ commit under test (note the commit and the `0x7E9` version in the result).
 | 11 | Ed25519 and HMAC policy of the bootloader | not run |
 | 12 | Hard fault dump and watchdog | not run |
 | 13 | Head telemetry through the rack | not run |
+| 14 | Ed25519 record, trust table and metadata log of the main bootloader | not run |
 
 ## 1. Slave I2C clock enable order
 
@@ -155,3 +156,19 @@ points, unplug the head.
 Expected: the two questions and the set point frames are exchanged as in the
 protocol document, counters advance, and an unplugged head is reported as lost
 within the configured time.
+
+## 14. Ed25519 record, trust table and metadata log of the main bootloader
+
+Steps, all with a main board that has the development bootloader flashed over SWD (its key is public, so any bench machine can sign an image for it; the seed is published with the shared reference):
+1. Update with a valid record: the board reaches VERIFY OK, resets, and the version query answers the new version; the `0x7ED` frame holds the key id of the table.
+2. Flip one bit of the record, then of the image, then change the version declared in `0x7F4`: each update is refused with reason 0x03 (or 0x02 for the image) and the main slot is untouched.
+3. Send a record signed by another key: refused with 0x03. Flash a bootloader whose table lists that key as `next`: it installs.
+4. Flash the official bootloader (closed table): every update, even with a valid development record, is refused with 0x03 and `0x7ED` is silent.
+5. Install counter 5, then try counter 3 with a newer version: refused with 0x05, also after `0x7FD`; counter 7 installs.
+6. Cut the power at several points of an update: during the data, during the verification (the SHA-256 and the Ed25519 take seconds), during the copy and during a metadata write. After each cut the board boots the old or the new application, never a damaged one; a cut during the copy resumes it at the next start.
+7. Install 14 versions in a row (28 records) and one more: the page is compacted and the board still boots the newest; repeat with a power cut at the compaction (the expected result is a first-boot adoption with the compiled floor).
+8. Measure with the debugger the time of one verification and the stack watermark, and read the size of the three bootloaders in the build log of Actions.
+
+Expected: every refusal leaves the previous application running; the watchdog never fires during a verification (the verifier feeds it every 8 bits of the scalar).
+
+Status: not run on a board.

@@ -1303,8 +1303,8 @@ CAN BOOTLOADER PROTOCOL - see the README's "Building & Flashing" section
 for the full walkthrough. These IDs are deliberately far from every
 application-runtime ID above (0x095-0x255) so there's no risk of confusing
 a bootloader-protocol frame with a normal command, or vice versa. 0x7F0 is
-handled by the RUNNING APPLICATION; 0x7F1-0x7F4/0x7F7 are handled by the
-BOOTLOADER (which only runs before the application, or after 0x7F0 resets
+handled by the RUNNING APPLICATION; 0x7F1-0x7F4 and 0x7EC (0x7F7 in the
+bootloaders of the earlier generation) are handled by the BOOTLOADER (which only runs before the application, or after 0x7F0 resets
 into it) - the application and bootloader never both listen for the same
 ID, with 2 deliberate exceptions: 0x7F8 (query version) and 0x7FB (query
 CAN error counters) are both answered by whichever one is currently
@@ -1313,7 +1313,7 @@ itself - without needing to trigger a reset first.
 
 Golden-image update model: every update is written into a backup/staging
 flash slot first, never into the slot currently running. Only after it
-fully passes size, CRC32, and HMAC-SHA256 signature verification does the
+fully passes size, CRC32, and Ed25519 signature verification does the
 bootloader copy it into the main slot - which is never touched before that
 point. See the README's flash memory layout section for the full reasoning.
 =============================================================================
@@ -1343,7 +1343,7 @@ Effect: erases exactly as many 2KB pages of the BACKUP slot as the declared
         Replies with a 0x7F5 status frame (0x02 = erasing, then
         0x03 = receiving once erase completes).
 
-ID: 0x7F7 [Master -> URTC Tool Head, handled by the BOOTLOADER]
+ID: 0x7F7 [Master -> URTC Tool Head, handled by the BOOTLOADER of the earlier generation]
 HMAC-SHA256 signature chunk
 DLC: 8 bytes
 Data:
@@ -1351,9 +1351,9 @@ Data:
     sent as 4 sequential frames covering bytes 0-7, 8-15, 16-23, 24-31 in
     order. Send all 4 after 0x7F1 and before the first 0x7F2 data frame.
     Computed over the raw firmware image with a key shared between the
-    bootloader and whatever tool signs the build - proves the image
-    actually came from this project's own build process, not just that it
-    arrived intact (which CRC32 alone only guarantees).
+    bootloader and whatever tool signs the build.
+Notes: the current main-board bootloader does not read this frame. It holds
+       no secret and asks for the Ed25519 record of 0x7EC instead.
 
 ID: 0x7F2 [Master -> URTC Tool Head, handled by the BOOTLOADER]
 Firmware data
@@ -1390,13 +1390,16 @@ Data:
     0x80 | PATCH (PATCH 0-127) - but only towards a bootloader that
     announced support in the flags of 0x7E9. The minor itself stays in
     rxData[7].
-Effect: the bootloader checks the backup slot's size, CRC32, and
-        HMAC-SHA256 against what was declared. Only if everything matches
+Effect: the bootloader checks the backup slot's size and CRC32 against what
+        was declared and the Ed25519 record of 0x7EC against its table of
+        public keys (the record signs the header these frames describe, the
+        SHA-256 of the image and the rollback counter). Only if everything
+        matches
         does it copy the backup slot into the main slot (page by page, with
         the same read-back verification as above), then save the new
         metadata and reset into the updated application (0x7F5 status 0x04,
         verify OK). On any mismatch - size/incomplete transfer, CRC32,
-        HMAC, or HardwareID - the main slot is never touched, 0x7F5 status
+        signature, or HardwareID - the main slot is never touched, 0x7F5 status
         0x05 (verify failed) is sent with a specific reason byte (see
         below), and the bootloader goes back to listening for a fresh
         attempt. It will never jump into an image that failed any of its
@@ -1413,9 +1416,11 @@ Data:
                112KB slot)
   - txData[1] (only present when txData[0] == 0x05): reason code -
                0x01 incomplete transfer (didn't receive the declared size
-               or all 4 HMAC chunks) | 0x02 CRC32 mismatch (transfer
-               corruption) | 0x03 HMAC signature mismatch (not signed with
-               this project's key) | 0x04 HardwareID mismatch (image built
+               or all 11 chunks of the record) | 0x02 CRC32 mismatch
+               (transfer corruption) | 0x03 signature mismatch (no record
+               that a key the bootloader trusts made: unknown or revoked
+               key, a changed image, version or board; also what a
+               bootloader with an empty table answers to everything) | 0x04 HardwareID mismatch (image built
                for different hardware - checked before a single byte is
                written, reported here for one consistent "why did it fail"
                path rather than the generic 0xFF error) | 0x05 rollback
@@ -1577,7 +1582,13 @@ Data:
   - txData[1..7]: seven bytes of the record (the last chunk is padded with
                   zeros)
 Notes: the record is key id (8) + rollback counter (4, big-endian) +
-       signature (64) = 76 bytes, sent after 0x7F1 next to the HMAC chunks.
+       signature (64) = 76 bytes, sent after 0x7F1 and before 0x7F4. The
+       main-board bootloader needs all 11 chunks (in any order, repeats are
+       harmless); a new 0x7F1 forgets them. It checks the record against the
+       header that 0x7F1 (hardware id, length) and 0x7F4 (CRC-32, version)
+       describe, with the patch 0 when the flasher did not send one and a
+       build number of 0, and refuses a counter below its floor with reason
+       0x05 (never overridable by 0x7FD).
 
 ID: 0x7ED [URTC Tool Head -> Master, bootloader only, right after its answer to 0x7F8]
 Identifier of the signing key a bootloader trusts

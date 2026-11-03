@@ -28,7 +28,7 @@ by an incoming update.
 
 ```
 0x08000000 ─┬─ Bootloader                30 KB   (this)
-0x08007800 ─┼─ Metadata                   2 KB   (version, size, CRC32, HMAC - describes whatever is in the main slot)
+0x08007800 ─┼─ Metadata                   2 KB   (version, size, CRC32, SHA-256, rollback floor - an append-only log of records)
 0x08008000 ─┼─ Main application slot    112 KB   (the application firmware, what actually runs)
 0x08024000 ─┴─ Backup/staging slot      112 KB   (OTA updates land here first, verified, then copied to main)
 0x08040000    (end of flash, 256 KB total)
@@ -47,7 +47,7 @@ verified at some point, not just present.
 2. Master sends `0x7F1` (start update, declares size + HardwareID).
    A HardwareID mismatch or an oversized declaration is rejected
    before a single byte is written.
-3. Firmware data (`0x7F2`) and the HMAC-SHA256 signature (`0x7F7`, 4
+3. Firmware data (`0x7F2`) and the Ed25519 record (`0x7EC`, 11
    chunks) stream in, page by page, into the **backup slot only**.
    Each page write gets a `0x7F3` acknowledgement; the master waits
    for it before sending the next page, which is what keeps the CAN
@@ -57,8 +57,8 @@ verified at some point, not just present.
    application as before the update started — nothing about the main
    slot has been touched yet.
 4. `0x7F4` (end update) triggers verification against the backup
-   slot: size/completeness first, then CRC32, then HMAC-SHA256 against
-   the signing key. **Any single failure aborts here** with a specific
+   slot: size/completeness first, then CRC32, then the Ed25519 record
+   against the trust table. **Any single failure aborts here** with a specific
    reason (`0x05` + a reason byte — see `docs/CANBUS.TXT`'s `0x7F5`
    documentation), and the main slot remains untouched.
 5. Only once *all* checks pass does the bootloader erase the main slot
@@ -89,21 +89,21 @@ different HardwareID (checked before erasing anything).
 
 Every boot (not just after an update) runs `ApplicationIsValid()`
 before deciding whether to jump: metadata's magic value, size bounds,
-CRC32, and HMAC-SHA256 must all check out against what's actually
+CRC32, and SHA-256 must all check out against what's actually
 sitting in the main slot right now, not just what metadata claims.
 
 **A board with no valid metadata at all** (a freshly SWD/JTAG-flashed
 chip, which never went through the CAN update flow that writes
 metadata) isn't treated as invalid outright — if the reset vector and
 stack pointer at the start of the main slot look like a plausible ARM
-Cortex-M image, the bootloader computes an HMAC over the whole slot
+Cortex-M image, the bootloader computes a SHA-256 over the whole slot
 and adopts it as a new baseline. This does not, and is not meant to,
 authenticate that image as coming from whoever holds the signing key —
 physical SWD/JTAG access already bypasses any check a bootloader could
 make. It only lets a directly-flashed image boot at all, the same way
-it would with no bootloader in the picture. The HMAC check that
+it would with no bootloader in the picture. The check that
 actually matters — gating a new image arriving over CAN against the
-signing key — is unaffected by this adoption path.
+trust table — is unaffected by this adoption path.
 
 `JumpToApplication()` repeats the stack-pointer and reset-vector
 checks independently right before the jump itself, as a second,
@@ -151,7 +151,7 @@ The bootloader drives the same physical OLED as the application
 `docs/PINOUT.TXT`), with its own minimal font renderer and a handful of
 fixed status screens:
 "UPDATING" with a live progress readout while backup-slot pages
-stream in, "VERIFYING" during the CRC32/HMAC checks, "COPYING" during
+stream in, "VERIFYING" during the CRC32/signature checks, "COPYING" during
 the backup-to-main copy, a plain success screen, and a failure screen
 carrying the same reason code sent over CAN. None of this is required
 for an update to succeed over CAN — it's a bench-debugging aid, not a
@@ -163,7 +163,9 @@ dependency of the protocol itself.
 |---|---|
 | `bootloader_main.c` | Entry point: clock/CAN/I2C init, `main()`'s own boot sequence and update-listening loop, and every HAL interrupt callback. Matches the application firmware's own `STM32F303CC_main.c` naming for its equivalent entry point. |
 | `bootloader_common.h` | Shared types, `#define`s (flash addresses/sizes, CAN IDs, the version constants), and `extern` declarations every other module needs — including the signing key, defined once in `bootloader_crypto.c` and referenced everywhere else, rather than a private copy compiled into each file that touches it. |
-| `bootloader_crypto.c` / `.h` | The from-scratch SHA-256/HMAC-SHA256 implementation (not a library), verified against the official RFC 4231 HMAC-SHA256 test vector before ever being wired into the update flow. Also where `HMAC_KEY` itself is defined. |
+| `bootloader_crypto.c` / `.h` | The from-scratch SHA-256 implementation (not a library), verified against FIPS 180-4 digests around every padding boundary. It holds no key. |
+| `bootloader_trust.c` / `.h`, `urtc_trust_dev.h`, `urtc_trust_release.h` | The trust table: the public Ed25519 keys that may sign an application, in the section `.trust_keys` at offset `0x200` of the binary (see `docs/FIRMWARE_SIGNING.TXT`, section 6). Generated by `tools/image_trust.py headers`. A release build with no key provisioned trusts nobody. |
+| `bootloader_ed25519.c` | The Ed25519 verifier of `src/common/urtc_ed25519.c`, compiled with the other files of this folder and feeding the watchdog while it works. |
 | `bootloader_flash.c` / `.h` | Page erase/write/verify primitives, the backup-to-main region copy, and metadata read/write. |
 | `bootloader_oled.c` / `.h` | The bootloader's own minimal font renderer and the fixed status screens described in section 6. |
 | `bootloader_protocol.c` / `.h` | The CAN update state machine (`0x7F0`-`0x7FA`), both startup validation paths, and `JumpToApplication()` itself. |

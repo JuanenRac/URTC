@@ -25,13 +25,17 @@ and the release workflow only checks the signatures with the public key.
 
 ### The development keys of the bootloaders
 
-Images built without a production key are signed with the public development key written in the `#else` branch of
-`bootloader_crypto.c` (main) and `slaveboot_crypto.c` (slave). They prove nothing about who made an image: they exist so that anybody
-can build and test. A release build replaces them with the production keys.
+The main bootloader holds no secret and no HMAC key: it trusts the public Ed25519 keys of its trust table (`keys/image_trust.json`, see
+[`FIRMWARE_SIGNING.TXT`](FIRMWARE_SIGNING.TXT)). The bench table holds a public development key (its seed is published with the shared
+reference), so a bootloader built with it proves nothing about who made an image; the official table is empty until the maintainer creates
+the image-signing key, which is not the key that signs release assets. Its private half stays outside every repository.
 
-The production HMAC keys of the two bootloaders are secrets. They live in `~/.urtc-keys/signing_keys.txt` (the lines `master=` and
-`slave=`) on the maintainer's machine, never in a repository or in GitHub. A published image says in its manifest
-which kind of key signed it (`signing_key_kind`).
+The two HMAC keys in the table above are the public development keys of the bootloaders of the earlier generation: the main one lives in
+`firmware_signing.py` (only to keep producing the HMAC those bootloaders check), the slave one in the `#else` branch of `slaveboot_crypto.c`.
+They prove nothing about who made an image: they exist so that anybody can build and test.
+
+The production HMAC keys are secrets. They live in `~/.urtc-keys/signing_keys.txt` (the lines `master=` and `slave=`) on the maintainer's
+machine, never in a repository or in GitHub. A published image says in its manifest which kind of key signed it (`signing_key_kind`).
 
 ## Checking
 
