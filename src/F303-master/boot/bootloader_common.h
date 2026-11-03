@@ -8,6 +8,7 @@
 
 #include "stm32f3xx_hal.h"
 #include "urtc_flash_layout.h"
+#include "urtc_can_ids.h" // the identifiers of the update exchange come from the shared specification
 
 // -----------------------------------------------------------------------
 // Shared peripheral handles - defined once in bootloader_main.c, declared
