@@ -29,6 +29,8 @@ jobs:
           python-version: "3.12"
       - name: Validate manifest, version, documentation and secret policy
         run: python tools/ci_validate.py
+      - name: Light build check (the stack and the files the full check needs; nothing is built)
+        run: python tools/build_test.py --check
       - name: Static checks (unused names, exception chaining, syntax)
         run: |
           python -m pip install "ruff==0.17.1"

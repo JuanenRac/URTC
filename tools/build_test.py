@@ -6,19 +6,38 @@
 # =============================================================================
 """Run a non-versioning build check for this repository.
 
+    python tools/build_test.py            the full check: build or compile what the stack builds, run the tests the repository lists
+    python tools/build_test.py --check    the light check: the manifest, the stack and the files the full check needs, nothing is built or run
+
 This command never invokes version bump scripts and never updates CHANGELOG.md.
 It may create normal compiler outputs such as build/, target/ or APK artifacts.
+
+One text for every repository of the family. What differs between repositories is data in an optional ``tools/build_test.json`` next to this file:
+
+    {"pytest": {"dir": "tests", "pythonpath": ["src"], "install": false}}   run the pytest suite of the repository (skipped when pytest is not installed,
+                                                                            unless "install" asks for it to be installed first)
+    {"unittest": "tests"}                                                   run a unittest discovery
+    {"python_extra": [{"cwd": "src/companion", "requires": ["numpy", "pytest"], "args": ["-m", "pytest", "-q", "tests"]}]}
+                                                                            further Python commands, each needing the modules it names
+
+The environment variables URTC_WSL_DISTRO and URTC_WSL_DISTRIBUTION pick the WSL distribution for a firmware build on Windows.
 """
 from __future__ import annotations
 
+import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 EXCLUDED_PARTS = {".git", ".venv", "node_modules", "build", "dist", "target", "__pycache__"}
+PYTHON_STACKS = {"python", "python-bare", "python-qtquick"}
+STACKS = PYTHON_STACKS | {"node", "rust", "go", "android", "flutter", "firmware-c"}
+# what the full check of each stack needs, relative to the root (the light check looks for it)
+STACK_MARKERS = {"node": "package.json", "rust": "Cargo.toml", "flutter": "pubspec.yaml", "firmware-c": "build_firmware.sh"}
 
 
 def fail(message: str) -> None:
@@ -36,6 +55,33 @@ def run(*command: str, cwd: Path = ROOT, env: dict[str, str] | None = None) -> N
         fail(f"command failed with exit code {exc.returncode}: {' '.join(command)}")
 
 
+def load_manifest() -> tuple[dict, str]:
+    try:
+        manifest = json.loads((ROOT / "urtc.project.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        fail(f"cannot read project manifest: {exc}")
+    stack = manifest.get("stack")
+    if not isinstance(stack, str):
+        fail("manifest stack must be a string")
+    return manifest, stack
+
+
+def load_config() -> dict:
+    path = ROOT / "tools" / "build_test.json"
+    if not path.is_file():
+        return {}
+    try:
+        config = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        fail(f"cannot read tools/build_test.json: {exc}")
+    if not isinstance(config, dict):
+        fail("tools/build_test.json must be an object")
+    unknown = sorted(set(config) - {"pytest", "unittest", "python_extra"})
+    if unknown:
+        fail(f"tools/build_test.json has keys this script does not know: {', '.join(unknown)}")
+    return config
+
+
 def compile_python_sources() -> None:
     files = [
         path for path in ROOT.rglob("*.py")
@@ -46,19 +92,152 @@ def compile_python_sources() -> None:
     print(f"PYTHON_COMPILE=PASS files={len(files)}")
 
 
-def main() -> int:
+def qml_sources() -> list[Path]:
+    return sorted((ROOT / "assets" / "qml").glob("*.qml"))
+
+
+def validate_qtquick_deck() -> None:
+    """Validate deployable Qt Quick deck sources without a graphics backend."""
+    sources = qml_sources()
+    if not sources:
+        fail("Qt Quick stack is missing assets/qml/*.qml")
+    qml_keys: set[str] = set()
+    for source in sources:
+        text = source.read_text(encoding="utf-8", errors="replace")
+        if "import QtQuick" not in text:
+            fail(f"Qt Quick import missing from {source.relative_to(ROOT)}")
+        qml_keys.update(re.findall(r'uiText\("([A-Z0-9_]+)"\)', text))
+    language_files = sorted((ROOT / "language").glob("*.lng"))
+    if qml_keys and language_files:
+        for language_file in language_files:
+            keys = {
+                line.split("=", 1)[0].strip()
+                for line in language_file.read_text(encoding="utf-8", errors="replace").splitlines()
+                if "=" in line and not line.lstrip().startswith("#")
+            }
+            missing = sorted(qml_keys - keys)
+            if missing:
+                fail(
+                    f"QML language keys missing from {language_file.relative_to(ROOT)}: "
+                    + ", ".join(missing)
+                )
+        print(f"QML_I18N=PASS keys={len(qml_keys)} languages={len(language_files)}")
+    print(f"QML_SOURCE=PASS files={len(sources)} runtime=manual-visual-check")
+
+
+def python_environment(pythonpath: list[str]) -> dict[str, str]:
+    environment = dict(os.environ)
+    environment["PYTHONPATH"] = os.pathsep.join(str(ROOT / item) for item in pythonpath) or str(ROOT)
+    return environment
+
+
+def run_python_tests(config: dict) -> None:
+    """The tests the repository lists in tools/build_test.json. pytest is a development tool that a user of an installed program may not have: without it the
+    run says the tests were SKIPPED, which is not a failed validation (nothing is installed from here unless the repository asks for it)."""
+    pytest = config.get("pytest")
+    if pytest:
+        tests_dir = ROOT / pytest.get("dir", "tests")
+        if tests_dir.is_dir():
+            environment = python_environment(pytest.get("pythonpath", ["."]))
+            probe = subprocess.run([sys.executable, "-m", "pytest", "--version"], capture_output=True, text=True, env=environment)
+            if probe.returncode != 0 and pytest.get("install"):
+                print("PYTEST=MISSING installing pytest for the tests of this repository")
+                installed = subprocess.run([sys.executable, "-m", "pip", "install", "--quiet", "pytest>=8"], capture_output=True, text=True, env=environment)
+                if installed.returncode != 0:
+                    detail = ((installed.stderr or installed.stdout).strip().splitlines() or [""])[-1][:200]
+                    print(f"PYTEST_TESTS=SKIPPED pytest is not installed and could not be ({detail})")
+                    return
+                probe = subprocess.run([sys.executable, "-m", "pytest", "--version"], capture_output=True, text=True, env=environment)
+            if probe.returncode != 0:
+                print("PYTEST_TESTS=SKIPPED pytest is not installed")
+            else:
+                run(sys.executable, "-m", "pytest", "-q", str(tests_dir), env=environment)
+    unittest_dir = config.get("unittest")
+    if unittest_dir and (ROOT / unittest_dir).is_dir():
+        run(sys.executable, "-m", "unittest", "discover", "-s", unittest_dir, "-v")
+        print(f"UNIT_TESTS=PASS suite={unittest_dir}")
+
+
+def run_python_extra(config: dict) -> None:
+    for item in config.get("python_extra", []):
+        cwd = ROOT / item.get("cwd", ".")
+        if not (cwd / "tests").is_dir():
+            continue
+        modules = ", ".join(item.get("requires", []))
+        if modules:
+            probe = subprocess.run([sys.executable, "-c", f"import {modules}"], capture_output=True)
+            if probe.returncode != 0:
+                fail(f"the tests in {cwd.relative_to(ROOT)} need these Python modules: {modules}")
+        run(sys.executable, *item["args"], cwd=cwd)
+
+
+def wsl_command() -> list[str]:
+    """The WSL command line of a firmware build on Windows: the distribution of URTC_WSL_DISTRO / URTC_WSL_DISTRIBUTION, or the default one."""
+    wsl = ["wsl.exe"]
+    distro = (os.environ.get("URTC_WSL_DISTRO") or os.environ.get("URTC_WSL_DISTRIBUTION") or "").strip()
+    if distro:
+        wsl += ["--distribution", distro]
     try:
-        manifest = json.loads((ROOT / "urtc.project.json").read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        fail(f"cannot read project manifest: {exc}")
+        probe = subprocess.run(wsl + ["--", "sh", "-c", "command -v arm-none-eabi-gcc"], capture_output=True)
+    except FileNotFoundError:
+        fail("required command not found: wsl.exe (the firmware build runs inside WSL on Windows)")
+    if probe.returncode != 0:
+        fail(
+            "arm-none-eabi-gcc was not found inside WSL"
+            + (f" (distribution {distro})" if distro else " (default distribution)")
+            + "; install gcc-arm-none-eabi there, or set URTC_WSL_DISTRO to a distribution that has it"
+        )
+    return wsl
 
-    stack = manifest.get("stack")
-    if not isinstance(stack, str):
-        fail("manifest stack must be a string")
-    print(f"BUILD_TEST project={manifest.get('name', ROOT.name)} stack={stack}")
 
-    if stack in {"python", "python-bare"}:
+def light_check(manifest: dict, stack: str, config: dict) -> int:
+    """The check that builds and runs nothing: the stack is one this script knows, the files its full check needs are there, the Python compiles."""
+    if stack not in STACKS:
+        fail(f"unsupported stack: {stack}")
+    marker = STACK_MARKERS.get(stack)
+    if marker and not (ROOT / marker).is_file():
+        fail(f"the {stack} stack needs {marker}")
+    if stack == "go" and not ((ROOT / "go.mod").is_file() or (ROOT / "src" / "go.mod").is_file()):
+        fail("the go stack needs go.mod")
+    if stack == "android" and not (ROOT / "gradlew").is_file():
+        fail("the android stack needs gradlew")
+    if stack in PYTHON_STACKS:
         compile_python_sources()
+        if stack == "python-qtquick":
+            validate_qtquick_deck()
+        pytest = config.get("pytest")
+        if pytest and not (ROOT / pytest.get("dir", "tests")).is_dir():
+            fail(f"tools/build_test.json names a tests folder that is not there: {pytest.get('dir', 'tests')}")
+    if stack == "node":
+        scripts = json.loads((ROOT / "package.json").read_text(encoding="utf-8")).get("scripts", {})
+        print(f"NODE_SCRIPTS=PASS {','.join(name for name in ('typecheck', 'test', 'lint') if name in scripts) or 'none of typecheck, test, lint'}")
+    if stack == "firmware-c":
+        generator = ROOT / "tools" / "gen_build_scripts.py"
+        if generator.is_file():
+            run(sys.executable, str(generator), "--check")
+    print(f"BUILD_TEST_CHECK=PASS project={manifest.get('name', ROOT.name)} stack={stack}")
+    return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Run a non-versioning build check for this repository.")
+    parser.add_argument("--check", action="store_true", help="the light check: nothing is built and no test is run")
+    args = parser.parse_args(argv)
+
+    manifest, stack = load_manifest()
+    config = load_config()
+    print(f"BUILD_TEST project={manifest.get('name', ROOT.name)} stack={stack}")
+    if args.check:
+        return light_check(manifest, stack, config)
+
+    # The Qt Quick variant shares the Python syntax baseline. A packaged Qt
+    # smoke test belongs to the explicit build flow because it needs a desktop
+    # runtime; this non-mutating test must remain safe on headless CI hosts.
+    if stack in PYTHON_STACKS:
+        compile_python_sources()
+        if stack == "python-qtquick":
+            validate_qtquick_deck()
+        run_python_tests(config)
     elif stack == "node":
         npm = "npm.cmd" if os.name == "nt" else "npm"
         # Reuse an existing local dependency tree so a running editor/linter
@@ -109,12 +288,10 @@ def main() -> int:
         if os.name == "nt":
             # WSL does not reliably inherit a Python child environment;
             # pass the read-only CI flag as an explicit WSL command argument.
-            run(
-                "wsl.exe", "--distribution", os.environ.get("URTC_WSL_DISTRIBUTION", "Ubuntu-24.04"), "--",
-                "env", "URTC_CI=1", "bash", "build_firmware.sh",
-            )
+            run(*wsl_command(), "--", "env", "URTC_CI=1", "bash", "build_firmware.sh")
         else:
             run("bash", "build_firmware.sh", env=environment)
+        run_python_extra(config)
     else:
         fail(f"unsupported stack: {stack}")
 
