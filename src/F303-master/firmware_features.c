@@ -121,6 +121,7 @@ void Features_Init(void) {
     if (running_mask & FEAT_THERMAL_PID) { pid_load(); pid_state = PID_STATE_RUNNING_VALUE; }
     HsiTrim_Init(&hsi, HSI_TRIM_DEFAULT);
     health_last_ms = service_last_ms = HAL_GetTick();
+    health_info_count = 0;
 }
 
 uint8_t Features_Running(void) { return running_mask; }
