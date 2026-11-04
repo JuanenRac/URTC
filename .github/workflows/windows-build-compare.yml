@@ -96,6 +96,12 @@ jobs:
           Expand-Archive -Path $zip -DestinationPath $env:RUNNER_TEMP -Force
           Add-Content -Path $env:GITHUB_PATH -Value (Join-Path $env:RUNNER_TEMP "arm-gnu-toolchain-13.3.rel1-mingw-w64-i686-arm-none-eabi\bin")
 
+      - name: Install a working cppcheck (the one on the runner image cannot find its configuration)
+        shell: pwsh
+        run: |
+          choco install cppcheck --no-progress --yes
+          Add-Content -Path $env:GITHUB_PATH -Value "C:\Program Files\Cppcheck"
+
       - name: Compile with the batch script
         env:
           URTC_CI: "1"
