@@ -37,10 +37,15 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install the Arm GNU toolchain (the same release on both systems)
-        uses: carlosperate/arm-none-eabi-gcc-action@49f4db4520f840e77ab1e99b24cfac2c540a21b1 # v1.14.1
-        with:
-          release: "13.3.Rel1"
+      - name: Install the Arm GNU toolchain 13.3.Rel1 (the same release on both systems, checked against its SHA-256)
+        shell: bash
+        run: |
+          set -euo pipefail
+          name=arm-gnu-toolchain-13.3.rel1-x86_64-arm-none-eabi.tar.xz
+          curl --fail --silent --show-error --location --output "$RUNNER_TEMP/$name" "https://developer.arm.com/-/media/Files/downloads/gnu/13.3.rel1/binrel/$name"
+          echo "95c011cee430e64dd6087c75c800f04b9c49832cc1000127a92a97f9c8d83af4  $RUNNER_TEMP/$name" | sha256sum --check -
+          tar -xJf "$RUNNER_TEMP/$name" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/arm-gnu-toolchain-13.3.rel1-x86_64-arm-none-eabi/bin" >> "$GITHUB_PATH"
 
       - name: Install the host tools that the script uses
         run: sudo apt-get update && sudo apt-get install --yes cppcheck
@@ -80,10 +85,16 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install the Arm GNU toolchain (the same release on both systems)
-        uses: carlosperate/arm-none-eabi-gcc-action@49f4db4520f840e77ab1e99b24cfac2c540a21b1 # v1.14.1
-        with:
-          release: "13.3.Rel1"
+      - name: Install the Arm GNU toolchain 13.3.Rel1 (the same release on both systems, checked against its SHA-256)
+        shell: pwsh
+        run: |
+          $name = "arm-gnu-toolchain-13.3.rel1-mingw-w64-i686-arm-none-eabi.zip"
+          $zip = Join-Path $env:RUNNER_TEMP $name
+          Invoke-WebRequest -Uri "https://developer.arm.com/-/media/Files/downloads/gnu/13.3.rel1/binrel/$name" -OutFile $zip
+          $hash = (Get-FileHash -Algorithm SHA256 $zip).Hash.ToLower()
+          if ($hash -ne "e46fda043c0ce83582bc8db4b3ef85f77f4beb7333344c2f4193c17e1167a095") { throw "the toolchain archive has the SHA-256 $hash" }
+          Expand-Archive -Path $zip -DestinationPath $env:RUNNER_TEMP -Force
+          Add-Content -Path $env:GITHUB_PATH -Value (Join-Path $env:RUNNER_TEMP "arm-gnu-toolchain-13.3.rel1-mingw-w64-i686-arm-none-eabiin")
 
       - name: Compile with the batch script
         env:
