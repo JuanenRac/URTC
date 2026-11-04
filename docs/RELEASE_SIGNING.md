@@ -43,14 +43,39 @@ The key is read from the file named by `URTC_RELEASE_KEY`, or from
 `~/.urtc-keys/urtc_release_ed25519.pem`. The tools never print it and refuse
 to sign with a key that is not the pinned one.
 
+## The image signature record (`.imgsig`)
+
+Besides the release signature of the assets there is a second signature, made for the bootloaders and not for the people who download:
+`<application image>.imgsig`, the 76-byte Ed25519 record (key id, rollback counter, signature) written as exactly 152 hexadecimal digits on one
+line. It is made **after** the build and apart from it, from the header that describes the image, the SHA-256 of the image and the counter, so the
+build needs no key and the bootloader holds only public keys (`keys/image_trust.json`, `docs/KEYS.md`). The bootloader files carry no record.
+
+The path of an official release, from the build to the published set:
+
+1. The workflow `firmware-build` builds the images on GitHub (input `flavour`: `release` for the official table) and uploads them as an artifact
+   with the build manifest and the attestation. It signs nothing and holds no key.
+2. On the maintainer's machine the artifact is downloaded and verified (attestation, digests, version, the bootloaders carry exactly the table of
+   the chosen flavour), the images and the sidecars are signed with the key of the releases (`.sig`), and for every application image the image
+   key adds `<image>.imgsig` with the counter of the release. Both keys stay outside every repository and are never printed.
+3. `python tools/publish_release_assets.py --sign --draft` puts the records in the set (the `.imgsig` of each application image and its `.sig`),
+   refuses an official set that lacks one or holds a file that is not a record, and prints the `gh release create` command; the workflow
+   `release.yml` repeats the check (`tools/verify_release_set.py`) before it publishes.
+4. The consumers take the record from the release: URTC-FLASHER and URTC-WEB-STUDIO read `<image>.imgsig` next to the image they flash and carry
+   it to the bootloader (11 frames of `0x7EC` for the main board, `0x21A` for the slave through the main board). The web studio bundles the
+   record of each application image with the image (`scripts/sync-firmware.mjs` downloads and verifies it, and refuses an official set without it
+   unless `--allow-unsigned`).
+
+A bootloader that does not find the record installs nothing: an image without its `.imgsig` is refused by the tools before a frame is sent.
+
 ## Who checks what
 
 | Consumer | Check |
 | --- | --- |
-| `tools/publish_release_assets.py` | an official release needs the `.sig` of every asset, and each one must verify; a pre-release may go out without |
+| `tools/publish_release_assets.py` | an official release needs the `.sig` of every asset, and each one must verify; a pre-release may go out without. It also needs the `.imgsig` of every application image (152 hexadecimal digits on one line), which is an asset of its own with its own `.sig`; a bench pre-release may go out without |
 | URTC-FLASHER (`tools/sync_firmware.py`, image check before a flash) | verifies the `.sig` of what it downloads or flashes when there is one; refuses a wrong one; an image with none is accepted only while the transition below lasts, and says so |
 | URTC-WEB-STUDIO (`scripts/sync-firmware.mjs`) | same, with `node:crypto` |
-| The bootloader on the board | still the HMAC-SHA256 of the image (see `FIRMWARE_SIGNING.TXT`) |
+| The main-board bootloader | the Ed25519 record `<image>.imgsig` of the application image against its table of public keys (see below and `FIRMWARE_SIGNING.TXT`); it holds no secret |
+| The expansion-slave bootloader | a plain SHA-256 of the image, and the confirmation of the main board, which verifies the same record (`SLAVE_BOOT_CONFIRMATION.md`) |
 
 ## Publishing an official release
 

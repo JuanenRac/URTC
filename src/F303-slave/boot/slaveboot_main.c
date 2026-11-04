@@ -30,7 +30,7 @@ I2C_HandleTypeDef hi2c1;
 // I2C1 slave-side register-protocol state. rx_buffer's size (33) is
 // exactly 1 register-address byte + REG_DATA's own documented 32-byte
 // ceiling - the largest single write this protocol ever needs to accept
-// in one transaction (REG_HMAC_EXPECTED is the same 33-byte total: 1 +
+// in one transaction (REG_DIGEST_EXPECTED is the same 33-byte total: 1 +
 // 32). tx_buffer's size (10) matches REG_QUERY_VERSION's own 10-byte
 // response, the largest read.
 // -----------------------------------------------------------------------
@@ -123,7 +123,7 @@ void I2C1_ER_IRQHandler(void) {
 // HAL_I2C "listen mode" callbacks - this project's chosen pattern for a
 // slave that can't know a write transaction's length in advance (register
 // writes here range from a 1-byte read-pointer-only write up to
-// REG_HMAC_EXPECTED/REG_DATA's own 33-byte ceiling). Always request the
+// REG_DIGEST_EXPECTED/REG_DATA's own 33-byte ceiling). Always request the
 // buffer's own full size on every receive regardless of what the master
 // actually intends to send.
 // To be confirmed on a board: in the STM32F3 HAL a STOP that arrives before
@@ -201,8 +201,8 @@ void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef *hi2c) {
             case REG_START_UPDATE:
                 if (bytes_received == 9) HandleStartUpdate(&rx_buffer[1]);
                 break;
-            case REG_HMAC_EXPECTED:
-                if (bytes_received == 33) HandleHmacExpected(&rx_buffer[1]);
+            case REG_DIGEST_EXPECTED:
+                if (bytes_received == 33) HandleDigestExpected(&rx_buffer[1]);
                 break;
             case REG_CONFIRM:
                 if (bytes_received == 33) HandleConfirm(&rx_buffer[1]);

@@ -109,7 +109,7 @@ extern I2C_HandleTypeDef hi2c1;
 
 #define REG_STATUS               0x00 // read-only, 1 byte - status codes below
 #define REG_START_UPDATE         0x01 // write-only, 8 bytes: big-endian total size (4) + big-endian HardwareID (4)
-#define REG_HMAC_EXPECTED        0x02 // write-only, 32 bytes: the expected SHA-256 (no key) of the complete image, sent once, before REG_END_UPDATE. The name is historic: the slave no longer checks an HMAC
+#define REG_DIGEST_EXPECTED        0x02 // write-only, 32 bytes: the expected SHA-256 (no key) of the complete image, sent once, before REG_END_UPDATE. The slave checks no HMAC
 #define REG_DATA                 0x03 // write-only, up to 32 bytes per transaction, sent sequentially - goes to the BACKUP slot, never main; unlike the main board's own CAN-framed 8-byte-per-frame limit, I2C has no equivalent per-transaction ceiling here, so this moves in much larger pieces
 #define REG_END_UPDATE           0x04 // write-only, 8 bytes: big-endian CRC32 (4) + big-endian VersionMajor (2) + big-endian VersionMinor (2)
 #define REG_PROGRESS             0x05 // read-only, 1 byte: 0-100, 0xFF if not currently updating

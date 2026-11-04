@@ -42,7 +42,7 @@ void JumpToApplication(void);
 // length already documented alongside its REG_* definition in
 // slaveboot_common.h).
 void HandleStartUpdate(uint8_t *data);
-void HandleHmacExpected(uint8_t *data);
+void HandleDigestExpected(uint8_t *data);
 void HandleData(uint8_t *data, uint32_t len);
 void HandleEndUpdate(uint8_t *data);
 // REG_CONFIRM, 32 bytes: the master's confirmation (urtc_slave_confirm.h). Only acted on while update_awaiting_confirm is set; it is used once whatever the

@@ -69,7 +69,7 @@ different transport:
    (`0x0303CB01`) and HMAC signing key are both deliberately different
    from the main board's own, so an image meant for one can never
    accidentally verify against the other.
-2. Master writes `REG_HMAC_EXPECTED` (the full 32-byte signature in one
+2. Master writes `REG_DIGEST_EXPECTED` (the full 32-byte SHA-256 in one
    transaction — I2C has no equivalent to CAN's 8-byte-per-frame
    ceiling, so this doesn't need the main board's own 4-chunk split).
 3. Firmware data streams in via repeated `REG_DATA` writes (up to 32

@@ -43,7 +43,7 @@
 // hand - there's no compiler to catch a mismatch here.
 #define REG_BOOT_STATUS         0x00
 #define REG_BOOT_START_UPDATE   0x01
-#define REG_BOOT_HMAC_EXPECTED  0x02
+#define REG_BOOT_DIGEST_EXPECTED  0x02
 #define REG_BOOT_DATA           0x03
 #define REG_BOOT_END_UPDATE     0x04
 #define REG_BOOT_PROGRESS       0x05
@@ -57,7 +57,7 @@
 #define SLAVE_BOOT_STATUS_AWAIT_CONFIRM 0x08
 #define REG_APP_ENTER_BOOTLOADER 0x02
 
-static uint8_t hmac_chunk_buf[32];
+static uint8_t digest_chunk_buf[32];
 
 // The slave bootloader holds a verified image until the master confirms that it checked the signature record (urtc_slave_confirm.h). Called after the END
 // frame has been relayed and only when SlaveAttest_Verify said yes: waits (one second at most) until the slave reports that it is waiting, reads the nonce of
@@ -81,7 +81,7 @@ static void ConfirmToSlave(void) {
     if (!SlaveAttest_Tag(nonce, tag)) return;
     ExpansionI2C_SlaveWriteRegister(REG_BOOT_CONFIRM, tag, URTC_SLAVE_CONFIRM_TAG_SIZE);
 }
-static uint8_t hmac_chunks_received = 0;
+static uint8_t digest_chunks_received = 0;
 
 static void SendCanResponse(uint32_t id, const uint8_t *data, uint8_t len) {
     if (HAL_CAN_GetTxMailboxesFreeLevel(&hcan) == 0) return;
@@ -112,9 +112,9 @@ void Handle_CAN_SlaveBridge(void) {
         // sequence (bus glitch, Flasher restart) before this update's own
         // real 0x212 chunks start landing - without this, stale bytes from
         // a previous, never-completed attempt could still occupy the tail
-        // of hmac_chunk_buf when a new sequence only sends fewer than 4
+        // of digest_chunk_buf when a new sequence only sends fewer than 4
         // fresh chunks before something re-triggers completion.
-        hmac_chunks_received = 0;
+        digest_chunks_received = 0;
         // The rollback floor of the slave is read BEFORE the START frame goes out: afterwards the slave is erasing its backup slot and does not answer. A slave
         // that does not answer (an older bootloader, no slave chip) leaves the floor unknown, and an unknown floor means nothing is ever vouched for.
         uint8_t floor_bytes[4];
@@ -134,19 +134,19 @@ void Handle_CAN_SlaveBridge(void) {
             SlaveAttest_RecordChunk(rxData[0], &rxData[1]);
         }
 
-    } else if (rxHeader.StdId == URTC_CAN_ID_SLAVE_HMAC_CHUNK && rxHeader.DLC == 8) {
+    } else if (rxHeader.StdId == URTC_CAN_ID_SLAVE_DIGEST_CHUNK && rxHeader.DLC == 8) {
         // Same 4-frames-of-8-bytes accumulation as the main board's own
         // bootloader HMAC chunk handling (CAN_ID_HMAC_CHUNK, bootloader_protocol.c) -
-        // REG_HMAC_EXPECTED expects the complete 32-byte signature in one
-        // I2C transaction (slaveboot_protocol.c's own HandleHmacExpected
+        // REG_DIGEST_EXPECTED expects the complete 32-byte signature in one
+        // I2C transaction (slaveboot_protocol.c's own HandleDigestExpected
         // doesn't accumulate partial writes the way HandleData does), so
         // this waits for all 4 frames before relaying anything.
-        if (hmac_chunks_received < 4) {
-            memcpy(&hmac_chunk_buf[hmac_chunks_received * 8], rxData, 8);
-            hmac_chunks_received++;
-            if (hmac_chunks_received == 4) {
-                ExpansionI2C_SlaveWriteRegister(REG_BOOT_HMAC_EXPECTED, hmac_chunk_buf, 32);
-                hmac_chunks_received = 0; // ready for the next update's own 4 chunks
+        if (digest_chunks_received < 4) {
+            memcpy(&digest_chunk_buf[digest_chunks_received * 8], rxData, 8);
+            digest_chunks_received++;
+            if (digest_chunks_received == 4) {
+                ExpansionI2C_SlaveWriteRegister(REG_BOOT_DIGEST_EXPECTED, digest_chunk_buf, 32);
+                digest_chunks_received = 0; // ready for the next update's own 4 chunks
             }
         }
 

@@ -12,7 +12,7 @@ pra = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(pra)
 
 
-def make_component(fw: Path, stem: str, version: str, data: bytes, application: bool, kind: str = "production"):
+def make_component(fw: Path, stem: str, version: str, data: bytes, application: bool, kind: str = "production", record: bool = True):
     image = fw / f"{stem}_v{version}.bin"
     image.write_bytes(data)
     (fw / f"{stem}_v{version}.hex").write_text(":00000001FF\n")
@@ -23,6 +23,8 @@ def make_component(fw: Path, stem: str, version: str, data: bytes, application: 
     if application:
         manifest["hmac_sha256"] = "ab" * 32
         manifest["signing_key_kind"] = kind
+        if record:  # the image signature record the signing tool writes next to an application image: 76 bytes as 152 hexadecimal digits
+            (fw / (image.name + ".imgsig")).write_bytes(b"ab" * 76 + b"\n")
     (fw / (image.name + ".manifest.json")).write_text(json.dumps(manifest))
     return {"version_string": version, "files": {"bin": {"filename": image.name, "sha256": digest}}}
 
@@ -73,12 +75,65 @@ class PublishPlanTests(unittest.TestCase):
         self.assertTrue(any(p.endswith(".elf") for p in with_elf["files"]))
         self.assertIn("gh release create v1.2.3 --repo o/r", pra.gh_command(plan))
 
+    def test_the_image_signature_record_goes_in_the_set_with_its_own_release_signature(self):
+        self.write_index({"main_application": make_component(self.fw, "URTC_MAIN_FIRMWARE", "1.2.3", b"app", True)})
+        plan = pra.build_plan(self.root, self.fw, False, "o/r", sign=True)
+        self.assertEqual(plan["problems"], [])
+        names = sorted(Path(p).name for p in plan["files"])
+        self.assertIn("URTC_MAIN_FIRMWARE_v1.2.3.bin.imgsig", names)
+        self.assertIn("URTC_MAIN_FIRMWARE_v1.2.3.bin.imgsig.sig", names)
+
+    def test_an_application_image_needs_a_record_or_an_hmac_but_not_both(self):
+        component = make_component(self.fw, "URTC_MAIN_FIRMWARE", "1.2.3", b"app", True, "release")
+        self.write_index({"main_application": component})
+        manifest_path = self.fw / "URTC_MAIN_FIRMWARE_v1.2.3.bin.manifest.json"
+        manifest = json.loads(manifest_path.read_text())
+        del manifest["hmac_sha256"]  # what a build of the Ed25519 generation publishes
+        manifest_path.write_text(json.dumps(manifest))
+        self.assertEqual(pra.build_plan(self.root, self.fw, False, "o/r", sign=True)["problems"], [])
+        (self.fw / "URTC_MAIN_FIRMWARE_v1.2.3.bin.imgsig").unlink()
+        plan = pra.build_plan(self.root, self.fw, False, "o/r", sign=True)
+        self.assertTrue(any("neither a signature record" in p for p in plan["problems"]), plan["problems"])
+
+    def test_a_bootloader_carries_no_image_signature_record(self):
+        self.write_index({"main_bootloader": make_component(self.fw, "URTC_MAIN_BOOTLOADER", "1.0.1", b"boot", False)})
+        plan = pra.build_plan(self.root, self.fw, False, "o/r", sign=True)
+        self.assertEqual(plan["problems"], [])
+        self.assertFalse(any(Path(p).name.endswith(".imgsig") for p in plan["files"]))
+
+    def test_an_official_release_without_the_image_signature_record_is_refused_and_a_bench_one_is_not(self):
+        self.write_index({"main_application": make_component(self.fw, "URTC_MAIN_FIRMWARE", "1.2.3", b"app", True, record=False)})
+        plan = pra.build_plan(self.root, self.fw, False, "o/r", sign=False)
+        self.assertTrue(any(".imgsig is missing" in p for p in plan["problems"]), plan["problems"])
+        self.write_index({"main_application": make_component(self.fw, "URTC_MAIN_FIRMWARE", "1.2.3", b"app", True, "dev", record=False)})
+        bench = pra.build_plan(self.root, self.fw, False, "o/r", allow_dev_key=True)
+        self.assertEqual(bench["problems"], [])
+        self.assertTrue(bench["prerelease"])
+
+    def test_a_file_that_is_not_an_image_signature_record_is_refused(self):
+        self.write_index({"main_application": make_component(self.fw, "URTC_MAIN_FIRMWARE", "1.2.3", b"app", True)})
+        record = self.fw / "URTC_MAIN_FIRMWARE_v1.2.3.bin.imgsig"
+        for text in ("ab" * 75 + "\n", "ab" * 76 + "\n\n", "zz" * 76 + "\n", "ab" * 76 + "\r\n", ""):
+            record.write_bytes(text.encode("ascii"))
+            plan = pra.build_plan(self.root, self.fw, False, "o/r", sign=True)
+            self.assertTrue(any("not an image signature record" in p for p in plan["problems"]), repr(text))
+
+    def test_single_image_layout_lists_the_record(self):
+        image = self.fw / "URTC_MAIN_FIRMWARE_v1.2.3.bin"
+        image.write_bytes(b"app")
+        (self.fw / "URTC_MAIN_FIRMWARE_v1.2.3.hex").write_text(":00000001FF\n")
+        (self.fw / (image.name + ".imgsig")).write_bytes(b"cd" * 76 + b"\n")
+        plan = pra.build_plan(self.root, self.fw, False, "o/r", sign=True)
+        self.assertEqual(plan["problems"], [])
+        self.assertIn("URTC_MAIN_FIRMWARE_v1.2.3.bin.imgsig", [Path(p).name for p in plan["files"]])
+
     def test_tampered_image_and_missing_signature_are_reported(self):
         comp = {"main_application": make_component(self.fw, "URTC_MAIN_FIRMWARE", "1.2.3", b"app", True)}
         self.write_index(comp)
         (self.fw / "URTC_MAIN_FIRMWARE_v1.2.3.bin").write_bytes(b"changed")
         plan = pra.build_plan(self.root, self.fw, False, "o/r")
         self.assertTrue(any("does not match" in p for p in plan["problems"]))
+        (self.fw / "URTC_MAIN_FIRMWARE_v1.2.3.bin.imgsig").unlink()
         comp = {"main_application": make_component(self.fw, "URTC_MAIN_FIRMWARE", "1.2.3", b"app", False)}
         self.write_index(comp)
         plan = pra.build_plan(self.root, self.fw, False, "o/r")

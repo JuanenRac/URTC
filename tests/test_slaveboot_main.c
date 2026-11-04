@@ -111,8 +111,8 @@ static void test_link(int *failures)
     update_in_progress = 0; update_total_size = 0;
     master_writes(short_start, 8);
     TEST_ASSERT(update_in_progress == 0 && update_total_size == 0, "a start command that is not nine bytes long does nothing");
-    uint8_t short_hmac[10] = {REG_HMAC_EXPECTED, 1, 2, 3, 4, 5, 6, 7, 8, 9};
-    master_writes(short_hmac, 10);
+    uint8_t short_digest[10] = {REG_DIGEST_EXPECTED, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+    master_writes(short_digest, 10);
     uint8_t short_end[5] = {REG_END_UPDATE, 1, 2, 3, 4};
     master_writes(short_end, 5);
     uint8_t unknown[3] = {0x77, 1, 2};

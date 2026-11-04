@@ -15,7 +15,7 @@ Registers of the slave bootloader on the I2C link bus (address `0x42`), next to 
 
 | Register | Access | Bytes | Meaning |
 |---|---|---|---|
-| `0x02` HMAC_EXPECTED | write | 32 | The SHA-256 (no key) of the whole image. The name is historic: the slave no longer checks an HMAC and its bootloader holds no signing secret in the update path. |
+| `0x02` DIGEST_EXPECTED | write | 32 | The SHA-256 (no key) of the whole image. The slave checks no HMAC and its bootloader holds no signing secret in the update path. |
 | `0x09` CHALLENGE | read | 16 | The nonce of the update session in progress (zeros when none). Made at `START_UPDATE`. |
 | `0x0A` CONFIRM | write | 32 | The master's confirmation. Accepted only in status `0x08` (AWAIT_CONFIRM), and used once. |
 | `0x0B` COUNTER_FLOOR | read | 4 | The rollback floor the slave keeps, big-endian: the higher of a floor compiled into the bootloader and the signed counter of the installed image. The master reads it before it starts the update. |
@@ -58,7 +58,7 @@ Host tests (`tests/test_slaveboot_update.c`, `tests/test_slave_attest.c`, `tests
 * **The boot-time check is a keyless SHA-256** of the installed application, kept in the metadata: it catches corruption of the flash, not an attacker who can write the flash. Protecting the boot pages against being rewritten through the debug port is a chip setting that has to be reviewed on a board.
 * **Verification runs in the application of the master**, not in its bootloader, because the master's application is what relays the slave's update. The trust anchor is still the table of the bootloader.
 * **Legacy tools:** a flasher that still sends an HMAC in `0x212` and no `0x21A` record can no longer update the slave: the digest does not match and no confirmation comes. This is deliberate (fail closed); the tools carry the record in their next versions. The same goes for a main-board application from before the counter: it never writes `0x0C`, so the slave refuses its confirmation.
-* **The slave bootloader holds no key at all.** The HMAC key and the HMAC routine were removed from it, together with the build flag that injected a production key and the `slave=` line of the private key file (an old file that still has the line is read and the line ignored). Its register `0x02` and the frames `0x212` keep their historic names (`HMAC_EXPECTED`, `SLAVE_HMAC_CHUNK`) and carry a plain SHA-256.
+* **The slave bootloader holds no key at all.** The HMAC key and the HMAC routine were removed from it, together with the build flag that injected a production key and the `slave=` line of the private key file (an old file that still has the line is read and the line ignored). Its register `0x02` and the frames `0x212` were renamed after the digest they carry (`DIGEST_EXPECTED`, `SLAVE_DIGEST_CHUNK`) and carry a plain SHA-256.
 
 ## Costs and what is not measured
 

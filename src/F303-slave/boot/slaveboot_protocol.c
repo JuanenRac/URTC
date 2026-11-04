@@ -211,7 +211,7 @@ uint32_t update_total_size = 0;
 static uint32_t update_declared_hw_id = 0;
 uint32_t update_bytes_received = 0;
 static uint32_t update_running_crc = 0xFFFFFFFFUL;
-static uint8_t  update_expected_hmac[32];   // the expected SHA-256 of the image (the name is historic)
+static uint8_t  update_expected_digest[32];   // the expected SHA-256 of the image
 static uint8_t  update_hmac_received = 0;
 // The confirmation by the master (urtc_slave_confirm.h). The nonce is made at START and read by the master from REG_CHALLENGE; what was verified at END is
 // kept here until the confirmation arrives. All of it is cleared by a new START, by a failure and by the first REG_CONFIRM of the session.
@@ -331,9 +331,9 @@ void HandleStartUpdate(uint8_t *data) {
     current_status = STATUS_RECEIVING;
 }
 
-void HandleHmacExpected(uint8_t *data) {
+void HandleDigestExpected(uint8_t *data) {
     if (!update_in_progress || update_failed || update_awaiting_confirm) return;
-    memcpy(update_expected_hmac, data, 32); // REG_HMAC_EXPECTED is always exactly 32 bytes in one transaction - no chunking needed the way CAN's 8-byte frames required
+    memcpy(update_expected_digest, data, 32); // REG_DIGEST_EXPECTED is always exactly 32 bytes in one transaction - no chunking needed the way CAN's 8-byte frames required
     update_hmac_received = 1;
     update_last_activity_tick = HAL_GetTick();
 }
@@ -409,9 +409,9 @@ void HandleEndUpdate(uint8_t *data) {
 
     // Integrity of what arrived: the SHA-256 (no key) of the backup slot against the digest the master sent. WHO vouched for the image is the master's
     // business: it verifies the Ed25519 record and confirms below (HandleConfirm).
-    uint8_t actual_hmac[32];
-    sha256_flash_region(BACKUP_APP_ADDR, update_total_size, actual_hmac);
-    if (!constant_time_equal(actual_hmac, update_expected_hmac, 32)) {
+    uint8_t actual_digest[32];
+    sha256_flash_region(BACKUP_APP_ADDR, update_total_size, actual_digest);
+    if (!constant_time_equal(actual_digest, update_expected_digest, 32)) {
         current_status = STATUS_VERIFY_FAIL;
         verify_fail_reason = VERIFY_FAIL_REASON_HMAC;
         update_in_progress = 0;
@@ -450,7 +450,7 @@ void HandleEndUpdate(uint8_t *data) {
 
     // Everything the slave can check alone has passed. Nothing is written to the metadata and the main slot is not touched until the master confirms that
     // it verified the signature record of THIS image in THIS session; without the confirmation the update fails closed (HandleConfirm, AbortUnconfirmed).
-    memcpy(await_digest, actual_hmac, 32);
+    memcpy(await_digest, actual_digest, 32);
     await_version_major = version_major;
     await_version_minor = version_minor;
     await_crc = actual_crc;

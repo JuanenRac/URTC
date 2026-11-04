@@ -965,7 +965,7 @@ DLC: 8 bytes
 Data: Same 4-frames-of-8-bytes accumulation as this board's own
       CAN_ID_HMAC_CHUNK (0x7F7) - sent sequentially right after 0x211
       and before the first 0x213 frame. Only relayed to the slave's own
-      REG_HMAC_EXPECTED once all 4 frames (32 bytes total) have arrived.
+      REG_DIGEST_EXPECTED once all 4 frames (32 bytes total) have arrived.
       The 32 bytes are the SHA-256 (no key) of the slave image; the register
       name is historic. WHO vouched for the image is decided by the master
       from the Ed25519 record of 0x21A (docs/SLAVE_BOOT_CONFIRMATION.md).
@@ -1958,7 +1958,7 @@ Machine-readable specification of the CAN bus protocol of the URTC tool head: ev
 
 B. Index of identifiers
 
-[[ BEGIN GENERATED index sha256=12a754a5fc5733da27f730deb8b2676c60d10716ebe8ee20bf7cb926f8476f4c ]]
+[[ BEGIN GENERATED index sha256=4319e296dc86ff12bf30c6b4a3f7758fd7e6723c0f6e21fe41b16c74a80c352b ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 | ID | Name | Direction | DLC | Tools | Group | Title |
@@ -2019,7 +2019,7 @@ Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_do
 | 0x200 | ULTRASONIC_WELD_CMD | host to board | 3 | 24 | welding | Ultrasonic welder timed pulse |
 | 0x210 | SLAVE_ENTER_BOOTLOADER | host to board | 4 | any | slave_bridge | Enter the expansion slave's bootloader |
 | 0x211 | SLAVE_START_UPDATE | host to board | 8 | any | slave_bridge | Start the slave firmware update |
-| 0x212 | SLAVE_HMAC_CHUNK | host to board | 8 | any | slave_bridge | Slave image digest chunk (SHA-256; the name is historic) |
+| 0x212 | SLAVE_DIGEST_CHUNK | host to board | 8 | any | slave_bridge | Slave image digest chunk (SHA-256, no key) |
 | 0x213 | SLAVE_DATA | host to board | 1-8 | any | slave_bridge | Slave firmware data |
 | 0x214 | SLAVE_END_UPDATE | host to board | 8 | any | slave_bridge | End the slave update and verify |
 | 0x215 | SLAVE_STATUS | both ways | any / 1 | any | slave_bridge | Slave bootloader status |
@@ -2068,7 +2068,7 @@ Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_do
 
 C. Field layouts and examples
 
-[[ BEGIN GENERATED layouts sha256=e509deab2b73ebe50eb7b923843f5d60dd44a88103c2975acd5be7a429a90127 ]]
+[[ BEGIN GENERATED layouts sha256=8684b2e5ea5b270607f09a8793c623211307633c932d84025a780485f8b2b7fc ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 ### 0x095 IMPACT_EVENT - Impact register (touch probe, maximum priority)
@@ -2932,7 +2932,7 @@ Example 1 KiB image: data 000004000303CB01 (total_size=1024, hardware_id=5058022
 
 Note: Same layout as 0x7F1; the slave HardwareID is not the main board one.
 
-### 0x212 SLAVE_HMAC_CHUNK - Slave image digest chunk (SHA-256; the name is historic)
+### 0x212 SLAVE_DIGEST_CHUNK - Slave image digest chunk (SHA-256, no key)
 
 host to board; handled by the application; tools: any; refused while a critical error is declared; the firmware accepts DLC 8.
 
@@ -2940,9 +2940,9 @@ request, DLC 8: Four sequential frames, bytes 0-7, 8-15, 16-23 and 24-31 of the 
 
 | Byte | Width | Type | Field | Values | Note |
 |---|---|---|---|---|---|
-| 0 | 8 | bytes | hmac_part |  |  |
+| 0 | 8 | bytes | digest_part |  |  |
 
-Example first of four: data 0001020304050607 (hmac_part=0001020304050607)
+Example first of four: data 0001020304050607 (digest_part=0001020304050607)
 
 ### 0x213 SLAVE_DATA - Slave firmware data
 
@@ -3983,7 +3983,7 @@ Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_do
 
 H. Registers of the expansion slave
 
-[[ BEGIN GENERATED registers sha256=23756f6c5f1536038119f437ebc803011c14d8d4533ff8b671b8645857b8860d ]]
+[[ BEGIN GENERATED registers sha256=20dfed6878f0bdd5eca0f849109888b7cc840b181494162a259d5ab293cfbe24 ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 slave_bootloader: Registers of the expansion slave bootloader (I2C link bus, address 0x42)
@@ -3992,7 +3992,7 @@ slave_bootloader: Registers of the expansion slave bootloader (I2C link bus, add
 |---|---|---|---|---|---|
 | 0 | STATUS | read | 1 | 0x215 | Status code |
 | 1 | START_UPDATE | write | 8 | 0x211 | Total size (4) and HardwareID (4), big-endian |
-| 2 | HMAC_EXPECTED | write | 32 | 0x212 | Expected SHA-256 (no key) of the image; the name is historic |
+| 2 | DIGEST_EXPECTED | write | 32 | 0x212 | Expected SHA-256 (no key) of the image |
 | 3 | DATA | write | up to 32 | 0x213 | Image bytes, to the backup slot |
 | 4 | END_UPDATE | write | 8 | 0x214 | CRC32 (4), major (2), minor (2), big-endian |
 | 5 | PROGRESS | read | 1 | 0x216 | Progress 0-100, 0xFF if not updating |

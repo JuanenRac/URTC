@@ -20,7 +20,7 @@ With --draft the command it prints uploads the signed set as an unpublished draf
 Two layouts are understood:
   * firmware_manifest.json present (the URTC controller firmware): every
     component's .bin and .hex, its .sha256 and .bin.manifest.json (sha256,
-    crc32 and, for application images, the hmac_sha256 the flashers transport),
+    crc32 and, for application images, the hmac_sha256 of the earlier generation of bootloaders when the build has one, and the .imgsig record),
     plus firmware_manifest.json itself;
   * no firmware_manifest.json: URTC_*_FIRMWARE_v<version>.bin and .hex of the
     project version; a missing .sha256 sidecar is written next to the image.
@@ -36,6 +36,11 @@ tools/release_sign.py and docs/RELEASE_SIGNING.md). --sign writes the missing
 ones with the private key of the releases (never read by this script's output);
 without it the .sig files already next to the assets are checked and attached.
 A pre-release may go out without signatures.
+
+Every application image of an official release also has its image signature record, <image>.imgsig (the 76-byte Ed25519 record, as 152
+hexadecimal digits on one line, that the bootloaders verify: docs/SIGNATURE_SEPARATION.md of URTC-COMMON). It is made after the build
+and apart from it, by the signing tool on the maintainer's machine, and goes in the set like any other asset (with its own release
+signature). The bootloader files carry none. A bench pre-release may go out without them; an official release is refused without.
 """
 from __future__ import annotations
 
@@ -52,6 +57,8 @@ ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_OWNER = "JuanenRac"
 #: The values of signing_key_kind that mean "a private key that is not in the repository".
 PRODUCTION_KEY_KINDS = ("release", "production")
+#: An image signature record: 76 bytes as exactly 152 hexadecimal digits on one line (at most one line end after it).
+IMGSIG_PATTERN = re.compile(r"[0-9a-fA-F]{152}\n?")
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import release_sign
@@ -82,7 +89,22 @@ def repo_slug(root: Path, name: str) -> str:
     return f"{match.group(1)}/{match.group(2)}" if match else f"{DEFAULT_OWNER}/{name}"
 
 
-def collect_with_index(fw_dir: Path, with_elf: bool, problems: list[str], dev_keys: list[str] | None = None) -> list[Path]:
+def image_record(image: Path, files: list[Path], problems: list[str], missing: list[str] | None, label: str) -> None:
+    """Adds the <image>.imgsig of an application image to `files` when it is there and well formed; otherwise `label` goes to `missing`."""
+    record = Path(str(image) + ".imgsig")
+    if not record.is_file():
+        if missing is not None:
+            missing.append(label)
+        return
+    text = record.read_bytes().decode("ascii", errors="replace")
+    if not IMGSIG_PATTERN.fullmatch(text):
+        problems.append(f"{record.name} is not an image signature record (152 hexadecimal digits on one line)")
+        return
+    files.append(record)
+
+
+def collect_with_index(fw_dir: Path, with_elf: bool, problems: list[str], dev_keys: list[str] | None = None,
+                       missing: list[str] | None = None) -> list[Path]:
     index = json.loads((fw_dir / "firmware_manifest.json").read_text(encoding="utf-8"))
     files: list[Path] = []
     for key, component in index.get("components", {}).items():
@@ -110,8 +132,9 @@ def collect_with_index(fw_dir: Path, with_elf: bool, problems: list[str], dev_ke
             problems.append(f"{key}: version in {manifest.name} differs from firmware_manifest.json")
         if "_v" + str(component.get("version_string")) + "." not in bin_name:
             problems.append(f"{key}: file name {bin_name} does not carry version {component.get('version_string')}")
-        if key.endswith("_application") and not data.get("hmac_sha256"):
-            problems.append(f"{key}: application image without a published hmac_sha256")
+        # An image carries the signature its bootloader checks: the Ed25519 record (<image>.imgsig) or, for the bootloaders of the earlier generation, the hmac_sha256 of its manifest.
+        if key.endswith("_application") and not data.get("hmac_sha256") and not (fw_dir / (bin_name + ".imgsig")).is_file():
+            problems.append(f"{key}: application image with neither a signature record ({bin_name}.imgsig) nor a published hmac_sha256")
         if key.endswith("_application") and dev_keys is not None:
             kind = data.get("signing_key_kind") or component.get("signing", {}).get("key_kind")
             # The build writes "release" for a key read from URTC_SIGNING_KEY_FILE and "dev" for the public development key;
@@ -119,11 +142,13 @@ def collect_with_index(fw_dir: Path, with_elf: bool, problems: list[str], dev_ke
             if kind not in PRODUCTION_KEY_KINDS:
                 dev_keys.append(f"{key}: signed with key kind {kind!r}, not a production key")
         files.extend(path for path in wanted if path.is_file())
+        if key.endswith("_application"):
+            image_record(image, files, problems, missing, f"{key}: {bin_name}.imgsig")
     files.append(fw_dir / "firmware_manifest.json")
     return files
 
 
-def collect_single(fw_dir: Path, version: str, with_elf: bool, problems: list[str]) -> list[Path]:
+def collect_single(fw_dir: Path, version: str, with_elf: bool, problems: list[str], missing: list[str] | None = None) -> list[Path]:
     images = sorted(fw_dir.glob(f"URTC_*_FIRMWARE_v{version}.bin"))
     if not images:
         problems.append(f"no URTC_*_FIRMWARE_v{version}.bin in {fw_dir} (run build_firmware.sh without URTC_CI)")
@@ -143,6 +168,7 @@ def collect_single(fw_dir: Path, version: str, with_elf: bool, problems: list[st
             if not path.is_file():
                 problems.append(f"{path.name} is missing")
         files.extend(path for path in wanted if path.is_file())
+        image_record(image, files, problems, missing, f"{image.name}.imgsig")
     return files
 
 
@@ -170,11 +196,12 @@ def build_plan(root: Path, fw_dir: Path, with_elf: bool, repo: str | None, allow
     name, version = project_info(root)
     problems: list[str] = []
     dev_keys: list[str] = []
+    missing_records: list[str] = []
     if not fw_dir.is_dir():
         problems.append(f"{fw_dir} does not exist (run build_firmware.sh without URTC_CI)")
         files: list[Path] = []
     elif (fw_dir / "firmware_manifest.json").is_file():
-        files = collect_with_index(fw_dir, with_elf, problems, dev_keys)
+        files = collect_with_index(fw_dir, with_elf, problems, dev_keys, missing_records)
     else:
         files = collect_single(fw_dir, version, with_elf, problems)
     prerelease = bool(dev_keys)
@@ -182,6 +209,10 @@ def build_plan(root: Path, fw_dir: Path, with_elf: bool, repo: str | None, allow
         for item in dev_keys:
             problems.append(f"{item}; an official release needs production-signed images "
                             "(use --allow-dev-key to publish a bench pre-release)")
+    if not prerelease:
+        for item in missing_records:
+            problems.append(f"{item} is missing: an official release carries the image signature record of every application image "
+                            "(make it with the signing tool of the maintainer, docs/RELEASE_SIGNING.md)")
     files = attach_signatures(files, sign, not prerelease, problems)
     slug = repo or repo_slug(root, name)
     tag = f"v{version}"

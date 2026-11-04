@@ -57,7 +57,7 @@ static void make_image(uint32_t size)
     for (uint32_t i = 0; i < size; i++) image[i] = (uint8_t)((i * 13 + 5) & 0xFF);
 }
 
-// The digest the master sends in REG_HMAC_EXPECTED (the name is historic): the SHA-256 of the image, no key.
+// The digest the master sends in REG_DIGEST_EXPECTED: the SHA-256 of the image, no key.
 static void sign_image(uint32_t size, uint8_t hmac[32])
 {
     sha256_flash_region(image_addr, size, hmac);
@@ -168,7 +168,7 @@ static void run_update(Upd u)
     sign_image(u.size, hmac);
     if (u.bad_hmac) hmac[31] ^= 0x01;
     start_update(u.size, u.declared_hw);
-    if (!u.skip_hmac) HandleHmacExpected(hmac);
+    if (!u.skip_hmac) HandleDigestExpected(hmac);
     send_data(u.size, u.piece);
     uint32_t crc = ref_crc32(image, u.size);
     if (u.bad_crc) crc ^= 1;
@@ -261,7 +261,7 @@ int main(void)
     uint8_t hm[32];
     sign_image(1000, hm);
     start_update(1000, THIS_HARDWARE_ID);
-    HandleHmacExpected(hm);
+    HandleDigestExpected(hm);
     send_data(384, 32);
     start_update(0, THIS_HARDWARE_ID);
     TEST_ASSERT(current_status == STATUS_ERROR && update_total_size == 1000 && update_bytes_received == 384 && update_in_progress, "a rejected START mid-transfer keeps the size and the progress of the transfer underway");
@@ -283,7 +283,7 @@ int main(void)
     for (int i = 0; i < 40; i++) any[i] = (uint8_t)(i + 1);
     uint32_t received_before = update_bytes_received;
     HandleData(any, 8);
-    HandleHmacExpected(any);
+    HandleDigestExpected(any);
     end_update(0, 0, 0);
     TEST_ASSERT(update_bytes_received == received_before && current_status == STATUS_LISTENING && fake_reset_count == 0, "data, signature or END before START are ignored");
     fresh();
@@ -303,13 +303,13 @@ int main(void)
     { Upd u = good(1500, 0, urtc_minor_field_pack(2, 0)); u.skip_hmac = 1; run_update(u); }
     TEST_ASSERT(verify_fail_reason == VERIFY_FAIL_REASON_INCOMPLETE && update_failed && current_status == STATUS_VERIFY_FAIL, "no expected signature received: INCOMPLETE");
     TEST_ASSERT(main_slot_blank(), "an incomplete update never touches the main slot");
-    { uint8_t before_status = current_status; HandleData(any, 8); HandleHmacExpected(any); end_update(0, 0, 0); TEST_ASSERT(current_status == before_status, "after a failure further transactions are ignored until a new START"); }
+    { uint8_t before_status = current_status; HandleData(any, 8); HandleDigestExpected(any); end_update(0, 0, 0); TEST_ASSERT(current_status == before_status, "after a failure further transactions are ignored until a new START"); }
 
     fresh();
     make_image(1500);
     sign_image(1500, hm);
     start_update(1500, THIS_HARDWARE_ID);
-    HandleHmacExpected(hm);
+    HandleDigestExpected(hm);
     send_data(1000, 32);
     end_update(0, 0, 0);
     TEST_ASSERT(verify_fail_reason == VERIFY_FAIL_REASON_INCOMPLETE && main_slot_blank(), "fewer bytes than declared: INCOMPLETE");
@@ -329,7 +329,7 @@ int main(void)
     { Upd u = good(2000, 0, urtc_minor_field_pack(3, 0)); u.no_confirm = 1; run_update(u); }
     TEST_ASSERT(current_status == STATUS_AWAIT_CONFIRM && update_awaiting_confirm && update_in_progress && !update_failed, "a verified image waits for the master's confirmation");
     TEST_ASSERT(main_slot_blank() && !Metadata_Read(&meta) && fake_reset_count == 0, "while it waits the main slot and the metadata are untouched and the chip does not reset");
-    { uint8_t tmp[40] = {0}; uint32_t before_bytes = update_bytes_received; HandleData(tmp, 8); HandleHmacExpected(tmp); end_update(0, 0, 0); TEST_ASSERT(update_bytes_received == before_bytes && current_status == STATUS_AWAIT_CONFIRM && update_awaiting_confirm, "data, a new digest or a second END are ignored while it waits"); }
+    { uint8_t tmp[40] = {0}; uint32_t before_bytes = update_bytes_received; HandleData(tmp, 8); HandleDigestExpected(tmp); end_update(0, 0, 0); TEST_ASSERT(update_bytes_received == before_bytes && current_status == STATUS_AWAIT_CONFIRM && update_awaiting_confirm, "data, a new digest or a second END are ignored while it waits"); }
     AbortUnconfirmed();   // what the main loop does after ten seconds of silence
     TEST_ASSERT(current_status == STATUS_VERIFY_FAIL && verify_fail_reason == VERIFY_FAIL_REASON_NOT_CONFIRMED && update_failed && !update_in_progress, "no confirmation: the update fails closed with reason NOT_CONFIRMED");
     confirm_now(2000, 0, urtc_minor_field_pack(3, 0), 0);
@@ -390,7 +390,7 @@ int main(void)
     make_image(3000);
     sign_image(3000, hm);
     start_update(3000, THIS_HARDWARE_ID);
-    HandleHmacExpected(hm);
+    HandleDigestExpected(hm);
     send_data(3000, 32);
     fake_flash_fail_erase_nth = 3;   // erases so far: 2 backup pages at START; the metadata is appended to a blank page with no erase; the 3rd is the first main-slot page
     end_update(ref_crc32(image, 3000), 0, urtc_minor_field_pack(6, 0));
@@ -512,7 +512,7 @@ int main(void)
     make_image(3000);
     sign_image(3000, hm);
     start_update(3000, THIS_HARDWARE_ID);
-    HandleHmacExpected(hm);
+    HandleDigestExpected(hm);
     send_data(3000, 32);
     fake_flash_fail_erase_nth = 3;
     g_counter = 8;
@@ -548,7 +548,7 @@ int main(void)
     make_image(4000);
     sign_image(4000, hm);
     start_update(4000, THIS_HARDWARE_ID);
-    HandleHmacExpected(hm);
+    HandleDigestExpected(hm);
     fake_flash_fail_program_nth = 5; // inside the first page write
     send_data(4000, 32);
     TEST_ASSERT(current_status == STATUS_ERROR && update_failed && !update_in_progress, "flash program failure while receiving: STATUS_ERROR, update aborted");
@@ -559,7 +559,7 @@ int main(void)
     make_image(3000);
     sign_image(3000, hm);
     start_update(3000, THIS_HARDWARE_ID);
-    HandleHmacExpected(hm);
+    HandleDigestExpected(hm);
     send_data(3000, 32);
     fake_flash_fail_erase_nth = 3; // erases so far: 2 backup pages at START; the metadata is appended with no erase; the 3rd is the first main-slot page
     end_update(ref_crc32(image, 3000), 0, urtc_minor_field_pack(6, 0));
