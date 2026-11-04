@@ -1,0 +1,131 @@
+# =============================================================================
+# URTC - Manual comparison of the two build scripts
+# Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
+# GPL-3.0-or-later - see LICENSE
+# =============================================================================
+# Started by hand only (workflow_dispatch). build_firmware.sh and build_firmware.bat are written by hand for their shell (only the data
+# blocks come from tools/build_plan.json). This workflow builds the four components with the shell script on Linux and with the batch
+# script on a Windows runner, from the same commit and with the same release of the Arm GNU toolchain, and fails when any image differs
+# by a single byte (tools/compare_builds.py). It holds no key and signs nothing: both builds use the public development table.
+
+name: Build scripts compared (manual)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-build-compare
+  cancel-in-progress: false
+
+jobs:
+  shell:
+    name: Build with build_firmware.sh
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out the commit this run was started from
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+
+      - name: Install the Arm GNU toolchain (the same release on both systems)
+        uses: carlosperate/arm-none-eabi-gcc-action@49f4db4520f840e77ab1e99b24cfac2c540a21b1 # v1.14.1
+        with:
+          release: "13.3.Rel1"
+
+      - name: Install the host tools that the script uses
+        run: sudo apt-get update && sudo apt-get install --yes cppcheck
+
+      - name: Compile with the shell script
+        env:
+          URTC_CI: "1"
+          URTC_RELEASE: "0"
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x build_firmware.sh
+          ./build_firmware.sh
+          arm-none-eabi-gcc --version | head -n 1
+
+      - name: Upload the images
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: images-sh
+          path: build/firmware/URTC_*.bin
+          if-no-files-found: error
+          retention-days: 3
+
+  batch:
+    name: Build with build_firmware.bat
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - name: Check out the commit this run was started from
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+
+      - name: Install the Arm GNU toolchain (the same release on both systems)
+        uses: carlosperate/arm-none-eabi-gcc-action@49f4db4520f840e77ab1e99b24cfac2c540a21b1 # v1.14.1
+        with:
+          release: "13.3.Rel1"
+
+      - name: Compile with the batch script
+        env:
+          URTC_CI: "1"
+          URTC_RELEASE: "0"
+        shell: cmd
+        run: |
+          call build_firmware.bat
+          if errorlevel 1 exit /b 1
+          arm-none-eabi-gcc --version
+
+      - name: Upload the images
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: images-bat
+          path: build/firmware/URTC_*.bin
+          if-no-files-found: error
+          retention-days: 3
+
+  compare:
+    name: Compare the images
+    needs: [shell, batch]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out the commit this run was started from
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Download the images of the shell script
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: images-sh
+          path: sh
+
+      - name: Download the images of the batch script
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: images-bat
+          path: bat
+
+      - name: Compare byte by byte
+        run: python3 tools/compare_builds.py sh bat --summary "$GITHUB_STEP_SUMMARY"
