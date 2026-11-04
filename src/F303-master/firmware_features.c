@@ -13,6 +13,7 @@
 #include "urtc_can_ids.h"
 
 #define HEALTH_PERIOD_MS 1000u
+#define HEALTH_INFO_EVERY 10u        // one 0x1BB frame after this many health frames
 #define PID_FRAM_ADDR 992u
 #define PID_MAGIC 0x50494447UL // 'PIDG'
 #define PID_VERSION 1u
@@ -106,6 +107,7 @@ static void pid_load(void) {
 static HsiTrim_t hsi;
 static uint8_t bus_off_count, bus_off_seen, loop_max_ms;
 static uint32_t health_last_ms, service_last_ms;
+static uint8_t health_info_count;
 static MpPlan_t motion_plan;
 
 __attribute__((weak)) int16_t Features_PlatformMcuTempC(uint16_t *vdda_mv) { *vdda_mv = HEALTH_VDDA_NA; return HEALTH_TEMP_NA; }
@@ -178,6 +180,11 @@ void Features_Service(void) {
     uint8_t out[8];
     Health_Encode(&h, out);
     send_frame(URTC_CAN_ID_HEALTH_PROFILE, out, 8);
+    if (++health_info_count >= HEALTH_INFO_EVERY) {
+        health_info_count = 0;
+        Health_EncodeInfo((uint8_t)URTC_PROTOCOL_VERSION, last_reset_cause, FIRMWARE_VERSION_MINOR, FIRMWARE_VERSION_PATCH, FIRMWARE_VERSION_BUILD, now, out);
+        send_frame(URTC_CAN_ID_HEALTH_INFO, out, 8);
+    }
 }
 
 // ---- stepper ramps ---------------------------------------------------------------------------------------

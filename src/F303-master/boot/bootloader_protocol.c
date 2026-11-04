@@ -876,12 +876,27 @@ void HandleEndUpdate(uint8_t *data) {
 // Addressing this bootloader by its serial number when several heads share a
 // bus (0x7EA commands, 0x7EB answers). With nobody addressing it, or a serial
 // that is blank, every frame is obeyed exactly as before. The serial is the
-// fold of the 96-bit unique ID; the programmable serial record is not read yet.
+// fold of the 96-bit unique ID. A programmed serial (three words: URTC_BL_SERIAL_MAGIC,
+// the serial, its complement, at offset 2032 of the metadata page, inside the 32 bytes
+// that stay free after its 28 records) replaces the fold ONLY when URTC_BL_PROGRAMMABLE_SERIAL is 1.
+// The default is 0: the record is not even read, so a stray value in flash can never change
+// which head answers. Nothing in this bootloader writes the record, and a recycled metadata
+// page erases it (the head then falls back to the fold of its unique ID).
 // ---------------------------------------------------------------------------
+#ifndef URTC_BL_PROGRAMMABLE_SERIAL
+#define URTC_BL_PROGRAMMABLE_SERIAL 0
+#endif
+#define BL_SERIAL_RECORD_ADDR (URTC_MASTER_METADATA_ADDR + 2048UL - 16UL)
+
 static urtc_bl_node_t bl_node;
 
 void BlSelect_Init(void) {
-    urtc_bl_node_init(&bl_node, HAL_GetUIDw0(), HAL_GetUIDw1(), HAL_GetUIDw2());
+    uint32_t programmed = 0u;
+#if URTC_BL_PROGRAMMABLE_SERIAL
+    const volatile uint32_t *rec = (const volatile uint32_t *)BL_SERIAL_RECORD_ADDR;
+    programmed = urtc_bl_serial_from_record(rec[0], rec[1], rec[2]);
+#endif
+    urtc_bl_node_init_prog(&bl_node, HAL_GetUIDw0(), HAL_GetUIDw1(), HAL_GetUIDw2(), programmed);
 }
 
 uint8_t BlSelect_Accepts(uint16_t can_id) {

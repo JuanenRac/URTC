@@ -27,6 +27,9 @@ typedef struct {
 // 0x1B8 payload: tec, rec, bus_off_count, hsi_trim, loop_max_ms, temperature plus 40 (0 = not available), vdda (big-endian).
 void Health_Encode(const HealthFrame_t *h, uint8_t out[8]);
 
+// 0x1BB payload: protocol byte, reset cause (bit field of 0x111 byte 5), firmware version minor, patch and build, uptime in seconds (24 bit, big-endian, saturating).
+void Health_EncodeInfo(uint8_t protocol, uint8_t reset_cause, uint8_t fw_minor, uint8_t fw_patch, uint8_t fw_build, uint32_t uptime_ms, uint8_t out[8]);
+
 // Count a bus-off: call on the rising edge of the bus-off flag.
 uint8_t Health_CountBusOff(uint8_t previous_count);
 

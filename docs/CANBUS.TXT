@@ -416,6 +416,23 @@ Data:
                   3 = autotune done (gains stored), 4 = autotune failed
   - txData[7]:    heater output of the last control cycle, percent
 
+ID: 0x1BB [URTC Tool Head -> Master]
+Identity and life of the board (only while feature 0x02 runs; every ten seconds, right after a health frame)
+DLC: 8 bytes
+Data:
+  - txData[0]: protocol version the firmware speaks (1)
+  - txData[1]: why the chip last reset, bit field: 1 independent watchdog,
+               2 window watchdog, 4 software, 8 power-on or brown-out,
+               16 reset pin, 32 low power, 64 option-byte load (the same value
+               as byte 5 of the 0x111 answer)
+  - txData[2]: firmware version, second component
+  - txData[3]: firmware version, third component
+  - txData[4]: firmware version, fourth component (0 while there are three)
+  - txData[5..7]: seconds since power-up or the last reset, big-endian
+                  (from the 32-bit millisecond tick: restarts after about 49 days)
+  Note: sent whichever tool is active; it adds what the one-second health frame
+        has no room for.
+
 ID: 0x1A2 [Master -> URTC Tool Head]
 Set free tool configuration
 DLC: 1+ bytes (only byte[0] used)
@@ -1811,6 +1828,7 @@ accepted.
   0x1B8 -> Health frame of the board, once a second while it is on (DLC:8)
   0x1B9 -> Heater PID gains and autotune (DLC:7)
   0x1BA -> Query/response: the heater PID (DLC:any/8)
+  0x1BB -> Identity and life of the board: protocol byte, reset cause, version, uptime (DLC:8)
   --- Per-tool commands (see dedicated sections above) ---
   0x120 -> Stepper motor control (Dispensers, Screwdriver, Grippers - DLC:5 - no watchdog)
   0x130 -> T12 setpoint temperature (Soldering iron - DLC:2 - 250ms watchdog)
@@ -1947,18 +1965,18 @@ GENERATED REFERENCE (from the specification in URTC-COMMON)
 
 A. Summary
 
-[[ BEGIN GENERATED summary sha256=d29e70f2e84b4719f4849a9833c734c65abaedf9d3f0386ecee81d364b8a7b5e ]]
+[[ BEGIN GENERATED summary sha256=9009ed59ee56ec5cede469a3f55ae45f1cf0247ee4aeca8b09b7666027e50b81 ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 URTC CAN protocol: protocol version 1, byte order big.
-101 identifiers, 25 tool profiles, 22 enumerations, 37 constants, 4 magic payloads, 27 registers of the expansion slave.
+102 identifiers, 25 tool profiles, 22 enumerations, 37 constants, 4 magic payloads, 27 registers of the expansion slave.
 
 Machine-readable specification of the CAN bus protocol of the URTC tool head: every identifier with its direction, length rule and payload layout, the magic payloads, the registers of the expansion slave, the version procedures and the SLCAN subset the host tools rely on. All multi-byte fields are big-endian.
 [[ END GENERATED summary ]]
 
 B. Index of identifiers
 
-[[ BEGIN GENERATED index sha256=4319e296dc86ff12bf30c6b4a3f7758fd7e6723c0f6e21fe41b16c74a80c352b ]]
+[[ BEGIN GENERATED index sha256=9a5ef645ab824644d91fee0967f71f62808ef506bb64c69f442de5094c17591f ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 | ID | Name | Direction | DLC | Tools | Group | Title |
@@ -2012,6 +2030,7 @@ Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_do
 | 0x1B8 | HEALTH_PROFILE | board to host | 8 | any | diagnostics | Periodic health frame of the board (only while the health feature runs) |
 | 0x1B9 | PID_CONFIG | host to board | 7 | any | configuration | Gains of the heater PID and start of its relay autotune |
 | 0x1BA | PID_STATE_RESP | both ways | any / 8 | any | configuration | The heater PID: gains in force, state and output |
+| 0x1BB | HEALTH_INFO | board to host | 8 | any | diagnostics | Identity and life of the board: protocol byte, last reset cause, firmware version and uptime (sent with the health frame) |
 | 0x1C0 | SPOT_WELD_CMD | host to board | 3 | 14 | welding | Spot welder timed pulse |
 | 0x1D0 | UV_CURING_CMD | host to board | 1 | 18 | uv | UV curing LED duty |
 | 0x1E0 | HOTAIR_CMD | host to board | 3 | 19 | hotair | Hot-air nozzle setpoint and blower duty |
@@ -2068,7 +2087,7 @@ Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_do
 
 C. Field layouts and examples
 
-[[ BEGIN GENERATED layouts sha256=8684b2e5ea5b270607f09a8793c623211307633c932d84025a780485f8b2b7fc ]]
+[[ BEGIN GENERATED layouts sha256=dcc2e7a1af2af579391f8a5abce0118fd55bdd307e85c015dbed2672bdccf20b ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 ### 0x095 IMPACT_EVENT - Impact register (touch probe, maximum priority)
@@ -2832,6 +2851,25 @@ response, DLC 8
 | 7 | 1 | u8 | duty_percent | 0..100, % | The heater output of the last control cycle. |
 
 Example running: data 0320001400960125 (kp_x100=800, ki_x100=20, kd_x100=150, state=1, duty_percent=37)
+
+### 0x1BB HEALTH_INFO - Identity and life of the board: protocol byte, last reset cause, firmware version and uptime (sent with the health frame)
+
+board to host; handled by the application; tools: any; answered even while a critical error is declared; timing: period_ms 10000.
+
+response, DLC 8
+
+| Byte | Width | Type | Field | Values | Note |
+|---|---|---|---|---|---|
+| 0 | 1 | u8 | protocol_version |  | Version of this protocol that the firmware speaks (protocol_version of the specification). A host compares it with its own window of compatible versions. |
+| 1 | 1 | u8 | reset_cause |  | Why the chip last reset, bit field: 1 independent watchdog, 2 window watchdog, 4 software, 8 power-on or brown-out, 16 reset pin, 32 low power, 64 option-byte load. The same value as byte 5 of the 0x111 answer. |
+| 2 | 1 | u8 | fw_minor |  | Second component of the firmware version. |
+| 3 | 1 | u8 | fw_patch |  | Third component of the firmware version. |
+| 4 | 1 | u8 | fw_build |  | Fourth component of the firmware version (0 while the version has three). |
+| 5 | 3 | u24 | uptime_s | s | Seconds since power-up or the last reset, from the 32-bit millisecond tick of the firmware, so it restarts from 0 after about 49 days. |
+
+Example board running 0.4.4 for one hour after a power-on: data 0108040400000E10 (protocol_version=1, reset_cause=8, fw_minor=4, fw_patch=4, fw_build=0, uptime_s=3600)
+
+Note: Sent every ten seconds, right after a health frame, by a board whose health feature runs. It adds what the one-second health frame has no room for.
 
 ### 0x1C0 SPOT_WELD_CMD - Spot welder timed pulse
 

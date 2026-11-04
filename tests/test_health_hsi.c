@@ -13,6 +13,7 @@
 
 #include "test_runner.h"
 #include "health_profile.h"
+#include "urtc_can_ids.h"
 #include "hsi_trim.h"
 
 static void test_health(int *failures)
@@ -34,6 +35,15 @@ static void test_health(int *failures)
     TEST_ASSERT(f[5] == 255, "215 is the highest");
     h.mcu_temp_c = 216; Health_Encode(&h, f);
     TEST_ASSERT(f[5] == 0, "above that: not available, never a wrapped value");
+
+    uint8_t info[8];
+    Health_EncodeInfo(URTC_PROTOCOL_VERSION, 0x08, 4, 4, 0, 3600u * 1000u, info);
+    const uint8_t want_info[8] = { 0x01, 0x08, 0x04, 0x04, 0x00, 0x00, 0x0E, 0x10 };
+    TEST_ASSERT(memcmp(info, want_info, 8) == 0, "0x1BB layout: protocol, reset cause, version minor/patch/build, uptime seconds big-endian (same bytes as the spec example)");
+    Health_EncodeInfo(1, 0, 0, 0, 0, 999u, info);
+    TEST_ASSERT(info[5] == 0 && info[6] == 0 && info[7] == 0, "uptime below one second is 0");
+    Health_EncodeInfo(1, 0, 0, 0, 0, 0xFFFFFFFFu, info);
+    TEST_ASSERT(info[5] == 0x41 && info[6] == 0x89 && info[7] == 0x37, "uptime of the full 32-bit tick in seconds");
 
     TEST_ASSERT(Health_CountBusOff(0) == 1 && Health_CountBusOff(254) == 255 && Health_CountBusOff(255) == 255, "bus-off count saturates at 255");
     TEST_ASSERT(Health_LoopMax(3, 2) == 3 && Health_LoopMax(3, 9) == 9 && Health_LoopMax(3, 100000) == 255, "loop maximum keeps the largest and saturates");

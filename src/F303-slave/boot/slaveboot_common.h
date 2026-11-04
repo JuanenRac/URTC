@@ -23,6 +23,7 @@
 
 #include "stm32f3xx_hal.h"
 #include "urtc_flash_layout.h"
+#include "urtc_can_ids.h" // the registers, status codes, reasons, address and hardware identity come from the shared specification
 
 // -----------------------------------------------------------------------
 // Shared peripheral handles - defined once in slaveboot_main.c, declared
@@ -63,7 +64,7 @@ extern I2C_HandleTypeDef hi2c1;
 // firmware image meant for one board must never be mistakenly accepted by
 // the other, and this ID is the check that catches that.
 // -----------------------------------------------------------------------
-#define THIS_HARDWARE_ID     0x0303CB01UL // STM32F303CBT6, expansion slave revision 1
+#define THIS_HARDWARE_ID     URTC_HARDWARE_ID_SLAVE // STM32F303CBT6, expansion slave revision 1
 // Kept in sync with slave_common.h's own FIRMWARE_VERSION_* by
 // bump_version.py's mirror-header argument (repo root) every time the
 // application is built - never edit this by hand.
@@ -105,37 +106,37 @@ extern I2C_HandleTypeDef hi2c1;
 // own note on where this address range sits relative to the running
 // application's own I2C register map, once that exists).
 // -----------------------------------------------------------------------
-#define I2C_SLAVE_ADDRESS        0x42 // 7-bit address on the link bus - distinct from every other address already in use elsewhere in this project (F-RAM 0x50, MLX90640 0x33, ADS1115 0x48-0x4B - no collision risk sharing a bus with those, though this link bus is physically separate from that one regardless)
+#define I2C_SLAVE_ADDRESS        URTC_SLAVE_I2C_ADDRESS // 7-bit address on the link bus - distinct from every other address already in use elsewhere in this project (F-RAM 0x50, MLX90640 0x33, ADS1115 0x48-0x4B - no collision risk sharing a bus with those, though this link bus is physically separate from that one regardless)
 
-#define REG_STATUS               0x00 // read-only, 1 byte - status codes below
-#define REG_START_UPDATE         0x01 // write-only, 8 bytes: big-endian total size (4) + big-endian HardwareID (4)
-#define REG_DIGEST_EXPECTED        0x02 // write-only, 32 bytes: the expected SHA-256 (no key) of the complete image, sent once, before REG_END_UPDATE. The slave checks no HMAC
-#define REG_DATA                 0x03 // write-only, up to 32 bytes per transaction, sent sequentially - goes to the BACKUP slot, never main; unlike the main board's own CAN-framed 8-byte-per-frame limit, I2C has no equivalent per-transaction ceiling here, so this moves in much larger pieces
-#define REG_END_UPDATE           0x04 // write-only, 8 bytes: big-endian CRC32 (4) + big-endian VersionMajor (2) + big-endian VersionMinor (2)
-#define REG_PROGRESS             0x05 // read-only, 1 byte: 0-100, 0xFF if not currently updating
-#define REG_QUERY_VERSION        0x06 // read-only, 10 bytes: byte0 (0=application,1=bootloader) + HardwareID (4) + version major (2) + version minor (2, all big-endian) - mirrors the main board's own 0x7F9 response fields, minus the CAN framing they need and this doesn't
-#define REG_VERIFY_FAIL_REASON   0x07 // read-only, 1 byte: one of the VERIFY_FAIL_REASON_* values below, valid to read once REG_STATUS reports STATUS_VERIFY_FAIL - same reason the main board's own CAN_ID_STATUS frame carries as its 2nd byte, exposed here as its own register instead since I2C reads don't share CAN's fixed-DLC framing
-#define REG_QUERY_VERSION_EXT    0x08 // read-only, 4 bytes: URTC_SLAVE_VERSION_EXT_MARKER (0xE1, never a status code) + installed application PATCH (0xFF = unknown) + this bootloader's MINOR + this bootloader's PATCH. A bootloader that predates it answers this register with its 1-byte status instead, which is how the master tells the two apart.
-#define REG_CHALLENGE            0x09 // read-only, 16 bytes: the nonce of the update session in progress (made at REG_START_UPDATE); all zero when there is none. The master binds its confirmation to it
-#define REG_CONFIRM              0x0A // write-only, 32 bytes: the master's confirmation that it verified the signature record of this image (urtc_slave_confirm.h). Accepted only in STATUS_AWAIT_CONFIRM
-#define REG_COUNTER_FLOOR        0x0B // read-only, 4 bytes, big-endian: the rollback floor this slave keeps (the higher of the compiled floor and the counter of the installed image). The master reads it before it verifies the record, and refuses a record below it
-#define REG_RECORD_COUNTER       0x0C // write-only, 4 bytes, big-endian: the signed counter of the record the master verified for this session. Sent before REG_END_UPDATE is relayed; the confirmation is bound to it and a counter below the floor is refused
+#define REG_STATUS               URTC_SLAVE_BOOT_REG_STATUS // read-only, 1 byte - status codes below
+#define REG_START_UPDATE         URTC_SLAVE_BOOT_REG_START_UPDATE // write-only, 8 bytes: big-endian total size (4) + big-endian HardwareID (4)
+#define REG_DIGEST_EXPECTED        URTC_SLAVE_BOOT_REG_DIGEST_EXPECTED // write-only, 32 bytes: the expected SHA-256 (no key) of the complete image, sent once, before REG_END_UPDATE. The slave checks no HMAC
+#define REG_DATA                 URTC_SLAVE_BOOT_REG_DATA // write-only, up to 32 bytes per transaction, sent sequentially - goes to the BACKUP slot, never main; unlike the main board's own CAN-framed 8-byte-per-frame limit, I2C has no equivalent per-transaction ceiling here, so this moves in much larger pieces
+#define REG_END_UPDATE           URTC_SLAVE_BOOT_REG_END_UPDATE // write-only, 8 bytes: big-endian CRC32 (4) + big-endian VersionMajor (2) + big-endian VersionMinor (2)
+#define REG_PROGRESS             URTC_SLAVE_BOOT_REG_PROGRESS // read-only, 1 byte: 0-100, 0xFF if not currently updating
+#define REG_QUERY_VERSION        URTC_SLAVE_BOOT_REG_QUERY_VERSION // read-only, 10 bytes: byte0 (0=application,1=bootloader) + HardwareID (4) + version major (2) + version minor (2, all big-endian) - mirrors the main board's own 0x7F9 response fields, minus the CAN framing they need and this doesn't
+#define REG_VERIFY_FAIL_REASON   URTC_SLAVE_BOOT_REG_VERIFY_FAIL_REASON // read-only, 1 byte: one of the VERIFY_FAIL_REASON_* values below, valid to read once REG_STATUS reports STATUS_VERIFY_FAIL - same reason the main board's own CAN_ID_STATUS frame carries as its 2nd byte, exposed here as its own register instead since I2C reads don't share CAN's fixed-DLC framing
+#define REG_QUERY_VERSION_EXT    URTC_SLAVE_BOOT_REG_QUERY_VERSION_EXT // read-only, 4 bytes: URTC_SLAVE_VERSION_EXT_MARKER (0xE1, never a status code) + installed application PATCH (0xFF = unknown) + this bootloader's MINOR + this bootloader's PATCH. A bootloader that predates it answers this register with its 1-byte status instead, which is how the master tells the two apart.
+#define REG_CHALLENGE            URTC_SLAVE_BOOT_REG_CHALLENGE // read-only, 16 bytes: the nonce of the update session in progress (made at REG_START_UPDATE); all zero when there is none. The master binds its confirmation to it
+#define REG_CONFIRM              URTC_SLAVE_BOOT_REG_CONFIRM // write-only, 32 bytes: the master's confirmation that it verified the signature record of this image (urtc_slave_confirm.h). Accepted only in STATUS_AWAIT_CONFIRM
+#define REG_COUNTER_FLOOR        URTC_SLAVE_BOOT_REG_COUNTER_FLOOR // read-only, 4 bytes, big-endian: the rollback floor this slave keeps (the higher of the compiled floor and the counter of the installed image). The master reads it before it verifies the record, and refuses a record below it
+#define REG_RECORD_COUNTER       URTC_SLAVE_BOOT_REG_RECORD_COUNTER // write-only, 4 bytes, big-endian: the signed counter of the record the master verified for this session. Sent before REG_END_UPDATE is relayed; the confirmation is bound to it and a counter below the floor is refused
 
-#define STATUS_LISTENING     0x01 // waiting for REG_START_UPDATE
-#define STATUS_ERASING       0x02 // erasing the backup slot
-#define STATUS_RECEIVING     0x03 // writing firmware data into the backup slot
-#define STATUS_VERIFYING     0x06 // checking size/CRC32/HMAC/HardwareID on the backup slot
-#define STATUS_COPYING       0x07 // backup slot verified - erasing and copying it into the main slot
-#define STATUS_AWAIT_CONFIRM 0x08 // size, CRC32, SHA-256 and rollback checks passed; waiting (ten seconds at most) for the master's REG_CONFIRM. Without it the update fails closed
-#define STATUS_VERIFY_OK     0x04 // copy to main slot complete and read-back verified; about to jump
-#define STATUS_VERIFY_FAIL   0x05 // size, CRC32, HMAC, or HardwareID mismatch on the backup slot - main slot untouched
-#define VERIFY_FAIL_REASON_INCOMPLETE  0x01
-#define VERIFY_FAIL_REASON_CRC32       0x02
-#define VERIFY_FAIL_REASON_HMAC        0x03
-#define VERIFY_FAIL_REASON_HARDWARE_ID 0x04
-#define VERIFY_FAIL_REASON_ROLLBACK    0x05
-#define VERIFY_FAIL_REASON_NOT_CONFIRMED 0x06 // the master did not confirm in time, or its confirmation does not match this session and this image
-#define STATUS_ERROR         0xFF
+#define STATUS_LISTENING     URTC_STATUS_LISTENING // waiting for REG_START_UPDATE
+#define STATUS_ERASING       URTC_STATUS_ERASING // erasing the backup slot
+#define STATUS_RECEIVING     URTC_STATUS_RECEIVING // writing firmware data into the backup slot
+#define STATUS_VERIFYING     URTC_STATUS_VERIFYING // checking size/CRC32/HMAC/HardwareID on the backup slot
+#define STATUS_COPYING       URTC_STATUS_COPYING // backup slot verified - erasing and copying it into the main slot
+#define STATUS_AWAIT_CONFIRM URTC_SLAVE_STATUS_AWAIT_CONFIRM // size, CRC32, SHA-256 and rollback checks passed; waiting (ten seconds at most) for the master's REG_CONFIRM. Without it the update fails closed
+#define STATUS_VERIFY_OK     URTC_STATUS_VERIFY_OK // copy to main slot complete and read-back verified; about to jump
+#define STATUS_VERIFY_FAIL   URTC_STATUS_VERIFY_FAIL // size, CRC32, HMAC, or HardwareID mismatch on the backup slot - main slot untouched
+#define VERIFY_FAIL_REASON_INCOMPLETE  URTC_VERIFY_FAIL_REASON_INCOMPLETE
+#define VERIFY_FAIL_REASON_CRC32       URTC_VERIFY_FAIL_REASON_CRC32
+#define VERIFY_FAIL_REASON_HMAC        URTC_VERIFY_FAIL_REASON_HMAC
+#define VERIFY_FAIL_REASON_HARDWARE_ID URTC_VERIFY_FAIL_REASON_HARDWARE_ID
+#define VERIFY_FAIL_REASON_ROLLBACK    URTC_VERIFY_FAIL_REASON_ROLLBACK
+#define VERIFY_FAIL_REASON_NOT_CONFIRMED URTC_SLAVE_VERIFY_FAIL_REASON_NOT_CONFIRMED // the master did not confirm in time, or its confirmation does not match this session and this image
+#define STATUS_ERROR         URTC_STATUS_ERROR
 
 // -----------------------------------------------------------------------
 // Firmware metadata: an APPEND-ONLY LOG in the metadata page (same layout as

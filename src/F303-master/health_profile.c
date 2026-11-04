@@ -18,6 +18,19 @@ void Health_Encode(const HealthFrame_t *h, uint8_t out[8]) {
     out[7] = (uint8_t)(h->vdda_mv & 0xFF);
 }
 
+void Health_EncodeInfo(uint8_t protocol, uint8_t reset_cause, uint8_t fw_minor, uint8_t fw_patch, uint8_t fw_build, uint32_t uptime_ms, uint8_t out[8]) {
+    uint32_t s = uptime_ms / 1000u;
+    if (s > 0xFFFFFFu) s = 0xFFFFFFu;
+    out[0] = protocol;
+    out[1] = reset_cause;
+    out[2] = fw_minor;
+    out[3] = fw_patch;
+    out[4] = fw_build;
+    out[5] = (uint8_t)(s >> 16);
+    out[6] = (uint8_t)(s >> 8);
+    out[7] = (uint8_t)s;
+}
+
 uint8_t Health_CountBusOff(uint8_t previous_count) {
     return previous_count == 0xFF ? 0xFF : (uint8_t)(previous_count + 1u);
 }

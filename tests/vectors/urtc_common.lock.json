@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "urtc_common_version": "0.1.7",
+  "urtc_common_version": "0.1.9",
   "files": {
     "blackbox_vectors.h": {
       "from": "generated/blackbox_vectors.h",
@@ -28,7 +28,7 @@
     },
     "urtc_fw_vectors.h": {
       "from": "generated/urtc_fw_vectors.h",
-      "sha256": "4be234fd1392e2e5c8a0c421a71876829eb587e612dc622573390fc02c26b3df"
+      "sha256": "b836b372c49481c9cc16c1d7522ce4450f1b49f6ef0f8beedcbd327e5e9c0183"
     },
     "urtc_test.h": {
       "from": "firmware_base/urtc_test.h",
