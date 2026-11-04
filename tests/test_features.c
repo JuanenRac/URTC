@@ -17,6 +17,7 @@
 #include "firmware_features.h"
 #include "firmware_fram.h"
 #include "health_profile.h"
+#include "urtc_can_ids.h"
 
 CAN_TypeDef can_regs;
 CAN_HandleTypeDef hcan = { &can_regs };
@@ -26,6 +27,7 @@ uint8_t rxData[8];
 volatile ToolMode_t active_tool;
 volatile uint8_t system_error_flag;
 volatile uint16_t current_temperature, target_temperature;
+volatile uint8_t last_reset_cause = 0x08;   // power-on, as the real one latches at boot
 
 static int hsi_writes;
 static uint8_t hsi_last_written;
@@ -190,11 +192,35 @@ static void test_health(int *failures)
     fake_tick = 9400; fake_hal_reset_recording(); fake_tx_mailboxes_free = 0; Features_Service();
     TEST_ASSERT(fake_tx_count == 0, "no mailbox free: nothing is sent and nothing breaks");
 
+    // the identity frame 0x1BB comes after every tenth health frame, never before
+    reset_world();
+    write_mask(FEAT_HEALTH_PROFILE);
+    Features_Init();
+    fake_tick = 5000; Features_Service();
+    int info_seen = 0;
+    for (int i = 1; i <= 10; i++) {
+        fake_tick = 5000u + (uint32_t)i * 1100u; fake_hal_reset_recording(); Features_Service();
+        const FakeTxFrame *info = find_tx(0x1BB);
+        if (i < 10) { TEST_ASSERT(info == 0, "no identity frame before the tenth health frame"); continue; }
+        info_seen = info != 0;
+        TEST_ASSERT(info && info->dlc == 8, "an 8-byte 0x1BB after the tenth health frame");
+        if (info) {
+            TEST_ASSERT(info->data[0] == URTC_PROTOCOL_VERSION && info->data[1] == 0x08, "protocol byte and the reset cause the board latched at boot");
+            TEST_ASSERT(info->data[2] == FIRMWARE_VERSION_MINOR && info->data[3] == FIRMWARE_VERSION_PATCH && info->data[4] == FIRMWARE_VERSION_BUILD, "firmware version");
+            uint32_t up = ((uint32_t)info->data[5] << 16) | ((uint32_t)info->data[6] << 8) | info->data[7];
+            TEST_ASSERT(up == (5000u + 10u * 1100u) / 1000u, "uptime in seconds from the tick");
+        }
+        TEST_ASSERT(find_tx(0x1B8) != 0, "the health frame goes out in the same pass");
+    }
+    TEST_ASSERT(info_seen, "the identity frame went out");
+    fake_tick = 5000u + 11u * 1100u; fake_hal_reset_recording(); Features_Service();
+    TEST_ASSERT(find_tx(0x1BB) == 0, "and the count starts again");
+
     // switch off: never a frame
     reset_world();
     Features_Init();
     for (uint32_t t = 5000; t < 20000; t += 250) { fake_tick = t; Features_Service(); }
-    TEST_ASSERT(find_tx(0x1B8) == 0, "health switch off: no frame at all");
+    TEST_ASSERT(find_tx(0x1B8) == 0 && find_tx(0x1BB) == 0, "health switch off: no frame at all");
 }
 
 static void test_hsi(int *failures)
