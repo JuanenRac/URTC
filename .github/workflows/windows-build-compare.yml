@@ -94,7 +94,7 @@ jobs:
           $hash = (Get-FileHash -Algorithm SHA256 $zip).Hash.ToLower()
           if ($hash -ne "e46fda043c0ce83582bc8db4b3ef85f77f4beb7333344c2f4193c17e1167a095") { throw "the toolchain archive has the SHA-256 $hash" }
           Expand-Archive -Path $zip -DestinationPath $env:RUNNER_TEMP -Force
-          Add-Content -Path $env:GITHUB_PATH -Value (Join-Path $env:RUNNER_TEMP "arm-gnu-toolchain-13.3.rel1-mingw-w64-i686-arm-none-eabiin")
+          Add-Content -Path $env:GITHUB_PATH -Value (Join-Path $env:RUNNER_TEMP "arm-gnu-toolchain-13.3.rel1-mingw-w64-i686-arm-none-eabi\bin")
 
       - name: Compile with the batch script
         env:
