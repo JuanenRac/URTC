@@ -596,6 +596,7 @@ REM console (e.g. redirected from NUL or a pipe).
 echo.
 %KEEP_OPEN%
 
-endlocal
-if %FAIL% GTR 0 exit /b 1
-exit /b 0
+REM The result is worked out before endlocal: after it %FAIL% no longer exists and the comparison would be a syntax error (exit code 255 even on success).
+set "RESULT=0"
+if %FAIL% GTR 0 set "RESULT=1"
+endlocal & exit /b %RESULT%
