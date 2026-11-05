@@ -40,7 +40,7 @@
 
 | | |
 |---|---|
-| Versão | `0.4.4` |
+| Versão | `0.4.5` |
 | Maturidade | Funcional |
 | Tecnologia | STM32F303 / bxCAN / 25 tool profiles |
 | Destino | Uma placa com microcontrolador (o firmware); compila-se num PC |

@@ -40,7 +40,7 @@
 
 | | |
 |---|---|
-| Version | `0.4.4` |
+| Version | `0.4.5` |
 | Maturity | Functional |
 | Stack | STM32F303 / bxCAN / 25 tool profiles |
 | Target | A microcontroller board (the firmware); built on a PC |
