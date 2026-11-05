@@ -71,6 +71,17 @@ if [ "$1" = "--clean" ]; then
     TARGET="${2:-all}"
 fi
 
+# The object files of a link, in one order whatever the shell: names compared without distinguishing capitals (C locale), which is the order of
+# build_firmware.bat (dir /b /on) and of a Windows folder. A bare glob would sort capitals first (MLX90640_API.o before firmware_*.o) in bash
+# and change the layout of the image.
+list_objects() {
+    printf '%s\n' "$1"/*.o | LC_ALL=C sort -f
+}
+link_objects() {
+    mapfile -t objs < <(list_objects "$1")
+    mapfile -t hal_objs < <(list_objects "$BUILD/hal_obj")
+}
+
 # WSL builds can run directly from a Windows-mounted checkout.  Windows may
 # keep the output directory itself open briefly (for example while an editor
 # refreshes its tree), even when it is empty.  Keep the directory and clear
@@ -352,9 +363,10 @@ SRC="$ROOT/src/F303-master/boot"
 BOOT_VER=$(version_or_bump "$SRC/bootloader_common.h" BOOTLOADER_VERSION)
 compile_dir "$SRC" "$OUT" "$MASTER_KEY_FLAGS"
 BOOT_NAME="URTC_MAIN_BOOTLOADER_v${BOOT_VER}"
+link_objects "$OUT"
 arm-none-eabi-gcc $LDCOMMON -T"$SRC/STM32F303CCTx_BOOTLOADER.ld" \
     "$BUILD/app_master/startup.o" "$BUILD/app_master/system_stm32f3xx.o" \
-    "$OUT"/*.o "$BUILD/hal_obj"/*.o -o "$OUT/${BOOT_NAME}.elf" 2>&1 | grep -v "not implemented\|note: the message\|in function \`_" || true
+    "${objs[@]}" "${hal_objs[@]}" -o "$OUT/${BOOT_NAME}.elf" 2>&1 | grep -v "not implemented\|note: the message\|in function \`_" || true
 build_bin_hex "$OUT/${BOOT_NAME}.elf"
 cp "$OUT/${BOOT_NAME}.elf" "$OUT/${BOOT_NAME}.bin" "$OUT/${BOOT_NAME}.hex" "$FIRMWARE_OUT/"
 pass "${BOOT_NAME}.bin/.hex/.elf built ($(arm-none-eabi-size "$OUT/${BOOT_NAME}.elf" | tail -1 | awk '{print $1}') bytes text)"
@@ -379,10 +391,11 @@ compile_dir "$SRC/melexis_mlx90642" "$OUT" "-I$SRC -I$SRC/melexis_mlx90642"
 arm-none-eabi-g++ $CXXFLAGS -I"$SRC/melexis_mlx90641" \
     -c "$SRC/melexis_mlx90641/MLX90641_API.cpp" -o "$OUT/MLX90641_API.o"
 APP_NAME="URTC_MAIN_FIRMWARE_v${APP_VER}"
+link_objects "$OUT"
 arm-none-eabi-g++ $LDCOMMON -fno-exceptions -fno-rtti -fno-unwind-tables -fno-threadsafe-statics \
     -T"$SRC/STM32F303CCTx_APP.ld" \
     "$BUILD/app_master/startup.o" "$BUILD/app_master/system_stm32f3xx.o" \
-    "$OUT"/*.o "$BUILD/hal_obj"/*.o -o "$OUT/${APP_NAME}.elf" 2>&1 | grep -v "not implemented\|note: the message\|in function \`_" || true
+    "${objs[@]}" "${hal_objs[@]}" -o "$OUT/${APP_NAME}.elf" 2>&1 | grep -v "not implemented\|note: the message\|in function \`_" || true
 build_bin_hex "$OUT/${APP_NAME}.elf"
 cp "$OUT/${APP_NAME}.elf" "$FIRMWARE_OUT/${APP_NAME}.elf"
 cp "$OUT/${APP_NAME}.bin" "$FIRMWARE_OUT/${APP_NAME}.bin"
@@ -407,9 +420,10 @@ SRC="$ROOT/src/F303-slave/boot"
 SLAVE_BOOT_VER=$(version_or_bump "$SRC/slaveboot_common.h" BOOTLOADER_VERSION)
 compile_dir "$SRC" "$OUT"
 SLAVE_BOOT_NAME="URTC_SLAVE_BOOTLOADER_v${SLAVE_BOOT_VER}"
+link_objects "$OUT"
 arm-none-eabi-gcc $LDCOMMON -T"$SRC/STM32F303CBTx_SLAVEBOOT.ld" \
     "$BUILD/app_slave/startup.o" "$BUILD/app_slave/system_stm32f3xx.o" \
-    "$OUT"/*.o "$BUILD/hal_obj"/*.o -o "$OUT/${SLAVE_BOOT_NAME}.elf" 2>&1 | grep -v "not implemented\|note: the message\|in function \`_" || true
+    "${objs[@]}" "${hal_objs[@]}" -o "$OUT/${SLAVE_BOOT_NAME}.elf" 2>&1 | grep -v "not implemented\|note: the message\|in function \`_" || true
 build_bin_hex "$OUT/${SLAVE_BOOT_NAME}.elf"
 cp "$OUT/${SLAVE_BOOT_NAME}.elf" "$OUT/${SLAVE_BOOT_NAME}.bin" "$OUT/${SLAVE_BOOT_NAME}.hex" "$FIRMWARE_OUT/"
 pass "${SLAVE_BOOT_NAME}.bin/.hex/.elf built ($(arm-none-eabi-size "$OUT/${SLAVE_BOOT_NAME}.elf" | tail -1 | awk '{print $1}') bytes text)"
@@ -429,10 +443,11 @@ arm-none-eabi-g++ $CXXFLAGS -I"$SRC/melexis_mlx90641" \
     -c "$SRC/melexis_mlx90641/MLX90641_API.cpp" -o "$OUT/MLX90641_API.o"
 compile_dir "$SRC/melexis_mlx90642" "$OUT" "-I$SRC -I$SRC/melexis_mlx90640 -I$SRC/melexis_mlx90641 -I$SRC/melexis_mlx90642"
 SLAVE_APP_NAME="URTC_SLAVE_FIRMWARE_v${SLAVE_APP_VER}"
+link_objects "$OUT"
 arm-none-eabi-g++ $LDCOMMON -fno-exceptions -fno-rtti -fno-unwind-tables -fno-threadsafe-statics \
     -T"$SRC/STM32F303CBTx_SLAVEAPP.ld" \
     "$BUILD/app_slave/startup.o" "$BUILD/app_slave/system_stm32f3xx.o" \
-    "$OUT"/*.o "$BUILD/hal_obj"/*.o -lm -o "$OUT/${SLAVE_APP_NAME}.elf" 2>&1 | grep -v "not implemented\|note: the message\|in function \`_" || true
+    "${objs[@]}" "${hal_objs[@]}" -lm -o "$OUT/${SLAVE_APP_NAME}.elf" 2>&1 | grep -v "not implemented\|note: the message\|in function \`_" || true
 build_bin_hex "$OUT/${SLAVE_APP_NAME}.elf"
 cp "$OUT/${SLAVE_APP_NAME}.elf" "$OUT/${SLAVE_APP_NAME}.bin" "$OUT/${SLAVE_APP_NAME}.hex" "$FIRMWARE_OUT/"
 MLX_PUBLIC_OK=$(arm-none-eabi-nm "$OUT/${SLAVE_APP_NAME}.elf" | grep -cE " T MLX90641_(DumpEE|ExtractParameters|GetFrameData|GetTa|CalculateTo)\b" || true)

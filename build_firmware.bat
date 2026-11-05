@@ -338,7 +338,9 @@ if "!SECTION_FAIL!"=="1" (
     set /a FAIL+=1
     goto :summary
 )
-arm-none-eabi-gcc %LDCOMMON% -T"!SRC!\STM32F303CCTx_BOOTLOADER.ld" "%BUILD%\app_master\startup.o" "%BUILD%\app_master\system_stm32f3xx.o" "!OUT!\*.o" "%BUILD%\hal_obj\*.o" -o "!OUT!\!BOOT_NAME!.elf"
+call :write_objlist "!OUT!" "%BUILD%\link_out.rsp"
+call :write_objlist "%BUILD%\hal_obj" "%BUILD%\link_hal.rsp"
+arm-none-eabi-gcc %LDCOMMON% -T"!SRC!\STM32F303CCTx_BOOTLOADER.ld" "%BUILD%\app_master\startup.o" "%BUILD%\app_master\system_stm32f3xx.o" @"%BUILD%\link_out.rsp" @"%BUILD%\link_hal.rsp" -o "!OUT!\!BOOT_NAME!.elf"
 if errorlevel 1 (
     echo   FAIL main board bootloader: link failed
     set /a FAIL+=1
@@ -407,7 +409,9 @@ if "!SECTION_FAIL!"=="1" (
     set /a FAIL+=1
     goto :summary
 )
-arm-none-eabi-g++ %LDCOMMON% -fno-exceptions -fno-rtti -fno-unwind-tables -fno-threadsafe-statics -T"!SRC!\STM32F303CCTx_APP.ld" "%BUILD%\app_master\startup.o" "%BUILD%\app_master\system_stm32f3xx.o" "!OUT!\*.o" "%BUILD%\hal_obj\*.o" -o "!OUT!\!APP_NAME!.elf"
+call :write_objlist "!OUT!" "%BUILD%\link_out.rsp"
+call :write_objlist "%BUILD%\hal_obj" "%BUILD%\link_hal.rsp"
+arm-none-eabi-g++ %LDCOMMON% -fno-exceptions -fno-rtti -fno-unwind-tables -fno-threadsafe-statics -T"!SRC!\STM32F303CCTx_APP.ld" "%BUILD%\app_master\startup.o" "%BUILD%\app_master\system_stm32f3xx.o" @"%BUILD%\link_out.rsp" @"%BUILD%\link_hal.rsp" -o "!OUT!\!APP_NAME!.elf"
 if errorlevel 1 (
     echo   FAIL main board application: link failed
     set /a FAIL+=1
@@ -464,7 +468,9 @@ if "!SECTION_FAIL!"=="1" (
     set /a FAIL+=1
     goto :summary
 )
-arm-none-eabi-gcc %LDCOMMON% -T"!SRC!\STM32F303CBTx_SLAVEBOOT.ld" "%BUILD%\app_slave\startup.o" "%BUILD%\app_slave\system_stm32f3xx.o" "!OUT!\*.o" "%BUILD%\hal_obj\*.o" -o "!OUT!\!SLAVE_BOOT_NAME!.elf"
+call :write_objlist "!OUT!" "%BUILD%\link_out.rsp"
+call :write_objlist "%BUILD%\hal_obj" "%BUILD%\link_hal.rsp"
+arm-none-eabi-gcc %LDCOMMON% -T"!SRC!\STM32F303CBTx_SLAVEBOOT.ld" "%BUILD%\app_slave\startup.o" "%BUILD%\app_slave\system_stm32f3xx.o" @"%BUILD%\link_out.rsp" @"%BUILD%\link_hal.rsp" -o "!OUT!\!SLAVE_BOOT_NAME!.elf"
 if errorlevel 1 (
     echo   FAIL expansion slave bootloader: link failed
     set /a FAIL+=1
@@ -526,7 +532,9 @@ if "!SECTION_FAIL!"=="1" (
     set /a FAIL+=1
     goto :summary
 )
-arm-none-eabi-g++ %LDCOMMON% -fno-exceptions -fno-rtti -fno-unwind-tables -fno-threadsafe-statics -T"!SRC!\STM32F303CBTx_SLAVEAPP.ld" "%BUILD%\app_slave\startup.o" "%BUILD%\app_slave\system_stm32f3xx.o" "!OUT!\*.o" "%BUILD%\hal_obj\*.o" -lm -o "!OUT!\!SLAVE_APP_NAME!.elf"
+call :write_objlist "!OUT!" "%BUILD%\link_out.rsp"
+call :write_objlist "%BUILD%\hal_obj" "%BUILD%\link_hal.rsp"
+arm-none-eabi-g++ %LDCOMMON% -fno-exceptions -fno-rtti -fno-unwind-tables -fno-threadsafe-statics -T"!SRC!\STM32F303CBTx_SLAVEAPP.ld" "%BUILD%\app_slave\startup.o" "%BUILD%\app_slave\system_stm32f3xx.o" @"%BUILD%\link_out.rsp" @"%BUILD%\link_hal.rsp" -lm -o "!OUT!\!SLAVE_APP_NAME!.elf"
 if errorlevel 1 (
     echo   FAIL expansion slave application: link failed
     set /a FAIL+=1
@@ -602,3 +610,12 @@ REM The result is worked out before endlocal: after it %FAIL% no longer exists a
 set "RESULT=0"
 if %FAIL% GTR 0 set "RESULT=1"
 endlocal & exit /b %RESULT%
+
+REM The object files of a link, one per line in a response file for the linker: names in the order of dir /b /on (without distinguishing capitals),
+REM the same order build_firmware.sh uses (sort -f in the C locale), whatever the compiler would do with a wildcard. Forward slashes: the linker
+REM reads backslashes in a response file as escapes.
+:write_objlist
+set "OBJ_DIR=%~1"
+set "OBJ_DIR=!OBJ_DIR:\=/!"
+> "%~2" (for /f "delims=" %%F in ('dir /b /on "%~1\*.o"') do @echo "!OBJ_DIR!/%%F")
+exit /b 0

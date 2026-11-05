@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented here.
 
+## [Unreleased]
+
+- **The two build scripts link the object files in the same order:** `build_firmware.sh` took the glob `*.o` as bash sorts it (by bytes, capitals first: `MLX90640_API.o`, `MLX90641_API.o`, `MLX90642.o` and `STM32F303CC_main.o` before every `firmware_*.o`) while `build_firmware.bat` left the wildcard to the linker, which sees the folder without distinguishing capitals, so the same sources gave images that differ in layout. Both now sort the names without distinguishing capitals: the shell script with `LC_ALL=C sort -f` into arrays (`list_objects`, `link_objects`), the batch script with `dir /b /on` into response files for the linker (`:write_objlist`, forward slashes), for the objects of the component and for those of the HAL. The comparison of the two scripts (`.github/workflows/windows-build-compare.yml`) is the check.
+
 ## [0.4.5] - The full build check compiles only on CI or when allowed: tools/buildtest.py prints BUILDTEST=SKIPPED (exit status 2) for the stacks that compile unless it runs on a CI runner or ALLOWLOCALBUILD=1 says so; the light check is... (and 25 more changes)
 
 - **The full build check compiles only on CI or when allowed:** `tools/build_test.py` prints `BUILD_TEST=SKIPPED` (exit status 2) for the stacks that compile unless it runs on a CI runner or `ALLOW_LOCAL_BUILD=1` says so; the light check is not locked.
