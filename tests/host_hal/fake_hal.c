@@ -121,7 +121,7 @@ int fake_flash_fail_program_nth;
 uint32_t fake_tick;
 uint32_t fake_tick_step;
 uint32_t fake_rx_queue_count;
-FakeRxFrame fake_rx_queue[8];
+FakeRxFrame fake_rx_queue[FAKE_MAX_RX];
 void (*fake_rx_empty_hook)(void);
 static uint8_t *flash_mem;
 static int erase_calls, program_calls;

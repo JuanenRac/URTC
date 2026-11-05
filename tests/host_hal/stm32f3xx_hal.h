@@ -75,6 +75,7 @@ typedef struct {
 
 // ---- recording --------------------------------------------------------------
 #define FAKE_MAX_TX 512
+#define FAKE_MAX_RX 64
 #define FAKE_MAX_GPIO 32
 typedef struct { uint32_t id, dlc; uint8_t data[8]; } FakeTxFrame;
 typedef struct { GPIO_TypeDef *port; uint16_t pin; GPIO_PinState state; } FakeGpioWrite;
@@ -147,7 +148,7 @@ extern uint32_t fake_rx_queue_count;
 // Called when the receive FIFO is polled and is empty: a host program that plays a bus (tests/virtual_bootloader.c) queues the next frame there.
 extern void (*fake_rx_empty_hook)(void);
 typedef struct { CAN_RxHeaderTypeDef hdr; uint8_t data[8]; } FakeRxFrame;
-extern FakeRxFrame fake_rx_queue[8];
+extern FakeRxFrame fake_rx_queue[FAKE_MAX_RX];
 
 HAL_StatusTypeDef HAL_FLASH_Unlock(void);
 HAL_StatusTypeDef HAL_FLASH_Lock(void);
