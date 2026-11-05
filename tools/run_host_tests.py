@@ -50,7 +50,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 try:
     from local_build import local_build_refusal  # noqa: E402  (the lock on builds that compile on this PC: copied by vendor_copy.py)
 except ImportError:   # a repository that has not taken the helper yet keeps the same rule
-    def local_build_refusal(env=None):
+    from typing import Mapping
+
+    def local_build_refusal(env: Mapping[str, str] | None = None) -> str | None:
         env = os.environ if env is None else env
         if env.get("ALLOW_LOCAL_BUILD", "").strip() == "1" or any(env.get(n, "").strip().lower() not in ("", "0", "false", "no", "off") for n in ("CI", "GITHUB_ACTIONS")):
             return None
