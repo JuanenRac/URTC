@@ -21,6 +21,9 @@ One text for every repository of the family. What differs between repositories i
                                                                             further Python commands, each needing the modules it names
 
 The environment variables URTC_WSL_DISTRO and URTC_WSL_DISTRIBUTION pick the WSL distribution for a firmware build on Windows.
+
+The full check of a stack that compiles (rust, go, android, flutter, firmware-c) is locked on a developer PC: it runs on a CI runner (CI or GITHUB_ACTIONS set) or with
+ALLOW_LOCAL_BUILD=1, and anywhere else it prints BUILD_TEST=SKIPPED and exits 2, never a pass. The light check and the Python, Qt Quick and node stacks are not locked.
 """
 from __future__ import annotations
 
@@ -31,10 +34,21 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+from typing import Mapping
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+try:
+    from local_build import local_build_refusal  # noqa: E402  (the lock on builds that compile on this PC: copied by vendor_copy.py)
+except ImportError:   # a repository that has not taken the helper yet keeps the same rule
+    def local_build_refusal(env: Mapping[str, str] | None = None) -> str | None:
+        env = os.environ if env is None else env
+        if env.get("ALLOW_LOCAL_BUILD", "").strip() == "1" or any(env.get(n, "").strip().lower() not in ("", "0", "false", "no", "off") for n in ("CI", "GITHUB_ACTIONS")):
+            return None
+        return "local C builds are off; GitHub Actions builds it. Set ALLOW_LOCAL_BUILD=1 to allow it on this PC"
 EXCLUDED_PARTS = {".git", ".venv", "node_modules", "build", "dist", "target", "__pycache__"}
 PYTHON_STACKS = {"python", "python-bare", "python-qtquick"}
+COMPILED_STACKS = {"rust", "go", "android", "flutter", "firmware-c"}   # the full check of these compiles: locked on a developer PC
 STACKS = PYTHON_STACKS | {"node", "rust", "go", "android", "flutter", "firmware-c"}
 # what the full check of each stack needs, relative to the root (the light check looks for it)
 STACK_MARKERS = {"node": "package.json", "rust": "Cargo.toml", "flutter": "pubspec.yaml", "firmware-c": "build_firmware.sh"}
@@ -229,6 +243,10 @@ def main(argv: list[str] | None = None) -> int:
     print(f"BUILD_TEST project={manifest.get('name', ROOT.name)} stack={stack}")
     if args.check:
         return light_check(manifest, stack, config)
+    refusal = local_build_refusal() if stack in COMPILED_STACKS else None
+    if refusal is not None:
+        print(f"BUILD_TEST=SKIPPED {refusal}")   # compiling on this PC is locked: skipped, never passed
+        return 2
 
     # The Qt Quick variant shares the Python syntax baseline. A packaged Qt
     # smoke test belongs to the explicit build flow because it needs a desktop

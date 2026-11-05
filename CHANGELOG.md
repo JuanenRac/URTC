@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **The full build check compiles only on CI or when allowed:** `tools/build_test.py` prints `BUILD_TEST=SKIPPED` (exit status 2) for the stacks that compile unless it runs on a CI runner or `ALLOW_LOCAL_BUILD=1` says so; the light check is not locked.
+
 - **The host C suites and the virtual boards compile only on CI or when allowed:** `tools/run_host_tests.py`, `tools/c_quality.py` (the conversion check), `tools/fuzz_virtual_board.py` and `tools/bootloader_twin.py` ask `tools/local_build.py` first; on a plain PC they say SKIPPED (exit status 2), never passed. `ALLOW_LOCAL_BUILD=1` allows them, a CI runner always may, and the build scripts of the repository set it themselves because running one is the explicit way to build. Tests of the lock added.
 
 - **`build_firmware.bat` ends with the right exit code:** it compared `%FAIL%` after `endlocal`, when the variable no longer exists, so the last line was a syntax error and the script returned 255 even after a build with no failure; the result is now worked out before `endlocal`. Found by the comparison workflow of the two build scripts, whose run on a Windows runner built the four components with 21 steps passed.
