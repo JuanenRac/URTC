@@ -888,11 +888,10 @@ void HandleEndUpdate(uint8_t *data) {
 static urtc_bl_node_t bl_node;
 
 static uint32_t programmed_serial(void) {
-    uint32_t serial = 0u, counter = 0u;
 #if URTC_BL_PROGRAMMABLE_SERIAL
+    uint32_t serial = 0u, counter = 0u;
     if (Serial_ReadNewest(&serial, &counter)) return serial;
 #endif
-    (void)counter;
     return 0u;
 }
 
