@@ -29,6 +29,8 @@ printf '\n'
 URTC_CI_MODE="${URTC_CI:-0}"
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Running this script is the explicit way to build on this PC, so the lock on local builds is lifted for the host tests it runs.
+export ALLOW_LOCAL_BUILD=1
 BUILD="$ROOT/build"
 # Release mode writes the images, hex, elf, sidecars and manifests to
 # firmware/ (git-ignored: they are published only as assets of the GitHub

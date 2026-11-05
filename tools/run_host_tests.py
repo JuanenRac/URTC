@@ -46,6 +46,15 @@ from dataclasses import dataclass
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+try:
+    from local_build import local_build_refusal  # noqa: E402  (the lock on builds that compile on this PC: copied by vendor_copy.py)
+except ImportError:   # a repository that has not taken the helper yet keeps the same rule
+    def local_build_refusal(env=None):
+        env = os.environ if env is None else env
+        if env.get("ALLOW_LOCAL_BUILD", "").strip() == "1" or any(env.get(n, "").strip().lower() not in ("", "0", "false", "no", "off") for n in ("CI", "GITHUB_ACTIONS")):
+            return None
+        return "local C builds are off; GitHub Actions builds it. Set ALLOW_LOCAL_BUILD=1 to allow it on this PC"
 CONFIG = ROOT / "tools" / "host_tests.json"
 DEFAULT_SANITIZE = ["-fsanitize=address,undefined", "-fno-sanitize-recover=all"]
 DEFAULT_WARN = ["-Wall", "-Wextra", "-Wno-unused-parameter"]
@@ -395,6 +404,10 @@ def main(argv: list[str]) -> int:
     if not SUITES:
         print("HOST_TESTS=FAIL tools/host_tests.json is missing or lists no suite")
         return 1
+    refusal = local_build_refusal()
+    if refusal is not None:
+        print(f"HOST_TESTS=SKIPPED {refusal}")   # compiling on this PC is locked: skipped, never passed
+        return 2
     compiler = host_compiler()
     if not sys.platform.startswith("linux") and (NEEDS_LINUX or compiler is None):
         return through_wsl(argv)

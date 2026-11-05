@@ -96,7 +96,7 @@ class RealBoardTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(dir=ROOT / "build" if (ROOT / "build").is_dir() else None) as directory:
             status = fuzz.main(["--build-dir", directory, "--extra", "300"])
         if status == 2:
-            self.skipTest("no host C compiler")
+            self.skipTest("no host C compiler, or local builds are off (ALLOW_LOCAL_BUILD=1 allows them)")
         self.assertEqual(status, 0)
 
 

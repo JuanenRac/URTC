@@ -62,6 +62,8 @@ Frame = tuple[int, bytes]
 
 def build(binary: Path) -> list[str] | None:
     """Compile the twin; returns the command prefix that runs it (through WSL on Windows), or None when it cannot be built."""
+    if _fvb.local_build_refusal() is not None:
+        return None   # compiling on this PC is locked (CI builds it): reported as skipped, never as passed
     inc = [f"-I{i}" for i in INCLUDES]
     if os.name == "nt":
         wsl = shutil.which("wsl")
@@ -343,7 +345,7 @@ def main(argv: list[str] | None = None) -> int:
     build_dir.mkdir(parents=True, exist_ok=True)
     prefix = build(build_dir / "virtual_bootloader")
     if prefix is None:
-        print("TWIN=SKIPPED no host C compiler (install gcc, or WSL on Windows)")
+        print("TWIN=SKIPPED " + (_fvb.local_build_refusal() or "no host C compiler (install gcc, or WSL on Windows)"))
         return 2
     if args.build_only:
         print("VIRTUAL_BOARD_COMMAND=" + json.dumps(prefix))

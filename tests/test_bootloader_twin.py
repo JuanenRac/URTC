@@ -97,7 +97,7 @@ class RealBootloaderTests(unittest.TestCase):
 
     def setUp(self):
         if self.prefix is None:
-            self.skipTest("no host C compiler")
+            self.skipTest("no host C compiler, or local builds are off (ALLOW_LOCAL_BUILD=1 allows them)")
 
     def test_the_whole_exchange_passes(self):
         self.assertEqual(twin.run_checks(self.prefix), [])

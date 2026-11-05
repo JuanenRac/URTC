@@ -1,0 +1,10 @@
+{
+  "format": 1,
+  "urtc_common_version": "0.1.9",
+  "files": {
+    "local_build.py": {
+      "from": "src/urtc_common/local_build.py",
+      "sha256": "81e00ec830afd2ba77cf0a3eeb33cf7eb5ccc3848769e97072c4e169d35e169f"
+    }
+  }
+}

@@ -188,8 +188,13 @@ def main(argv: list[str]) -> int:
     config = load_config()
     import run_host_tests as host
 
-    compiler = host.host_compiler()
+    from local_build import local_build_refusal
+
     wants_compiler = everything or args.conversion
+    locked = local_build_refusal() if wants_compiler else None   # compiling on this PC is locked: the conversion check is skipped, never passed
+    if locked is not None:
+        wants_compiler = False
+    compiler = host.host_compiler() if wants_compiler else None
     if wants_compiler and not sys.platform.startswith("linux") and compiler is None:
         return through_wsl(argv)
     if wants_compiler and not sys.platform.startswith("linux") and shutil.which("cppcheck") is None and (everything or args.cppcheck):
@@ -198,7 +203,10 @@ def main(argv: list[str]) -> int:
     failed: list[str] = []
     skipped = False
     if everything or args.conversion:
-        if compiler is None:
+        if locked is not None:
+            print(f"CONVERSION=SKIPPED {locked}")
+            skipped = True
+        elif compiler is None:
             print("CONVERSION=SKIPPED no host C compiler")
             skipped = True
         else:

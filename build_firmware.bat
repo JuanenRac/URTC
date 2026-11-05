@@ -37,6 +37,8 @@ REM HYDRA_UMC_SCRIPT_STANDARD_VERSION_CAPTURE_BEFORE
 for /f "usebackq delims=" %%V in (`python -c "import json; print(json.load(open(r'%~dp0urtc.project.json', encoding='utf-8'))['version'])"`) do set "HYDRA_UMC_VERSION_BEFORE=%%V"
 echo.
 set "ROOT=%~dp0"
+rem Running this script is the explicit way to build on this PC, so the lock on local builds is lifted for the host tests it runs.
+set "ALLOW_LOCAL_BUILD=1"
 if "%ROOT:~-1%"=="\" set "ROOT=%ROOT:~0,-1%"
 set "BUILD=%ROOT%\build"
 set "FIRMWARE_OUT=%ROOT%\firmware"
