@@ -361,19 +361,15 @@ static void test_programmed_serial(int *failures)
     if (!(good && first && other_key && other_head && not_mine)) return;
     const uint8_t on = URTC_BL_PROGRAMMABLE_SERIAL;
 
-    // a valid command: written (or refused when the bootloader is built without the feature), then a replay and a command of another key
+    // a valid command: written (or refused when the bootloader is built without the feature)
     set_uid(good);
     boot_world();
     push_serial_command(good->command, 12);
-    push_serial_command(first->command, 12);         // counter 1 after counter 5: a replay
-    push_serial_command(other_key->command, 12);
     run_boot(1500);
-    TEST_ASSERT(result_count() == 3, "each complete command is answered once");
-    const FakeTxFrame *r0 = result_at(0), *r1 = result_at(1), *r2 = result_at(2);
-    if (r0 && r1 && r2) {
+    TEST_ASSERT(result_count() == 1, "a complete command is answered once");
+    const FakeTxFrame *r0 = result_at(0);
+    if (r0) {
         TEST_ASSERT(r0->dlc == 5 && r0->data[0] == (on ? URTC_SERIAL_OK : URTC_SERIAL_DISABLED), on ? "a valid command is written" : "without the feature the command says so");
-        TEST_ASSERT(r1->data[0] == (on ? URTC_SERIAL_REPLAY : URTC_SERIAL_DISABLED), on ? "a counter that is not higher is a replay" : "still refused");
-        TEST_ASSERT(r2->data[0] == (on ? URTC_SERIAL_UNKNOWN_KEY : URTC_SERIAL_DISABLED), on ? "a key that is not in the trust table is refused" : "still refused");
         TEST_ASSERT(urtc_serial_get32(r0->data + 1) == (on ? 0x00C0FFEEu : good->current_serial), "the answer carries the serial the head has now");
     }
     TEST_ASSERT(on ? (urtc_serial_slot_valid(slot_words(0)) && slot_words(0)[1] == 0x00C0FFEEu && slot_words(0)[3] == 5u) : urtc_serial_slot_blank(slot_words(0)),
@@ -395,6 +391,23 @@ static void test_programmed_serial(int *failures)
         int a = first_index(0x7EB);
         TEST_ASSERT(a >= 0 && fake_tx[a].data[0] == 2 && fake_tx[a].data[4] == 0xEE, "after the restart it answers with the programmed serial");
     }
+
+    // a record already kept (the serial it holds is the one the vectors name as the target, so the head still answers to it): a replay and a key that is not trusted
+    set_uid(good);
+    boot_world();
+    TEST_ASSERT(Serial_Store(good->current_serial, 5u), "a record with the counter 5 is kept");
+    push_serial_command(good->command, 12);          // counter 5 again: a replay
+    push_serial_command(first->command, 12);         // counter 1: below the stored one
+    push_serial_command(other_key->command, 12);
+    run_boot(1500);
+    TEST_ASSERT(result_count() == 3, "each complete command is answered once");
+    const FakeTxFrame *q0 = result_at(0), *q1 = result_at(1), *q2 = result_at(2);
+    if (q0 && q1 && q2) {
+        TEST_ASSERT(q0->data[0] == (on ? URTC_SERIAL_REPLAY : URTC_SERIAL_DISABLED), on ? "a counter that is not higher is a replay" : "without the feature the command says so");
+        TEST_ASSERT(q1->data[0] == (on ? URTC_SERIAL_REPLAY : URTC_SERIAL_DISABLED), on ? "a counter below the stored one is a replay" : "still refused");
+        TEST_ASSERT(q2->data[0] == (on ? URTC_SERIAL_UNKNOWN_KEY : URTC_SERIAL_DISABLED), on ? "a key that is not in the trust table is refused" : "still refused");
+    }
+    TEST_ASSERT(slot_words(0)[3] == 5u && urtc_serial_slot_blank(slot_words(1)), "none of them changes the record");
 
     // another head, an incomplete command: no answer, nothing written
     set_uid(not_mine);
