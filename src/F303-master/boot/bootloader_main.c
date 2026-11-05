@@ -155,6 +155,8 @@ int main(void) {
                     BlSelect_OnFrame(rxData, (uint8_t)rxHeader.DLC);
                 } else if (!BlSelect_Accepts((uint16_t)rxHeader.StdId)) {
                     // another head is addressed: this frame is not for this bootloader
+                } else if (rxHeader.StdId == URTC_CAN_ID_BOOTLOADER_SERIAL_CHUNK && rxHeader.DLC == 8) {
+                    HandleSerialChunk(rxData);
                 } else if (rxHeader.StdId == CAN_ID_START_UPDATE && rxHeader.DLC == 8) {
                     enter_update_mode = 1;
                     HandleStartUpdate(rxData);
@@ -203,6 +205,8 @@ int main(void) {
                     HandleStartUpdate(rxData);
                 } else if (rxHeader.StdId == CAN_ID_IMG_SIG_CHUNK && rxHeader.DLC == 8) {
                     HandleSigChunk(rxData);
+                } else if (rxHeader.StdId == URTC_CAN_ID_BOOTLOADER_SERIAL_CHUNK && rxHeader.DLC == 8) {
+                    HandleSerialChunk(rxData);
                 } else if (rxHeader.StdId == CAN_ID_DATA) {
                     HandleData(rxData, rxHeader.DLC);
                 } else if (rxHeader.StdId == CAN_ID_END_UPDATE && rxHeader.DLC == 8) {

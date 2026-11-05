@@ -18,6 +18,8 @@
 #include "bootloader_oled.h"
 #include "bootloader_protocol.h"
 #include "urtc_boot_session.h"
+#include "bl_serial_vectors.h"
+#include "urtc_bl_serial.h"
 #include "test_runner.h"
 
 #define CAN_RTR_REMOTE_FRAME 2u
@@ -308,6 +310,149 @@ static void test_serial_selection(int *failures)
     TEST_ASSERT(count_id(0x7EB) == 0 && count_id(CAN_ID_VERSION_RESPONSE) == 1, "a head with a blank serial takes no part and obeys every frame as before");
 }
 
+// ---- the signed command that programs the serial number (0x7EE / 0x7EF) -------------------------------------------------------------------------
+// Built twice: by default the command answers "not built with it" and writes nothing; with -DURTC_BL_PROGRAMMABLE_SERIAL=1 it writes the record.
+#ifndef URTC_BL_PROGRAMMABLE_SERIAL
+#define URTC_BL_PROGRAMMABLE_SERIAL 0
+#endif
+#define SLOT_A_ADDR (METADATA_ADDR + META_RECORD_SLOTS * META_RECORD_SIZE)
+
+static const bl_serial_command_vec_t *serial_vector(const char *name)
+{
+    for (size_t i = 0; i < BL_SERIAL_COMMAND_VECTOR_COUNT; i++) {
+        if (strcmp(BL_SERIAL_COMMAND_VECTORS[i].name, name) == 0) return &BL_SERIAL_COMMAND_VECTORS[i];
+    }
+    return 0;
+}
+
+static void push_serial_command(const uint8_t *command, int chunks)
+{
+    for (int i = 0; i < chunks; i++) {
+        uint8_t frame[8];
+        frame[0] = (uint8_t)i;
+        memcpy(frame + 1, command + 7 * i, 7);
+        push(URTC_CAN_ID_BOOTLOADER_SERIAL_CHUNK, 8, 0, 0, frame);
+    }
+}
+
+static void set_uid(const bl_serial_command_vec_t *v)
+{
+    fake_uid[0] = v->uid[0]; fake_uid[1] = v->uid[1]; fake_uid[2] = v->uid[2];
+}
+
+static int result_count(void) { return count_id(URTC_CAN_ID_BOOTLOADER_SERIAL_RESULT); }
+
+static const FakeTxFrame *result_at(int n)
+{
+    for (int i = 0; i < fake_tx_count; i++) if (fake_tx[i].id == URTC_CAN_ID_BOOTLOADER_SERIAL_RESULT && n-- == 0) return &fake_tx[i];
+    return 0;
+}
+
+static const uint32_t *slot_words(int slot) { return (const uint32_t *)(uintptr_t)(SLOT_A_ADDR + (uint32_t)slot * URTC_SERIAL_SLOT_BYTES); }
+
+static void test_programmed_serial(int *failures)
+{
+    const bl_serial_command_vec_t *good = serial_vector("a valid command");
+    const bl_serial_command_vec_t *first = serial_vector("a valid command for the first write (nothing stored)");
+    const bl_serial_command_vec_t *other_key = serial_vector("signed by a key the bootloader does not trust");
+    const bl_serial_command_vec_t *other_head = serial_vector("a command made for another head fails");
+    const bl_serial_command_vec_t *not_mine = serial_vector("the same command on another head is not for it");
+    TEST_ASSERT(good && first && other_key && other_head && not_mine, "the vectors of the command are there");
+    if (!(good && first && other_key && other_head && not_mine)) return;
+    const uint8_t on = URTC_BL_PROGRAMMABLE_SERIAL;
+
+    // a valid command: written (or refused when the bootloader is built without the feature), then a replay and a command of another key
+    set_uid(good);
+    boot_world();
+    push_serial_command(good->command, 12);
+    push_serial_command(first->command, 12);         // counter 1 after counter 5: a replay
+    push_serial_command(other_key->command, 12);
+    run_boot(1500);
+    TEST_ASSERT(result_count() == 3, "each complete command is answered once");
+    const FakeTxFrame *r0 = result_at(0), *r1 = result_at(1), *r2 = result_at(2);
+    if (r0 && r1 && r2) {
+        TEST_ASSERT(r0->dlc == 5 && r0->data[0] == (on ? URTC_SERIAL_OK : URTC_SERIAL_DISABLED), on ? "a valid command is written" : "without the feature the command says so");
+        TEST_ASSERT(r1->data[0] == (on ? URTC_SERIAL_REPLAY : URTC_SERIAL_DISABLED), on ? "a counter that is not higher is a replay" : "still refused");
+        TEST_ASSERT(r2->data[0] == (on ? URTC_SERIAL_UNKNOWN_KEY : URTC_SERIAL_DISABLED), on ? "a key that is not in the trust table is refused" : "still refused");
+        TEST_ASSERT(urtc_serial_get32(r0->data + 1) == (on ? 0x00C0FFEEu : good->current_serial), "the answer carries the serial the head has now");
+    }
+    TEST_ASSERT(on ? (urtc_serial_slot_valid(slot_words(0)) && slot_words(0)[1] == 0x00C0FFEEu && slot_words(0)[3] == 5u) : urtc_serial_slot_blank(slot_words(0)),
+                on ? "the record is in the first slot with its counter" : "nothing is written");
+    TEST_ASSERT(urtc_serial_slot_blank(slot_words(1)), "the second slot is untouched");
+
+    // after a restart the programmed serial is the one the head answers with (and only when the feature is built in)
+    if (on) {
+        fake_hal_reset_recording(); fake_rx_queue_count = 0; fake_tick = 5000; fake_tick_step = 1;
+        uint8_t select_old[8] = {2, (uint8_t)(good->current_serial >> 24), (uint8_t)(good->current_serial >> 16), (uint8_t)(good->current_serial >> 8),
+                                 (uint8_t)good->current_serial, 4, 0, 0};
+        push(0x7EA, 6, 0, 0, select_old);
+        run_boot(900);
+        TEST_ASSERT(count_id(0x7EB) == 0, "after the restart the head no longer answers with the fold of its unique ID");
+        fake_hal_reset_recording(); fake_rx_queue_count = 0; fake_tick = 5000; fake_tick_step = 1;
+        uint8_t select_new[8] = {2, 0x00, 0xC0, 0xFF, 0xEE, 3, 0, 0};
+        push(0x7EA, 6, 0, 0, select_new);
+        run_boot(900);
+        int a = first_index(0x7EB);
+        TEST_ASSERT(a >= 0 && fake_tx[a].data[0] == 2 && fake_tx[a].data[4] == 0xEE, "after the restart it answers with the programmed serial");
+    }
+
+    // another head, an incomplete command: no answer, nothing written
+    set_uid(not_mine);
+    boot_world();
+    push_serial_command(not_mine->command, 12);
+    run_boot(1500);
+    TEST_ASSERT(result_count() == 0, "a command meant for another serial is not answered");
+    set_uid(good);
+    boot_world();
+    push_serial_command(good->command, 11);
+    run_boot(1500);
+    TEST_ASSERT(result_count() == 0 && urtc_serial_slot_blank(slot_words(0)), "eleven chunks of twelve write nothing and are not answered");
+    set_uid(other_head);
+    boot_world();
+    push_serial_command(other_head->command, 12);   // signed for another unique ID but sent to the serial of this one
+    run_boot(1500);
+    const FakeTxFrame *bad = result_at(0);
+    TEST_ASSERT(bad && bad->data[0] == (on ? URTC_SERIAL_BAD_SIGNATURE : URTC_SERIAL_DISABLED) && urtc_serial_slot_blank(slot_words(0)),
+                "a command signed for another unique ID is refused and writes nothing");
+}
+
+// The record survives the recycling of the page of the log, and a write that fails never leaves a wrong serial.
+static void test_serial_record_storage(int *failures)
+{
+    uint32_t serial = 0, counter = 0;
+    boot_world();
+    TEST_ASSERT(!Serial_ReadNewest(&serial, &counter), "a blank page holds no serial");
+    TEST_ASSERT(Serial_Store(0x0A0A0A0Au, 1u) && Serial_ReadNewest(&serial, &counter) && serial == 0x0A0A0A0Au && counter == 1u, "the first record goes to the first slot");
+    TEST_ASSERT(Serial_Store(0x0B0B0B0Bu, 2u) && Serial_ReadNewest(&serial, &counter) && serial == 0x0B0B0B0Bu && counter == 2u, "the second one to the second slot, and it is the newest");
+
+    FirmwareMetadata_t meta;
+    memset(&meta, 0, sizeof meta);
+    meta.magic = METADATA_MAGIC_VALID; meta.state = META_STATE_APP_VALID; meta.hardware_id = THIS_HARDWARE_ID;
+    for (uint32_t i = 0; i < META_RECORD_SLOTS * 2u; i++) {      // fills the log and recycles the page more than once
+        meta.counter = 100u + i;
+        TEST_ASSERT(Metadata_EraseAndWrite(&meta), "a record is appended");
+    }
+    TEST_ASSERT(Serial_ReadNewest(&serial, &counter) && serial == 0x0B0B0B0Bu && counter == 2u, "the recycling of the page of the log carries the newest serial over");
+    FirmwareMetadata_t read;
+    TEST_ASSERT(Metadata_Read(&read) && read.counter == meta.counter, "and the log keeps its newest state");
+
+    TEST_ASSERT(Serial_Store(0x0C0C0C0Cu, 3u) && Serial_ReadNewest(&serial, &counter) && serial == 0x0C0C0C0Cu && counter == 3u, "after a recycle one slot is free again");
+    TEST_ASSERT(Serial_Store(0x0D0D0D0Du, 4u) && Serial_ReadNewest(&serial, &counter) && serial == 0x0D0D0D0Du && counter == 4u, "with both slots used the page is recycled for the new record");
+    TEST_ASSERT(Metadata_Read(&read) && read.counter == meta.counter, "the metadata state is written again after that recycle");
+
+    // a program that fails at each of the eight steps of the second write: the first record stays the serial, never a half record
+    for (int k = 1; k <= 8; k++) {
+        boot_world();
+        fake_flash_erase_all();                                    // the counter of programs starts again
+        TEST_ASSERT(Serial_Store(0x01010101u, 1u), "the first record is written");
+        fake_flash_fail_program_nth = 8 + k;
+        TEST_ASSERT(!Serial_Store(0x02020202u, 2u), "a failing program makes the store fail");
+        fake_flash_fail_program_nth = 0;
+        TEST_ASSERT(Serial_ReadNewest(&serial, &counter) && serial == 0x01010101u && counter == 1u, "the old serial is still the serial after a write that failed at any step");
+    }
+    boot_world();
+}
+
 static void test_unsafe_commands(int *failures)
 {
     // the decision itself
@@ -367,6 +512,8 @@ void run_bootloader_boot_tests(int *failures)
     test_display(failures);
     test_main_loop(failures);
     test_serial_selection(failures);
+    test_programmed_serial(failures);
+    test_serial_record_storage(failures);
     test_unsafe_commands(failures);
 }
 

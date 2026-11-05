@@ -8,6 +8,7 @@
 #include "bootloader_common.h"
 #include "bootloader_flash.h"
 #include "bootloader_oled.h"
+#include "urtc_bl_serial.h"
 
 static uint32_t crc32_table[256];
 static uint8_t crc32_table_built = 0;
@@ -197,6 +198,58 @@ uint8_t Metadata_Read(FirmwareMetadata_t *out) {
     return 1;
 }
 
+// ---- the programmed serial number: two slots after the 28 records of the log ----------------------------------------------------------------------
+#define SERIAL_SLOT_A (METADATA_ADDR + META_RECORD_SLOTS * META_RECORD_SIZE)
+#define SERIAL_SLOT_B (SERIAL_SLOT_A + URTC_SERIAL_SLOT_BYTES)
+_Static_assert(META_RECORD_SLOTS * META_RECORD_SIZE + URTC_SERIAL_SLOT_COUNT * URTC_SERIAL_SLOT_BYTES <= 2048u, "the two serial slots fit after the log");
+
+static void serial_slot_words(uint32_t address, uint32_t words[4]) {
+    memcpy(words, (const void*)(uintptr_t)address, URTC_SERIAL_SLOT_BYTES);
+}
+
+static uint8_t metadata_page_erase(void) {
+    FLASH_EraseInitTypeDef eraseInit;
+    uint32_t pageError;
+    eraseInit.TypeErase = FLASH_TYPEERASE_PAGES;
+    eraseInit.PageAddress = METADATA_ADDR;
+    eraseInit.NbPages = 1;
+    HAL_FLASH_Unlock();
+    __HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_EOP | FLASH_FLAG_WRPERR | FLASH_FLAG_PGERR);
+    HAL_StatusTypeDef res = HAL_FLASHEx_Erase(&eraseInit, &pageError);
+    HAL_FLASH_Lock();
+    return (res == HAL_OK && pageError == 0xFFFFFFFF) ? 1u : 0u;
+}
+
+// Programs a blank slot: the serial, its complement and the counter first, the magic last, so a write that is cut leaves no record at all.
+static uint8_t serial_slot_program(uint32_t address, uint32_t serial, uint32_t counter) {
+    uint32_t words[4];
+    urtc_serial_slot_pack(serial, counter, words);
+    if (!Flash_WriteVerified(address + 4u, (const uint8_t*)&words[1], 12u)) return 0;
+    return Flash_WriteVerified(address, (const uint8_t*)&words[0], 4u);
+}
+
+uint8_t Serial_ReadNewest(uint32_t *serial, uint32_t *counter) {
+    uint32_t a[4], b[4];
+    serial_slot_words(SERIAL_SLOT_A, a);
+    serial_slot_words(SERIAL_SLOT_B, b);
+    return urtc_serial_pick(a, b, serial, counter) ? 1u : 0u;
+}
+
+uint8_t Serial_Store(uint32_t serial, uint32_t counter) {
+    uint32_t a[4], b[4];
+    serial_slot_words(SERIAL_SLOT_A, a);
+    serial_slot_words(SERIAL_SLOT_B, b);
+    if (urtc_serial_slot_blank(a)) return serial_slot_program(SERIAL_SLOT_A, serial, counter);
+    if (urtc_serial_slot_blank(b)) return serial_slot_program(SERIAL_SLOT_B, serial, counter);
+    // both slots are used: recycle the page. The new record is written first, then the newest metadata state again (a cut in between costs the
+    // metadata state, which the bootloader rebuilds as a first start, never the serial).
+    FirmwareMetadata_t meta;
+    const uint8_t have_meta = Metadata_Read(&meta);
+    if (!metadata_page_erase()) return 0;
+    if (!serial_slot_program(SERIAL_SLOT_A, serial, counter)) return 0;
+    return have_meta ? Metadata_EraseAndWrite(&meta) : 1u;
+}
+
 // Appends the state as a new record; nothing is erased unless the page is full (then it is erased and the new record is the first of a fresh log).
 // The name is kept from the single-record page this replaced.
 uint8_t Metadata_EraseAndWrite(const FirmwareMetadata_t *meta) {
@@ -218,16 +271,11 @@ uint8_t Metadata_EraseAndWrite(const FirmwareMetadata_t *meta) {
         }
     }
     if (slot == META_RECORD_SLOTS) {
-        FLASH_EraseInitTypeDef eraseInit;
-        uint32_t pageError;
-        eraseInit.TypeErase = FLASH_TYPEERASE_PAGES;
-        eraseInit.PageAddress = METADATA_ADDR;
-        eraseInit.NbPages = 1;
-        HAL_FLASH_Unlock();
-        __HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_EOP | FLASH_FLAG_WRPERR | FLASH_FLAG_PGERR);
-        HAL_StatusTypeDef res = HAL_FLASHEx_Erase(&eraseInit, &pageError);
-        HAL_FLASH_Lock();
-        if (res != HAL_OK || pageError != 0xFFFFFFFF) return 0;
+        // the programmed serial is carried over the erase: read before, written first after (a cut in between leaves the fold of the unique ID, never a wrong serial)
+        uint32_t serial = 0, counter = 0;
+        const uint8_t have_serial = Serial_ReadNewest(&serial, &counter);
+        if (!metadata_page_erase()) return 0;
+        if (have_serial && !serial_slot_program(SERIAL_SLOT_A, serial, counter)) return 0;
         slot = 0;
     }
     MetaRecord_t record;

@@ -14,6 +14,7 @@
 #include "urtc_auth.h"
 #include "urtc_version_wire.h"
 #include "urtc_bl_select.h"
+#include "urtc_bl_serial.h"
 
 static uint8_t CAN_WaitForFreeMailbox(void) {
     // 50 attempts x 1ms = 50ms max - a small fraction of the ~800ms IWDG
@@ -876,27 +877,27 @@ void HandleEndUpdate(uint8_t *data) {
 // Addressing this bootloader by its serial number when several heads share a
 // bus (0x7EA commands, 0x7EB answers). With nobody addressing it, or a serial
 // that is blank, every frame is obeyed exactly as before. The serial is the
-// fold of the 96-bit unique ID. A programmed serial (three words: URTC_BL_SERIAL_MAGIC,
-// the serial, its complement, at offset 2032 of the metadata page, inside the 32 bytes
-// that stay free after its 28 records) replaces the fold ONLY when URTC_BL_PROGRAMMABLE_SERIAL is 1.
-// The default is 0: the record is not even read, so a stray value in flash can never change
-// which head answers. Nothing in this bootloader writes the record, and a recycled metadata
-// page erases it (the head then falls back to the fold of its unique ID).
+// fold of the 96-bit unique ID. A PROGRAMMED serial replaces the fold ONLY when URTC_BL_PROGRAMMABLE_SERIAL is 1 (the default is 0: the record is not
+// even read, and the command that writes it, 0x7EE, answers "not built with it"). It is written by a command signed with a key of the trust table
+// (urtc_bl_serial.h) and kept in two slots after the log of the metadata page, which a recycled page carries over (bootloader_flash.c).
 // ---------------------------------------------------------------------------
 #ifndef URTC_BL_PROGRAMMABLE_SERIAL
 #define URTC_BL_PROGRAMMABLE_SERIAL 0
 #endif
-#define BL_SERIAL_RECORD_ADDR (URTC_MASTER_METADATA_ADDR + 2048UL - 16UL)
 
 static urtc_bl_node_t bl_node;
 
-void BlSelect_Init(void) {
-    uint32_t programmed = 0u;
+static uint32_t programmed_serial(void) {
+    uint32_t serial = 0u, counter = 0u;
 #if URTC_BL_PROGRAMMABLE_SERIAL
-    const volatile uint32_t *rec = (const volatile uint32_t *)BL_SERIAL_RECORD_ADDR;
-    programmed = urtc_bl_serial_from_record(rec[0], rec[1], rec[2]);
+    if (Serial_ReadNewest(&serial, &counter)) return serial;
 #endif
-    urtc_bl_node_init_prog(&bl_node, HAL_GetUIDw0(), HAL_GetUIDw1(), HAL_GetUIDw2(), programmed);
+    (void)counter;
+    return 0u;
+}
+
+void BlSelect_Init(void) {
+    urtc_bl_node_init_prog(&bl_node, HAL_GetUIDw0(), HAL_GetUIDw1(), HAL_GetUIDw2(), programmed_serial());
 }
 
 uint8_t BlSelect_Accepts(uint16_t can_id) {
@@ -915,4 +916,49 @@ void BlSelect_OnFrame(const uint8_t *data, uint8_t dlc) {
     txHeader.DLC = reply.dlc;
     txHeader.TransmitGlobalTime = DISABLE;
     HAL_CAN_AddTxMessage(&hcan, &txHeader, reply.data, &mailbox);
+}
+
+// ---- the signed command that programs the serial number (0x7EE, answered on 0x7EF) ----------------------------------------------------------------
+static uint8_t  serial_command[URTC_SERIAL_COMMAND_SIZE];
+static uint16_t serial_chunks = 0;
+
+static void send_serial_result(uint8_t status, uint32_t serial) {
+    if (!CAN_WaitForFreeMailbox()) return;
+    CAN_TxHeaderTypeDef txHeader;
+    uint8_t data[5];
+    uint32_t mailbox;
+    data[0] = status;
+    urtc_serial_put32(data + 1, serial);
+    txHeader.StdId = URTC_CAN_ID_BOOTLOADER_SERIAL_RESULT;
+    txHeader.IDE = CAN_ID_STD;
+    txHeader.RTR = CAN_RTR_DATA;
+    txHeader.DLC = 5;
+    txHeader.TransmitGlobalTime = DISABLE;
+    HAL_CAN_AddTxMessage(&hcan, &txHeader, data, &mailbox);
+}
+
+void HandleSerialChunk(uint8_t *data) {
+    const uint8_t index = data[0];
+    if (index >= URTC_SERIAL_CHUNKS) return;
+    memcpy(&serial_command[index * URTC_SERIAL_CHUNK_BYTES], data + 1, URTC_SERIAL_CHUNK_BYTES);
+    serial_chunks = (uint16_t)(serial_chunks | (1u << index));
+    if (serial_chunks != URTC_SERIAL_ALL_CHUNKS) return;
+    serial_chunks = 0;
+
+    const uint32_t uid[3] = {HAL_GetUIDw0(), HAL_GetUIDw1(), HAL_GetUIDw2()};
+    const TrustKeys_t *trust = Trust_Active();
+    uint32_t stored_serial = 0u, stored_counter = 0u, serial = 0u, counter = 0u;
+    if (!Serial_ReadNewest(&stored_serial, &stored_counter)) stored_counter = 0u;
+    urtc_serial_status_t status = urtc_serial_decide(serial_command, uid, bl_node.serial, (const uint8_t (*)[URTC_ED25519_PUBLIC_KEY_SIZE])trust->keys, trust->count,
+                                                    stored_counter, URTC_BL_PROGRAMMABLE_SERIAL, update_in_progress, &serial, &counter);
+    memset(serial_command, 0, sizeof serial_command);
+    if (status == URTC_SERIAL_NOT_FOR_ME) return;              // another head: no answer
+    if (status == URTC_SERIAL_OK) {
+        if (Serial_Store(serial, counter)) {
+            urtc_bl_node_init_prog(&bl_node, uid[0], uid[1], uid[2], serial);
+        } else {
+            status = URTC_SERIAL_FLASH_FAILED;
+        }
+    }
+    send_serial_result((uint8_t)status, bl_node.serial);
 }

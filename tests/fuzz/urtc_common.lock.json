@@ -4,7 +4,7 @@
   "files": {
     "fuzz_corpus.txt": {
       "from": "conformance/fuzz_corpus.txt",
-      "sha256": "d174b17124c73ed64502fbef151514ffdb231b20c19c5e51f2a04bd33f127b70"
+      "sha256": "e89f6e36dac605b21462a0fd438cd1c44346143967f6b3d17a16ef635a309726"
     }
   }
 }

@@ -2,6 +2,10 @@
   "format": 1,
   "urtc_common_version": "0.1.9",
   "files": {
+    "bl_serial_vectors.h": {
+      "from": "generated/bl_serial_vectors.h",
+      "sha256": "a57f353ad5ce538ded72e97637e984b7ccd1cfde90f9a9eb374690f0c0fd2c32"
+    },
     "blackbox_vectors.h": {
       "from": "generated/blackbox_vectors.h",
       "sha256": "efd5441c3ec973284a86eb48d867eeb9103a0342ab83e9a82e60df3687cb00ec"
@@ -28,7 +32,7 @@
     },
     "urtc_fw_vectors.h": {
       "from": "generated/urtc_fw_vectors.h",
-      "sha256": "b836b372c49481c9cc16c1d7522ce4450f1b49f6ef0f8beedcbd327e5e9c0183"
+      "sha256": "b01c737485850f567d05860c99cddc39827db3bac46ffdae0fb99a13d0dfc6c0"
     },
     "urtc_test.h": {
       "from": "firmware_base/urtc_test.h",

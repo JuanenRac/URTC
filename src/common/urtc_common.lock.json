@@ -10,9 +10,13 @@
       "from": "firmware_base/urtc_bl_select.h",
       "sha256": "e58c6e5d9f67a5f3828ec9e5baaae7c49c11d2fd5bb6d9ea8909fdacb11ca046"
     },
+    "urtc_bl_serial.h": {
+      "from": "firmware_base/urtc_bl_serial.h",
+      "sha256": "ddcc05536fe8788c59f5e69b1b9d7251cc384e1a270ffae1a27f3815e7830f53"
+    },
     "urtc_can_ids.h": {
       "from": "generated/urtc_can_ids.h",
-      "sha256": "bde8c12d052479cab547ef84e06e06375be33cbe97de738bcac836c44ee3f8fe"
+      "sha256": "19d0928018b974d6a00d2a6cf4b3afc3f325519e697e71494d691107da801dc9"
     },
     "urtc_ed25519.c": {
       "from": "firmware_base/urtc_ed25519.c",

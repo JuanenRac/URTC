@@ -132,6 +132,12 @@ the probe frame (`0x7EA`), select one by its serial, update only that one.
 Expected: exactly one head is selected at a time, the others stay silent, and
 the release frame (`0x7EB` to `0x7ED` group) returns all of them to normal.
 
+Programmed serial (a bootloader built with `URTC_BL_PROGRAMMABLE_SERIAL=1` and a trust table that holds the public half of the key of the command): make the command with
+`tools/serial_command.py` of URTC-FLASHER from the unique ID the head answers to the UID query, send the twelve frames of `0x7EE`, expect `0x7EF` with status 0 and
+the new serial. Power-cycle the head: the probe and the selection answer with the new serial. Send the same twelve frames again: status 3 (replay). Send a command
+made for another head or with another key: status 1 or 2 and nothing changes. Then fill the log of the metadata (repeated updates) until the page is recycled and
+check that the serial is the same afterwards. Never tried on a board.
+
 ## 11. Ed25519 and HMAC policy of the bootloader
 
 Steps: load images signed with Ed25519 only, HMAC only and both; load an image

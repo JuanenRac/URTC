@@ -1632,6 +1632,32 @@ Notes: sent only by a bootloader that holds a trusted Ed25519 key. A
        that gets no 0x7ED (an older bootloader, or one without a key) has
        no data to compare: that is never a difference and never an error.
 
+ID: 0x7EE [Master -> URTC Tool Head, bootloader only]
+One chunk of the signed command that programs the serial number
+DLC: 8 bytes
+Data:
+  - txData[0]: index of the chunk (0..11)
+  - txData[1..7]: seven bytes of the command
+Notes: the command is target serial (4) + key id (8) + new serial (4) +
+       counter (4) + Ed25519 signature (64) = 84 bytes, all big-endian.
+       The signature covers a 44-byte message: "URTC-SERIAL-V1" and two
+       zero bytes, the 96-bit unique ID of the head (three words), the new
+       serial, the counter and the key id. A head whose serial is not the
+       target stays silent. A bootloader built with the programmable serial
+       (URTC_BL_PROGRAMMABLE_SERIAL, off by default) writes the serial when
+       the key is in its trust table, the signature is valid for its own
+       unique ID and the counter is higher than the one stored; anything
+       else changes nothing. The twelfth chunk triggers the answer 0x7EF.
+
+ID: 0x7EF [URTC Tool Head -> Master, bootloader only]
+Result of the command that programs the serial number
+DLC: 5 bytes
+Data:
+  - txData[0]: 0 written, 1 bad signature, 2 unknown key, 3 replay, 4 not a
+               usable serial, 5 flash failed, 6 built without the
+               programmable serial, 7 an update is running
+  - txData[1..4]: the serial the head answers with now, big-endian
+
 ID: 0x7FB [Master -> URTC Tool Head, handled by BOTH the application AND
 the bootloader, whichever is currently running]
 Query CAN error counters
@@ -1965,18 +1991,18 @@ GENERATED REFERENCE (from the specification in URTC-COMMON)
 
 A. Summary
 
-[[ BEGIN GENERATED summary sha256=9009ed59ee56ec5cede469a3f55ae45f1cf0247ee4aeca8b09b7666027e50b81 ]]
+[[ BEGIN GENERATED summary sha256=d3ec04f05bfe3413e0495e5eb9c40cf2b407c98e4afc03fdeefbd3884805302a ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 URTC CAN protocol: protocol version 1, byte order big.
-102 identifiers, 25 tool profiles, 22 enumerations, 37 constants, 4 magic payloads, 27 registers of the expansion slave.
+104 identifiers, 25 tool profiles, 22 enumerations, 37 constants, 4 magic payloads, 27 registers of the expansion slave.
 
 Machine-readable specification of the CAN bus protocol of the URTC tool head: every identifier with its direction, length rule and payload layout, the magic payloads, the registers of the expansion slave, the version procedures and the SLCAN subset the host tools rely on. All multi-byte fields are big-endian.
 [[ END GENERATED summary ]]
 
 B. Index of identifiers
 
-[[ BEGIN GENERATED index sha256=9a5ef645ab824644d91fee0967f71f62808ef506bb64c69f442de5094c17591f ]]
+[[ BEGIN GENERATED index sha256=a79eb1ee6234d0af123c92e9d40c724937014df4e9fd8b78ad8d3ba18ab78a9a ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 | ID | Name | Direction | DLC | Tools | Group | Title |
@@ -2067,6 +2093,8 @@ Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_do
 | 0x7EB | BOOTLOADER_SELECT_RESPONSE | board to host | 2 6 6 | any | bootloader | Answer to the addressing of a bootloader |
 | 0x7EC | BOOTLOADER_SIGNATURE_CHUNK | host to board | 8 | any | bootloader | One chunk of the Ed25519 signature record |
 | 0x7ED | BOOTLOADER_KEY_ID | board to host | 8 | any | bootloader | Identifier of the signing key a bootloader trusts |
+| 0x7EE | BOOTLOADER_SERIAL_CHUNK | host to board | 8 | any | bootloader | One chunk of the signed command that programs the serial number |
+| 0x7EF | BOOTLOADER_SERIAL_RESULT | board to host | 5 | any | bootloader | Result of the command that programs the serial number |
 | 0x7F0 | ENTER_BOOTLOADER | host to board | 4 | any | bootloader | Enter the bootloader |
 | 0x7F1 | START_UPDATE | host to board | 8 | any | bootloader | Start the firmware update |
 | 0x7F2 | DATA | host to board | 1-8 | any | bootloader | Firmware data |
@@ -2087,7 +2115,7 @@ Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_do
 
 C. Field layouts and examples
 
-[[ BEGIN GENERATED layouts sha256=dcc2e7a1af2af579391f8a5abce0118fd55bdd307e85c015dbed2672bdccf20b ]]
+[[ BEGIN GENERATED layouts sha256=a4f5cf3e8d9008fc06fb48f9ed08a8b02fbc1727f98620622aa33759fe61c2bf ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 ### 0x095 IMPACT_EVENT - Impact register (touch probe, maximum priority)
@@ -3470,6 +3498,36 @@ Example a key identifier: data 0102030405060708 (key_id=0102030405060708)
 
 Note: Sent by a bootloader that holds a trusted Ed25519 key, right after its answer to 0x7F8. A bootloader without the frame (older, or without a key) sends nothing: tools read that as 'no data', never as a difference.
 Note: With several heads, only the selected one answers 0x7F8 and therefore only its key identifier arrives.
+
+### 0x7EE BOOTLOADER_SERIAL_CHUNK - One chunk of the signed command that programs the serial number
+
+host to board; handled by the bootloader; tools: any; the firmware accepts DLC 8.
+
+request, DLC 8: The command is target serial (4) + key id (8) + new serial (4) + counter (4) + Ed25519 signature (64) = 84 bytes in 12 frames. The signature covers the unique ID of the head, the new serial, the counter and the key id; a head whose serial is not the target stays silent.
+
+| Byte | Width | Type | Field | Values | Note |
+|---|---|---|---|---|---|
+| 0 | 1 | u8 | index | 0..11 |  |
+| 1 | 7 | bytes | data |  |  |
+
+Example first chunk: data 0000000000000000 (index=0, data=00000000000000)
+
+Note: Only a bootloader built with the programmable serial (URTC_BL_PROGRAMMABLE_SERIAL) obeys it, and only for a signature of a key of its trust table made for its own unique ID with a counter higher than the stored one. Answered on 0x7EF.
+
+### 0x7EF BOOTLOADER_SERIAL_RESULT - Result of the command that programs the serial number
+
+board to host; handled by the bootloader; tools: any.
+
+response, DLC 5
+
+| Byte | Width | Type | Field | Values | Note |
+|---|---|---|---|---|---|
+| 0 | 1 | u8 | status |  | 0 written, 1 bad signature, 2 unknown key, 3 replay, 4 not a usable serial, 5 flash failed, 6 not built with the programmable serial, 7 an update is running. |
+| 1 | 4 | u32 | serial |  | The serial the head answers with now. |
+
+Example written: data 0000C0FFEE (status=0, serial=12648430)
+
+Note: Sent once the twelfth chunk arrived, by the head the command was meant for only.
 
 ### 0x7F0 ENTER_BOOTLOADER - Enter the bootloader
 

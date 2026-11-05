@@ -65,6 +65,10 @@ void HandleData(uint8_t *data, uint32_t dlc);
 // main slot and resets into the new application.
 void HandleEndUpdate(uint8_t *data);
 
+// CAN_ID_BOOTLOADER_SERIAL_CHUNK (0x7EE) - one of the 12 chunks of the signed command that programs the serial number; the twelfth is answered on 0x7EF
+// (nothing is sent by a head the command is not meant for).
+void HandleSerialChunk(uint8_t *data);
+
 // Addressing by serial number (0x7EA): BlSelect_Accepts says whether a frame
 // with this identifier is for this bootloader now, BlSelect_OnFrame handles a
 // 0x7EA command and sends the 0x7EB answer when there is one.

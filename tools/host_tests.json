@@ -86,6 +86,19 @@
    "std": "c11"
   },
   {
+   "name": "bl_serial",
+   "test": "tests/test_bl_serial.c",
+   "sources": [
+    "src/common/urtc_ed25519.c"
+   ],
+   "includes": [
+    "tests",
+    "tests/vectors",
+    "src/common"
+   ],
+   "std": "c11"
+  },
+  {
    "name": "bootloader_crypto",
    "test": "tests/test_bootloader_crypto.c",
    "sources": [
@@ -728,7 +741,8 @@
     "tests",
     "tests/host_hal",
     "src/F303-master/boot",
-    "src/common"
+    "src/common",
+    "tests/vectors"
    ],
    "extra": [
     "-Wno-cpp",
@@ -738,6 +752,37 @@
     "-Dmain=bootloader_main_entry",
     "-DURTC_HOST_TEST",
     "-DURTC_TRUST_DEV"
+   ]
+  },
+  {
+   "name": "bootloader_boot_serial",
+   "test": "tests/test_bootloader_boot.c",
+   "sources": [
+    "tests/host_hal/fake_hal.c",
+    "src/F303-master/boot/bootloader_main.c",
+    "src/F303-master/boot/bootloader_oled.c",
+    "src/F303-master/boot/bootloader_protocol.c",
+    "src/F303-master/boot/bootloader_flash.c",
+    "src/F303-master/boot/bootloader_crypto.c",
+    "src/F303-master/boot/bootloader_trust.c",
+    "src/F303-master/boot/bootloader_ed25519.c"
+   ],
+   "includes": [
+    "tests",
+    "tests/host_hal",
+    "src/F303-master/boot",
+    "src/common",
+    "tests/vectors"
+   ],
+   "extra": [
+    "-Wno-cpp",
+    "-Wno-int-to-pointer-cast"
+   ],
+   "defines": [
+    "-Dmain=bootloader_main_entry",
+    "-DURTC_HOST_TEST",
+    "-DURTC_TRUST_DEV",
+    "-DURTC_BL_PROGRAMMABLE_SERIAL=1"
    ]
   },
   {
