@@ -65,7 +65,8 @@ jobs:
             echo "::error::The tag ${REQUESTED_TAG} is not v${version}, the version of urtc.project.json at this commit."
             exit 1
           fi
-          if gh release view "${REQUESTED_TAG}" >/dev/null 2>&1; then
+          # the draft that holds the signed files is expected to exist (gh shows drafts to this token); only a PUBLISHED release of the tag stops the job
+          if state="$(gh release view "${REQUESTED_TAG}" --json isDraft --jq .isDraft 2>/dev/null)" && [ "${state}" != "true" ]; then
             echo "::error::A release ${REQUESTED_TAG} already exists; a published version is never replaced, raise the version first."
             exit 1
           fi
