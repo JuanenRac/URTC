@@ -140,9 +140,8 @@ unaffected. A release made from your own machine does not run the workflow, so i
 gh secret set URTC_DISPATCH_TOKEN --repo JuanenRac/URTC
 ```
 
-After the first official release exists, the flasher and the web studio take their images from
-it: delete `firmware_release.json` (flasher) and `firmware-release.json` (web studio), which only
-name the bench pre-release to use while there is no official one.
+The flasher and the web studio take their images from the newest official release (GitHub's "latest"):
+they keep no file that names another release to use in its place.
 
 ## Transition from the development key
 
@@ -152,8 +151,7 @@ nothing proves who published them. The plan, in order:
 1. **Until the first official release.** Releases that are signed with the development key are published as
    pre-releases ("bench"). The tools verify a `.sig` when it is there; a download without signatures is
    refused unless you say `--allow-unsigned`. The flasher and the web studio keep no copy of the images:
-   they take them from the release, and while GitHub's "latest" answers 404 (it ignores pre-releases) they use
-   the bench release named in `firmware_release.json` / `firmware-release.json`.
+   they take them from the release; a bench pre-release is reached only by its tag.
 2. **First official release.** Built with the production HMAC key and signed
    with `--sign`. From then on the flasher and the web studio treat an asset
    without a valid `.sig` as an error (`REQUIRE_RELEASE_SIGNATURE = True`), and

@@ -73,14 +73,12 @@ must allow it after the redirect.
   (sha256 against sidecar and manifest, `hmac_sha256` on application
   images, the release signature) before copying. The `firmware/` folder is
   not in git: the window and the sync tool fill it from the newest official
-  release, or, while there is none, from the release named in
-  `firmware_release.json`.
+  release (GitHub's "latest").
 - **URTC-WEB-STUDIO**: `scripts/sync-firmware.mjs` downloads the release
   assets (newest, or a given tag) or reads a local build folder, verifies each
   sha256 and the release signature and regenerates `src/lib/bundledFirmware.ts`.
   `public/firmware/` is not in git: the CI and the Pages build run the sync
-  (the release named in `firmware-release.json` while there is no official
-  one). Nothing in the browser code reads GitHub at run time.
+  (the newest official release). Nothing in the browser code reads GitHub at run time.
 - **URTC-UPDATER**: it reads only `urtc.project.json` and the native version
   file of each repository; if it ever downloads firmware it must use the
   release assets described above.
@@ -98,8 +96,7 @@ as a **pre-release** ("bench"): `tools/publish_release_assets.py` refuses it
 as an official release, and with `--allow-dev-key` it adds `--prerelease` to
 the printed command. Until the first release signed with a private production
 key exists, the clients reach the bench images by tag
-(`sync_firmware.py --release v0.3.8`, `sync-firmware.mjs --tag <tag>`) or through
-the fallback file described above; they keep no copy of their own.
+(`sync_firmware.py --release v0.3.8`, `sync-firmware.mjs --tag <tag>`); they keep no copy of their own.
 
 ## The flasher and the web studio keep no copy of the images
 
