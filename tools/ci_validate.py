@@ -13,6 +13,7 @@ import re
 import sys
 import subprocess
 from pathlib import Path
+from typing import NoReturn
 
 
 from _doc_policy import check_public_private_boundary
@@ -131,7 +132,7 @@ def has_build_run_section(text: str) -> bool:
     return any(marker in text for marker in BUILD_RUN_SECTION_MARKERS)
 
 
-def fail(message: str) -> None:
+def fail(message: str) -> NoReturn:
     print(f"CI_VALIDATION=FAIL {message}", file=sys.stderr)
     raise SystemExit(1)
 

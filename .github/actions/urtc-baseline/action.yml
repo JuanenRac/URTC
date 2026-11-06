@@ -1,0 +1,48 @@
+# =============================================================================
+# URTC - the baseline steps every repository of the family runs first (composite action)
+# Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
+# GPL-3.0-or-later - see LICENSE
+# =============================================================================
+# CANONICAL COPY: it is written once, in files/ of the devtools repository, and put into every repository as .github/actions/urtc-baseline/action.yml by the sync of the
+# documentation hub (the version of the set and the hash of each copy go in tools/devtools.lock.json, and the check of the repository tools finds a copy that was edited or left behind).
+# Edit it in the devtools repository and sync; do not hand-edit a copy.
+#
+# What every repository did first, in the same words, written once: set up Python, validate the manifest, the version, the documentation and the secret policy
+# (tools/ci_validate.py), and compile every Python source without running the build scripts (those change versions). The workflow of the repository checks the
+# repository out first (a local action needs the files) and keeps what is its own after this step: its linting, its type checks, its tests.
+# The action it uses is pinned to a commit, like the ones of the workflows that pin theirs.
+name: Repository baseline
+description: Set up Python, validate the project baseline and compile the Python sources of the repository
+
+inputs:
+  python-version:
+    description: The version of Python the workflow of the repository uses
+    required: false
+    default: "3.12"
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+      with:
+        python-version: ${{ inputs.python-version }}
+    - name: Validate manifest, version, documentation and secret policy
+      shell: bash
+      run: python tools/ci_validate.py
+    - name: Light build check (the stack and the files the full check needs; nothing is built)
+      shell: bash
+      run: python tools/build_test.py --check
+    - name: Compile Python sources without running versioning build scripts
+      shell: bash
+      run: |
+        python - <<'PY'
+        from pathlib import Path
+        import py_compile
+
+        excluded = {".git", ".venv", "node_modules", "dist", "build", "target", "__pycache__"}
+        files = [path for path in Path(".").rglob("*.py") if not any(part in excluded for part in path.parts)]
+        for path in files:
+            py_compile.compile(str(path), doraise=True)
+        print(f"PYTHON_SYNTAX=PASS files={len(files)}")
+        PY

@@ -301,7 +301,8 @@ def run_checks(prefix: list[str]) -> list[str]:
         reason = verify_failure(twin.end_update(crc32(image), 0, 5, 1))
         if reason != FAIL_SIGNATURE:
             problems.append(f"a flipped bit in the signature gave reason {reason}, expected {FAIL_SIGNATURE}")
-        if twin.installed_version() is not None and twin.installed_version()[1:] != (0, 0):
+        installed = twin.installed_version()
+        if installed is not None and installed[1:] != (0, 0):
             problems.append("a refused update changed the installed identity")
 
     with Twin(prefix) as twin:
