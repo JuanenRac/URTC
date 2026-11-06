@@ -195,3 +195,16 @@ Status: not run on a board.
 10. Read the size of the slave bootloader in the build log of Actions after the HMAC routine and key were removed and the metadata log and the counter were added, against the 18432-byte region. [HW]
 
 Status: not run on a board.
+
+## What runs without a board
+
+Some of the behaviour above is exercised on a PC by compiling the real C for the host. This is not a bench test and does not replace one: it says nothing about the pins, the clocks, the interrupt timing, the flash of the chip or the CAN transceiver.
+
+| What | How to start it | What it covers |
+|---|---|---|
+| The virtual board | `python tools/fuzz_virtual_board.py` (or `urtc-virtual-board --firmware-repo DIR` of URTC-COMMON, then `URTC_VIRTUAL_PORT=socket://127.0.0.1:7777` in the tester, the flasher or the gateway) | The real receive path of the application behind an SLCAN text port, with the address and undefined-behaviour sanitizers: it never stops on a frame of the specification or a random one, only transmits identifiers a board may send and resets into the bootloader exactly on the magic frame |
+| The twin of the bootloader | `python tools/bootloader_twin.py --check` (`--build-only` prints the command that runs it; `urtc-virtual-board --firmware-bootloader` bridges to it) | The real bootloader of the master (window, main loop, flash that only clears bits until a page is erased, CRC, Ed25519 record, trust table): a signed update is taken; a bad signature, an unknown key, a counter below the floor, a foreign board and a transfer left silent are refused or abandoned |
+| The host suites | `python tools/run_host_tests.py` | The logic of the firmware against a fake HAL |
+| The flasher against the twin | the tests of URTC-FLASHER (`tests/test_bootloader_twin.py`) | The flasher unchanged against the real bootloader, with the image and its `.imgsig` file |
+
+On a plain PC these tools compile only on request: `ALLOW_LOCAL_BUILD=1` allows it (inside WSL on Windows, because the fake flash needs a 64-bit Linux), and the CI always may. Without a compiler they say SKIPPED (exit status 2), never passed. The bootloader of the expansion slave, the bus timing and the interrupts are not simulated; bench tests 1 to 15 stay as they are.

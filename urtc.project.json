@@ -12,11 +12,11 @@
   ],
   "deployment_target": "mcu",
   "maturity": "functional",
-  "evidence": "host-test",
+  "evidence": "simulator",
   "family": "URTC Tool Platform",
   "parent": null,
   "build": "4 independently-versioned components (main + slave, app + bootloader each). This registry tracks the main application as representative. Real build: bash build_firmware.sh.",
-  "notes": "Firmware for the Universal Robot Tool Controller PCB (no populated board exists yet, so it has never run on a real board) - 25+ tool profiles, CAN bus.",
+  "notes": "Firmware for the Universal Robot Tool Controller PCB (no populated board exists yet, so it has never run on a real board; its receive path and the bootloader of the master run on a PC against virtual boards) - 25+ tool profiles, CAN bus.",
   "native_version": {
     "file": "src/F303-master/firmware_common.h",
     "pattern": {

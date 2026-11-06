@@ -54,6 +54,12 @@ jobs:
           python -m pip install coverage
           python -m coverage run --source=tools --omit=tools/pretty_run.py,tools/universal_readme_check.py,tools/_readme_svg.py,tools/make_architecture.py,tools/make_structure.py -m unittest discover -s tests -p "test_*.py" -v
           python -m coverage report --fail-under=35
+      - name: Simulation bench (the real receive path of the application and the real bootloader of the master, compiled for the host)
+        env:
+          URTC_CI: "1"
+        run: |
+          python tools/fuzz_virtual_board.py --extra 3000
+          python tools/bootloader_twin.py --check
       - name: Install ARM GNU Toolchain for firmware projects
         if: ${{ hashFiles('build_firmware.sh') != '' }}
         run: |
