@@ -214,29 +214,14 @@ void HandleErrorCounterQuery(void) {
 // re-checking. Returns 1 if the main slot ends up holding a verified,
 // jumpable application; 0 otherwise (bootloader stays in listening mode).
 // -----------------------------------------------------------------------
-// This chip has two distinct RAM regions a valid stack pointer could
-// legitimately sit in - not just the 40KB standard SRAM at 0x20000000,
-// but also an 8KB CCM (Core-Coupled Memory) region at 0x10000000,
-// confirmed against ST's own datasheet (DS9118) for the STM32F303xB/xC
-// family. CCM is CPU-only (no DMA access) and mapped on both instruction
-// and data bus - a firmware built to run its most timing-critical code
-// from there (or simply place its stack there) is using this chip
-// exactly as ST documents it supporting, not doing anything unusual.
+// The chip has two RAM regions a valid stack pointer can sit in: the 40KB
+// SRAM at 0x20000000 and the 8KB CCM at 0x10000000 (STM32F303xB/xC
+// datasheet DS9118). Start addresses come from CMSIS; the sizes stay
+// literals because the family headers define no size macro.
 //
-// Start addresses come from CMSIS (SRAM_BASE/CCMDATARAM_BASE) rather
-// than hardcoded literals. The sizes stay as literals - verified neither
-// SRAM_SIZE nor CCMDATARAM_SIZE exists in this chip family's CMSIS
-// headers, so there's no macro to derive them from.
-//
-// The inclusive upper bound (<=, not <) on each range is intentional,
-// not an off-by-one: this project's own linker script defines
-// _estack = ORIGIN(RAM) + LENGTH(RAM), i.e. exactly SRAM_BASE + 40K -
-// the standard ARM Cortex-M "empty descending stack" convention, where
-// the reset vector table's initial MSP value legitimately points one
-// address past the last usable byte (nothing is stored there; the first
-// push decrements before writing). A stricter "<" here would reject the
-// exact initial SP value of any correctly-linked application using this
-// project's own linker script.
+// The inclusive upper bound (<=) is intentional: the linker script sets
+// _estack = SRAM_BASE + 40K, the Cortex-M empty descending stack, so a
+// correctly linked application starts with an SP one past the last byte.
 static uint8_t StackPointerInValidRAM(uint32_t sp) {
     // Lower bound leaves headroom for at least a few PUSHes before the
     // very base of RAM - a stack pointer sitting exactly at the base
@@ -323,23 +308,11 @@ void JumpToApplication(void) {
     uint32_t app_stack = *(volatile uint32_t*)MAIN_APP_ADDR;
     uint32_t app_reset_vector = *(volatile uint32_t*)(MAIN_APP_ADDR + 4);
 
-    // Sanity check runs before any peripheral teardown below - a failure
-    // here returns to the caller with CAN still alive to fall back to
-    // listening with, rather than having already disabled the CAN
-    // interrupt, de-initialized CAN, reset the clock config, and
-    // de-initialized HAL first. Four separate conditions, each catching a
-    // different way a corrupted or wrong-slot image could otherwise still
-    // pass a naive check: the stack pointer must sit in one of this
-    // chip's two real RAM regions (40KB SRAM at 0x20000000, or 8KB CCM at
-    // 0x10000000 - see StackPointerInValidRAM's own note on why both are
-    // legitimate), the stack pointer must be
-    // contiguous SRAM (0x20000000-0x2000A000), the stack pointer must be
-    // 4-byte aligned per the AAPCS calling convention Cortex-M requires,
-    // the reset vector's LSB must be 1 (Thumb state - Cortex-M cannot
-    // execute ARM-mode instructions at all, so a 0 here means an
-    // instant UsageFault on entry), and the reset vector itself must
-    // actually point inside the application slot rather than anywhere
-    // else a corrupted vector table might claim.
+    // The sanity check runs before any peripheral teardown, so a failure
+    // returns with CAN still alive and the bootloader can keep listening.
+    // The stack pointer must sit in SRAM or CCM (see StackPointerInValidRAM)
+    // and be 4-byte aligned; the reset vector must have its Thumb bit set
+    // (a 0 is an instant UsageFault) and point inside the application slot.
     if (!StackPointerInValidRAM(app_stack) ||
         (app_stack & 0x3UL) != 0 ||
         (app_reset_vector & 0x1UL) == 0 ||

@@ -451,31 +451,13 @@ static volatile uint8_t mlx_capture_requested = 0;
 
 void MLX_TriggerCapture(void) {
     if (mlx_sensor_variant == MLX_VARIANT_90640 || mlx_sensor_variant == MLX_VARIANT_90641) {
-        // this used to call MLX90640_DoTriggerCapture/
-        // MLX90641_DoTriggerCapture() directly, right here - but this
-        // function is itself called from HAL_I2C_SlaveRxCpltCallback
-        // (slave_i2c_link.c), the I2C1 slave link's own ISR context.
-        // TriggerMeasurement + GetFrameData (the real work those
-        // functions do) is a whole sequence of blocking I2C2 master
-        // transactions - Melexis's own reference timing for a full
-        // MLX9064x frame is comfortably capable of taking hundreds of
-        // ms, and this project's own firmware_mlx90640_app.c (the main
-        // board's direct-connection driver) already documents a real,
-        // measured >500ms worst case for the same underlying capture.
-        // Blocking that long INSIDE this ISR callback left I2C1 deaf to
-        // the main board for the whole duration (no other register
-        // write/read on this link could be serviced until the callback
-        // returned) and, worse, starved this chip's own
-        // HAL_IWDG_Refresh() (only ever reached from the main loop's own
-        // while(1), see slave_main.c) for the same stretch - long enough
-        // to risk tripping the ~0.8s watchdog on an ordinary capture, not
-        // just an unusually slow one. Setting BUSY immediately below (so
-        // a host that polls status right after triggering sees the
-        // correct thing with no delay) and flagging the real work for
-        // MLX_ServiceCapture keeps this ISR callback itself fast -
-        // exactly the same "start something async, poll for completion
-        // separately" shape MLX90642_DoTriggerCapture/
-        // MLX90642_DoGetCaptureStatus below already use for that sensor.
+        // This runs in the I2C1 slave ISR (HAL_I2C_SlaveRxCpltCallback in
+        // slave_i2c_link.c). A full capture is a sequence of blocking I2C2
+        // master transactions that can take over 500 ms, which would leave
+        // I2C1 deaf to the main board and starve the ~0.8 s watchdog (its
+        // refresh is only reached from the main loop). So BUSY is set at once
+        // and the real work is flagged for MLX_ServiceCapture, the same
+        // start-then-poll shape the MLX90642 functions below use.
         if (mlx_sensor_variant == MLX_VARIANT_90640) {
             mlx90640_capture_status = MLX_CAPTURE_BUSY;
         } else {

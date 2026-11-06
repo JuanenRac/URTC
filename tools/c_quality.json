@@ -25,7 +25,7 @@
  },
  "comments": {
   "max_block_lines": 14,
-  "max_long_blocks": 4,
+  "max_long_blocks": 0,
   "exclude": ["src/F303-master/melexis_mlx90640/", "src/F303-slave/melexis_mlx90640/", "src/F303-master/melexis_mlx90641/", "src/F303-slave/melexis_mlx90641/", "src/F303-master/melexis_mlx90642/", "src/F303-slave/melexis_mlx90642/"]
  }
 }
