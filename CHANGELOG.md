@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented here.
 
-## [Unreleased]
+## [0.4.6] - The distribution notes say that the clients read the official release only: docs/FIRMWAREDISTRIBUTION.md and docs/RELEASESIGNING.md no longer describe a file that names a bench release to use while there is no official one;... (and 5 more changes)
 
 - **The distribution notes say that the clients read the official release only:** `docs/FIRMWARE_DISTRIBUTION.md` and `docs/RELEASE_SIGNING.md` no longer describe a file that names a bench release to use while there is no official one; the flasher and the web studio take the newest official release and reach a bench pre-release only by its tag.
 - **The Python sources are type checked in CI, and the workflow runs the shared baseline action:** `mypy.ini` (mypy 2.4.0, the same version as URTC-DEVTOOLS) checks `tools/`, `tests/` and the root scripts, leaving out the copies of the shared picture tools and of the image-record reference; `fail()` in `tools/ci_validate.py` is typed as never returning and the installed-identity check of the bootloader twin reads the value once. The steps every repository runs first (Python, project validation, light build check, compilation of the sources) now come from `.github/actions/urtc-baseline/action.yml`, the canonical copy of URTC-DEVTOOLS, and `tools/devtools.lock.json` records it with set version 0.0.3.
