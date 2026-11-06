@@ -46,6 +46,8 @@ jobs:
         run: |
           python tools/fuzz_virtual_board.py --extra 3000
           python tools/bootloader_twin.py --check
+      - name: Simulation bench (the model of the bootloader of the expansion slave, Python only)
+        run: python tools/slave_bootloader_twin.py --check
       - name: Install ARM GNU Toolchain for firmware projects
         if: ${{ hashFiles('build_firmware.sh') != '' }}
         run: |

@@ -161,6 +161,7 @@ Every file of the repository with a line on what it does: the annotated tree tha
 │   ├── c_quality.py / c_quality.json  Checks the compiler of the board does not make: `-Wconversion` with the host compiler, cppcheck and the length of comment blocks (what is excluded and why, and the limits, are in the JSON)
 │   ├── gen_build_scripts.py / build_plan.json  Writes the pinned vendor sources, the compiler and linker flags and the HAL modules into build_firmware.sh and build_firmware.bat from one file (`--check` in CI)
 │   ├── bootloader_twin.py / changelog_section.py / fuzz_virtual_board.py The twin of the bootloader (build and drive); the text of one CHANGELOG section for a release; a fuzz run of the virtual board
+│   ├── slave_bootloader_twin.py  Host model of the bootloader of the expansion slave (register protocol, update states, confirmation, rollback floor, metadata log, power cuts); no compiler needed
 │   └── _doc_policy.py / _readme_parity.py / _tracked_names.py Shared checks used by ci_validate.py
 ├── VERSION_CHECKLIST.txt        Mechanical checklist for bumping any of this project's own
 │                                4 independent version numbers correctly
