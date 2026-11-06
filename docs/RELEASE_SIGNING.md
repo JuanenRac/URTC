@@ -59,7 +59,10 @@ The path of an official release, from the build to the published set:
    key adds `<image>.imgsig` with the counter of the release. Both keys stay outside every repository and are never printed.
 3. `python tools/publish_release_assets.py --sign --draft` puts the records in the set (the `.imgsig` of each application image and its `.sig`),
    refuses an official set that lacks one or holds a file that is not a record, and prints the `gh release create` command; the workflow
-   `release.yml` repeats the check (`tools/verify_release_set.py`) before it publishes.
+   `release.yml` repeats the check (`tools/verify_release_set.py`) before it publishes. That check needs no key: `tools/verify_image_records.py`
+   rebuilds, from the file name and the bytes of each application image, what the bootloader verifies (hardware, version, length, CRC-32, SHA-256,
+   counter) and decides as the bootloader would against the release table of `keys/image_trust.json`; it also requires the bootloader of the set to
+   hold exactly that table. The header the record covers is never inside the flashed image.
 4. The consumers take the record from the release: URTC-FLASHER and URTC-WEB-STUDIO read `<image>.imgsig` next to the image they flash and carry
    it to the bootloader (11 frames of `0x7EC` for the main board, `0x21A` for the slave through the main board). The web studio bundles the
    record of each application image with the image (`scripts/sync-firmware.mjs` downloads and verifies it, and refuses an official set without it
@@ -113,7 +116,8 @@ Environments). It holds no secret for this and needs none. Then it:
    public key is the one pinned in `tools/release_sign.py`;
 4. runs `tools/verify_release_set.py`: the tag, every digest (`.sha256`, the manifests, the
    index), the versions, that the application images are signed with a production key, the
-   `.sig` of **every** asset against the public key, and that no file is there that the set does
+   `.sig` of **every** asset against the public key, that every `.imgsig` verifies for the image next to it
+   under the release trust table (no key is read), and that no file is there that the set does
    not account for;
 5. only if all of it passes, creates the release from the files it just verified (not from the
    draft, which could change in between), downloads the published files and verifies them again,

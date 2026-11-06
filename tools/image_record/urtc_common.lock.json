@@ -1,0 +1,26 @@
+{
+  "format": 1,
+  "urtc_common_version": "0.2.1",
+  "files": {
+    "__init__.py": {
+      "from": "src/urtc_common/__init__.py",
+      "sha256": "9bd3a7b36b34e445e590f5fd732da9af3e195c6a2823b45433395a4f39a580be"
+    },
+    "ed25519.py": {
+      "from": "src/urtc_common/ed25519.py",
+      "sha256": "c32eae555fee5c8d5061aeffcb44be1c116c628bc28aff3f62897fa925cbda6f"
+    },
+    "image_auth.py": {
+      "from": "src/urtc_common/image_auth.py",
+      "sha256": "8187422f3bac5b000760f35e0c6ba5a58a0d61eb178b1da4420ac10669f4fa71"
+    },
+    "image_header.py": {
+      "from": "src/urtc_common/image_header.py",
+      "sha256": "6f00c88ee955bd0c415fc8490b62c18362e4afeb2b328f1c0e04550e7766272e"
+    },
+    "image_sig.py": {
+      "from": "src/urtc_common/image_sig.py",
+      "sha256": "b733d51f1fa144b955c33ab564d49fb06034bfd15db27bab82d3aadccec58cb9"
+    }
+  }
+}

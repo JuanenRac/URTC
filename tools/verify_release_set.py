@@ -16,6 +16,8 @@ the one pinned in tools/release_sign.py), and it checks, for the files of DIR:
   * the set is complete and consistent (the checks of tools/publish_release_assets.py: sidecar
     digests, manifests, versions, application images signed with a production key);
   * every asset has its .sig and each one verifies against the public key of the registry;
+  * every image signature record (.imgsig) verifies, with no key, against the release trust table of keys/image_trust.json for the image next to
+    it, and the bootloader of the set holds exactly that table (tools/verify_image_records.py);
   * no file is in DIR that the set does not account for.
 
 Prints VERIFY_RELEASE_SET=PASS and exits 0 only when all of that holds; otherwise nothing may be
@@ -24,6 +26,7 @@ published. --list-file writes the names of the files to publish, one per line.
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -33,6 +36,7 @@ sys.path.insert(0, str(HERE))
 import keys  # noqa: E402
 import publish_release_assets  # noqa: E402
 import release_sign  # noqa: E402
+import verify_image_records  # noqa: E402
 
 KEY_ID = "urtc-release-ed25519"
 
@@ -46,8 +50,8 @@ def registry_public_key(registry: dict | None = None) -> str:
 
 
 def verify_set(folder: Path, tag: str, with_elf: bool = False, root: Path = ROOT,
-               public_hex: str | None = None) -> tuple[list[str], list[str]]:
-    """Returns (problems, names of the files to publish)."""
+               public_hex: str | None = None, records: bool = True) -> tuple[list[str], list[str]]:
+    """Returns (problems, names of the files to publish). `records` also checks every .imgsig against the release trust table (needs no key)."""
     problems: list[str] = []
     public_hex = public_hex or registry_public_key()
     if public_hex != release_sign.PUBLIC_KEY_HEX:
@@ -73,6 +77,10 @@ def verify_set(folder: Path, tag: str, with_elf: bool = False, root: Path = ROOT
             continue
         if not release_sign.verify_file(asset, public_hex=public_hex):
             problems.append(f"{name}: its signature does not verify against the public key of the registry")
+    if records:
+        trust_file = root / "keys" / "image_trust.json"
+        doc = json.loads(trust_file.read_text(encoding="utf-8")) if trust_file.is_file() else None
+        problems.extend(verify_image_records.check_folder(folder, "release", doc))
     return problems, names
 
 

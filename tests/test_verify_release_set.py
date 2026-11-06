@@ -56,7 +56,8 @@ class VerifyReleaseSetTests(unittest.TestCase):
             stray.unlink()
 
     def check(self, tag="v1.2.3"):
-        return vrs.verify_set(self.fw, tag, root=self.root, public_hex=self.public)
+        # the records of these sets are placeholders: their cryptography is held by tests/test_verify_image_records.py
+        return vrs.verify_set(self.fw, tag, root=self.root, public_hex=self.public, records=False)
 
     def test_a_complete_signed_set_passes_and_lists_every_file(self):
         self.make_signed_set()
