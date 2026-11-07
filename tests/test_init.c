@@ -241,9 +241,101 @@ static void test_can_bit_timing(int *failures)
                 "the crystal is off by default and the register encodings are those of the HAL");
 }
 
+// ---- limits, cuts and a fuzz with a fixed seed for the bit timing --------------------------------------------------------------------------
+static uint32_t bt_rng_state = 0x5EED1234u;
+static uint32_t bt_rng(void)
+{
+    bt_rng_state ^= bt_rng_state << 13;
+    bt_rng_state ^= bt_rng_state >> 17;
+    bt_rng_state ^= bt_rng_state << 5;
+    return bt_rng_state;
+}
+
+static const uint32_t bt_clocks[] = {8000000u, 16000000u, 24000000u, 32000000u, 36000000u, 48000000u, 64000000u, 72000000u};
+static const uint32_t bt_rates[] = {10000u, 20000u, 50000u, 100000u, 125000u, 250000u, 500000u, 800000u, 1000000u};
+
+static void test_can_bit_timing_limits(int *failures)
+{
+    urtc_can_bt_t bt;
+    // The two ends of the accepted sample point, and one step outside each.
+    TEST_ASSERT(urtc_can_bt_compute(32000000u, 500000u, 500u, 2u, &bt) == URTC_CAN_BT_OK && urtc_can_bt_rate(32000000u, &bt) == 500000u, "a sample point of 500 per thousand is accepted");
+    TEST_ASSERT(urtc_can_bt_compute(32000000u, 500000u, 900u, 2u, &bt) == URTC_CAN_BT_OK && urtc_can_bt_rate(32000000u, &bt) == 500000u, "a sample point of 900 per thousand is accepted");
+    TEST_ASSERT(urtc_can_bt_compute(32000000u, 500000u, 499u, 2u, &bt) == URTC_CAN_BT_ERR_ARGS && urtc_can_bt_compute(32000000u, 500000u, 901u, 2u, &bt) == URTC_CAN_BT_ERR_ARGS, "a sample point one step outside is refused");
+    TEST_ASSERT(urtc_can_bt_compute(32000000u, 0u, 875u, 2u, &bt) == URTC_CAN_BT_ERR_ARGS, "a zero bit rate is refused");
+    // A prescaler beyond 1024 is no fit; so is a clock equal to the rate; and huge arguments cannot overflow the products.
+    TEST_ASSERT(urtc_can_bt_compute(32000000u, 1000u, 875u, 2u, &bt) == URTC_CAN_BT_ERR_NO_FIT, "a rate whose prescaler is above 1024 for every quanta count has no fit");
+    TEST_ASSERT(urtc_can_bt_compute(1000000u, 1000000u, 875u, 2u, &bt) == URTC_CAN_BT_ERR_NO_FIT, "a clock equal to the bit rate has no fit (fewer than 8 quanta)");
+    TEST_ASSERT(urtc_can_bt_compute(0xFFFFFFFFu, 0xFFFFFFFFu, 875u, 2u, &bt) == URTC_CAN_BT_ERR_NO_FIT, "the largest arguments do not overflow the products");
+    TEST_ASSERT(urtc_can_bt_compute(8000000u, 1000000u, 875u, 2u, &bt) == URTC_CAN_BT_OK && bt.prescaler == 1u && urtc_can_bt_total_tq(&bt) == 8u, "1 Mbit/s from 8 MHz uses the smallest bit of 8 quanta");
+    TEST_ASSERT(urtc_can_bt_compute(32000000u, 500000u, 875u, 3u, &bt) == URTC_CAN_BT_OK && bt.sjw == 2u, "a jump width of 3 is cut to the second segment of 2 quanta");
+    TEST_ASSERT(urtc_can_bt_compute(32000000u, 500000u, 875u, 4294967295u, &bt) == URTC_CAN_BT_OK && bt.sjw >= 1u && bt.sjw <= 4u && bt.sjw <= bt.bs2, "the largest jump width is cut to 4 and to the second segment");
+    // The tolerance is exactly the smaller of the two conditions of the specification (500 kbit/s, 16 quanta: 6250 and 4854 ppm).
+    TEST_ASSERT(urtc_can_bt_compute(32000000u, 500000u, 875u, 2u, &bt) == URTC_CAN_BT_OK && urtc_can_bt_tolerance_ppm(&bt) == 4854u, "the tolerance of the standard setting is exactly 4854 ppm");
+    urtc_can_bt_t flat = {1u, 1u, 1u, 1u};
+    TEST_ASSERT(urtc_can_bt_total_tq(&flat) == 3u && urtc_can_bt_sample_permille(&flat) == 666u && urtc_can_bt_tolerance_ppm(&flat) > 0u, "the smallest setting still has a tolerance and a sample point");
+    urtc_can_bt_t zero = {0u, 0u, 0u, 0u};
+    TEST_ASSERT(urtc_can_bt_rate(32000000u, &zero) == 0u && urtc_can_bt_total_tq(&zero) == 1u, "a setting of zeros gives no rate, never a division by zero");
+    // The limits of the diagnostic, one ppm either side.
+    urtc_can_bt_compute(32000000u, 500000u, 875u, 2u, &bt);
+    uint32_t tol = urtc_can_bt_tolerance_ppm(&bt);
+    TEST_ASSERT(urtc_can_bt_diag(32000000u, 500000u, &bt, tol / 2u, 0, 0) == URTC_CAN_DIAG_OK, "a clock error of exactly half the tolerance is ok");
+    TEST_ASSERT(urtc_can_bt_diag(32000000u, 500000u, &bt, tol / 2u + 1u, 0, 0) == URTC_CAN_DIAG_MARGINAL, "one ppm above half the tolerance is marginal");
+    TEST_ASSERT(urtc_can_bt_diag(32000000u, 500000u, &bt, tol, 0, 0) == URTC_CAN_DIAG_MARGINAL, "a clock error of exactly the tolerance is still marginal");
+    TEST_ASSERT(urtc_can_bt_diag(32000000u, 500000u, &bt, tol + 1u, 0, 0) == URTC_CAN_DIAG_FAIL, "one ppm above the tolerance fails");
+    TEST_ASSERT(urtc_can_bt_diag(32000000u, 500000u, &bt, 0u, 0, 0) == URTC_CAN_DIAG_OK, "a perfect clock is ok");
+    int32_t err = 0;
+    TEST_ASSERT(urtc_can_bt_diag(33000000u, 500000u, &bt, 0u, 0, &err) == URTC_CAN_DIAG_FAIL && err > 0, "a clock that is too fast is reported with a positive rate error");
+    TEST_ASSERT(urtc_can_bt_diag(32000000u, 0u, &bt, 0u, 0, 0) == URTC_CAN_DIAG_BAD_ARGS && urtc_can_bt_diag(32000000u, 500000u, 0, 0u, 0, 0) == URTC_CAN_DIAG_BAD_ARGS, "a zero bit rate or a missing setting is a bad argument");
+    urtc_can_bt_t no_presc = {0u, 13u, 2u, 2u};
+    TEST_ASSERT(urtc_can_bt_diag(32000000u, 500000u, &no_presc, 0u, 0, 0) == URTC_CAN_DIAG_BAD_ARGS, "a setting with a prescaler of zero is a bad argument");
+    TEST_ASSERT(URTC_CAN_HAL_BS1(1u) == 0u && URTC_CAN_HAL_BS1(16u) == (15u << 16) && URTC_CAN_HAL_BS2(8u) == (7u << 20) && URTC_CAN_HAL_SJW(4u) == (3u << 24),
+                "the register encodings of the smallest and largest segments");
+    TEST_ASSERT(URTC_CLOCK_HSE_PPM < URTC_CLOCK_HSI_PPM && URTC_HSE_PLLMUL_VALUE * URTC_HSE_HZ == 64000000u, "the crystal is more exact than the internal oscillator and the multiplier gives 64 MHz");
+
+    // Every common clock, rate and sample point gives a legal exact setting or a clean refusal (a sweep, no randomness).
+    for (unsigned c = 0; c < sizeof bt_clocks / sizeof bt_clocks[0]; c++) {
+        for (unsigned r = 0; r < sizeof bt_rates / sizeof bt_rates[0]; r++) {
+            for (uint32_t sp = 500u; sp <= 900u; sp += 25u) {
+                int rc = urtc_can_bt_compute(bt_clocks[c], bt_rates[r], sp, 2u, &bt);
+                TEST_ASSERT(rc == URTC_CAN_BT_OK || rc == URTC_CAN_BT_ERR_NO_FIT, "a valid request is either solved or reported as no fit");
+                if (rc == URTC_CAN_BT_OK) {
+                    TEST_ASSERT(urtc_can_bt_rate(bt_clocks[c], &bt) == bt_rates[r] && bt_clocks[c] % (bt_rates[r] * urtc_can_bt_total_tq(&bt)) == 0u, "a solved setting gives exactly the requested rate");
+                    TEST_ASSERT(bt.prescaler >= 1u && bt.prescaler <= 1024u && bt.bs1 >= 1u && bt.bs1 <= 16u && bt.bs2 >= 1u && bt.bs2 <= 8u && bt.sjw >= 1u && bt.sjw <= 4u && bt.sjw <= bt.bs2, "a solved setting is inside the limits of the peripheral");
+                }
+            }
+        }
+    }
+
+    // Fuzz with a fixed seed: whatever the arguments, the answer is a legal exact setting or one of the two refusals, and the refusals match their cause.
+    bt_rng_state = 0x5EED1234u;
+    unsigned solved = 0, no_fit = 0, bad_args = 0;
+    for (unsigned i = 0; i < 4000; i++) {
+        uint32_t pclk = (bt_rng() % 8u == 0u) ? 0u : ((bt_rng() % 10u < 7u) ? bt_clocks[bt_rng() % (sizeof bt_clocks / sizeof bt_clocks[0])] : (bt_rng() % 80000000u) + 1u);
+        uint32_t rate = (bt_rng() % 8u == 0u) ? 0u : ((bt_rng() % 10u < 7u) ? bt_rates[bt_rng() % (sizeof bt_rates / sizeof bt_rates[0])] : (bt_rng() % 1100000u) + 1u);
+        uint32_t sp = 450u + (bt_rng() % 500u);
+        uint32_t sjw = bt_rng() % 8u;
+        int rc = urtc_can_bt_compute(pclk, rate, sp, sjw, &bt);
+        int args_bad = (pclk == 0u || rate == 0u || sp < 500u || sp > 900u);
+        if (args_bad) {
+            bad_args++;
+            TEST_ASSERT(rc == URTC_CAN_BT_ERR_ARGS, "bad arguments are always refused as such");
+        } else if (rc == URTC_CAN_BT_OK) {
+            solved++;
+            TEST_ASSERT(urtc_can_bt_rate(pclk, &bt) == rate && pclk % (rate * urtc_can_bt_total_tq(&bt)) == 0u, "a solved setting is exact");
+            TEST_ASSERT(bt.prescaler >= 1u && bt.prescaler <= 1024u && bt.bs1 >= 1u && bt.bs1 <= 16u && bt.bs2 >= 1u && bt.bs2 <= 8u && bt.sjw >= 1u && bt.sjw <= 4u && bt.sjw <= bt.bs2, "a solved setting is legal");
+            TEST_ASSERT(urtc_can_bt_tolerance_ppm(&bt) <= 25000u, "no setting claims a tolerance above what the first condition allows");
+        } else {
+            no_fit++;
+            TEST_ASSERT(rc == URTC_CAN_BT_ERR_NO_FIT, "a good request that is not solved is reported as no fit");
+        }
+    }
+    TEST_ASSERT(bad_args > 100u && no_fit > 100u && solved > 100u, "the fuzz reaches the refusals and the solutions");
+}
+
 void run_init_tests(int *failures)
 {
     test_can_bit_timing(failures);
+    test_can_bit_timing_limits(failures);
     test_clocks(failures);
     test_can(failures);
     test_buses(failures);

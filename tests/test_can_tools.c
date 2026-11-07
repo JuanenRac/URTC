@@ -502,6 +502,28 @@ static void weld_timing(int *failures)
     TEST_ASSERT(urtc_weld_timer_params(9000u, 20, &psc, &arr) == 1 && urtc_weld_timer_params(1000000000u, 20, &psc, &arr) == 1, "a clock below 10 kHz or a prescaler beyond 16 bits is refused");
     uint32_t total_ticks_us = (arr + 1u);   // (arr of the last successful call is unchanged by a refusal)
     TEST_ASSERT(total_ticks_us == 50000u, "a refused call leaves the registers untouched");
+    // Edges and properties of the limits and of the timer arithmetic.
+    TEST_ASSERT(urtc_weld_clamp_ms(0) == 0 && urtc_weld_clamp_ms(1) == 1 && urtc_weld_clamp_ms(1999) == 1999, "the clamp leaves the short durations as they are");
+    for (uint32_t d = 0; d <= 0xFFFFu; d += 7u) {
+        uint16_t c = urtc_weld_clamp_ms((uint16_t)d);
+        TEST_ASSERT(c <= URTC_WELD_PULSE_HARD_MAX_MS && c <= URTC_WELD_PULSE_MAX_MS && (d > URTC_WELD_PULSE_MAX_MS || c == d), "the clamp never passes the hard limit and never changes a duration inside the limits");
+    }
+    uint32_t p2 = 0, a2 = 0;
+    TEST_ASSERT(urtc_weld_timer_params(10000u, 1, &p2, &a2) == 0 && p2 == 0u && a2 == 9u, "the slowest clock (10 kHz) gives a prescaler of 1 and 10 counts for 1 ms");
+    TEST_ASSERT(urtc_weld_timer_params(9999u, 1, &p2, &a2) == 1, "a clock one hertz under 10 kHz is refused");
+    TEST_ASSERT(urtc_weld_timer_params(655360000u, 1, &p2, &a2) == 0 && p2 == 65535u, "the largest prescaler of 16 bits is accepted");
+    TEST_ASSERT(urtc_weld_timer_params(655370000u, 1, &p2, &a2) == 1, "a prescaler one above 16 bits is refused");
+    TEST_ASSERT(urtc_weld_timer_params(64000001u, 20, &p2, &a2) == 1 && urtc_weld_timer_params(15000u, 20, &p2, &a2) == 1, "a clock that is not a whole multiple of 10 kHz is refused (it would give a pulse of the wrong length)");
+    static const uint32_t clocks[] = {40000u, 1000000u, 8000000u, 16000000u, 32000000u, 36000000u, 64000000u, 72000000u};
+    for (unsigned k = 0; k < sizeof clocks / sizeof clocks[0]; k++) {
+        for (uint32_t d = 1; d <= URTC_WELD_PULSE_HARD_MAX_MS; d += 13u) {
+            int rc = urtc_weld_timer_params(clocks[k], (uint16_t)d, &p2, &a2);
+            TEST_ASSERT(rc == 0 && a2 <= 65535u && p2 <= 65535u && (uint64_t)(p2 + 1u) * (uint64_t)(a2 + 1u) * 1000u == (uint64_t)d * clocks[k],
+                        "for every clock and duration the timer runs exactly the requested time and both registers fit 16 bits");
+        }
+    }
+    uint32_t keep_p = 11u, keep_a = 22u;
+    TEST_ASSERT(urtc_weld_timer_params(64000001u, 20, &keep_p, &keep_a) == 1 && keep_p == 11u && keep_a == 22u, "a refusal never writes the registers");
 }
 
 // ---- welding pulses (0x1C0 spot welder, 0x200 ultrasonic) -------------------------------------------------------------------

@@ -48,10 +48,11 @@ static inline uint16_t urtc_weld_clamp_ms(uint16_t raw_ms)
 
 // One-pulse timer of 16 bits: the counter runs at 10 kHz (a tick of 100 microseconds), which covers 6553 ms, more than the hard limit.
 // Gives the prescaler and the auto-reload register (both "value - 1" as the registers want them). Returns 0 on success, 1 for a clock that cannot make
-// 10 kHz exactly enough (below 10 kHz or a prescaler above 16 bits) or a duration of 0 or above the hard limit.
+// 10 kHz exactly (below 10 kHz, not a whole multiple of 10 kHz, or a prescaler above 16 bits) or a duration of 0 or above the hard limit. A clock that is
+// not a multiple would give a pulse of the wrong length, so it is refused and the main loop ends the pulse as it always did.
 static inline int urtc_weld_timer_params(uint32_t timer_hz, uint16_t duration_ms, uint32_t *psc, uint32_t *arr)
 {
-    if (timer_hz < 10000u || duration_ms == 0 || duration_ms > URTC_WELD_PULSE_HARD_MAX_MS) return 1;
+    if (timer_hz < 10000u || (timer_hz % 10000u) != 0u || duration_ms == 0 || duration_ms > URTC_WELD_PULSE_HARD_MAX_MS) return 1;
     uint32_t div = timer_hz / 10000u;
     if (div == 0 || div > 65536u) return 1;
     *psc = div - 1u;

@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **More host tests for the bit timing, the weld pulse timing and the slave write reassembly:** limits and cuts of every function (sample points 500 and 900, the largest arguments, every cut point of every fixed-length register, the stale time at the limit and across the wrap of the tick counter), sweeps over the common clocks and rates, and fuzz runs with a fixed seed against a shadow of the expected bytes. The pulse timer now refuses a clock that is not a whole multiple of 10 kHz instead of producing a pulse of the wrong length (the main loop still ends the pulse).
+
 - **The copy of the image record tools is refreshed:** the shared module that builds and reads the signature record of an image is at the current version of URTC-COMMON again.
 - **The expansion slave can reassemble a register write that arrives in pieces:** `slave_write_assembler.h` (pure logic) collects the pieces of a link write in order, tells when the write is complete for its register, drops a half-written command after a timeout and counts what it dropped, and never lets the bootloader entry run from an incomplete payload. The link uses it only when built with `URTC_SLAVE_WRITE_REASSEMBLY=1` (off by default: the link behaves as before). Host tests cover short writes, a late piece, overflow and expiry.
 

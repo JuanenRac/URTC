@@ -481,6 +481,148 @@ static void test_write_assembler(int *failures)
     TEST_ASSERT(a.completed >= 5, "the completed writes are counted");
 }
 
+// ---- cuts, limits and a fuzz with a fixed seed for the reassembly of register writes ---------------------------------------------------
+static uint32_t swa_rng_state = 0x5EED5A17u;
+static uint32_t swa_rng(void)
+{
+    swa_rng_state ^= swa_rng_state << 13;
+    swa_rng_state ^= swa_rng_state >> 17;
+    swa_rng_state ^= swa_rng_state << 5;
+    return swa_rng_state;
+}
+
+static void test_write_assembler_limits(int *failures)
+{
+    slave_write_asm_t a;
+    const uint8_t *msg = 0;
+    uint8_t len = 0;
+
+    // The lengths of the registers that have a fixed one, and the ones that have none.
+    TEST_ASSERT(swa_expected_len(0x02) == 5 && swa_expected_len(0x20) == 3 && swa_expected_len(0x30) == 4 && swa_expected_len(0x31) == 4 && swa_expected_len(0x32) == 2, "the fixed lengths of the registers");
+    TEST_ASSERT(swa_expected_len(0x00) == 0 && swa_expected_len(0x01) == 0 && swa_expected_len(0x03) == 0 && swa_expected_len(0x21) == 0 && swa_expected_len(0xFF) == 0, "the registers without a fixed length");
+
+    // Every register with a fixed length, cut at every possible point: held until the last byte, then complete and equal to the whole write.
+    static const uint8_t fixed_regs[] = {0x02, 0x20, 0x30, 0x31, 0x32};
+    for (unsigned r = 0; r < sizeof fixed_regs; r++) {
+        uint8_t want = swa_expected_len(fixed_regs[r]);
+        uint8_t whole[8] = {fixed_regs[r], 0xB0, 0x07, 0x1D, 0x5A, 0, 0, 0};
+        for (uint8_t cut = 1; cut < want; cut++) {
+            swa_init(&a, 20);
+            TEST_ASSERT(swa_feed(&a, whole, cut, 100, &msg, &len) == SWA_PARTIAL && a.fill == cut, "the first piece of a fixed write is held");
+            TEST_ASSERT(swa_feed(&a, whole + cut, (uint8_t)(want - cut), 105, &msg, &len) == SWA_COMPLETE && len == want && memcmp(msg, whole, want) == 0 && a.fill == 0, "the second piece completes it exactly");
+        }
+        swa_init(&a, 20);
+        int partial_before_last = 1;
+        for (uint8_t i = 0; i < want; i++) {
+            swa_result_t rc = swa_feed(&a, &whole[i], 1, 100u + i, &msg, &len);
+            if (i + 1 < want && rc != SWA_PARTIAL) partial_before_last = 0;
+            if (i + 1 == want) TEST_ASSERT(rc == SWA_COMPLETE && len == want && memcmp(msg, whole, want) == 0, "fed one byte at a time, the write completes on the last byte");
+        }
+        TEST_ASSERT(partial_before_last, "fed one byte at a time, no write completes before its last byte");
+        swa_init(&a, 20);
+        uint8_t over[8] = {fixed_regs[r], 1, 2, 3, 4, 5, 6, 7};
+        TEST_ASSERT(swa_feed(&a, over, (uint8_t)(want + 1), 100, &msg, &len) == SWA_DROPPED && a.fill == 0 && a.dropped_overflow == 1 && a.completed == 0, "one byte more than the register takes is dropped, never executed");
+    }
+    // The bootloader entry: no prefix of its payload is ever complete.
+    {
+        const uint8_t boot[5] = {0x02, 0xB0, 0x07, 0x1D, 0x5A};
+        int never = 1;
+        for (uint8_t n = 1; n < 5; n++) {
+            swa_init(&a, 20);
+            if (swa_feed(&a, boot, n, 100, &msg, &len) == SWA_COMPLETE) never = 0;
+        }
+        TEST_ASSERT(never, "no prefix of the bootloader command is ever executed");
+    }
+
+    // The stale time: exactly the limit is still fresh, one tick more is stale; the same across the wrap of the tick counter.
+    swa_init(&a, 20);
+    const uint8_t pulse[4] = {0x31, 2, 50, 20};
+    swa_feed(&a, pulse, 2, 1000, &msg, &len);
+    TEST_ASSERT(swa_expire(&a, 1020) == 0 && a.fill == 2, "a half command exactly at the stale time is still fresh");
+    TEST_ASSERT(swa_expire(&a, 1021) == 1 && a.fill == 0 && a.dropped_stale == 1, "one tick later it is stale");
+    TEST_ASSERT(swa_expire(&a, 5000) == 0 && a.dropped_stale == 1, "an empty assembler has nothing to expire");
+    swa_feed(&a, pulse, 2, 0xFFFFFFF0u, &msg, &len);
+    TEST_ASSERT(swa_feed(&a, pulse + 2, 2, 0x00000003u, &msg, &len) == SWA_COMPLETE && a.dropped_stale == 1, "across the wrap of the tick counter 19 ticks is still fresh");
+    swa_feed(&a, pulse, 2, 0xFFFFFFF0u, &msg, &len);
+    TEST_ASSERT(swa_expire(&a, 0x0000000Au) == 1 && a.dropped_stale == 2, "across the wrap of the tick counter 26 ticks is stale");
+    swa_feed(&a, pulse, 2, 1000, &msg, &len);
+    const uint8_t late_piece[2] = {0x31, 9};
+    TEST_ASSERT(swa_feed(&a, late_piece, 2, 1021, &msg, &len) == SWA_PARTIAL && a.dropped_stale == 3 && a.fill == 2, "a late piece starts a new write instead of completing the stale one");
+    swa_init(&a, 1000);
+    TEST_ASSERT(a.stale_ms == 1000u, "the largest stale time is accepted");
+    swa_init(&a, 1001);
+    TEST_ASSERT(a.stale_ms == SWA_STALE_MS_DEFAULT, "a stale time one above the largest selects the default");
+    swa_init(&a, 1);
+    TEST_ASSERT(a.stale_ms == 1u, "the smallest stale time is accepted");
+
+    // Empty deliveries, the buffer limit and registers without a fixed length.
+    swa_init(&a, 20);
+    TEST_ASSERT(swa_feed(&a, pulse, 0, 10, &msg, &len) == SWA_DROPPED, "an empty delivery to an empty assembler makes no write");
+    swa_feed(&a, pulse, 2, 20, &msg, &len);
+    TEST_ASSERT(swa_feed(&a, pulse, 0, 21, &msg, &len) == SWA_PARTIAL && a.fill == 2, "an empty delivery leaves a half command as it is");
+    const uint8_t ptr8[8] = {0x12, 1, 2, 3, 4, 5, 6, 7};
+    swa_init(&a, 20);
+    TEST_ASSERT(swa_feed(&a, ptr8, 8, 30, &msg, &len) == SWA_COMPLETE && len == 8 && memcmp(msg, ptr8, 8) == 0, "a write that fills the buffer exactly is complete");
+    const uint8_t ptr9[9] = {0x12, 1, 2, 3, 4, 5, 6, 7, 8};
+    TEST_ASSERT(swa_feed(&a, ptr9, 9, 40, &msg, &len) == SWA_DROPPED && a.dropped_overflow == 1, "a write one byte over the buffer is dropped");
+    const uint8_t stop3[3] = {0x32, 0, 0};
+    swa_init(&a, 20);
+    TEST_ASSERT(swa_feed(&a, stop3, 3, 50, &msg, &len) == SWA_DROPPED && a.completed == 0, "a stop command with a byte too many is dropped");
+    const uint8_t stop2[2] = {0x32, 1};
+    TEST_ASSERT(swa_feed(&a, stop2, 2, 60, &msg, &len) == SWA_COMPLETE && a.completed == 1, "and the next good write after a drop is complete");
+    swa_feed(&a, pulse, 2, 70, &msg, &len);
+    swa_reset(&a);
+    TEST_ASSERT(a.fill == 0 && swa_expire(&a, 9999) == 0, "a reset forgets the half command");
+
+    // Fuzz with a fixed seed, against a shadow of the bytes that should be held.
+    swa_rng_state = 0x5EED5A17u;
+    swa_init(&a, 20);
+    uint8_t shadow[16];
+    unsigned shadow_len = 0;
+    uint32_t now = 1000;
+    unsigned seen_complete = 0, seen_partial = 0, seen_dropped = 0;
+    static const uint8_t regs[] = {0x02, 0x20, 0x30, 0x31, 0x32, 0x12, 0x00, 0x55};
+    for (unsigned i = 0; i < 6000; i++) {
+        now += swa_rng() % 41u;
+        uint8_t piece[6];
+        uint8_t n = (uint8_t)(swa_rng() % 6u);
+        for (uint8_t k = 0; k < n; k++) piece[k] = (uint8_t)swa_rng();
+        int fresh = (a.fill == 0) || (uint32_t)(now - a.last_tick) > a.stale_ms;
+        if (n > 0 && fresh) piece[0] = regs[swa_rng() % sizeof regs];
+        if (n > 0 && a.fill > 0 && (uint32_t)(now - a.last_tick) > a.stale_ms) shadow_len = 0;
+        unsigned held_before = shadow_len;
+        swa_result_t rc = swa_feed(&a, piece, n, now, &msg, &len);
+        if (n == 0) {
+            TEST_ASSERT(rc == (held_before ? SWA_PARTIAL : SWA_DROPPED) && a.fill == held_before, "an empty delivery changes nothing");
+            continue;
+        }
+        if (shadow_len + n > SWA_BUFFER_SIZE) {
+            TEST_ASSERT(rc == SWA_DROPPED && a.fill == 0, "a delivery that overflows the buffer drops the whole write");
+            shadow_len = 0;
+            seen_dropped++;
+            continue;
+        }
+        memcpy(&shadow[shadow_len], piece, n);
+        shadow_len += n;
+        uint8_t want = swa_expected_len(shadow[0]);
+        if (want == 0 || shadow_len == want) {
+            TEST_ASSERT(rc == SWA_COMPLETE && len == shadow_len && memcmp(msg, shadow, len) == 0 && a.fill == 0, "a complete write is exactly the bytes that were fed, in order");
+            TEST_ASSERT(want == 0 || len == want, "a register with a fixed length completes only at that length");
+            shadow_len = 0;
+            seen_complete++;
+        } else if (shadow_len > want) {
+            TEST_ASSERT(rc == SWA_DROPPED && a.fill == 0, "more bytes than the register takes drop the write");
+            shadow_len = 0;
+            seen_dropped++;
+        } else {
+            TEST_ASSERT(rc == SWA_PARTIAL && a.fill == shadow_len, "a short write is held");
+            seen_partial++;
+        }
+        TEST_ASSERT(a.fill <= SWA_BUFFER_SIZE, "the buffer never holds more than its size");
+    }
+    TEST_ASSERT(seen_complete > 100u && seen_partial > 100u && seen_dropped > 10u && a.dropped_stale > 10u, "the fuzz reaches complete, held, dropped and stale writes");
+}
+
 // ---- the start-up and the main loop ---------------------------------------------------------------------------------------------------------
 static void test_main(int *failures)
 {
@@ -524,6 +666,7 @@ void run_slave_tests(int *failures)
     test_camera_641(failures);
     test_camera_642(failures);
     test_write_assembler(failures);
+    test_write_assembler_limits(failures);
     test_main(failures);
 }
 
