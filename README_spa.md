@@ -32,7 +32,7 @@
 
 ---
 
-> **⚠️ Aviso de seguridad (fase de diseño, ninguna placa ha ejecutado aún este firmware):** esta placa controla un **diodo láser de grabado de 10W** y varias etapas de calentamiento (cartucho de soldador T12, hotend de impresora 3D). Construirla y usarla implica trabajar con equipo que puede causar **quemaduras, incendios o daño ocular** si se ensambla o se opera sin las medidas de seguridad adecuadas (gafas láser calificadas para la longitud de onda del diodo, protección térmica, un corte de energía accesible). Este es un proyecto hobbyista/maker compartido tal cual - constrúyelo y úsalo bajo tu propio riesgo, y no te saltes las prácticas básicas de seguridad solo porque el firmware tenga watchdogs (watchdogs por software que nunca se han ejecutado en una placa real).
+> **⚠️ Aviso de seguridad (fase de diseño, ninguna placa ha ejecutado aún este firmware):** esta placa controla un **diodo láser de grabado de 10W** y varias etapas de calentamiento (cartucho de soldador T12, hotend de impresora 3D). Construirla y usarla implica trabajar con equipo que puede causar **quemaduras, incendios o daño ocular** si se ensambla o se opera sin las medidas de seguridad adecuadas (gafas láser homologadas para la longitud de onda del diodo, protección térmica, un corte de energía accesible). Este es un proyecto de aficionados (maker) compartido tal cual - constrúyelo y úsalo bajo tu propio riesgo, y no te saltes las prácticas básicas de seguridad solo porque el firmware tenga watchdogs (watchdogs por software que nunca se han ejecutado en una placa real).
 
 > **Estado de seguridad física y de ciberseguridad:** este ecosistema no es un sistema de seguridad certificado y todavía no existe ninguna placa URTC poblada. El bootloader de la placa principal comprueba las imágenes de firmware con CRC32 y una firma Ed25519 contra una tabla de claves públicas y no guarda ningún secreto; el bootloader de la expansión esclava comprueba CRC32 y un SHA-256 sin clave e instala solo una imagen que la placa principal, que verifica el registro Ed25519, le ha confirmado por el bus de enlace interno (confía en la placa principal a través de ese bus). La tabla de la build oficial está vacía hasta que se cree la clave de firma de imágenes, así que un bootloader principal oficial todavía no instala nada, y una build de banco confía en una clave pública de desarrollo, así que cualquiera puede producir una imagen que ese bootloader acepte; no se ha transmitido nada a una placa real. Lee la [línea base de seguridad](https://github.com/JuanenRac/URTC-DOCS/blob/main/docs/SECURITY_BASELINE.md) y el [modelo de amenazas](https://github.com/JuanenRac/URTC-DOCS/blob/main/docs/THREAT_MODEL.md) antes de fiarte de cualquier afirmación de aquí para la seguridad de una persona.
 
@@ -73,7 +73,7 @@
 
 Aquí está el desglose completo de qué es, qué hace, y el ecosistema de hardware que gestiona actualmente.
 
-URTC es una placa de control todo-en-uno y compacta, impulsada por un microcontrolador STM32 (STM32F303CCT6, LQFP48). Se comunica con el controlador principal del robot vía bus CAN, pensada para ejecutar con baja latencia tareas complejas directamente en el cabezal de la herramienta o en el eje (la latencia nunca se ha medido en una placa y no se promete tiempo real estricto). Cuenta con una pantalla OLED integrada para diagnóstico instantáneo — splash de arranque animado, iconos animados por herramienta, telemetría en vivo en un panel de dos tonos — un LED RGB de estado de un solo píxel más un anillo de LED RGB direccionable para iluminación de cámara, un conector de expansión de 20 pines para placas adicionales, una F-RAM integrada que persiste los setpoints de la herramienta activa a través de un corte de energía, y etapas dedicadas de potencia analógica y de alta corriente.
+URTC es una placa de control todo-en-uno y compacta, impulsada por un microcontrolador STM32 (STM32F303CCT6, LQFP48). Se comunica con el controlador principal del robot por bus CAN, pensada para ejecutar con baja latencia tareas complejas directamente en el cabezal de la herramienta o en el eje (la latencia nunca se ha medido en una placa y no se promete tiempo real estricto). Cuenta con una pantalla OLED integrada para diagnóstico instantáneo — splash de arranque animado, iconos animados por herramienta, telemetría en vivo en un panel de dos tonos — un LED RGB de estado de un solo píxel más un anillo de LED RGB direccionable para iluminación de cámara, un conector de expansión de 20 pines para placas adicionales, una F-RAM integrada que persiste los setpoints de la herramienta activa a través de un corte de energía, y etapas dedicadas de potencia analógica y de alta corriente.
 
 ## 🧩 Papel en URTC
 
@@ -92,10 +92,10 @@ Cómo encajan las partes de este repositorio: quién lo usa, qué contiene y de 
 La fortaleza principal de URTC es su extrema versatilidad. En vez de cambiar la electrónica para cada trabajo distinto, la placa presenta una arquitectura de matriz escalable:
 
 * **Esquema de identificación de 32 direcciones:** el hardware y el protocolo de comunicación están diseñados para identificar hasta 32 herramientas o efectores finales distintos directamente en el cabezal del robot, mediante una matriz de identificación de 5 bits por jumper de soldadura (ID0-ID4). De esas 32 lecturas, 31 se mapean directamente a un perfil de herramienta; la número 32 (los 5 jumpers instalados, `11111`) está reservada como dirección de "configuración libre" en su lugar - ver abajo.
-* **25 perfiles automatizados plug-and-play:** el firmware maneja nativamente 25 perfiles de herramienta - la placa lee la identidad física del cabezal de herramienta y configura las etapas de potencia, sensores, y la lógica de conmutación de forma transparente sin necesitar un reflasheo completo. Quedan 6 direcciones más libres dentro del esquema existente para futuros perfiles de herramienta.
+* **25 perfiles automatizados plug-and-play:** el firmware maneja nativamente 25 perfiles de herramienta - la placa lee la identidad física del cabezal de herramienta y configura las etapas de potencia, sensores, y la lógica de conmutación de forma transparente sin necesidad de una regrabación completa. Quedan 6 direcciones más libres dentro del esquema existente para futuros perfiles de herramienta.
 * **Configuración libre de herramienta:** la lectura de jumper reservada `11111` no elige una herramienta fija - le indica a la placa que busque qué herramienta usar en un registro de su propia F-RAM persistente, establecido de antemano por CAN (mediante `URTC Flasher`). Útil para una placa que necesita reprogramarse a una herramienta distinta sin volver a soldar jumpers físicamente. Ver `docs/EEPROM.TXT` sección 5 para el mecanismo completo.
 
-### Layout de memoria flash (256K total, modelo de imagen dorada / actualización A-B)
+### Distribución de la memoria flash (256K total, modelo de imagen dorada / actualización A-B)
 
 ```
 0x08000000 ┌─────────────────────────────────┐
@@ -143,7 +143,7 @@ La fortaleza principal de URTC es su extrema versatilidad. En vez de cambiar la 
 
 Para manejar una variedad tan amplia de aplicaciones, el hardware de URTC está completamente equipado para controlar:
 
-* **Motores paso a paso NEMA:** NEMA 8, 11, 14, y 17 funcionan directamente desde el TMC2209 integrado, lo mismo que NEMA 23 y 34 - hasta **2.0A** en cualquiera de ellos mediante la etapa de driver de la placa principal. Para NEMA 23/34 a su par nominal completo, un TMC5160 en el conector de expansión (ver abajo) soporta hasta **10A**, escalado en corriente por los MOSFETs externos/resistencia de sensado elegidos para esa placa - el límite de 2.0A integrado no aplica una vez que un motor se ha movido al driver de expansión.
+* **Motores paso a paso NEMA:** NEMA 8, 11, 14, y 17 funcionan directamente desde el TMC2209 integrado, lo mismo que NEMA 23 y 34 - hasta **2,0 A** en cualquiera de ellos mediante la etapa de driver de la placa principal. Para NEMA 23/34 a su par nominal completo, un TMC5160 en el conector de expansión (ver abajo) soporta hasta **10 A**, escalado en corriente por los MOSFETs externos/resistencia de sensado elegidos para esa placa - el límite de 2,0 A integrado no aplica una vez que un motor se ha movido al driver de expansión.
 * **Motores BLDC de 3 fases / motores gimbal** para movimiento de alta precisión.
 * **Motores con sensores Hall y tacómetros** para control en lazo cerrado.
 * **Entradas dedicadas** para sensores de proximidad óptica reflectivos como el TCRT5000, más una entrada genérica de fin de carrera/límite activa en bajo, compartida entre cuatro perfiles de herramienta.
@@ -154,9 +154,9 @@ Un header de 20 pines, separado de los conectores específicos de herramienta, p
 
 | Pines | Señal |
 |---|---|
-| 4 | 24V |
-| 1 | 3.3V |
-| 1 | 5V |
+| 4 | 24 V |
+| 1 | 3,3 V |
+| 1 | 5 V |
 | 3 | GND |
 | 2 | I2C por bit-banging (SCL/SDA) — su propio bus, separado del I2C2 por hardware del OLED/F-RAM |
 | 3 | STEP/DIR/EN — universal para cualquiera de los 2 chips driver de abajo |
@@ -166,15 +166,15 @@ Un header de 20 pines, separado de los conectores específicos de herramienta, p
 
 20 pines en total.
 
-**Dos buses I2C separados a propósito:** el OLED/F-RAM usan el único periférico I2C por hardware utilizable de este chip (I2C2, en PA9/PA10); el conector de expansión obtiene su propio bus I2C independiente por bit-banging (PB10/PB11 - los únicos otros pares de pines capaces de I2C de este chip ya estaban comprometidos con otras funciones, así que el bit-banging fue la forma de darle a este conector su propio bus sin un conflicto de hardware). Cualquier cosa colgada del header de expansión — un ADC/DAC I2C, un expansor de puertos, lo que sea que una placa adicional dada necesite — comparte este bus por bit-banging con cualquier otro dispositivo I2C del lado de expansión, pero no puede estirar el reloj (clock stretching) ni interferir de otro modo con el propio timing del OLED en su bus separado, I2C2 por hardware.
+**Dos buses I2C separados a propósito:** el OLED/F-RAM usan el único periférico I2C por hardware utilizable de este chip (I2C2, en PA9/PA10); el conector de expansión obtiene su propio bus I2C independiente por bit-banging (PB10/PB11 - los únicos otros pares de pines capaces de I2C de este chip ya estaban comprometidos con otras funciones, así que el bit-banging fue la forma de darle a este conector su propio bus sin un conflicto de hardware). Cualquier cosa colgada del header de expansión — un ADC/DAC I2C, un expansor de puertos, lo que sea que una placa adicional dada necesite — comparte este bus por bit-banging con cualquier otro dispositivo I2C del lado de expansión, pero no puede estirar el reloj (clock stretching) ni interferir de otro modo con la propia temporización del OLED en su bus separado, I2C2 por hardware.
 
-**Un TMC2209 o un TMC5160, no necesariamente ambos.** Ambos chips usan la misma interfaz STEP/DIR/EN para el movimiento real, así que esa parte es universal. Donde difieren es en configuración/diagnóstico: un TMC2209 usa su propio UART de un solo hilo para eso, mientras que un TMC5160 usa SPI — y dado que los 2 son mutuamente excluyentes en cualquier placa de expansión dada, los 4 pines SPI también sirven de forma natural como hogar para la única línea UART de un TMC2209, en vez de necesitar todavía otro pin dedicado que nadie usa al mismo tiempo que el bus SPI. El bus SPI por bit-banging habla exactamente el protocolo que un TMC5160 espera (SPI Modo 3, MSB primero, CS mantenido en bajo durante toda la transacción — ver `docs/CANBUS.TXT`, `0x180`/`0x181` para el comando genérico de paso-de-bytes que lo controla) en vez de que este firmware necesite conocer el layout de registros específico de ese chip. La línea DIAG0 de stall/fallo de un TMC5160 también está cableada (`0x182`/`0x183`) — reutiliza uno de los 2 pines GPIO de propósito general, que ya estaban reservados exactamente para este tipo de entrada rápida impulsada por interrupción.
+**Un TMC2209 o un TMC5160, no necesariamente ambos.** Ambos chips usan la misma interfaz STEP/DIR/EN para el movimiento real, así que esa parte es universal. Donde difieren es en configuración/diagnóstico: un TMC2209 usa su propio UART de un solo hilo para eso, mientras que un TMC5160 usa SPI — y dado que los 2 son mutuamente excluyentes en cualquier placa de expansión dada, los 4 pines SPI también sirven de forma natural como hogar para la única línea UART de un TMC2209, en vez de necesitar todavía otro pin dedicado que nadie usa al mismo tiempo que el bus SPI. El bus SPI por bit-banging habla exactamente el protocolo que un TMC5160 espera (SPI Modo 3, MSB primero, CS mantenido en bajo durante toda la transacción — ver `docs/CANBUS.TXT`, `0x180`/`0x181` para el comando genérico de paso-de-bytes que lo controla) en vez de que este firmware necesite conocer la disposición de registros específica de ese chip. La línea DIAG0 de stall/fallo de un TMC5160 también está cableada (`0x182`/`0x183`) — reutiliza uno de los 2 pines GPIO de propósito general, que ya estaban reservados exactamente para este tipo de entrada rápida impulsada por interrupción.
 
-El detalle completo pin por pin — qué pin del MCU respalda qué señal, y el razonamiento detrás de un par de restricciones de layout que tiene el paquete de 48 pines de este chip — vive en `docs/PINOUT_CONNECTORS.TXT` y `src/F303-master/README.md`.
+El detalle completo pin por pin — qué pin del MCU respalda qué señal, y el razonamiento detrás de un par de restricciones de disposición que tiene el paquete de 48 pines de este chip — vive en `docs/PINOUT_CONNECTORS.TXT` y `src/F303-master/README.md`.
 
 #### Las 6 variantes de placa de expansión
 
-4 de las 6 variantes de placa de expansión llevan un driver de motor paso a paso — ya sea un TMC2209 (hasta 2A/bobina, MOSFETs de potencia integrados) o un TMC5160A (hasta 10A+/bobina, necesita 8 MOSFETs de potencia externos que el propio driver no incluye). Independientemente de esa elección de driver, una placa con driver es o bien **básica** (driver + conectores solamente, sin MCU — STEP/DIR/EN enrutado directamente desde la placa principal) o **avanzada** (añade un segundo microcontrolador, STM32F303CBT6, más 2 chips de sensor locales — un ADC de 16 bits ADS1115 y una cámara térmica de la familia MLX9064x — y generación local de PWM para herramientas cuyo timing necesita generarse justo en el cabezal de herramienta en vez de enrutarse por un cable). 2×2 combinaciones, más 2 placas básicas solo-sensor adicionales (ADS1115 o MLX9064x, cableadas directamente a la propia STM32F303CC de la placa principal, sin driver y sin MCU esclavo) para una herramienta que solo necesita uno de esos 2 chips y nada más de lo que también lleva una placa avanzada — 6 placas en total — ver `BOM/BOM_EXPANSION_*.TXT` (6 archivos), `docs/EXPANSION.TXT`, y `docs/PINOUT_SLAVE.txt`.
+4 de las 6 variantes de placa de expansión llevan un driver de motor paso a paso — ya sea un TMC2209 (hasta 2A/bobina, MOSFETs de potencia integrados) o un TMC5160A (hasta 10A+/bobina, necesita 8 MOSFETs de potencia externos que el propio driver no incluye). Independientemente de esa elección de driver, una placa con driver es o bien **básica** (driver + conectores solamente, sin MCU — STEP/DIR/EN enrutado directamente desde la placa principal) o **avanzada** (añade un segundo microcontrolador, STM32F303CBT6, más 2 chips de sensor locales — un ADC de 16 bits ADS1115 y una cámara térmica de la familia MLX9064x — y generación local de PWM para herramientas cuya temporización necesita generarse justo en el cabezal de herramienta en vez de enrutarse por un cable). 2×2 combinaciones, más 2 placas básicas solo-sensor adicionales (ADS1115 o MLX9064x, cableadas directamente a la propia STM32F303CC de la placa principal, sin driver y sin MCU esclavo) para una herramienta que solo necesita uno de esos 2 chips y nada más de lo que también lleva una placa avanzada — 6 placas en total — ver `BOM/BOM_EXPANSION_*.TXT` (6 archivos), `docs/EXPANSION.TXT`, y `docs/PINOUT_SLAVE.txt`.
 
 La propia STM32F303CBT6 de la variante avanzada habla con la placa principal a través del bus I2C por bit-banging ya existente del conector de expansión de arriba — placa principal como maestro, chip esclavo respondiendo como un verdadero esclavo I2C por hardware — y controla su propio segundo bus I2C, local únicamente, para los 2 chips de sensor. Tiene su propio bootloader y firmware de aplicación, actualizados de la misma forma que la placa principal (CAN-OTA desde `URTC Flasher`), solo que retransmitidos a través de ese enlace I2C en vez de alcanzar el chip esclavo directamente. Ver `src/F303-slave/README.md` y `src/F303-slave/boot/README.md` para el detalle técnico completo.
 
@@ -196,7 +196,7 @@ Mediante su lógica de conmutación dinámica, el firmware maneja nativamente lo
 6. **Taladro (BL4260):** control de velocidad PWM, cambio de dirección, y frenado eléctrico dinámico con lecturas de RPM en vivo, en su propia línea dedicada de habilitación/freno, independiente de la habilitación del driver de herramientas paso a paso. Entrada de fin de carrera genérica disponible. [Configuración de jumper/cableado →](images/TOOL_DRILL.png)
 7. **Pinza gimbal:** manipulación de alta sensibilidad usando motores gimbal brushless de 3 fases. [Configuración de jumper/cableado →](images/TOOL_GRIPPER_GIMBAL.png)
 8. **Pinza NEMA:** fuerza de sujeción robusta controlada mediante un motor paso a paso de trabajo pesado. [Configuración de jumper/cableado →](images/TOOL_GRIPPER_NEMA.png)
-9. **Sistema AOI (Inspección Óptica Automatizada):** control estroboscópico síncrono del arreglo de iluminación LED para captura de cámara de visión artificial. Entrada de fin de carrera genérica disponible. [Configuración de jumper/cableado →](images/TOOL_AOI_INSPECTION.png)
+9. **Sistema AOI (Inspección Óptica Automatizada):** control estroboscópico síncrono del matriz de iluminación LED para captura de cámara de visión artificial. Entrada de fin de carrera genérica disponible. [Configuración de jumper/cableado →](images/TOOL_AOI_INSPECTION.png)
 10. **Diodo láser de grabado (10W óptico):** modulación PWM de potencia del haz con un watchdog CAN por software que bloquea la salida del láser si se pierde la comunicación con el host (compilado, nunca ejecutado en una placa real, y no sustituye a un interlock de hardware independiente). Entrada de fin de carrera genérica disponible. [Configuración de jumper/cableado →](images/TOOL_LASER_ENGRAVER.png)
 11. **Hotend de impresión 3D:** control todo/nada con histéresis del cartucho calentador, lectura de termistor NTC, control de extrusor, y un ventilador dedicado de enfriamiento de capa controlado por PWM de 25kHz (4 hilos, retroalimentación de tacómetro, watchdog de comunicación propio) — todo integrado en un solo bloque. [Configuración de jumper/cableado →](images/TOOL_3D_PRINTER.png)
 12. **Sonda de escáner 3D:** entrada de interrupción por hardware ultrarrápida (EXTI) con prioridad absoluta para digitalización de superficie en tiempo real y detección de impacto sin retraso. También cubre el palpado táctil de metrología - la misma ruta de hardware, una sonda física distinta en el mismo cabezal de herramienta. [Configuración de jumper/cableado →](images/TOOL_SCAN_PROBE.png)
@@ -204,15 +204,15 @@ Mediante su lógica de conmutación dinámica, el firmware maneja nativamente lo
 14. **Electroimán de trabajo pesado:** control de recogida on/off para piezas ferromagnéticas, desde la salida del calentador T12 reutilizada como driver GPIO genérico. [Configuración de jumper/cableado →](images/TOOL_ELECTROMAGNET.png)
 15. **Cabezal de soldadura por puntos:** pulsos de soldadura de precisión de milisegundos para tiras de níquel de packs de baterías, con un sensor de contacto de superficie que controla el pulso. [Configuración de jumper/cableado →](images/TOOL_SPOT_WELDER.png)
 16. **Aerógrafo de recubrimiento conformal:** control de aspersión de recubrimiento protector para PCBs terminadas - la válvula de aspersión y su propio sensor viven en la propia placa principal del robot, fuera del alcance propio de esta placa. [Configuración de jumper/cableado →](images/TOOL_CONFORMAL_COATING.png)
-17. **Pinza de vacío de gran formato:** arreglo de ventosas múltiples para placas FR4 sin poblar, en la misma interfaz de motor paso a paso que la herramienta #13 de arriba. [Configuración de jumper/cableado →](images/TOOL_VACUUM_GRIPPER_LG.png)
-18. **Cabezal de pruebas funcionales:** pruebas de voltaje/continuidad con sonda voladora — lectura básica desde el ADC integrado, lectura avanzada mediante un ADC de 16 bits ADS1115 en una placa de expansión **avanzada**. [Configuración de jumper/cableado →](images/TOOL_FLYING_PROBE.png)
+17. **Pinza de vacío de gran formato:** matriz de ventosas para placas FR4 sin poblar, en la misma interfaz de motor paso a paso que la herramienta #13 de arriba. [Configuración de jumper/cableado →](images/TOOL_VACUUM_GRIPPER_LG.png)
+18. **Cabezal de pruebas funcionales:** pruebas de tensión y continuidad con sonda voladora — lectura básica desde el ADC integrado, lectura avanzada mediante un ADC de 16 bits ADS1115 en una placa de expansión **avanzada**. [Configuración de jumper/cableado →](images/TOOL_FLYING_PROBE.png)
 19. **Cabezal de curado UV:** driver de LED UV de alta potencia para curado instantáneo de pegamento/máscara. [Configuración de jumper/cableado →](images/TOOL_UV_CURING.png)
 20. **Boquilla de retrabajo de aire caliente:** elemento calefactor, soplador de turbina, y retroalimentación de termopar para reflow de piezas SMD desalineadas - comparte el propio lazo de control térmico del soldador. [Configuración de jumper/cableado →](images/TOOL_HOTAIR_REWORK.png)
 21. **Insertador neumático de presión (press-fit):** control de actuador lineal para presionar conectores en PCBs - el actuador y su propio sensor viven en la propia placa principal del robot, fuera del alcance propio de esta placa. [Configuración de jumper/cableado →](images/TOOL_PRESSFIT_INSERTER.png)
 22. **Actuador de arnés de cables / engarzado (crimping):** mordaza de alto torque para pelar/engarzar terminales, impulsada por el **propio driver de una placa de expansión** en vez del de la placa principal. El firmware no tiene sensado de torque ni de fuerza. [Configuración de jumper/cableado →](images/TOOL_CRIMPING_ACTUATOR.png)
-23. **Inspección avanzada de PCB:** imagen térmica (arreglo de la familia MLX9064x - los 3 miembros de la familia, MLX90640/MLX90641/MLX90642, soportados hoy, ya sea mediante el propio chip esclavo de una placa de expansión **avanzada** o una placa de expansión **básica** MLX9064x cableada directamente a la placa principal) para detectar cortocircuitos por firma de temperatura, junto con iluminación por anillo de LED. También cubre el depanelizado por micro-husillo - la misma ruta de hardware del taladro de arriba, un bit distinto para un trabajo distinto. [Configuración de jumper/cableado →](images/TOOL_THERMAL_INSPECTION.png)
+23. **Inspección avanzada de PCB:** imagen térmica (matriz de la familia MLX9064x - los 3 miembros de la familia, MLX90640/MLX90641/MLX90642, soportados hoy, ya sea mediante el propio chip esclavo de una placa de expansión **avanzada** o una placa de expansión **básica** MLX9064x cableada directamente a la placa principal) para detectar cortocircuitos por firma de temperatura, junto con iluminación por anillo de LED. También cubre el depanelizado por micro-husillo - la misma ruta de hardware del taladro de arriba, un bit distinto para un trabajo distinto. [Configuración de jumper/cableado →](images/TOOL_THERMAL_INSPECTION.png)
 24. **Válvula de jetting de pasta de soldadura:** dispensación de micro-gotas piezoeléctrica, precisión de pulso sub-milisegundo generada localmente en una placa de expansión **avanzada**. [Configuración de jumper/cableado →](images/TOOL_PASTE_JETTING.png)
-25. **Soldador ultrasónico / sellador de empaques:** disparo de transductor de alta frecuencia para soldadura de carcasas plásticas. [Configuración de jumper/cableado →](images/TOOL_ULTRASONIC_WELDER.png)
+25. **Soldador ultrasónico / sellador de envases:** disparo de transductor de alta frecuencia para soldadura de carcasas plásticas. [Configuración de jumper/cableado →](images/TOOL_ULTRASONIC_WELDER.png)
 
 *(Existen imágenes de configuración de herramienta para las herramientas 1-12; las imágenes para las herramientas 13-25 se irán completando a medida que la documentación de hardware se ponga al día - los nombres de archivo de arriba coinciden con la convención de nomenclatura ya en uso en `images/`.)*
 
@@ -227,7 +227,7 @@ Ambas variantes físicas de abajo son el mismo panel eléctricamente (controlado
 * **16 píxeles superiores (páginas 0-1): amarillo.** URTC usa esta franja para lo que sea más útil de ver de un vistazo sin leer con detalle - el indicador de actividad CAN, lecturas hero en vivo, o (en el splash de arranque / pantallas de herramienta inválida) texto de estado corto.
 * **48 píxeles inferiores (páginas 2-7): azul.** Todo lo demás - iconos de herramienta, telemetría detallada, la cara animada de JuanenBOT en la pantalla de splash, la gran palabra ERROR parpadeante.
 
-Ambos caen en el mismo bus I2C2 y en el mismo `OLED_Init()` — el firmware no puede saber cuál de los 2 está conectado, y no lo necesita. Son mutuamente excluyentes en una placa dada (ver la nota `CONN_OLED2` de `BOM/BOM.TXT` - el nombre que usa este documento para lo que el esquemático llama `LCD1`).
+Ambos van al mismo bus I2C2 y en el mismo `OLED_Init()` — el firmware no puede saber cuál de los 2 está conectado, y no lo necesita. Son mutuamente excluyentes en una placa dada (ver la nota `CONN_OLED2` de `BOM/BOM.TXT` - el nombre que usa este documento para lo que el esquemático llama `LCD1`).
 
 ##### Opción A — montaje directo (`CONN_OLED2`, el footprint realmente poblado en la placa)
 
@@ -238,11 +238,11 @@ Un panel desnudo sin PCB de breakout separado - solo el cristal y su cinta FPC d
 | Pin(es) CONN_OLED2 | Net | Función |
 |---|---|---|
 | 1, 8, 29, 30 | GND / AGND | Tierra |
-| 9 | VDD | Alimentación lógica (desde `+3V3B`, el riel exclusivo del OLED — ver BOM §1) |
+| 9 | VDD | Alimentación lógica (desde `+3V3B`, el carril de alimentación exclusivo del OLED — ver BOM §1) |
 | 28 | VCC | Alimentación del panel |
 | 2–5 | C2P/C2N/C1P/C1N | Condensadores de bomba de carga — `C26`/`C27` en la BOM |
 | 26 | IREF | Resistencia de ajuste de corriente de referencia |
-| 27 | VCOMH | Desacoplo de voltaje común interno |
+| 27 | VCOMH | Desacoplo de la tensión común interna |
 | 10, 12 | BS0, BS2 | Conectados a GND |
 | 11 | BS1 | Conectado a `+3V3B` |
 | 18 | D0/SCK | I2C2 SCL — PA9 |
@@ -259,7 +259,7 @@ El mismo panel pre-montado en una pequeña placa portadora con un header de 4 pi
 | Pin del módulo OLED | Pin CONN_OLED | Señal |
 |---|---|---|
 | GND | 1 | Tierra |
-| VDD | 2 | +3.3V (alimentación lógica de la pantalla) |
+| VDD | 2 | +3,3 V (alimentación lógica de la pantalla) |
 | SCK | 3 | SCL — PA9, I2C2 por hardware |
 | SDA | 4 | SDA — PA10, I2C2 por hardware |
 
@@ -328,12 +328,12 @@ Separado del OLED y del anillo de iluminación de 8 píxeles, `CONN_LED1` lleva 
 **Automático por defecto, anulable por el host bajo demanda.** El firmware colorea este LED por sí mismo, con prioridad de 3 vías:
 
 * 🔴 **Rojo** — hay un fallo de hardware activo (`system_error_flag`). Siempre gana, sin importar qué más esté pasando.
-* 🔵 **Azul** — la placa está funcionando activamente: llegó una trama CAN (cualquier ID) en los últimos 1.5 segundos.
-* 🟢 **Verde** — inactiva, esperando comandos: sin tráfico CAN en más de 1.5 segundos.
+* 🔵 **Azul** — la placa está funcionando activamente: llegó una trama CAN (cualquier ID) en los últimos 1,5 segundos.
+* 🟢 **Verde** — inactiva, esperando comandos: sin tráfico CAN en más de 1,5 segundos.
 
 El maestro todavía puede anular esto en cualquier momento enviando el ID CAN `0x100` (DLC 8) con la intensidad de rojo, verde, y azul como los primeros 3 bytes (0-255 cada uno — color completo de 24 bits, no solo los 3 automáticos). Un color enviado por el host se mantiene 10 segundos antes de volver al esquema automático — suficiente para realmente verse, lo bastante corto para que la placa no se quede atascada mostrando un color personalizado obsoleto si el host deja de actualizarlo. Enviar `0x100` de nuevo (ya sea el mismo color o uno nuevo) renueva esa ventana de 10 segundos, así que un host que quiera mantener control personalizado solo necesita seguir enviándolo periódicamente. Un fallo de hardware siempre interrumpe una anulación activa — el rojo tiene prioridad sobre cualquier color que el host hubiera establecido.
 
-Ver `docs/CANBUS.TXT` (ID `0x100`) para el layout exacto de bytes, que también comparte este mismo mensaje con el control del anillo de LED y del modo nocturno del OLED.
+Ver `docs/CANBUS.TXT` (ID `0x100`) para la disposición exacta de los bytes, que también comparte este mismo mensaje con el control del anillo de LED y del modo nocturno del OLED.
 
 ## 🔒 Seguridad y protección
 
@@ -351,7 +351,7 @@ Una vez que el bootloader está en su lugar, actualizar la aplicación ya no nec
 
 **La secuencia de actualización:**
 
-1. **Disparo.** El maestro envía `0x7F0` (DLC 4, payload `B0 07 1D 5A`) a la *aplicación en ejecución*. Corta la energía de forma segura a cada actuador en línea — motores, calentadores, láser — y resetea el chip. Este requisito de payload mágico significa que una trama corrupta o malformada no puede disparar accidentalmente un reset hacia el modo de actualización.
+1. **Disparo.** El maestro envía `0x7F0` (DLC 4, carga útil `B0 07 1D 5A`) a la *aplicación en ejecución*. Corta la energía de forma segura a cada actuador en línea — motores, calentadores, láser — y resetea el chip. Este requisito de carga útil mágica significa que una trama corrupta o malformada no puede disparar accidentalmente un reset hacia el modo de actualización.
 2. **Inicio.** Tras el reset, el bootloader está escuchando. El maestro envía `0x7F1` (DLC 8, tamaño total de firmware big-endian + HardwareID big-endian). Una imagen construida para un hardware distinto se rechaza justo aquí, antes de que se toque un solo byte de flash. El bootloader borra exactamente tantas páginas del slot de respaldo como necesite la imagen nueva y responde con una trama de estado (`0x7F5`).
 3. **Firma.** El maestro envía el registro Ed25519 de 76 bytes (id de clave, contador de reversión, firma) como 11 tramas `0x7EC` (un índice y 7 bytes cada una) antes de los datos y en cualquier orden; lo calcula la máquina del mantenedor tras la build, sobre una cabecera que describe la imagen, su SHA-256 y el contador. El bootloader solo guarda claves públicas, así que leerlo no da a nadie el poder de firmar; la tabla de claves oficial está vacía hasta que se cree la clave de firma de imágenes, y una build de banco confía en una clave pública de desarrollo (véase `docs/FIRMWARE_SIGNING.TXT`).
 4. **Datos.** El maestro transmite el archivo `.bin` como una secuencia de tramas `0x7F2` (hasta 8 bytes de datos de firmware en bruto cada una), enviadas una tras otra — CAN garantiza que las tramas llegan en el orden en que se enviaron en un solo bus, así que no hace falta un número de secuencia por trama. El bootloader acumula los bytes entrantes en una página de 2KB en RAM y la escribe en el slot de *respaldo* una vez llena, releyendo cada media palabra y comparándola contra lo que se suponía que se escribiera antes de dar la página por terminada, y enviando un reconocimiento `0x7F3` (con el índice de página) tras cada escritura verificada. Una implementación razonable del maestro espera el ACK de cada página antes de enviar los datos de la siguiente, para evitar desbordar el búfer de recepción del bootloader.
@@ -359,15 +359,15 @@ Una vez que el bootloader está en su lugar, actualizar la aplicación ya no nec
 
 **Tramas de estado (`0x7F5`, DLC 1):** `0x01` escuchando, `0x02` borrando, `0x03` recibiendo, `0x06` verificando, `0x07` copiando respaldo a principal, `0x04` verificado OK (a punto de saltar), `0x05` verificación fallida, `0xFF` error.
 
-**Latido (`0x7F6`, DLC 2, cada ~1s mientras escucha o actualiza):** byte de estado + porcentaje de progreso (0-100, o `0xFF` donde un porcentaje no aplica). Permite al maestro distinguir "el nodo está vivo pero todavía no ha empezado a escuchar" de "el nodo está completamente sin respuesta" - útil para puesta en marcha automatizada y para detectar un bootloader atascado sin esperar a un timeout.
+**Latido (`0x7F6`, DLC 2, cada ~1s mientras escucha o actualiza):** byte de estado + porcentaje de progreso (0-100, o `0xFF` donde un porcentaje no aplica). Permite al maestro distinguir "el nodo está vivo pero todavía no ha empezado a escuchar" de "el nodo está completamente sin respuesta" - útil para puesta en marcha automatizada y para detectar un bootloader atascado sin esperar a que venza un tiempo de espera.
 
 **Progreso en pantalla.** El bootloader controla el OLED directamente durante una actualización — nadie tiene que adivinar si algo está pasando. Muestra "UPDATING" más una barra de progreso en vivo y un porcentaje mientras se escriben o copian páginas, "FLASH OK" durante un instante antes de resetear hacia el firmware nuevo, y "ERROR" si falla la escritura de una página, la transferencia se estanca más de 10 segundos, o la verificación vuelve con una discrepancia.
 
-**⚠️ Prueba esto en banco antes de confiar en ello en campo.** El protocolo de arriba compila y enlaza limpio y la lógica se ha razonado cuidadosamente, pero un bootloader es exactamente el tipo de firmware donde "compila correctamente" está muy lejos de "confiable en hardware" — el timing real de programación de flash, el comportamiento de CAN a través de una transferencia de varios miles de tramas, y el traspaso bootloader-a-aplicación necesitan todos verificarse en una placa real (idealmente con JTAG a mano como respaldo) antes de confiar en esto para una actualización desatendida con actuadores reales conectados.
+**⚠️ Prueba esto en banco antes de confiar en ello en campo.** El protocolo de arriba compila y enlaza limpio y la lógica se ha razonado cuidadosamente, pero un bootloader es exactamente el tipo de firmware donde "compila correctamente" está muy lejos de "confiable en hardware" — los tiempos reales de programación de flash, el comportamiento de CAN a través de una transferencia de varios miles de tramas, y el traspaso bootloader-a-aplicación necesitan todos verificarse en una placa real (idealmente con JTAG a mano como respaldo) antes de confiar en esto para una actualización desatendida con actuadores reales conectados.
 
 ## 🚀 Inicio rápido
 
-La flash de URTC está dividida en 2 piezas independientes, para que la placa pueda reflashearse por el mismo cordón umbilical CAN que ya usa para todo lo demás — sin necesitar nunca más acceso físico al header JTAG/SWD después de la configuración inicial.
+La flash de URTC está dividida en 2 piezas independientes, para que la placa pueda volver a grabarse por el mismo cable umbilical CAN que ya usa para todo lo demás — sin necesitar nunca más acceso físico al header JTAG/SWD después de la configuración inicial.
 
 ### Configuración inicial — requiere JTAG/SWD (una vez)
 
@@ -391,7 +391,7 @@ dan soporte a esta placa - **URTC Flasher** (actualizaciones CAN-OTA y
 de chip completo por SWD/JTAG, tanto para esta placa como, en una
 variante de expansión Avanzada, para su propio chip esclavo de
 expansión) y **URTC Tester** (un ejercitador en vivo de bus CAN que
-muestra el perfil de herramienta que esté jumpereado en cada momento).
+muestra el perfil de herramienta que esté configurado con jumpers en cada momento).
 Ambas solían vivir dentro de este repositorio bajo `tools/`; cada una es
 ahora su propio proyecto independiente, con su propio README, licencia,
 y traducciones:

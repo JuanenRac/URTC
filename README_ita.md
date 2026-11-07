@@ -32,7 +32,7 @@
 
 ---
 
-> **⚠️ Avviso di sicurezza (fase di progetto, nessuna scheda ha ancora eseguito questo firmware):** questa scheda pilota un **diodo laser da incisione da 10W** e più stadi di riscaldamento (cartuccia per saldatore T12, hotend per stampante 3D). Costruirla e usarla significa lavorare con apparecchiature che possono causare **ustioni, incendi o danni agli occhi** se assemblate o utilizzate senza le adeguate misure di sicurezza (occhiali protettivi con classificazione adatta alla lunghezza d'onda del diodo, protezione termica, un interruttore di alimentazione accessibile). Questo è un progetto hobbistico/maker condiviso così com'è - costruiscilo e usalo a tuo rischio, e non saltare le pratiche di sicurezza di base solo perché il firmware ha dei watchdog (watchdog software mai eseguiti su una scheda reale).
+> **⚠️ Avviso di sicurezza (fase di progetto, nessuna scheda ha ancora eseguito questo firmware):** questa scheda pilota un **diodo laser da incisione da 10 W** e più stadi di riscaldamento (cartuccia per saldatore T12, hotend per stampante 3D). Costruirla e usarla significa lavorare con apparecchiature che possono causare **ustioni, incendi o danni agli occhi** se assemblate o utilizzate senza le adeguate misure di sicurezza (occhiali protettivi con classificazione adatta alla lunghezza d'onda del diodo, protezione termica, un interruttore di alimentazione accessibile). Questo è un progetto hobbistico/maker condiviso così com'è - costruiscilo e usalo a tuo rischio, e non saltare le pratiche di sicurezza di base solo perché il firmware ha dei watchdog (watchdog software mai eseguiti su una scheda reale).
 
 > **Stato di sicurezza (safety e security):** questo ecosistema non è un sistema di sicurezza certificato e non esiste ancora alcuna scheda URTC assemblata. Il bootloader della scheda principale verifica le immagini firmware con CRC32 e una firma Ed25519 rispetto a una tabella di chiavi pubbliche e non custodisce alcun segreto; il bootloader dell'espansione slave controlla CRC32 e un SHA-256 senza chiave e installa solo un'immagine che la scheda principale, che verifica il record Ed25519, gli ha confermato tramite il bus di collegamento interno (si fida della scheda principale attraverso quel bus). La tabella della build ufficiale è vuota finché non viene creata la chiave di firma delle immagini, quindi un bootloader principale ufficiale non installa ancora nulla, e una build da banco si fida di una chiave pubblica di sviluppo, così chiunque può produrre un'immagine che un tale bootloader accetta; nulla è stato trasmesso a una scheda reale. Leggi la [base di sicurezza](https://github.com/JuanenRac/URTC-DOCS/blob/main/docs/SECURITY_BASELINE.md) e il [modello delle minacce](https://github.com/JuanenRac/URTC-DOCS/blob/main/docs/THREAT_MODEL.md) prima di fidarti di qualsiasi affermazione qui per la sicurezza di una persona.
 
@@ -365,14 +365,14 @@ Una volta che il bootloader è in posizione, aggiornare l'applicazione non richi
 
 ## 🚀 Avvio rapido
 
-La flash di URTC è divisa in due parti indipendenti, così la scheda può essere riflashata sullo stesso cavo ombelicale CAN che già usa per tutto il resto - senza mai più necessitare di accesso fisico all'header JTAG/SWD dopo la configurazione iniziale.
+La flash di URTC è divisa in due parti indipendenti, così la scheda può essere riprogrammata sullo stesso cavo ombelicale CAN che già usa per tutto il resto - senza mai più necessitare di accesso fisico all'header JTAG/SWD dopo la configurazione iniziale.
 
 ### Configurazione iniziale — richiede JTAG/SWD (una tantum)
 
-Il bootloader può arrivare sul chip solo tramite programmazione fisica - non c'è modo di flashare via CAN una scheda che non ha ancora un bootloader su di essa. Questo è un passo una tantum:
+Il bootloader può arrivare sul chip solo tramite programmazione fisica - non c'è modo di programmare via CAN una scheda che non ha ancora un bootloader su di essa. Questo è un passo una tantum:
 
 1. Apri il progetto in **STM32CubeIDE** (compilato e testato contro il target STM32F303CC), o usa **STM32CubeProgrammer** direttamente con gli output compilati sotto.
-2. Flasha **entrambe** le immagini via SWD (ST-Link) tramite l'header integrato `STM_JTAG` - ogni file `.hex` ha il proprio indirizzo di destinazione incorporato, così la maggior parte degli strumenti (incluso STM32CubeProgrammer) può caricare entrambi nella stessa sessione:
+2. Programma **entrambe** le immagini via SWD (ST-Link) tramite l'header integrato `STM_JTAG` - ogni file `.hex` ha il proprio indirizzo di destinazione incorporato, così la maggior parte degli strumenti (incluso STM32CubeProgrammer) può caricare entrambi nella stessa sessione:
    * `URTC_MAIN_BOOTLOADER_v<version>.hex` → `0x08000000`
    * `URTC_MAIN_FIRMWARE_v<version>.hex` → `0x08008000`
 3. Imposta l'identità dello strumento tramite i jumper di saldatura ID prima di accendere - la scheda li legge una volta all'avvio, come sempre. Cinque jumper (ID0-ID4), che coprono l'intero spazio di 32 indirizzi (31 indirizzi diretti per strumento, più l'indirizzo riservato `11111` di configurazione libera - vedi la sezione Matrice degli Strumenti sopra).
@@ -395,7 +395,7 @@ progetto indipendente, con proprio README, licenza, e traduzioni:
 - [URTC Flasher](https://github.com/JuanenRac/URTC-FLASHER)
 - [URTC Tester](https://github.com/JuanenRac/URTC-TESTER)
 
-Esiste anche un'alternativa basata sul web che copre terreno simile (monitoraggio dal vivo, analisi CAN, flashing OTA, ispezione termica) senza installare nulla localmente: [URTC Web Studio](https://github.com/JuanenRac/URTC-WEB-STUDIO).
+Esiste anche un'alternativa basata sul web che copre terreno simile (monitoraggio dal vivo, analisi CAN, programmazione OTA, ispezione termica) senza installare nulla localmente: [URTC Web Studio](https://github.com/JuanenRac/URTC-WEB-STUDIO).
 
 <!-- urtc-section:compatibility -->
 ### Requisiti e compatibilità
