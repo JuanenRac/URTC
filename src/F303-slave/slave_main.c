@@ -64,6 +64,7 @@ static void MX_GPIO_Init(void) {
 }
 
 static uint8_t MX_I2C1_Init_Slave(void) {
+    __HAL_RCC_I2C1_CLK_ENABLE();   // before HAL_I2C_Init: a peripheral whose clock is off ignores the writes of the init
     hi2c1.Instance = I2C1;
     hi2c1.Init.Timing = 0x2000090E; // same value as the bootloader's own I2C1 init. The I2C kernel clock is the default one, the 8 MHz HSI (RCC_CFGR3 is not changed), not PCLK1: at 8 MHz this value gives about 100 kHz (standard mode)
     hi2c1.Init.OwnAddress1 = (I2C_SLAVE_ADDRESS << 1);
@@ -74,7 +75,6 @@ static uint8_t MX_I2C1_Init_Slave(void) {
     hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE; // same reasoning as the bootloader - register handlers here (particularly anything touching the local sensor bus) aren't necessarily instant
     if (HAL_I2C_Init(&hi2c1) != HAL_OK) return 0;
 
-    __HAL_RCC_I2C1_CLK_ENABLE();
     HAL_NVIC_SetPriority(I2C1_EV_IRQn, 1, 0);
     HAL_NVIC_EnableIRQ(I2C1_EV_IRQn);
     HAL_NVIC_SetPriority(I2C1_ER_IRQn, 1, 0);
@@ -83,6 +83,7 @@ static uint8_t MX_I2C1_Init_Slave(void) {
 }
 
 static void MX_I2C2_Init_Master(void) {
+    __HAL_RCC_I2C2_CLK_ENABLE();   // before HAL_I2C_Init, as for I2C1
     hi2c2.Instance = I2C2;
     hi2c2.Init.Timing = 0x2000090E; // same timing as I2C1 (about 100 kHz from the 8 MHz HSI kernel clock) - both ADS1115 and MLX90640 are comfortably within standard mode's own 100kHz ceiling (MLX90640 supports up to 1MHz Fast Mode+, but nothing here currently needs that speed)
     hi2c2.Init.OwnAddress1 = 0; // master-only role on this bus - no slave address of its own needed
@@ -92,7 +93,6 @@ static void MX_I2C2_Init_Master(void) {
     hi2c2.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
     hi2c2.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
     HAL_I2C_Init(&hi2c2);
-    __HAL_RCC_I2C2_CLK_ENABLE();
     // No interrupt/NVIC setup here deliberately - slave_i2c_sensors.c
     // talks to both local chips with HAL's own blocking
     // Master_Transmit/Receive calls (50ms timeout each), not interrupt-

@@ -94,6 +94,7 @@ static void MX_IWDG_Init(void) {
 }
 
 static void MX_I2C1_Init_Slave(void) {
+    __HAL_RCC_I2C1_CLK_ENABLE();   // before HAL_I2C_Init: a peripheral whose clock is off ignores the writes of the init
     hi2c1.Instance = I2C1;
     hi2c1.Init.Timing = 0x2000090E; // About 100 kHz standard mode from the I2C kernel clock, which is the default 8 MHz HSI here (RCC_CFGR3 is not changed), not PCLK1 - this register's bitfields don't map to a simple formula on this I2C peripheral generation, so recompute it with STM32CubeMX's I2C timing calculator if the kernel clock ever changes
     hi2c1.Init.OwnAddress1 = (I2C_SLAVE_ADDRESS << 1); // HAL expects the 7-bit address pre-shifted into bits [7:1]
@@ -104,7 +105,6 @@ static void MX_I2C1_Init_Slave(void) {
     hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE; // clock stretching left enabled deliberately - flash operations (erase/write/verify, tens of microseconds to milliseconds) run inside the same handlers this interrupt calls, and a master expecting instant responses without stretching would see NACKs or garbled data during those windows otherwise
     HAL_I2C_Init(&hi2c1);
 
-    __HAL_RCC_I2C1_CLK_ENABLE();
     HAL_NVIC_SetPriority(I2C1_EV_IRQn, 1, 0);
     HAL_NVIC_EnableIRQ(I2C1_EV_IRQn);
     HAL_NVIC_SetPriority(I2C1_ER_IRQn, 1, 0);

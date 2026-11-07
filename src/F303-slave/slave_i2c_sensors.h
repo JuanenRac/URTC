@@ -32,6 +32,10 @@ int16_t ADS1115_ReadResult(void);
 // MLX_ServiceCapture once per main-loop iteration (slave_main.c).
 void MLX_TriggerCapture(void);
 void MLX_ServiceCapture(void);
+// The master chose a sensor (REG_MLX_SENSOR_VARIANT): the sensor is initialised by the next MLX_ServiceCapture, in the main loop and not in the interrupt that
+// took the write. At start-up the variant is always NONE (only the master sets it, over the bus that is not listening yet), so without this request the sensor
+// was never initialised.
+void MLX_RequestInit(void);
 uint8_t MLX_GetCaptureStatus(void);
 void MLX_GetRawChunk(uint8_t chunk_index, uint8_t out[32]);
 void MLX_GetCalibratedChunk(uint8_t chunk_index, uint8_t out[32]);

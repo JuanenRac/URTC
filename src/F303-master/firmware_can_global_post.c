@@ -93,6 +93,9 @@ void Handle_CAN_GlobalCommands_PostErrorGate(void) {
             uint8_t blank[sizeof(SavedState_t)];
             memset(blank, 0xFF, sizeof(blank)); // an arbitrary but definite pattern (no special hardware meaning for F-RAM the way it has for Flash/EEPROM - chosen purely so the magic/checksum check below is guaranteed to fail on the next boot)
             FRAM_WriteBytes(SAVEDSTATE_FRAM_ADDR, blank, sizeof(blank));
+            uint8_t blank_hw[sizeof(HardwareConfig_t)];
+            memset(blank_hw, 0xFF, sizeof(blank_hw));
+            FRAM_WriteBytes(HWCONFIG_FRAM_ADDR, blank_hw, sizeof(blank_hw));   // the hardware configuration record goes with the saved state
             had_valid_recovered_state = 0;
             memset(&recovered_state, 0, sizeof(recovered_state));
             memset(&last_saved_state, 0xFF, sizeof(last_saved_state)); // forces the next SavedState_MaybeSave() comparison to see a real difference and write a fresh record rather than assuming nothing changed

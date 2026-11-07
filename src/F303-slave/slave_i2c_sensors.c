@@ -142,7 +142,7 @@ static uint16_t mlx90640_frame_data[834]; // 768 pixels + 64 aux words + frameDa
 static float mlx90640_calibrated_frame[768];
 
 static void MLX90640_DoInit(void) {
-    static uint16_t ee_data[MLX90640_EEPROM_DUMP_NUM]; // static, not a stack local - fits this chip's 40KB RAM but not the linker script's own 1KB minimum stack reservation
+    static uint16_t ee_data[MLX90640_EEPROM_DUMP_NUM]; // static, not a stack local - fits this chip's 32KB RAM but not the linker script's own 1KB minimum stack reservation
     MLX90640_I2CInit();
     if (MLX90640_DumpEE(MLX90640_I2C_ADDR, ee_data) == MLX90640_NO_ERROR) {
         MLX90640_ExtractParameters(ee_data, &mlx90640_params);
@@ -448,6 +448,11 @@ void Sensors_Init(void) {
 // is never lost, only picked up on the loop iteration after the current
 // capture finishes.
 static volatile uint8_t mlx_capture_requested = 0;
+static volatile uint8_t mlx_init_requested = 0;
+
+void MLX_RequestInit(void) {
+    mlx_init_requested = 1;
+}
 
 void MLX_TriggerCapture(void) {
     if (mlx_sensor_variant == MLX_VARIANT_90640 || mlx_sensor_variant == MLX_VARIANT_90641) {
@@ -480,6 +485,10 @@ void MLX_TriggerCapture(void) {
 // keep it out of I2C1's own ISR context - see MLX_TriggerCapture's own
 // comment for the full reasoning.
 void MLX_ServiceCapture(void) {
+    if (mlx_init_requested) {
+        mlx_init_requested = 0;
+        Sensors_Init();          // the sensor the master has just chosen; a capture requested meanwhile runs after it
+    }
     if (!mlx_capture_requested) return;
     mlx_capture_requested = 0;
     if (mlx_sensor_variant == MLX_VARIANT_90640) {

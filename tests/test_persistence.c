@@ -284,12 +284,104 @@ static void test_save(int *failures)
     TEST_ASSERT(recovered_state.printer_nozzle_setpoint == 200 && recovered_state.layer_fan_power == 33 && target_temperature == 0 && layer_fan_duty == 0, "the heater and fan values come back as information only, not as live setpoints");
 }
 
+static HardwareConfig_t stored_hw(void)
+{
+    HardwareConfig_t h;
+    memcpy(&h, fake_fram + HWCONFIG_FRAM_ADDR, sizeof h);
+    return h;
+}
+
+// The hardware configuration has a record of its own (URTC-BUG-014): a saved state of another layout version no longer takes it away.
+static void test_hardware_config(int *failures)
+{
+    // saved with the configuration set; the record carries a valid checksum
+    reset_world();
+    SavedState_Load();                        // a blank chip: nothing valid yet, the baseline is "write me"
+    expansion_board_type = 4; free_tool_selection = 9; device_serial_number = 77; mlx_sensor_variant = 3;
+    SavedState_MaybeSave();
+    HardwareConfig_t h = stored_hw();
+    TEST_ASSERT(h.magic == HWCONFIG_MAGIC && h.version == HWCONFIG_VERSION && h.expansion_board_type == 4 && h.free_tool_selection == 9 && h.device_serial_number == 77 && h.mlx_sensor_variant == 3,
+                "a save writes the four values of the hardware configuration in their own record");
+    TEST_ASSERT(h.checksum == ref_crc8(&h, sizeof h - 1), "and the record carries a valid checksum");
+    TEST_ASSERT(HWCONFIG_FRAM_ADDR >= BLACKBOX_FRAM_ADDR + sizeof(BlackBoxRecord_t) && HWCONFIG_FRAM_ADDR + sizeof(HardwareConfig_t) <= 960, "the record sits in the free space between the fault recorder and the multinode switch");
+
+    // the layout of the saved state changes: only the rest is lost
+    SavedState_t other = sample_record();
+    other.struct_version = SAVEDSTATE_VERSION - 1;
+    other.checksum = ref_crc8(&other, sizeof other - 1);
+    put_record(&other);
+    expansion_board_type = free_tool_selection = device_serial_number = mlx_sensor_variant = 0;
+    had_valid_recovered_state = 0;
+    memset(&last_saved_state, 0, sizeof last_saved_state);   // a new boot: the RAM starts empty
+    SavedState_Load();
+    TEST_ASSERT(!had_valid_recovered_state, "a saved state of another layout version is still ignored");
+    TEST_ASSERT(expansion_board_type == 4 && free_tool_selection == 9 && device_serial_number == 77 && mlx_sensor_variant == 3, "but the hardware configuration comes back from its own record");
+
+    // and the next save does not overwrite the record with zeros
+    fake_tick += 5000;
+    SavedState_MaybeSave();
+    h = stored_hw();
+    TEST_ASSERT(h.expansion_board_type == 4 && h.device_serial_number == 77 && stored().struct_version == SAVEDSTATE_VERSION, "the next save keeps the configuration and writes the saved state in the current layout");
+
+    // a corrupted record is not believed
+    reset_world();
+    SavedState_Load();
+    expansion_board_type = 2;
+    SavedState_MaybeSave();
+    fake_fram[HWCONFIG_FRAM_ADDR + 5] ^= 0x01;
+    expansion_board_type = 0;
+    put_record(&other);
+    SavedState_Load();
+    TEST_ASSERT(expansion_board_type == 0, "a record with a wrong checksum restores nothing");
+    reset_world();
+    memset(fake_fram + HWCONFIG_FRAM_ADDR, 0xFF, sizeof(HardwareConfig_t));
+    put_record(&other);
+    SavedState_Load();
+    TEST_ASSERT(expansion_board_type == 0 && free_tool_selection == 0, "a blank record restores nothing");
+
+    // a valid saved state: its values win, and a chip with no record yet gets one
+    reset_world();
+    SavedState_t good = sample_record();
+    put_record(&good);
+    SavedState_Load();
+    TEST_ASSERT(expansion_board_type == 4 && device_serial_number == 0xC3, "a valid saved state restores the configuration as ever");
+    SavedState_MaybeSave();
+    h = stored_hw();
+    TEST_ASSERT(h.magic == HWCONFIG_MAGIC && h.expansion_board_type == 4 && h.device_serial_number == 0xC3, "and a chip that has no record of the configuration yet gets one at the first save");
+    fake_tick += 5000;
+    SavedState_MaybeSave();
+    TEST_ASSERT(stored_hw().device_serial_number == 0xC3, "an unchanged configuration stays as it was");
+
+    // a change of the configuration is written, but not more than once in three seconds
+    uint32_t t0 = fake_tick;
+    device_serial_number = 5;
+    SavedState_MaybeSave();
+    HardwareConfig_t after = stored_hw();
+    TEST_ASSERT(after.device_serial_number == 5, "a change of the configuration is written");
+    device_serial_number = 6;
+    fake_tick = t0 + 100;
+    SavedState_MaybeSave();
+    TEST_ASSERT(stored_hw().device_serial_number == 5, "a second change inside three seconds waits");
+    fake_tick = t0 + 3100;
+    SavedState_MaybeSave();
+    TEST_ASSERT(stored_hw().device_serial_number == 6, "and is written once they have passed");
+    fake_fram_fail_writes = 1;
+    device_serial_number = 7;
+    fake_tick = t0 + 7000;
+    SavedState_MaybeSave();
+    fake_fram_fail_writes = 0;
+    TEST_ASSERT(stored_hw().device_serial_number == 6, "a failed write changes nothing");
+    SavedState_MaybeSave();
+    TEST_ASSERT(stored_hw().device_serial_number == 7, "and is tried again on the next pass");
+}
+
 void run_persistence_tests(int *failures)
 {
     test_checksum(failures);
     test_load(failures);
     test_fram_chunks(failures);
     test_save(failures);
+    test_hardware_config(failures);
 }
 
 int main(void)

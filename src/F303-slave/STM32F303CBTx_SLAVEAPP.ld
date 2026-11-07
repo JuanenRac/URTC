@@ -5,7 +5,7 @@
  * separate region - this firmware only ever runs there, copied in by
  * the bootloader after passing verification, same relationship the main
  * board's own application firmware has with its own bootloader.
- * RAM: 40KB main SRAM at 0x20000000, same as the bootloader - this
+ * RAM: 32KB main SRAM at 0x20000000 (the F303CB has 32KB of SRAM and 8KB of CCM: 40KB in all, not 40KB of SRAM), same as the bootloader - this
  * firmware's own buffers (MLX90640's raw+calibrated frames, ~3KB
  * combined) fit comfortably without needing this chip's other 8KB CCM
  * region, so it's left unused here too, same as the bootloader.
@@ -14,7 +14,7 @@
 MEMORY
 {
   FLASH (rx)      : ORIGIN = 0x08005000, LENGTH = 54K
-  RAM (xrw)       : ORIGIN = 0x20000000, LENGTH = 40K
+  RAM (xrw)       : ORIGIN = 0x20000000, LENGTH = 32K
 }
 
 _estack = ORIGIN(RAM) + LENGTH(RAM);

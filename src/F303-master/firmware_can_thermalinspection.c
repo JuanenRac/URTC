@@ -67,14 +67,28 @@ static void SendChunkFrames(uint32_t id, const uint8_t *data32) {
     }
 }
 
+// The sensor whose capture was requested over CAN and has not finished (0: none). Set in the receive interrupt, cleared by ThermalInspection_Service when the
+// capture is over, so a status query sees BUSY from the request until the driver reports its own result.
+static volatile uint8_t thermal_capture_pending = 0;
+
+void ThermalInspection_Service(void) {
+    const uint8_t variant = thermal_capture_pending;
+    if (variant == 0) return;
+    HAL_IWDG_Refresh(&hiwdg);   // the capture is long: it starts with the whole watchdog period in front of it
+    if (variant == MLX_VARIANT_90640) {
+        MLX90640_Direct_TriggerCapture();
+    } else if (variant == MLX_VARIANT_90641) {
+        MLX90641_Direct_TriggerCapture();
+    } else if (variant == MLX_VARIANT_90642) {
+        MLX90642_Direct_TriggerCapture();
+    }
+    thermal_capture_pending = 0;
+}
+
 void Handle_CAN_ThermalInspection(void) {
     if (rxHeader.StdId == URTC_CAN_ID_THERMAL_TRIGGER && !boot_sequence_active) {
-        if (expansion_board_type == 6 && mlx_sensor_variant == MLX_VARIANT_90640) {
-            MLX90640_Direct_TriggerCapture();
-        } else if (expansion_board_type == 6 && mlx_sensor_variant == MLX_VARIANT_90641) {
-            MLX90641_Direct_TriggerCapture();
-        } else if (expansion_board_type == 6 && mlx_sensor_variant == MLX_VARIANT_90642) {
-            MLX90642_Direct_TriggerCapture();
+        if (expansion_board_type == 6 && (mlx_sensor_variant == MLX_VARIANT_90640 || mlx_sensor_variant == MLX_VARIANT_90641 || mlx_sensor_variant == MLX_VARIANT_90642)) {
+            if (thermal_capture_pending == 0) thermal_capture_pending = mlx_sensor_variant;   // a trigger while one is running is not queued twice
         } else if (expansion_board_type != 6) {
             ExpansionI2C_SlaveWriteRegister(REG_APP_MLX_TRIGGER_CAPTURE, rxData, 0);
         }
@@ -85,7 +99,10 @@ void Handle_CAN_ThermalInspection(void) {
     } else if (rxHeader.StdId == URTC_CAN_ID_THERMAL_STATUS) {
         uint8_t status = 0;
         uint8_t got_status = 0;
-        if (expansion_board_type == 6 && mlx_sensor_variant == MLX_VARIANT_90640) {
+        if (expansion_board_type == 6 && thermal_capture_pending != 0) {
+            status = MLX_CAPTURE_BUSY;    // requested over CAN, not finished: the main loop has it
+            got_status = 1;
+        } else if (expansion_board_type == 6 && mlx_sensor_variant == MLX_VARIANT_90640) {
             status = MLX90640_Direct_GetCaptureStatus();
             got_status = 1;
         } else if (expansion_board_type == 6 && mlx_sensor_variant == MLX_VARIANT_90641) {

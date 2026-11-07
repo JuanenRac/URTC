@@ -279,6 +279,32 @@ static void test_transport_codes(int *failures)
     TEST_ASSERT(fake_tick - before == 12, "the MLX90642 wait is the HAL delay");
 }
 
+// The sensor the master chooses is initialised by the main loop, not by the interrupt (URTC-BUG-013): at start-up the variant is always NONE.
+static void test_variant_write_initialises_the_sensor(int *failures)
+{
+    static uint16_t ee[MLX90640_EEPROM_DUMP_NUM];
+    world();
+    mlx = fake_i2c_bus_add(0x33, FAKE_I2C_MLX);
+    mlx->clear_trigger_on_reset = 1;
+    synthetic_eeprom(ee);
+    for (int i = 0; i < MLX90640_EEPROM_DUMP_NUM; i++) mlx->words16[0x2400 + i] = ee[i];
+    mlx->words16[0x800D] = 0x1901;
+    mlx->words16[0x8000] = 0x0008;
+    Sensors_Init();                                         // what start-up does: the variant is NONE, so nothing is read
+    fake_i2c_bus_clear_counters();
+    uint8_t choose[2] = {REG_MLX_SENSOR_VARIANT, MLX_VARIANT_90640};
+    master_writes(choose, 2);
+    TEST_ASSERT(mlx_sensor_variant == MLX_VARIANT_90640 && fake_i2c_bus.starts == 0, "the write of the variant only stores it: the interrupt does not talk to the sensor");
+    MLX_ServiceCapture();
+    TEST_ASSERT(fake_i2c_bus.starts > 0, "the next pass of the main loop initialises the sensor that was chosen (it reads its calibration)");
+    int after_init = fake_i2c_bus.starts;
+    MLX_ServiceCapture();
+    TEST_ASSERT(fake_i2c_bus.starts == after_init, "and only once");
+    master_writes(choose, 2);
+    MLX_ServiceCapture();
+    TEST_ASSERT(fake_i2c_bus.starts > after_init, "a new choice initialises again");
+}
+
 static void test_camera_640(int *failures)
 {
     static uint16_t ee[MLX90640_EEPROM_DUMP_NUM];
@@ -430,6 +456,7 @@ static void test_main(int *failures)
     TEST_ASSERT(fake_hal_inits == 1 && fake_scb.VTOR == 0x08005000UL, "the vector table is set to the application address, then the HAL started");
     TEST_ASSERT(fake_rcc_calls == 2 && fake_rcc_osc.PLL.PLLMUL == RCC_PLL_MUL16 && fake_rcc_clk.APB1CLKDivider == RCC_HCLK_DIV2, "the clocks: 64 MHz from the internal oscillator, a slower APB1");
     TEST_ASSERT(fake_iwdg_inits == 1 && fake_iwdg_prescaler == IWDG_PRESCALER_32 && fake_iwdg_reload == 999, "the watchdog is armed: 32 kHz / 32 for 1000 counts, a second");
+    TEST_ASSERT(fake_i2c_inits == 2 && fake_i2c_inits_without_clock == 0, "the clock of each I2C peripheral is enabled before its init (an init with the clock off is ignored by the chip)");
     TEST_ASSERT(fake_i2c_inits == 2 && hi2c1.Init.OwnAddress1 == (I2C_SLAVE_ADDRESS << 1) && hi2c2.Init.OwnAddress1 == 0, "I2C1 answers at address 0x42, I2C2 is a master");
     TEST_ASSERT(fake_nvic[I2C1_EV_IRQn].enabled && fake_nvic[I2C1_ER_IRQn].enabled && fake_nvic[I2C1_EV_IRQn].preempt == 1, "its two interrupts are enabled at priority 1");
     TEST_ASSERT(fake_i2c_listen_count == 1, "the link is listening");
@@ -448,6 +475,7 @@ void run_slave_tests(int *failures)
     test_link(failures);
     test_converter(failures);
     test_transport_codes(failures);
+    test_variant_write_initialises_the_sensor(failures);
     test_camera_640(failures);
     test_camera_641(failures);
     test_camera_642(failures);

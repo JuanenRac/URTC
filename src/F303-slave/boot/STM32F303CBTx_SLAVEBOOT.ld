@@ -3,7 +3,7 @@
  * slaveboot_common.h's own MAIN_APP_ADDR=0x08005000 /
  * BACKUP_APP_ADDR=0x08012800 constants, which assume exactly this 18KB
  * bootloader region + 2KB metadata page ahead of them).
- * RAM: 40KB main SRAM at 0x20000000, same as the main board's own
+ * RAM: 32KB main SRAM at 0x20000000 (the F303CB has 32KB of SRAM and 8KB of CCM: 40KB in all, not 40KB of SRAM), same as the main board's own
  * bootloader - this chip's other 8KB (CCM RAM at 0x10000000) isn't used
  * here either, same reasoning: nothing in this bootloader needs it.
  */
@@ -11,7 +11,7 @@
 MEMORY
 {
   FLASH (rx)      : ORIGIN = 0x08000000, LENGTH = 18K
-  RAM (xrw)       : ORIGIN = 0x20000000, LENGTH = 40K
+  RAM (xrw)       : ORIGIN = 0x20000000, LENGTH = 32K
 }
 
 _estack = ORIGIN(RAM) + LENGTH(RAM);

@@ -336,6 +336,9 @@ void HAL_NVIC_EnableIRQ(int irq);
 #define I2C_GENERALCALL_DISABLE 0u
 #define I2C_NOSTRETCH_DISABLE 0u
 extern int fake_i2c_inits;
+// Every enable of an I2C peripheral clock counts one; HAL_I2C_Init consumes one, and an init with none left to consume (the clock was enabled after it, or never)
+// counts in fake_i2c_inits_without_clock. A real peripheral ignores the writes of HAL_I2C_Init while its clock is off.
+extern int fake_i2c_clock_enables, fake_i2c_clock_used, fake_i2c_inits_without_clock;
 extern I2C_InitTypeDef fake_i2c_init;
 extern void *fake_i2c2_instance_ptr;
 #define I2C2 (fake_i2c2_instance_ptr)
@@ -385,8 +388,8 @@ typedef struct { uint32_t OCMode, Pulse, OCPolarity, OCFastMode, OCNPolarity, OC
 #define __HAL_RCC_TIM2_CLK_ENABLE() ((void)0)
 #define __HAL_RCC_TIM3_CLK_ENABLE() ((void)0)
 #define __HAL_RCC_ADC12_CLK_ENABLE() ((void)0)
-#define __HAL_RCC_I2C2_CLK_ENABLE() ((void)0)
-#define __HAL_RCC_I2C1_CLK_ENABLE() ((void)0)
+#define __HAL_RCC_I2C2_CLK_ENABLE() (fake_i2c_clock_enables++)
+#define __HAL_RCC_I2C1_CLK_ENABLE() (fake_i2c_clock_enables++)
 #define __HAL_RCC_SPI1_CLK_ENABLE() ((void)0)
 #define __HAL_RCC_CAN1_CLK_ENABLE() ((void)0)
 #define __HAL_RCC_PWR_CLK_ENABLE() ((void)0)

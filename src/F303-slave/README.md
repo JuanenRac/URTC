@@ -28,7 +28,7 @@ this is a companion to rather than a variant of, see
 | MCU | STM32F303CBT6, LQFP48 |
 | Core | ARM Cortex-M4F (hardware FPU, single-precision) - the calibration math for whichever MLX9064x sensor is configured (section 3 below) leans on this directly |
 | Flash | 128 KB |
-| RAM | 40 KB main SRAM (`0x20000000`) + 8 KB CCM at `0x10000000` (unused by this firmware, same as the main board's own firmware leaves its own CCM unused - nothing here needs the extra 8 KB enough to deal with the split) |
+| RAM | 32 KB main SRAM (`0x20000000`) + 8 KB CCM at `0x10000000` (unused by this firmware, same as the main board's own firmware leaves its own CCM unused - nothing here needs the extra 8 KB enough to deal with the split) |
 | Clock | No external crystal populated - `RCC_OSCILLATORTYPE_HSI` → `/2` → PLL ×16 → **64 MHz**. Deliberate design choice, not a placeholder: this chip does no CAN (the main board's own reason for needing HSE's tighter accuracy), only I2C, which tolerates HSI comfortably - see `slave_main.c`'s own top-of-file note, flagged for confirmation same as any hardware assumption in this project. |
 | I2C1 | LINK bus to the main board's own STM32F303CC - this chip is SLAVE here, real hardware I2C (not bit-banged) |
 | I2C2 | LOCAL sensor bus - this chip is MASTER here, drives the onboard ADS1115 + whichever MLX9064x sensor is configured |

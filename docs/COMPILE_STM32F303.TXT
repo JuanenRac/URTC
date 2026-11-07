@@ -27,7 +27,7 @@ another):
       changes a version; see the root README's own changelog for the
       current one)
 
-  Expansion slave (STM32F303CBT6, 128KB flash / 40KB SRAM, only
+  Expansion slave (STM32F303CBT6, 128KB flash / 32KB SRAM + 8KB CCM, only
   populated on Advanced expansion board variants):
     - Bootloader: src/F303-slave/boot/   -> URTC_SLAVE_BOOTLOADER_v{MAJOR}.{MINOR}.{PATCH}.bin/.hex/.elf
     - Application: src/F303-slave/       -> URTC_SLAVE_FIRMWARE_v{MAJOR}.{MINOR}.{PATCH}.bin/.hex/.elf

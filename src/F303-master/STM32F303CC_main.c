@@ -27,6 +27,7 @@
 #include "firmware_control_sensors.h"
 #include "firmware_telemetry_watchdog.h"
 #include "firmware_can_weldpulse.h"
+#include "firmware_can_thermalinspection.h"
 #include "firmware_persistence.h"
 #include "firmware_blackbox.h"
 #include "firmware_multinode.h"
@@ -516,6 +517,9 @@ int main(void) {
 
         // Multinode discovery answer and status frame (does nothing while the switch is off)
         MultiNode_Service();
+
+        // A thermal capture requested over CAN (0x250) runs here, not in the receive interrupt that took the command
+        ThermalInspection_Service();
 
         // Health frame and oscillator trim (do nothing while their switches are off)
         Features_Service();

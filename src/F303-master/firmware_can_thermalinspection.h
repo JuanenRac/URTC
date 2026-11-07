@@ -10,4 +10,8 @@
 
 void Handle_CAN_ThermalInspection(void);
 
+// The capture of a sensor wired straight to this board takes most of a second. The CAN handler (which runs in the receive interrupt) only marks it requested
+// and answers BUSY to a status query; this runs it from the main loop, once per pass, after the watchdog has been refreshed.
+void ThermalInspection_Service(void);
+
 #endif // FIRMWARE_CAN_THERMALINSPECTION_H

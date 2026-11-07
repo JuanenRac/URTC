@@ -7,10 +7,12 @@ LICENSE: This document is licensed under CC BY-SA 4.0 (https://creativecommons.o
 =============================================================================
 Everything URTC stores in its onboard FM24CL64B F-RAM (U8, I2C2, shares
 that bus with the OLED - see ../BOM/BOM.TXT and PINOUT.TXT's I2C2 block). The
-chip holds 8192 bytes (64Kbit) and four regions of it are in use: the
+chip holds 8192 bytes (64Kbit) and five regions of it are in use: the
 settings struct SavedState_t at address 0 (34 bytes, described in section 1),
 the lifetime thermal counters at address 192 (13 bytes), the fault recorder
-at address 256 (678 bytes) the multinode switch at address 960 (8 bytes,
+at address 256 (678 bytes), the hardware configuration record at address 944
+(10 bytes: expansion board, free tool, serial label and thermal sensor, kept
+apart so that a new SAVEDSTATE_VERSION does not discard them), the multinode switch at address 960 (8 bytes,
 section 8) and the optional firmware features at addresses 976 and 992
 (section 9); section 7 has the whole map. Everything else up to 8191 is free.
 
@@ -398,7 +400,14 @@ Address | Size  | What                                  | Defined in
         |       | on the rising edge of the error flag; | (BlackBoxRecord_t);
         |       | read over CAN with 0x1A8 / 0x1A9;     | layout in CANBUS.TXT
         |       | record version 2)                     | at 0x1A9
-934     | 26    | free                                  |
+934     | 10    | free                                  |
+944     | 10    | hardware configuration: expansion     | firmware_common.h
+        |       | board, free tool, serial label and    | (HardwareConfig_t),
+        |       | thermal sensor, in a record of its    | firmware_persistence.c
+        |       | own (magic 'HWCF', version 1, CRC-8)  | (own CRC-8 record, so a
+        |       | so that a new SAVEDSTATE_VERSION      | new SavedState_t
+        |       | does not discard it                   | version keeps it)
+954     | 6     | free                                  |
 960     | 8     | multinode switch: whether several     | multinode.h,
         |       | tool heads share the bus (default     | firmware_multinode.c
         |       | OFF), and the instance number         | (own CRC-8 record, so

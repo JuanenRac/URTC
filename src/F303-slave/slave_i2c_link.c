@@ -112,9 +112,12 @@ void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef *hi2c) {
 
     // REG_MLX_SENSOR_VARIANT: also a 2-byte write (register + the new
     // variant value), but a plain configuration write rather than a
-    // read-pointer selection - stored directly, no capture side effect.
+    // read-pointer selection - stored directly, no capture side effect. The
+    // sensor itself is initialised by the main loop (MLX_ServiceCapture):
+    // at start-up the variant is always NONE, so nothing else would do it.
     if (bytes_received == 2 && reg == REG_MLX_SENSOR_VARIANT) {
         mlx_sensor_variant = rx_buffer[1];
+        MLX_RequestInit();
         return;
     }
 

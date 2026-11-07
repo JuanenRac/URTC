@@ -300,6 +300,21 @@ typedef struct __attribute__((packed)) {
                                     // hazardous on boot. See CANBUS.TXT 0x132.
     uint8_t  checksum;           // CRC-8 (polynomial 0x07, CRC-8/SMBUS) over every byte above - proportionate for "was this corrupted", not a security boundary the way the OTA update's HMAC is
 } SavedState_t;
+// The hardware configuration that a host sets once (the expansion board, the free tool, the serial label, the thermal sensor), kept in a record of its own so that a
+// change of the layout of SavedState_t (a new SAVEDSTATE_VERSION) does not discard it: the saved state of another version is ignored as a whole, and these four
+// values used to go with it, then to be overwritten with zeros by the next save. Written by SavedState_MaybeSave when it changes, read at boot.
+typedef struct __attribute__((packed)) {
+    uint32_t magic;
+    uint8_t  version;
+    uint8_t  expansion_board_type;
+    uint8_t  free_tool_selection;
+    uint8_t  device_serial_number;
+    uint8_t  mlx_sensor_variant;
+    uint8_t  checksum;           // CRC-8/SMBUS over every byte above
+} HardwareConfig_t;
+#define HWCONFIG_MAGIC 0x48574346UL   // 'HWCF'
+#define HWCONFIG_VERSION 1
+#define HWCONFIG_FRAM_ADDR 944        // between the end of the fault recorder (934) and the multinode switch (960); docs/EEPROM.TXT has the map
 #define SAVEDSTATE_MAGIC 0x55525443UL // 'URTC' as bytes, arbitrary but distinctive - astronomically unlikely to appear by chance in an uninitialized F-RAM
 #define SAVEDSTATE_VERSION 7
 // Fixed hardware/firmware identity constant, not a F-RAM field - the same

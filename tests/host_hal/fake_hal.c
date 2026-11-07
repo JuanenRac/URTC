@@ -62,6 +62,7 @@ void fake_hal_reset_recording(void)
     fake_can_notifications = 0;
     memset(fake_nvic, 0, sizeof fake_nvic);
     fake_i2c_inits = fake_dma_inits = fake_spi_inits = 0;
+    fake_i2c_clock_enables = fake_i2c_clock_used = fake_i2c_inits_without_clock = 0;
     fake_tim_base_inits = fake_tim_pwm_inits = fake_tim_oc_configs = fake_tim_pwm_starts = fake_tim_base_starts_it = fake_tim_moe = 0;
     memset(fake_tim_init, 0, sizeof fake_tim_init);
     memset(fake_tim_oc, 0, sizeof fake_tim_oc);
@@ -361,7 +362,15 @@ int fake_i2c_inits;
 I2C_InitTypeDef fake_i2c_init;
 static int i2c2_instance;
 void *fake_i2c2_instance_ptr = &i2c2_instance;
-HAL_StatusTypeDef HAL_I2C_Init(I2C_HandleTypeDef *h) { fake_i2c_init = h->Init; fake_i2c_inits++; return HAL_OK; }
+int fake_i2c_clock_enables, fake_i2c_clock_used, fake_i2c_inits_without_clock;
+HAL_StatusTypeDef HAL_I2C_Init(I2C_HandleTypeDef *h)
+{
+    fake_i2c_init = h->Init;
+    fake_i2c_inits++;
+    if (fake_i2c_clock_used < fake_i2c_clock_enables) fake_i2c_clock_used++;
+    else fake_i2c_inits_without_clock++;
+    return HAL_OK;
+}
 
 int fake_dma_inits;
 DMA_InitTypeDef fake_dma_init;

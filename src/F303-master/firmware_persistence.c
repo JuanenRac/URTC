@@ -8,6 +8,61 @@
 #include "firmware_fram.h"
 
 static uint32_t last_fram_write_tick = 0;
+static uint32_t last_hw_write_tick = 0;
+static HardwareConfig_t last_saved_hw;   // what the chip holds as the hardware configuration; all 0xFF: nothing valid yet
+
+static uint8_t Crc8Smbus(const uint8_t *bytes, size_t length) {
+    uint8_t crc = 0x00;
+    for (size_t i = 0; i < length; i++) {
+        crc ^= bytes[i];
+        for (uint8_t bit = 0; bit < 8; bit++) {
+            crc = (crc & 0x80) ? (uint8_t)((crc << 1) ^ 0x07) : (uint8_t)(crc << 1);
+        }
+    }
+    return crc;
+}
+
+static void HardwareConfig_Snapshot(HardwareConfig_t *h) {
+    memset(h, 0, sizeof *h);
+    h->magic = HWCONFIG_MAGIC;
+    h->version = HWCONFIG_VERSION;
+    h->expansion_board_type = expansion_board_type;
+    h->free_tool_selection = free_tool_selection;
+    h->device_serial_number = device_serial_number;
+    h->mlx_sensor_variant = mlx_sensor_variant;
+    h->checksum = Crc8Smbus((const uint8_t *)h, sizeof *h - 1);
+}
+
+// Reads the record of the hardware configuration. A valid one becomes the baseline of what the chip holds and, when `apply` is set, its four values are restored
+// (passive configuration, like the same fields of the saved state). Anything else leaves the baseline at "nothing valid", so that the next save writes it.
+static void HardwareConfig_Load(uint8_t apply) {
+    HardwareConfig_t h;
+    memset(&last_saved_hw, 0xFF, sizeof last_saved_hw);
+    if (!FRAM_ReadBytes(HWCONFIG_FRAM_ADDR, (uint8_t *)&h, sizeof h)) return;
+    if (h.magic != HWCONFIG_MAGIC || h.version != HWCONFIG_VERSION || h.checksum != Crc8Smbus((const uint8_t *)&h, sizeof h - 1)) return;
+    last_saved_hw = h;
+    if (apply) {
+        expansion_board_type = h.expansion_board_type;
+        free_tool_selection = h.free_tool_selection;
+        device_serial_number = h.device_serial_number;
+        mlx_sensor_variant = h.mlx_sensor_variant;
+    }
+}
+
+static void HardwareConfig_MaybeSave(void) {
+    if (last_saved_state.magic == 0xFFFFFFFFUL) {
+        memset(&last_saved_hw, 0xFF, sizeof last_saved_hw);   // the saved state was erased (0x192): the record goes with it and is written again with the current values
+    }
+    HardwareConfig_t h;
+    HardwareConfig_Snapshot(&h);
+    if (memcmp(&h, &last_saved_hw, sizeof h) == 0) return;
+    uint32_t now = HAL_GetTick();
+    if ((uint32_t)(now - last_hw_write_tick) < 3000) return;
+    if (FRAM_WriteBytes(HWCONFIG_FRAM_ADDR, (const uint8_t *)&h, sizeof h)) {
+        last_saved_hw = h;
+        last_hw_write_tick = now;
+    }
+}
 
 uint8_t SavedState_Checksum(const SavedState_t *s) {
     // CRC-8 (polynomial 0x07, the standard CRC-8/SMBUS variant) over
@@ -22,15 +77,7 @@ uint8_t SavedState_Checksum(const SavedState_t *s) {
     // corrupted" check. Bit-by-bit rather than a 256-entry lookup table:
     // this runs only at F-RAM save/load, never in a timing-critical
     // path, so the table's flash cost isn't worth it for 27 bytes.
-    const uint8_t *bytes = (const uint8_t *)s;
-    uint8_t crc = 0x00;
-    for (size_t i = 0; i < sizeof(SavedState_t) - 1; i++) {
-        crc ^= bytes[i];
-        for (uint8_t bit = 0; bit < 8; bit++) {
-            crc = (crc & 0x80) ? (uint8_t)((crc << 1) ^ 0x07) : (uint8_t)(crc << 1);
-        }
-    }
-    return crc;
+    return Crc8Smbus((const uint8_t *)s, sizeof(SavedState_t) - 1);
 }
 
 // Called once, early in main()'s boot sequence, after active_tool is known
@@ -54,11 +101,14 @@ void SavedState_Load(void) {
         return; // F-RAM not present or not responding - board still boots fine without it
     }
     if (s.magic != SAVEDSTATE_MAGIC || s.struct_version != SAVEDSTATE_VERSION) {
+        HardwareConfig_Load(1);   // the hardware configuration has its own record, so a layout from another version loses only the rest
         return; // blank chip, or a layout from a different firmware version - don't trust it
     }
     if (SavedState_Checksum(&s) != s.checksum) {
+        HardwareConfig_Load(1);
         return; // corrupted - a partial/interrupted write, most likely
     }
+    HardwareConfig_Load(0);   // only to know what the chip holds; the values below come from the saved state as ever
     recovered_state = s;
     had_valid_recovered_state = 1;
     last_saved_state = s; // so the very first change-check in SavedState_MaybeSave() compares against what's genuinely on the chip
@@ -92,6 +142,7 @@ void SavedState_Load(void) {
 // value to the bus instead of just the one it settles on.
 #define FRAM_MIN_SAVE_INTERVAL_MS 3000
 void SavedState_MaybeSave(void) {
+    HardwareConfig_MaybeSave();
     SavedState_t s = {0};
     // Snapshotting every field with interrupts disabled - each individual
     // read below is already atomic on its own (single-byte/word volatile

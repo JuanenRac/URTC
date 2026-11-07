@@ -83,8 +83,9 @@ void BuildCounterFloorResponse(uint8_t out[4]) {
 // Same two real RAM regions and same reasoning as the main board's own
 // StackPointerInValidRAM - this chip is the same xB/xC density line
 // (STM32F303CB), confirmed against the same ST datasheet family (DS9118)
-// that already covers the main board's own F303CC: 40KB standard SRAM at
-// 0x20000000, 8KB CCM (CPU-only, no DMA) at 0x10000000.
+// that already covers the main board's own F303CC. The F303CB has 32KB of SRAM at 0x20000000 and 8KB of CCM (CPU-only, no DMA) at 0x10000000; the
+// check below still accepts a stack top up to SRAM_BASE + 0xA000 because the applications linked before the script said 32KB end their stack there, and
+// an installed application must not be refused for it.
 // -----------------------------------------------------------------------
 static uint8_t StackPointerInValidRAM(uint32_t sp) {
     uint8_t in_sram = (sp >= SRAM_BASE + 0x100UL && sp <= SRAM_BASE + 0xA000UL);

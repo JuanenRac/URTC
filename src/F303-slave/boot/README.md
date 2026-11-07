@@ -98,8 +98,8 @@ different transport:
 
 Identical logic to the main board's own `ApplicationIsValid()` and
 `JumpToApplication()` — same metadata checks, same stack-pointer-in-
-valid-RAM verification (this chip's own 2 real RAM regions: 40 KB SRAM
-at `0x20000000`, 8 KB CCM at `0x10000000`, confirmed against the same
+valid-RAM verification (this chip's own 2 real RAM regions: 32 KB SRAM
+(the check still accepts a stack top up to 40 KB, which applications linked before the linker script said 32 KB use) at `0x20000000`, 8 KB CCM at `0x10000000`, confirmed against the same
 xB/xC datasheet family as the main board), same SWD/JTAG-adoption path
 for a directly-flashed chip with no update-flow metadata yet, same
 interrupted-copy resume on the next boot. The reasoning transfers
