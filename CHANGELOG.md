@@ -4,6 +4,7 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **The copy of the image record tools is refreshed:** the shared module that builds and reads the signature record of an image is at the current version of URTC-COMMON again.
 - **The expansion slave can reassemble a register write that arrives in pieces:** `slave_write_assembler.h` (pure logic) collects the pieces of a link write in order, tells when the write is complete for its register, drops a half-written command after a timeout and counts what it dropped, and never lets the bootloader entry run from an incomplete payload. The link uses it only when built with `URTC_SLAVE_WRITE_REASSEMBLY=1` (off by default: the link behaves as before). Host tests cover short writes, a late piece, overflow and expiry.
 
 - **The CAN bit timing can be calculated, and its clock checked:** `can_bit_timing.h` finds the prescaler and segments of an exact bit rate and sample point from a peripheral clock, gives the oscillator error the setting tolerates (the two conditions of the CAN specification) and a diagnostic that tells whether an internal oscillator or a crystal is good enough. `URTC_CAN_BT_FROM_CONFIG=1` (with `URTC_CAN_BITRATE_BPS`, `URTC_CAN_SAMPLE_PERMILLE`, `URTC_CAN_SJW_TQ`) makes the application and the master bootloader use it; `URTC_USE_HSE=1` (with `URTC_HSE_HZ`) runs the PLL from an external crystal and falls back to the internal oscillator if the crystal does not start. Both are off by default: the fixed 500 kbit/s setting and the internal oscillator stay.
