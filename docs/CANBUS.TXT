@@ -2002,7 +2002,7 @@ Machine-readable specification of the CAN bus protocol of the URTC tool head: ev
 
 B. Index of identifiers
 
-[[ BEGIN GENERATED index sha256=a79eb1ee6234d0af123c92e9d40c724937014df4e9fd8b78ad8d3ba18ab78a9a ]]
+[[ BEGIN GENERATED index sha256=3afc5c5b9deb7f13027e7d1311758ca2acee52e82a70129a5c376d3888df2cf0 ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 | ID | Name | Direction | DLC | Tools | Group | Title |
@@ -2089,8 +2089,8 @@ Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_do
 | 0x254 | THERMAL_CAL_CHUNK_REQ | host to board | 1 | 22 | thermal | Request a calibrated temperature chunk |
 | 0x255 | THERMAL_CAL_CHUNK | board to host | 8 | 22 | thermal | Calibrated temperature chunk data |
 | 0x7E9 | VERSION_PATCH_RESPONSE | board to host | 3-8 | any | bootloader | Version patch response |
-| 0x7EA | BOOTLOADER_SELECT | host to board | 6 6 1 2 | any | bootloader | Address one bootloader by its serial number |
-| 0x7EB | BOOTLOADER_SELECT_RESPONSE | board to host | 2 6 6 | any | bootloader | Answer to the addressing of a bootloader |
+| 0x7EA | BOOTLOADER_SELECT | host to board | 6 6 1 2 1 | any | bootloader | Address one bootloader by its serial number |
+| 0x7EB | BOOTLOADER_SELECT_RESPONSE | board to host | 2 6 6 7 | any | bootloader | Answer to the addressing of a bootloader |
 | 0x7EC | BOOTLOADER_SIGNATURE_CHUNK | host to board | 8 | any | bootloader | One chunk of the Ed25519 signature record |
 | 0x7ED | BOOTLOADER_KEY_ID | board to host | 8 | any | bootloader | Identifier of the signing key a bootloader trusts |
 | 0x7EE | BOOTLOADER_SERIAL_CHUNK | host to board | 8 | any | bootloader | One chunk of the signed command that programs the serial number |
@@ -2115,7 +2115,7 @@ Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_do
 
 C. Field layouts and examples
 
-[[ BEGIN GENERATED layouts sha256=a4f5cf3e8d9008fc06fb48f9ed08a8b02fbc1727f98620622aa33759fe61c2bf ]]
+[[ BEGIN GENERATED layouts sha256=ce21adb204fe64c4f222eb2600b3f12ee5610df30f16bcd7031ce99963e1b9e6 ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 ### 0x095 IMPACT_EVENT - Impact register (touch probe, maximum priority)
@@ -3430,6 +3430,14 @@ request (uid), DLC 2: The selected bootloader answers with one word of its 96-bi
 
 Example word 1 of the unique ID: data 0401 (operation=04, part=1)
 
+request (rotation_status), DLC 1: Asks a bootloader which signing keys it trusts right now and for how long. Only a bootloader that implements the rotation window answers.
+
+| Byte | Width | Type | Field | Values | Note |
+|---|---|---|---|---|---|
+| 0 | 1 | bytes | operation | fixed 05 |  |
+
+Example ask for the key status: data 05 (operation=05)
+
 Note: Part of the design of the bootloader identity and image authentication. A frame with an unknown operation or the wrong length is ignored.
 Note: A bootloader that hears any valid frame here is in addressed mode and obeys 0x7F0 to 0x7FF only while it is selected; with nobody addressing it, it behaves as before.
 Note: The serial is the 32-bit fold of the 96-bit unique ID, or the programmable serial of the metadata when there is one (it takes priority). 0 and 0xFFFFFFFF are not serials.
@@ -3467,6 +3475,17 @@ response (uid), DLC 6: One word of the unique ID, big-endian.
 
 Example word 0: data 040011111111 (operation=04, part=0, word=286331153)
 
+response (rotation_status), DLC 7: Answer to operation 05 of 0x7EA. The window is a configuration parameter of the bootloader, never a constant of the protocol.
+
+| Byte | Width | Type | Field | Values | Note |
+|---|---|---|---|---|---|
+| 0 | 1 | bytes | operation | fixed 05 |  |
+| 1 | 1 | u8 | key_count |  | How many fingerprints are valid now (0 to 2); the same number of frames follows on 0x7ED, the current key first. |
+| 2 | 1 | u8 | flags |  | Bit 0: a previous key is still valid (a rotation is in progress). Bit 1: the current key is revoked. Other bits are zero. |
+| 3 | 4 | u32 | seconds_left |  | Seconds until the previous key stops verifying, big-endian; 0xFFFFFFFF when there is no window. |
+
+Example rotating, one hour left: data 05020100000E10 (operation=05, key_count=2, flags=1, seconds_left=3600)
+
 Note: Answers only what 0x7EA asked; never sent unasked.
 
 ### 0x7EC BOOTLOADER_SIGNATURE_CHUNK - One chunk of the Ed25519 signature record
@@ -3498,6 +3517,7 @@ Example a key identifier: data 0102030405060708 (key_id=0102030405060708)
 
 Note: Sent by a bootloader that holds a trusted Ed25519 key, right after its answer to 0x7F8. A bootloader without the frame (older, or without a key) sends nothing: tools read that as 'no data', never as a difference.
 Note: With several heads, only the selected one answers 0x7F8 and therefore only its key identifier arrives.
+Note: While a key rotation is in progress a bootloader sends a second frame for the previous key, only inside the window and never more than two frames in all; the current key always comes first, so a tool that reads only the first frame sees what it sees today. The status is the answer to operation 05 of 0x7EA on 0x7EB.
 
 ### 0x7EE BOOTLOADER_SERIAL_CHUNK - One chunk of the signed command that programs the serial number
 

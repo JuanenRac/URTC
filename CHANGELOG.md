@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **The copies of the shared CAN tables are refreshed:** `docs/CANBUS.TXT`, `src/common/urtc_can_ids.h` and the fuzz corpus now include the key rotation status frames (operation `05` of `0x7EA` and its seven-byte answer on `0x7EB`). The bootloaders do not send them yet.
+
 - **A host suite for the rotation of the signing key (45 host suites):** `tests/test_key_rotation.c` holds `src/common/urtc_key_rotation.h` (which fingerprints a bootloader accepts and announces while a rotation is in progress, with a configurable window) to the shared vectors of URTC-COMMON. No bootloader uses it yet and nothing is built for the board; the documented suite counters say 45.
 
 - **The documented counters of the host tests match what the CI runs:** the README (all eight languages), the structure picture and the source map now say 44 host suites (40 under the sanitizers, 4 plain) and a coverage of 94.6 percent of the lines of the 81 firmware sources the suites compile (3 of 84 need the board), as measured by the CI.
