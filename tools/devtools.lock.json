@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "source": "URTC-DEVTOOLS",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "files": {
     ".github/actions/urtc-baseline/action.yml": "424598f66bb19c9b8667ba3d2be6887d982eccf22262799e62105290f9d54709",
     ".github/workflows/dashboard-dispatch.yml": "d0fcb644615c52528d9f4fb3f62752541be91e7b2ccee03c4e8bbadc8b8fd8bf",
