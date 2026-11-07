@@ -34,7 +34,7 @@
 
 > **⚠️ 安全提示（设计阶段，尚无板卡运行过此固件）：** 本板驱动一个**10W 雕刻激光二极管**以及多个加热级（T12 电烙铁头、3D 打印机热端）。制作和使用它意味着要操作在缺乏适当安全措施（针对该激光二极管波长的护目镜、热防护、可及的电源切断装置）时可能造成**烧伤、火灾或眼部伤害**的设备。这是一个按原样分享的爱好者/创客项目——自行承担构建和使用的风险，不要仅仅因为固件带有看门狗机制就跳过基本的安全规范（这些是软件看门狗，从未在真实板卡上运行过）。
 
-> **安全与安防现状:**本生态系统不是经认证的安全系统,目前也不存在已组装的 URTC 板卡。主板的引导程序使用 CRC32 和针对公钥表的 Ed25519 签名来验证固件镜像，不保存任何秘密；扩展从板的引导程序检查 CRC32 和无密钥的 SHA-256，只安装由验证 Ed25519 记录的主板通过内部链路总线确认过的镜像（它通过该总线信任主板）。官方构建的公钥表在创建镜像签名密钥之前为空，因此官方主引导程序目前不会安装任何东西；台架构建信任一个公开的开发密钥，所以任何人都能制作出这种引导程序会接受的镜像；尚未向真实板卡传输任何内容。在依赖此处任何说法来保障人身安全之前,请先阅读[安全基线](https://github.com/JuanenRac/URTC-DOCS/blob/main/docs/SECURITY_BASELINE.md)和[威胁模型](https://github.com/JuanenRac/URTC-DOCS/blob/main/docs/THREAT_MODEL.md)。
+> **安全与安防现状：**本生态系统不是经认证的安全系统，目前也不存在已组装的 URTC 板卡。主板的引导程序使用 CRC32 和针对公钥表的 Ed25519 签名来验证固件镜像，不保存任何秘密；扩展从板的引导程序检查 CRC32 和无密钥的 SHA-256，只安装由验证 Ed25519 记录的主板通过内部链路总线确认过的镜像（它通过该总线信任主板）。官方构建的公钥表在创建镜像签名密钥之前为空，因此官方主引导程序目前不会安装任何东西；台架构建信任一个公开的开发密钥，所以任何人都能制作出这种引导程序会接受的镜像；尚未向真实板卡传输任何内容。在依赖此处任何说法来保障人身安全之前，请先阅读[安全基线](https://github.com/JuanenRac/URTC-DOCS/blob/main/docs/SECURITY_BASELINE.md)和[威胁模型](https://github.com/JuanenRac/URTC-DOCS/blob/main/docs/THREAT_MODEL.md)。
 
 ## 📋 速览
 
@@ -484,18 +484,18 @@ README 和文本提供英语、西班牙语、法语、意大利语、德语、�
 URTC 由相互独立的仓库组成，每个仓库都有自己的版本、测试和 README。以下是按组划分的家族：
 
 * **URTC Tool Platform:**
-  * **URTC** (本仓库) - 工具头板卡的固件(25 个工具配置、CAN 引导程序)以及 CAN 协议参考。
-  * [URTC-COMMON](https://github.com/JuanenRac/URTC-COMMON) - 只写一次的 CAN 协议数据(规范、生成的表格、一致性向量)以及各程序共享的代码。
+  * **URTC** (本仓库) - 工具头板卡的固件（25 个工具配置、CAN 引导程序）以及 CAN 协议参考。
+  * [URTC-COMMON](https://github.com/JuanenRac/URTC-COMMON) - 只写一次的 CAN 协议数据（规范、生成的表格、一致性向量）以及各程序共享的代码。
   * [URTC-FLASHER](https://github.com/JuanenRac/URTC-FLASHER) - 通过 CAN 或 SWD/JTAG 更新板卡固件的桌面工具。
-  * [URTC-GATEWAY](https://github.com/JuanenRac/URTC-GATEWAY) - 位于 CAN 总线前的网关:只放行列表中的标识符,限制其速率,并要求会话密钥。
+  * [URTC-GATEWAY](https://github.com/JuanenRac/URTC-GATEWAY) - 位于 CAN 总线前的网关：只放行列表中的标识符，限制其速率，并要求会话密钥。
   * [URTC-SMART-RACK](https://github.com/JuanenRac/URTC-SMART-RACK) - 用于带预热和生命周期跟踪的工具架的、与硬件无关的 C 逻辑和命令协议。
-  * [URTC-TESTER](https://github.com/JuanenRac/URTC-TESTER) - 桌面实时 CAN 总线测试器,显示板卡所报告工具配置的控件和遥测。
-  * [URTC-VISION-TOOL](https://github.com/JuanenRac/URTC-VISION-TOOL) - C 语言的传感器帧协议,以及用于检测工具头的 Python 热成像/RGB 配套程序。
-  * [URTC-WEB-STUDIO](https://github.com/JuanenRac/URTC-WEB-STUDIO) - 通过 Web Serial 和 SLCAN 烧录并测试板卡的浏览器应用,无需安装。
+  * [URTC-TESTER](https://github.com/JuanenRac/URTC-TESTER) - 桌面实时 CAN 总线测试器，显示板卡所报告工具配置的控件和遥测。
+  * [URTC-VISION-TOOL](https://github.com/JuanenRac/URTC-VISION-TOOL) - C 语言的传感器帧协议，以及用于检测工具头的 Python 热成像/RGB 配套程序。
+  * [URTC-WEB-STUDIO](https://github.com/JuanenRac/URTC-WEB-STUDIO) - 通过 Web Serial 和 SLCAN 烧录并测试板卡的浏览器应用，无需安装。
 * **Ecosystem Operations:**
   * [URTC-DEVTOOLS](https://github.com/JuanenRac/URTC-DEVTOOLS) - 家族共用的仓库工具，作为带版本的整套工具，并用锁文件区分被改动的副本和已过时的副本。
-  * [URTC-DOCS](https://github.com/JuanenRac/URTC-DOCS) - 生态系统的架构、接口、安全基线和生成的目录,以及比较所有仓库的工具。
-  * [URTC-UPDATER](https://github.com/JuanenRac/URTC-UPDATER) - 检测、安装并更新 URTC 家族仓库的桌面工具,每次只执行一个明确的操作。
+  * [URTC-DOCS](https://github.com/JuanenRac/URTC-DOCS) - 生态系统的架构、接口、安全基线和生成的目录，以及比较所有仓库的工具。
+  * [URTC-UPDATER](https://github.com/JuanenRac/URTC-UPDATER) - 检测、安装并更新 URTC 家族仓库的桌面工具，每次只执行一个明确的操作。
 
 **姊妹项目（相互独立，共用同一基础和工具）：**
 
@@ -526,7 +526,7 @@ URTC 由相互独立的仓库组成，每个仓库都有自己的版本、测试
 
 ## 📜 许可证
 
-URTC 版权所有 (c) 2026 JuanenRac（Electro Hobby 3D）。分发本项目或其衍生作品时必须包含此声明。
+URTC 版权所有（c） 2026 JuanenRac（Electro Hobby 3D）。分发本项目或其衍生作品时必须包含此声明。
 
 由于本项目由几种不同类型的内容组成，各个部分依据不同的许可证提供——各自适合其实际所涵盖的内容，而不是强行用一种许可证套用一切：
 
