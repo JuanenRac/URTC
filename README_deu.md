@@ -40,13 +40,13 @@
 
 | | |
 |---|---|
-| Version | `0.4.6` |
+| Version | `0.4.7` |
 | Reifegrad | Funktionsfähig |
 | Technik | STM32F303 / bxCAN / 25 tool profiles |
 | Ziel | Eine Mikrocontroller-Platine (die Firmware); wird auf einem PC gebaut |
 | Auf echter Hardware | Noch nicht: für diese Version ist kein Lauf auf echter Hardware vermerkt |
 
-**Springen Sie zu:** [Überblick](#-überblick) · [Architektur](#-architektur) · [Funktionen](#-funktionen) · [Sicherheit](#-sicherheit-und-schutz) · [Schnittstellen](#-schnittstellen) · [Schnellstart](#-schnellstart) · [Tests](#-tests) · [Struktur](#-struktur-des-repositorys) · [Verwandte](#-verwandte-projekte)
+**Springe zu:** [Überblick](#-überblick) · [Architektur](#-architektur) · [Funktionen](#-funktionen) · [Sicherheit](#-sicherheit-und-schutz) · [Schnittstellen](#-schnittstellen) · [Schnellstart](#-schnellstart) · [Tests](#-tests) · [Struktur](#-struktur-des-repositorys) · [Verwandte](#-verwandte-projekte)
 
 <!-- urtc-section:status_firmware -->
 ## 🚦 Projektstatus
