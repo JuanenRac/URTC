@@ -36,15 +36,43 @@ def same_content(a, b):
         return fa.read().replace(b"\r\n", b"\n") == fb.read().replace(b"\r\n", b"\n")
 
 
+def sha256_core(path, end_marker):
+    """The SHA-256 core of a bootloader crypto file (constants, init, update,
+    final) with comments and blank lines dropped: the part that must be the
+    same code on both chips. What follows the end marker is the glue each
+    bootloader names its own way."""
+    with open(path, "r", encoding="utf-8") as handle:
+        text = handle.read()
+    header = "slaveboot_crypto.h" if "slave" in path else "bootloader_crypto.h"
+    start = text.index(header)
+    start = text.index(chr(10), start) + 1
+    core = text[start:text.index(end_marker)]
+    lines = []
+    for line in core.splitlines():
+        code = line.split("//")[0].strip()
+        if code:
+            lines.append(code)
+    return lines
+
+
+def crypto_cores_match():
+    master = sha256_core(os.path.join(MASTER, "boot", "bootloader_crypto.c"), "void sha256_flash_region(")
+    slave = sha256_core(os.path.join(SLAVE, "boot", "slaveboot_crypto.c"), "void sha256_buffer(")
+    return master == slave and len(master) > 40
+
+
 def main():
     different = [rel for rel in shared_files()
                  if not same_content(os.path.join(MASTER, rel), os.path.join(SLAVE, rel))]
+    if not crypto_cores_match():
+        print("DIFFERS: the SHA-256 core of src/F303-master/boot/bootloader_crypto.c and src/F303-slave/boot/slaveboot_crypto.c")
+        different.append("boot SHA-256 core")
     for rel in different:
         print(f"DIFFERS: src/F303-master/{rel} vs src/F303-slave/{rel}")
     if different:
         print("Copy the fixed version to both chips (the master's is the reference).")
         return 1
-    print(f"{sum(1 for _ in shared_files())} shared Melexis driver files identical on master and slave")
+    print(f"{sum(1 for _ in shared_files())} shared Melexis driver files and the bootloader SHA-256 core identical on master and slave")
     return 0
 
 

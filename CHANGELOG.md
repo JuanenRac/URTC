@@ -4,9 +4,11 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **The two bootloaders must carry the same SHA-256 code:** `check_shared_drivers.py` (step of both build scripts) now also compares the SHA-256 core of the master and the slave bootloader once comments are dropped, next to the Melexis drivers it already compared, so a fix made to one copy cannot be forgotten in the other.
+
 - **The clock of each I2C peripheral of the expansion slave is enabled before its init:** in the bootloader and in the application the clock was enabled after `HAL_I2C_Init`, which a chip ignores; the fake HAL now counts an init made with the clock off and the start-up tests assert zero of them.
 
-- **The RAM of the expansion slave is declared as 32 KB:** the STM32F303CB has 32 KB of SRAM and 8 KB of CCM (40 KB in all), and both linker scripts declared 40 KB of SRAM, which put the stack top above the real RAM. The bootloader still accepts a stack top up to the old limit so that an application linked before is not refused. The documents of the slave say 32 KB.
+- **The bootloader and the application of the expansion slave ship together:** both are cut in the same version and must not be mixed with the ones of another version, because the bootloader now listens for 600 ms before it enters an application, takes its interrupt work out of the I2C handler and the application starts its thermal sensor when the master chooses it. The RAM of the slave stays declared as 40 KB of SRAM plus 8 KB of CCM in both linker scripts and the bootloader accepts a stack top in either region.
 
 - **The thermal sensor of the expansion slave is initialised when the master chooses it:** at start-up the variant is always none, so the sensor was never initialised; the write of the variant register now requests an init that the main loop runs, not the interrupt. A host test reads the sensor bus before and after.
 

@@ -142,7 +142,7 @@ static uint16_t mlx90640_frame_data[834]; // 768 pixels + 64 aux words + frameDa
 static float mlx90640_calibrated_frame[768];
 
 static void MLX90640_DoInit(void) {
-    static uint16_t ee_data[MLX90640_EEPROM_DUMP_NUM]; // static, not a stack local - fits this chip's 32KB RAM but not the linker script's own 1KB minimum stack reservation
+    static uint16_t ee_data[MLX90640_EEPROM_DUMP_NUM]; // static, not a stack local - fits this chip's 40KB RAM but not the linker script's own 1KB minimum stack reservation
     MLX90640_I2CInit();
     if (MLX90640_DumpEE(MLX90640_I2C_ADDR, ee_data) == MLX90640_NO_ERROR) {
         MLX90640_ExtractParameters(ee_data, &mlx90640_params);
