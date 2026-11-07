@@ -53,6 +53,26 @@ extern TIM_HandleTypeDef htim1; // local PWM generation - see slave_pwm.c
 extern uint8_t mlx_sensor_variant; // MLX_VARIANT_* - which MLX9064x family member is actually populated, set by the main board over REG_MLX_SENSOR_VARIANT, defaults to MLX_VARIANT_NONE (no sensor configured) until told otherwise
 
 // -----------------------------------------------------------------------
+// Pins of the local sensor bus (I2C2). The default is PB10 (SCL) and PB11 (SDA), as on the boards built so far. A board that wires the bus elsewhere
+// builds with -DURTC_SLAVE_I2C2_PRESET=1 (PA9 SCL / PA10 SDA) or defines the three macros itself (port, the two pins as a mask, and the alternate
+// function) - no source file has to change.
+// -----------------------------------------------------------------------
+#ifndef URTC_SLAVE_I2C2_PRESET
+#define URTC_SLAVE_I2C2_PRESET 0
+#endif
+#if !defined(URTC_SLAVE_I2C2_PORT)
+#if URTC_SLAVE_I2C2_PRESET == 1
+#define URTC_SLAVE_I2C2_PORT GPIOA
+#define URTC_SLAVE_I2C2_PINS (GPIO_PIN_9 | GPIO_PIN_10)
+#define URTC_SLAVE_I2C2_AF   GPIO_AF4_I2C2
+#else
+#define URTC_SLAVE_I2C2_PORT GPIOB
+#define URTC_SLAVE_I2C2_PINS (GPIO_PIN_10 | GPIO_PIN_11)
+#define URTC_SLAVE_I2C2_AF   GPIO_AF4_I2C2
+#endif
+#endif
+
+// -----------------------------------------------------------------------
 // Local sensor bus (I2C2) addresses
 // -----------------------------------------------------------------------
 #define ADS1115_I2C_ADDR   0x48 // ADDR pin tied to GND - the datasheet-default of the 4 selectable addresses (0x48-0x4B); this board's own schematic is what actually fixes which one is wired, noted here as the assumption this firmware is built against

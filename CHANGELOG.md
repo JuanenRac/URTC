@@ -4,6 +4,14 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **The expansion slave can reassemble a register write that arrives in pieces:** `slave_write_assembler.h` (pure logic) collects the pieces of a link write in order, tells when the write is complete for its register, drops a half-written command after a timeout and counts what it dropped, and never lets the bootloader entry run from an incomplete payload. The link uses it only when built with `URTC_SLAVE_WRITE_REASSEMBLY=1` (off by default: the link behaves as before). Host tests cover short writes, a late piece, overflow and expiry.
+
+- **The CAN bit timing can be calculated, and its clock checked:** `can_bit_timing.h` finds the prescaler and segments of an exact bit rate and sample point from a peripheral clock, gives the oscillator error the setting tolerates (the two conditions of the CAN specification) and a diagnostic that tells whether an internal oscillator or a crystal is good enough. `URTC_CAN_BT_FROM_CONFIG=1` (with `URTC_CAN_BITRATE_BPS`, `URTC_CAN_SAMPLE_PERMILLE`, `URTC_CAN_SJW_TQ`) makes the application and the master bootloader use it; `URTC_USE_HSE=1` (with `URTC_HSE_HZ`) runs the PLL from an external crystal and falls back to the internal oscillator if the crystal does not start. Both are off by default: the fixed 500 kbit/s setting and the internal oscillator stay.
+
+- **The weld and soldering pulse has configurable limits and an optional hardware timer:** `weld_pulse_timing.h` holds the duration clamp (`URTC_WELD_PULSE_MAX_MS`, default 2000, and `URTC_WELD_PULSE_MIN_MS`, default 0; a maximum above the hard limit of 5000 ms does not compile) and the arithmetic of a one-pulse timer. With `URTC_WELD_PULSE_HW_TIMER=1` timer 17 ends the pulse in its own interrupt, whatever the main loop is doing; the loop tick stays as the second way to end it. Off by default, so the timing is the current one.
+
+- **The pins of the I2C bus of the expansion slave sensors come from configuration:** `URTC_SLAVE_I2C2_PORT`, `URTC_SLAVE_I2C2_PINS` and `URTC_SLAVE_I2C2_AF` (or the preset `URTC_SLAVE_I2C2_PRESET=1`, PA9 and PA10) replace the pins that were written in `slave_main.c`; the default stays PB10 and PB11 and a host test checks it.
+
 - **The two bootloaders must carry the same SHA-256 code:** `check_shared_drivers.py` (step of both build scripts) now also compares the SHA-256 core of the master and the slave bootloader once comments are dropped, next to the Melexis drivers it already compared, so a fix made to one copy cannot be forgotten in the other.
 
 - **The clock of each I2C peripheral of the expansion slave is enabled before its init:** in the bootloader and in the application the clock was enabled after `HAL_I2C_Init`, which a chip ignores; the fake HAL now counts an init made with the clock off and the start-up tests assert zero of them.

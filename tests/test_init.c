@@ -17,6 +17,7 @@
 #include "firmware_init_buses.h"
 #include "firmware_init_timers.h"
 #include "firmware_init_gpio.h"
+#include "can_bit_timing.h"
 #include "test_runner.h"
 
 #define HSI_HZ 8000000.0
@@ -204,8 +205,45 @@ static void test_gpio_post(int *failures)
     TEST_ASSERT(first_write_before_init(GPIOB, STEP_PIN), "the step pin is written and configured");
 }
 
+static void test_can_bit_timing(int *failures)
+{
+    urtc_can_bt_t bt;
+    TEST_ASSERT(urtc_can_bt_compute(32000000u, 500000u, 875u, 2u, &bt) == URTC_CAN_BT_OK && bt.prescaler == 4 && bt.bs1 == 13 && bt.bs2 == 2 && bt.sjw == 2,
+                "the calculation gives back the fixed 500 kbit/s setting of the firmware (prescaler 4, 13 + 2 quanta, jump width 2)");
+    TEST_ASSERT(urtc_can_bt_rate(32000000u, &bt) == 500000u && urtc_can_bt_sample_permille(&bt) == 875u, "its rate and sample point are exact");
+    TEST_ASSERT(urtc_can_bt_compute(32000000u, 250000u, 875u, 2u, &bt) == URTC_CAN_BT_OK && urtc_can_bt_rate(32000000u, &bt) == 250000u, "250 kbit/s is exact too");
+    TEST_ASSERT(urtc_can_bt_compute(32000000u, 300000u, 875u, 2u, &bt) == URTC_CAN_BT_ERR_NO_FIT, "a rate that no setting gives exactly is refused, never approximated");
+    TEST_ASSERT(urtc_can_bt_compute(0, 500000u, 875u, 2u, &bt) == URTC_CAN_BT_ERR_ARGS && urtc_can_bt_compute(32000000u, 500000u, 950u, 2u, &bt) == URTC_CAN_BT_ERR_ARGS
+                && urtc_can_bt_compute(32000000u, 500000u, 875u, 2u, 0) == URTC_CAN_BT_ERR_ARGS, "bad arguments are refused");
+    TEST_ASSERT(urtc_can_bt_compute(32000000u, 500000u, 875u, 9u, &bt) == URTC_CAN_BT_OK && bt.sjw == 2 && bt.sjw <= bt.bs2, "the jump width is limited to the second segment");
+    TEST_ASSERT(urtc_can_bt_compute(32000000u, 500000u, 875u, 0u, &bt) == URTC_CAN_BT_OK && bt.sjw == 1, "the jump width is at least 1");
+    // The same rate from a 36 MHz clock (72 MHz system, 36 MHz APB1) is also found.
+    TEST_ASSERT(urtc_can_bt_compute(36000000u, 500000u, 875u, 2u, &bt) == URTC_CAN_BT_OK && urtc_can_bt_rate(36000000u, &bt) == 500000u, "500 kbit/s from 36 MHz is found");
+    static const uint32_t rates[] = {125000u, 250000u, 500000u, 1000000u};
+    for (unsigned k = 0; k < sizeof rates / sizeof rates[0]; k++) {
+        uint32_t rate = rates[k];
+        int rc = urtc_can_bt_compute(32000000u, rate, 800u, 2u, &bt);
+        TEST_ASSERT(rc == URTC_CAN_BT_OK && urtc_can_bt_rate(32000000u, &bt) == rate && bt.bs1 >= 1 && bt.bs1 <= 16 && bt.bs2 >= 1 && bt.bs2 <= 8 && bt.sjw <= bt.bs2, "every standard rate gives a legal setting");
+    }
+
+    // Tolerance and diagnostic of the clock.
+    urtc_can_bt_compute(32000000u, 500000u, 875u, 2u, &bt);
+    uint32_t tol = urtc_can_bt_tolerance_ppm(&bt);
+    TEST_ASSERT(tol > 4000u && tol < 6000u, "the standard setting tolerates about half a percent of oscillator error");
+    uint32_t tol_out = 0;
+    int32_t rate_err = 99;
+    TEST_ASSERT(urtc_can_bt_diag(32000000u, 500000u, &bt, URTC_CLOCK_HSE_PPM, &tol_out, &rate_err) == URTC_CAN_DIAG_OK && tol_out == tol && rate_err == 0, "a crystal is well inside the tolerance and the rate has no error");
+    TEST_ASSERT(urtc_can_bt_diag(32000000u, 500000u, &bt, tol - 100u, 0, 0) == URTC_CAN_DIAG_MARGINAL, "a clock close to the limit is marginal (a second node with the same clock can fail)");
+    TEST_ASSERT(urtc_can_bt_diag(32000000u, 500000u, &bt, URTC_CLOCK_HSI_PPM, 0, 0) == URTC_CAN_DIAG_FAIL, "an untrimmed internal oscillator at one percent is outside the tolerance");
+    TEST_ASSERT(urtc_can_bt_diag(30000000u, 500000u, &bt, 0u, 0, &rate_err) == URTC_CAN_DIAG_FAIL && rate_err < 0, "a clock that does not give the requested rate is reported with its rate error");
+    TEST_ASSERT(urtc_can_bt_diag(0, 500000u, &bt, 0u, 0, 0) == URTC_CAN_DIAG_BAD_ARGS, "a zero clock is a bad argument");
+    TEST_ASSERT(URTC_USE_HSE == 0 && URTC_HSE_PLLMUL_VALUE == 8u && URTC_HSE_PLLMUL_ENC(8u) == (6u << 18) && URTC_CAN_HAL_BS1(13u) == (12u << 16) && URTC_CAN_HAL_BS2(2u) == (1u << 20),
+                "the crystal is off by default and the register encodings are those of the HAL");
+}
+
 void run_init_tests(int *failures)
 {
+    test_can_bit_timing(failures);
     test_clocks(failures);
     test_can(failures);
     test_buses(failures);

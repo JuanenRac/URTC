@@ -26,6 +26,7 @@
 #include "firmware_can_soldering.h"
 #include "firmware_can_uvcuring.h"
 #include "firmware_can_weldpulse.h"
+#include "weld_pulse_timing.h"
 #include "test_runner.h"
 
 void WeldPulse_Tick(void);
@@ -488,6 +489,21 @@ static void expansion(int *failures)
     TEST_ASSERT(fake_tx_count == 0, "no answer when no transmit mailbox is free");
 }
 
+// ---- the limits and the timer arithmetic of the pulse ---------------------------------------------------------------------------------
+static void weld_timing(int *failures)
+{
+    TEST_ASSERT(urtc_weld_clamp_ms(100) == 100 && urtc_weld_clamp_ms(2000) == 2000 && urtc_weld_clamp_ms(2001) == 2000 && urtc_weld_clamp_ms(0xFFFF) == 2000,
+                "by default the pulse is clamped at the 2000 ms the firmware has always allowed");
+    TEST_ASSERT(URTC_WELD_PULSE_MAX_MS <= URTC_WELD_PULSE_HARD_MAX_MS && URTC_WELD_PULSE_MIN_MS == 0 && URTC_WELD_PULSE_HW_TIMER == 0, "the defaults keep the old timing and the hardware timer is off");
+    uint32_t psc = 0, arr = 0;
+    TEST_ASSERT(urtc_weld_timer_params(64000000u, 20, &psc, &arr) == 0 && psc == 6399u && arr == 199u, "20 ms at 64 MHz: a prescaler of 6400 (10 kHz) and 200 counts");
+    TEST_ASSERT(urtc_weld_timer_params(64000000u, 5000, &psc, &arr) == 0 && arr == 49999u && arr <= 65535u, "the hard limit fits the 16-bit counter");
+    TEST_ASSERT(urtc_weld_timer_params(64000000u, 5001, &psc, &arr) == 1 && urtc_weld_timer_params(64000000u, 0, &psc, &arr) == 1, "a duration of 0 or above the hard limit is refused");
+    TEST_ASSERT(urtc_weld_timer_params(9000u, 20, &psc, &arr) == 1 && urtc_weld_timer_params(1000000000u, 20, &psc, &arr) == 1, "a clock below 10 kHz or a prescaler beyond 16 bits is refused");
+    uint32_t total_ticks_us = (arr + 1u);   // (arr of the last successful call is unchanged by a refusal)
+    TEST_ASSERT(total_ticks_us == 50000u, "a refused call leaves the registers untouched");
+}
+
 // ---- welding pulses (0x1C0 spot welder, 0x200 ultrasonic) -------------------------------------------------------------------
 static void weld(int *failures)
 {
@@ -653,6 +669,7 @@ int main(void)
     aoi(&failures);
     printer(&failures);
     expansion(&failures);
+    weld_timing(&failures);
     weld(&failures);
     motion(&failures);
     if (failures == 0) {

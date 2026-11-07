@@ -13,6 +13,11 @@
 #include "bootloader_flash.h"
 #include "bootloader_oled.h"
 #include "bootloader_protocol.h"
+#include "../can_bit_timing.h"
+
+#ifndef URTC_CAN_BT_FROM_CONFIG
+#define URTC_CAN_BT_FROM_CONFIG 0   // 1 = bit timing calculated from the configuration (same macros as the application); 0 = the fixed 500 kbit/s
+#endif
 #include "urtc_boot_session.h"
 
 CAN_HandleTypeDef hcan;
@@ -23,6 +28,25 @@ void SystemClock_Config(void) {
     RCC_OscInitTypeDef RCC_OscInitStruct = {0};
     RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
 
+#if URTC_USE_HSE
+    // External crystal (build option, off by default): the PLL multiplier gives the same 64 MHz as the internal oscillator. If the crystal does not
+    // start, the oscillator configuration fails and the internal oscillator is used instead, so a board without the crystal still boots.
+    RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE | RCC_OSCILLATORTYPE_HSI;
+    RCC_OscInitStruct.HSEState = RCC_HSE_ON;
+    RCC_OscInitStruct.HSEPredivValue = RCC_HSE_PREDIV_DIV1;
+    RCC_OscInitStruct.HSIState = RCC_HSI_ON;
+    RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
+    RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+    RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
+    RCC_OscInitStruct.PLL.PLLMUL = URTC_HSE_PLLMUL_ENC(URTC_HSE_PLLMUL_VALUE);
+    if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) {
+        RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
+        RCC_OscInitStruct.HSEState = RCC_HSE_OFF;
+        RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
+        RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL16;
+        HAL_RCC_OscConfig(&RCC_OscInitStruct);
+    }
+#else
     RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
     RCC_OscInitStruct.HSIState = RCC_HSI_ON;
     RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
@@ -30,6 +54,7 @@ void SystemClock_Config(void) {
     RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
     RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL16;
     HAL_RCC_OscConfig(&RCC_OscInitStruct);
+#endif
 
     RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK
                                  | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
@@ -61,11 +86,25 @@ static void MX_CAN_Init(void) {
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
     hcan.Instance = CAN;
+#if URTC_CAN_BT_FROM_CONFIG
+    {
+        urtc_can_bt_t bt;
+        if (urtc_can_bt_compute(32000000u, URTC_CAN_BITRATE_BPS, URTC_CAN_SAMPLE_PERMILLE, URTC_CAN_SJW_TQ, &bt) != URTC_CAN_BT_OK) {
+            bt.prescaler = 4; bt.bs1 = 13; bt.bs2 = 2; bt.sjw = 1;
+        }
+        hcan.Init.Prescaler = bt.prescaler;
+        hcan.Init.SyncJumpWidth = URTC_CAN_HAL_SJW(bt.sjw);
+        hcan.Init.TimeSeg1 = URTC_CAN_HAL_BS1(bt.bs1);
+        hcan.Init.TimeSeg2 = URTC_CAN_HAL_BS2(bt.bs2);
+    }
+    hcan.Init.Mode = CAN_MODE_NORMAL;
+#else
     hcan.Init.Prescaler = 4;
     hcan.Init.Mode = CAN_MODE_NORMAL;
     hcan.Init.SyncJumpWidth = CAN_SJW_1TQ;
     hcan.Init.TimeSeg1 = CAN_BS1_13TQ;
     hcan.Init.TimeSeg2 = CAN_BS2_2TQ;
+#endif
     hcan.Init.TimeTriggeredMode = DISABLE;
     hcan.Init.AutoBusOff = ENABLE;
     hcan.Init.AutoWakeUp = DISABLE;

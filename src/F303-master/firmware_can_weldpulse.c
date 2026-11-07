@@ -19,6 +19,36 @@
 #include "firmware_common.h"
 #include "firmware_can_weldpulse.h"
 #include "urtc_can_ids.h"
+#include "weld_pulse_timing.h"
+
+#if URTC_WELD_PULSE_HW_TIMER
+// Timer 17 in one-pulse mode ends the pulse in its own interrupt, whatever the main loop is doing; WeldPulse_Tick stays as the second way to end it.
+static void WeldPulse_HwStart(uint16_t duration_ms) {
+    uint32_t psc = 0, arr = 0;
+    if (urtc_weld_timer_params(SystemCoreClock, duration_ms, &psc, &arr) != 0) return;
+    __HAL_RCC_TIM17_CLK_ENABLE();
+    TIM17->CR1 = 0;
+    TIM17->PSC = psc;
+    TIM17->ARR = arr;
+    TIM17->EGR = TIM_EGR_UG;
+    TIM17->SR = 0;
+    TIM17->DIER = TIM_DIER_UIE;
+    HAL_NVIC_SetPriority(TIM1_TRG_COM_TIM17_IRQn, 0, 0);
+    HAL_NVIC_EnableIRQ(TIM1_TRG_COM_TIM17_IRQn);
+    TIM17->CR1 = TIM_CR1_OPM | TIM_CR1_CEN;
+}
+
+void TIM1_TRG_COM_TIM17_IRQHandler(void) {
+    if (TIM17->SR & TIM_SR_UIF) {
+        TIM17->SR = 0;
+        HAL_GPIO_WritePin(T12_PWM_PORT, T12_PWM_PIN, GPIO_PIN_RESET);
+        weld_pulse_active = 0;
+    }
+}
+#define WELD_HW_START(ms) WeldPulse_HwStart(ms)
+#else
+#define WELD_HW_START(ms) ((void)0)
+#endif
 
 void Handle_CAN_WeldPulse(void) {
     if (weld_pulse_active) return; // ignore a new fire command while a pulse is already running - not queued, just dropped
@@ -41,20 +71,22 @@ void Handle_CAN_WeldPulse(void) {
         // hold CONN_T12 energized for up to 65 seconds (0xFFFF) instead of
         // a normal short pulse.
         uint16_t raw_duration = ((uint16_t)rxData[1] << 8) | rxData[2];
-        weld_pulse_duration_ms = (raw_duration > 2000) ? 2000 : raw_duration;
+        weld_pulse_duration_ms = urtc_weld_clamp_ms(raw_duration);
         weld_pulse_start_tick = HAL_GetTick();
         weld_pulse_active = 1;
         HAL_GPIO_WritePin(T12_PWM_PORT, T12_PWM_PIN, GPIO_PIN_SET);
+        WELD_HW_START(weld_pulse_duration_ms);
     } else if (rxHeader.StdId == URTC_CAN_ID_ULTRASONIC_WELD_CMD && rxHeader.DLC >= 3 && !boot_sequence_active
                && active_tool == TOOL_ULTRASONIC_WELDER) {
         if (rxData[0] != 0x01) return;
         // No contact-sensor gate - doc #15 doesn't call for one the way
         // doc #4 explicitly does.
         uint16_t raw_duration = ((uint16_t)rxData[1] << 8) | rxData[2];
-        weld_pulse_duration_ms = (raw_duration > 2000) ? 2000 : raw_duration; // see the same clamp's own comment above
+        weld_pulse_duration_ms = urtc_weld_clamp_ms(raw_duration); // see the same clamp's own comment above
         weld_pulse_start_tick = HAL_GetTick();
         weld_pulse_active = 1;
         HAL_GPIO_WritePin(T12_PWM_PORT, T12_PWM_PIN, GPIO_PIN_SET);
+        WELD_HW_START(weld_pulse_duration_ms);
     }
 }
 

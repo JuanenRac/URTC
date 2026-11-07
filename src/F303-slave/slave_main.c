@@ -55,12 +55,12 @@ static void MX_GPIO_Init(void) {
     // I2C2 (local sensor bus, master) on PB10/PB11 - this chip's default
     // I2C2 remap, open-drain with pull-ups required on this board (same
     // convention as every other I2C bus in this project).
-    GPIO_InitStruct.Pin = GPIO_PIN_10 | GPIO_PIN_11;
+    GPIO_InitStruct.Pin = URTC_SLAVE_I2C2_PINS;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_OD;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-    GPIO_InitStruct.Alternate = GPIO_AF4_I2C2;
-    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+    GPIO_InitStruct.Alternate = URTC_SLAVE_I2C2_AF;
+    HAL_GPIO_Init(URTC_SLAVE_I2C2_PORT, &GPIO_InitStruct);
 }
 
 static uint8_t MX_I2C1_Init_Slave(void) {

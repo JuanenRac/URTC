@@ -17,6 +17,7 @@
 #include "slave_i2c_link.h"
 #include "slave_i2c_sensors.h"
 #include "slave_pwm.h"
+#include "slave_write_assembler.h"
 #include "MLX90640_I2C_Driver.h"
 #include "MLX90641_I2C_Driver.h"
 #include "MLX90642_depends.h"
@@ -440,6 +441,46 @@ static void test_camera_642(int *failures)
     TEST_ASSERT(MLX_GetCaptureStatus() == MLX_CAPTURE_ERROR, "an unknown variant is an error");
 }
 
+// ---- the reassembly of register writes ----------------------------------------------------------------------------------------------------
+static void test_write_assembler(int *failures)
+{
+    slave_write_asm_t a;
+    const uint8_t *msg = 0;
+    uint8_t len = 0;
+    swa_init(&a, 0);
+    TEST_ASSERT(a.stale_ms == SWA_STALE_MS_DEFAULT, "a stale time of 0 selects the default");
+    swa_init(&a, 5000);
+    TEST_ASSERT(a.stale_ms == SWA_STALE_MS_DEFAULT, "a stale time above the maximum selects the default");
+    swa_init(&a, 20);
+
+    const uint8_t pulse[4] = {0x31, 2, 50, 20};
+    TEST_ASSERT(swa_feed(&a, pulse, 4, 100, &msg, &len) == SWA_COMPLETE && len == 4 && memcmp(msg, pulse, 4) == 0, "a whole write is complete at once");
+    TEST_ASSERT(swa_feed(&a, pulse, 2, 200, &msg, &len) == SWA_PARTIAL, "a short write (STOP early) is held");
+    TEST_ASSERT(swa_feed(&a, pulse + 2, 2, 205, &msg, &len) == SWA_COMPLETE && len == 4 && memcmp(msg, pulse, 4) == 0, "the rest completes it in order");
+    const uint8_t late[3] = {0x01, 50, 20};
+    TEST_ASSERT(swa_feed(&a, pulse, 1, 300, &msg, &len) == SWA_PARTIAL && swa_feed(&a, late, 3, 345, &msg, &len) == SWA_COMPLETE && len == 3 && msg[0] == 1 && a.dropped_stale == 1,
+                "a half command that waited longer than the stale time is dropped, and the late bytes start a new write instead of completing it");
+
+    // The bootloader entry is never run from an incomplete payload.
+    const uint8_t boot[5] = {0x02, 0xB0, 0x07, 0x1D, 0x5A};
+    swa_reset(&a);
+    TEST_ASSERT(swa_feed(&a, boot, 3, 1000, &msg, &len) == SWA_PARTIAL, "three of five bytes of the bootloader command are only held");
+    TEST_ASSERT(swa_expire(&a, 1010) == 0 && swa_expire(&a, 1100) == 1 && a.fill == 0, "the main loop can expire a half command without waiting for the next write");
+    TEST_ASSERT(swa_feed(&a, boot, 5, 1200, &msg, &len) == SWA_COMPLETE && len == 5, "the whole command is complete");
+
+    // Overflow and too many bytes.
+    const uint8_t junk[9] = {0x31, 1, 2, 3, 4, 5, 6, 7, 8};
+    swa_reset(&a);
+    TEST_ASSERT(swa_feed(&a, junk, 9, 2000, &msg, &len) == SWA_DROPPED && a.fill == 0 && a.dropped_overflow == 1, "more bytes than the buffer are dropped");
+    TEST_ASSERT(swa_feed(&a, junk, 6, 2010, &msg, &len) == SWA_DROPPED && a.dropped_overflow == 2, "more bytes than the register takes are dropped, not executed");
+    TEST_ASSERT(swa_feed(&a, junk, 0, 2020, &msg, &len) == SWA_DROPPED, "an empty delivery makes no write");
+
+    // Registers without a fixed length (read-pointer selections) complete at once, whatever the length.
+    const uint8_t sel[2] = {0x12, 7};
+    TEST_ASSERT(swa_feed(&a, sel, 2, 3000, &msg, &len) == SWA_COMPLETE && len == 2, "a read-pointer selection with a payload is complete");
+    TEST_ASSERT(a.completed >= 5, "the completed writes are counted");
+}
+
 // ---- the start-up and the main loop ---------------------------------------------------------------------------------------------------------
 static void test_main(int *failures)
 {
@@ -463,6 +504,9 @@ static void test_main(int *failures)
     int sda_scl_pairs = 0;
     for (int i = 0; i < fake_gpio_init_count; i++) if (fake_gpio_inits[i].init.Mode == GPIO_MODE_AF_OD) sda_scl_pairs++;
     TEST_ASSERT(sda_scl_pairs == 2, "the pins of both I2C buses are open-drain alternate function");
+    int i2c2_pins = 0;
+    for (int i = 0; i < fake_gpio_init_count; i++) if (fake_gpio_inits[i].port == URTC_SLAVE_I2C2_PORT && fake_gpio_inits[i].init.Pin == URTC_SLAVE_I2C2_PINS && fake_gpio_inits[i].init.Alternate == URTC_SLAVE_I2C2_AF) i2c2_pins++;
+    TEST_ASSERT(i2c2_pins == 1 && URTC_SLAVE_I2C2_PRESET == 0 && URTC_SLAVE_I2C2_PINS == (GPIO_PIN_10 | GPIO_PIN_11), "by default the sensor bus is on PB10 and PB11, and the pins come from the configuration macros");
     TEST_ASSERT(fake_tim_pwm_stops > 4 && fake_tim_pwm_stops < 4 * 1500 - 4 * 900, "the outputs are stopped only after more than a second without a word from the master, then on every pass (a lost master leaves no output on)");
     I2C1_EV_IRQHandler();
     I2C1_ER_IRQHandler();
@@ -479,6 +523,7 @@ void run_slave_tests(int *failures)
     test_camera_640(failures);
     test_camera_641(failures);
     test_camera_642(failures);
+    test_write_assembler(failures);
     test_main(failures);
 }
 

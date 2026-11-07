@@ -5,6 +5,13 @@
 // =============================================================================
 #include "firmware_common.h"
 #include "firmware_init_can.h"
+#include "can_bit_timing.h"
+
+// 1 = the bit timing is calculated from URTC_CAN_BITRATE_BPS, URTC_CAN_SAMPLE_PERMILLE and URTC_CAN_SJW_TQ for the 32 MHz peripheral clock (a build error if no
+// setting gives that rate exactly). 0 (default) = the fixed 500 kbit/s setting below.
+#ifndef URTC_CAN_BT_FROM_CONFIG
+#define URTC_CAN_BT_FROM_CONFIG 0
+#endif
 
 void MX_CAN_Init(void) {
     CAN_FilterTypeDef sFilterConfig;
@@ -34,11 +41,25 @@ void MX_CAN_Init(void) {
     // (was 1TQ) rather than just changing this one field - baud rate and
     // sample point land in the exact same place either way, just with finer
     // time-quantum resolution now (16 total instead of 8).
+#if URTC_CAN_BT_FROM_CONFIG
+    {
+        urtc_can_bt_t bt;
+        if (urtc_can_bt_compute(32000000u, URTC_CAN_BITRATE_BPS, URTC_CAN_SAMPLE_PERMILLE, URTC_CAN_SJW_TQ, &bt) != URTC_CAN_BT_OK) {
+            bt.prescaler = 4; bt.bs1 = 13; bt.bs2 = 2; bt.sjw = 2;   // an impossible setting falls back to the standard 500 kbit/s
+        }
+        hcan.Init.Prescaler = bt.prescaler;
+        hcan.Init.SyncJumpWidth = URTC_CAN_HAL_SJW(bt.sjw);
+        hcan.Init.TimeSeg1 = URTC_CAN_HAL_BS1(bt.bs1);
+        hcan.Init.TimeSeg2 = URTC_CAN_HAL_BS2(bt.bs2);
+    }
+    hcan.Init.Mode = CAN_MODE_NORMAL;
+#else
     hcan.Init.Prescaler = 4;
     hcan.Init.Mode = CAN_MODE_NORMAL;
     hcan.Init.SyncJumpWidth = CAN_SJW_2TQ;
     hcan.Init.TimeSeg1 = CAN_BS1_13TQ;
     hcan.Init.TimeSeg2 = CAN_BS2_2TQ;
+#endif
     hcan.Init.TimeTriggeredMode = DISABLE;
     hcan.Init.AutoBusOff = ENABLE;
     hcan.Init.AutoWakeUp = DISABLE;

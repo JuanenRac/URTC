@@ -23,6 +23,15 @@
 #include "slave_i2c_link.h"
 #include "slave_i2c_sensors.h"
 #include "slave_pwm.h"
+#include "slave_write_assembler.h"
+
+// 1 = the pieces of a register write are reassembled before they are executed, and a half-written command is dropped after a timeout (slave_write_assembler.h). 0 (default) = a write is executed as the HAL delivers it.
+#ifndef URTC_SLAVE_WRITE_REASSEMBLY
+#define URTC_SLAVE_WRITE_REASSEMBLY 0
+#endif
+#if URTC_SLAVE_WRITE_REASSEMBLY
+static slave_write_asm_t write_asm;
+#endif
 
 static uint8_t rx_buffer[8]; // largest real write is 4 bytes (1 register + 3 payload, REG_PWM_CONFIGURE/REG_PWM_PULSE) - sized with margin
 static uint8_t tx_buffer[32]; // largest real read is 32 bytes (REG_MLX_RAW_CHUNK/REG_MLX_CALIBRATED_CHUNK)
@@ -31,6 +40,9 @@ static uint8_t pending_mlx_chunk_index = 0;
 volatile uint32_t i2c_link_last_activity_tick = 0;
 
 void I2CLink_Init(void) {
+#if URTC_SLAVE_WRITE_REASSEMBLY
+    swa_init(&write_asm, SWA_STALE_MS_DEFAULT);
+#endif
     HAL_I2C_EnableListen_IT(&hi2c1);
 }
 
@@ -94,6 +106,20 @@ void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef *hi2c) {
     uint32_t bytes_received = sizeof(rx_buffer) - hi2c->XferCount;
     if (bytes_received == 0) return;
     i2c_link_last_activity_tick = HAL_GetTick();
+#if URTC_SLAVE_WRITE_REASSEMBLY
+    {
+        const uint8_t *msg = 0;
+        uint8_t msg_len = 0;
+        swa_result_t result = swa_feed(&write_asm, rx_buffer, (uint8_t)bytes_received, HAL_GetTick(), &msg, &msg_len);
+        if (result == SWA_DROPPED) return;
+        if (result == SWA_PARTIAL) {
+            if (bytes_received == 1) pending_read_register = rx_buffer[0]; // a bare register number still selects what a following read returns
+            return;
+        }
+        for (uint8_t i = 0; i < msg_len; i++) rx_buffer[i] = msg[i];
+        bytes_received = msg_len;
+    }
+#endif
 
     uint8_t reg = rx_buffer[0];
 
