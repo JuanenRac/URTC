@@ -433,6 +433,40 @@ Data:
   Note: sent whichever tool is active; it adds what the one-second health frame
         has no room for.
 
+ID: 0x1BC [Master -> URTC Tool Head]
+Ask for the crash record (the registers the last HardFault left)
+DLC: 1+ bytes (only byte[0] used)
+Data:
+  - rxData[0]: operation, 0 = read the record (any other value gets no answer)
+Effect: answered with six frames of 0x1BD. Only a firmware built with the crash
+  capture (URTC_CRASH_DUMP, off by default) answers; any other firmware ignores
+  the identifier. Read-only, answered whatever the active tool or the error state.
+
+ID: 0x1BD [URTC Tool Head -> Master, answering 0x1BC]
+The crash record
+DLC: 8 bytes, six consecutive frames that make 48 bytes, every word little-endian
+Data (the 48 bytes, in order):
+  - bytes 0..3:   magic "CRSH" (0x43 0x52 0x53 0x48)
+  - bytes 4..7:   crashes captured since the last power-up (0 = none)
+  - bytes 8..11:  PC of the stacked frame
+  - bytes 12..15: LR of the stacked frame
+  - bytes 16..19: xPSR of the stacked frame
+  - bytes 20..23: CFSR (memory, bus and usage fault status)
+  - bytes 24..27: HFSR (hard fault status)
+  - bytes 28..31: MMFAR (valid when CFSR bit 7 is set)
+  - bytes 32..35: BFAR (valid when CFSR bit 15 is set)
+  - bytes 36..39: address of the stacked frame
+  - byte 40:      reset cause, the bit field of 0x1BB byte 1
+  - byte 41:      kind: 0 no crash, 1 crash with its frame,
+                  2 crash whose stack pointer was not inside RAM (frame words are 0)
+  - byte 42:      record version (1)
+  - byte 43:      reserved (0)
+  - bytes 44..47: CRC-32 (IEEE) of bytes 0..43
+  Note: the record lives in RAM that the start-up code does not clear, so it
+        survives the watchdog reset that follows a HardFault; it is emptied at a
+        power-on and refused by the firmware when its CRC does not agree. A host
+        believes it only when the magic, the version and the CRC agree.
+
 ID: 0x1A2 [Master -> URTC Tool Head]
 Set free tool configuration
 DLC: 1+ bytes (only byte[0] used)
@@ -1855,6 +1889,8 @@ accepted.
   0x1B9 -> Heater PID gains and autotune (DLC:7)
   0x1BA -> Query/response: the heater PID (DLC:any/8)
   0x1BB -> Identity and life of the board: protocol byte, reset cause, version, uptime (DLC:8)
+  0x1BC -> Ask for the crash record, only a firmware built with the crash capture answers (DLC:1+)
+  0x1BD -> The crash record: six frames of eight bytes (DLC:8)
   --- Per-tool commands (see dedicated sections above) ---
   0x120 -> Stepper motor control (Dispensers, Screwdriver, Grippers - DLC:5 - no watchdog)
   0x130 -> T12 setpoint temperature (Soldering iron - DLC:2 - 250ms watchdog)
@@ -2117,7 +2153,7 @@ Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_do
 
 C. Field layouts and examples
 
-[[ BEGIN GENERATED layouts sha256=422f9e174d926bdea7408982d0a32dd3f8fc4f8653b93db218bba202c50ff523 ]]
+[[ BEGIN GENERATED layouts sha256=10b8978ea581b8d377e4c508cd00e23eef238ac1fdb0ad1a6f577f1b492ed618 ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 ### 0x095 IMPACT_EVENT - Impact register (touch probe, maximum priority)
@@ -2903,7 +2939,7 @@ Note: Sent every ten seconds, right after a health frame, by a board whose healt
 
 ### 0x1BC CRASH_DUMP_QUERY - Request the fault capture of the last crash (stacked registers kept across the reset)
 
-host to board; handled by the application; tools: any; answered even while a critical error is declared; read only.
+host to board; handled by the application; tools: any; answered even while a critical error is declared; read only; the firmware accepts DLC 1-8.
 
 request, DLC 1-8
 
