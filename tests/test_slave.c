@@ -129,7 +129,7 @@ static void test_pwm(int *failures)
 static void master_writes(const uint8_t *bytes, uint32_t count)
 {
     // the master addresses the slave for a write, the HAL starts a receive into the buffer of the firmware, the master sends its bytes and stops
-    HAL_I2C_AddrCallback(&hi2c1, I2C_DIRECTION_RECEIVE, I2C_SLAVE_ADDRESS << 1);
+    HAL_I2C_AddrCallback(&hi2c1, I2C_DIRECTION_TRANSMIT, I2C_SLAVE_ADDRESS << 1);
     for (uint32_t i = 0; i < count && i < fake_i2c_slave_rx_len; i++) fake_i2c_slave_rx_buffer[i] = bytes[i];
     hi2c1.XferCount = fake_i2c_slave_rx_len - count;
     HAL_I2C_SlaveRxCpltCallback(&hi2c1);
@@ -144,13 +144,12 @@ static void test_link(int *failures)
     I2CLink_Init();
     TEST_ASSERT(fake_i2c_listen_count == 1, "the link starts listening for its address");
 
-    // The firmware starts a receive when the direction it is given is I2C_DIRECTION_RECEIVE and a transmit otherwise. In the HAL the direction is the
-    // master's: I2C_DIRECTION_TRANSMIT (0) is a write by the master, which the slave must receive. KNOWN, not changed here: the code reads it the other
-    // way round, so the tests below follow the code (a "write" is announced with RECEIVE) and the point is to be checked on the board.
-    HAL_I2C_AddrCallback(&hi2c1, I2C_DIRECTION_RECEIVE, 0x84);
-    TEST_ASSERT(fake_i2c_slave_rx_count == 1 && fake_i2c_slave_rx_len == 8 && fake_i2c_slave_tx_count == 0, "KNOWN: the direction RECEIVE starts a receive of up to eight bytes");
+    // The direction the HAL gives is the master's: I2C_DIRECTION_TRANSMIT (0) is a write by the master, which the slave receives, and I2C_DIRECTION_RECEIVE (1)
+    // is a read by the master, which the slave answers.
     HAL_I2C_AddrCallback(&hi2c1, I2C_DIRECTION_TRANSMIT, 0x84);
-    TEST_ASSERT(fake_i2c_slave_tx_count == 1 && fake_i2c_slave_tx_len == 1 && fake_i2c_slave_tx[0] == APP_STATUS_IDLE, "KNOWN: with no register chosen the answer is the idle status");
+    TEST_ASSERT(fake_i2c_slave_rx_count == 1 && fake_i2c_slave_rx_len == 8 && fake_i2c_slave_tx_count == 0, "a write by the master starts a receive of up to eight bytes");
+    HAL_I2C_AddrCallback(&hi2c1, I2C_DIRECTION_RECEIVE, 0x84);
+    TEST_ASSERT(fake_i2c_slave_tx_count == 1 && fake_i2c_slave_tx_len == 1 && fake_i2c_slave_tx[0] == APP_STATUS_IDLE, "with no register chosen a read by the master gets the idle status");
 
     hi2c1.XferCount = 8;
     uint32_t before = i2c_link_last_activity_tick;
@@ -158,11 +157,11 @@ static void test_link(int *failures)
     TEST_ASSERT(i2c_link_last_activity_tick == before, "a receive that ended with no byte is not activity");
     master_write_reg(REG_APP_STATUS);
     TEST_ASSERT(i2c_link_last_activity_tick == fake_tick, "a received byte is activity");
-    HAL_I2C_AddrCallback(&hi2c1, I2C_DIRECTION_TRANSMIT, 0x84);
+    HAL_I2C_AddrCallback(&hi2c1, I2C_DIRECTION_RECEIVE, 0x84);
     TEST_ASSERT(fake_i2c_slave_tx_len == 1 && fake_i2c_slave_tx[0] == APP_STATUS_IDLE, "register 0 answers the application status");
 
     master_write_reg(REG_APP_VERSION);
-    HAL_I2C_AddrCallback(&hi2c1, I2C_DIRECTION_TRANSMIT, 0x84);
+    HAL_I2C_AddrCallback(&hi2c1, I2C_DIRECTION_RECEIVE, 0x84);
     TEST_ASSERT(fake_i2c_slave_tx_len == 10 && fake_i2c_slave_tx[0] == 0, "the version answer is ten bytes after a zero status byte");
     TEST_ASSERT(fake_i2c_slave_tx[1] == 0x03 && fake_i2c_slave_tx[2] == 0x03 && fake_i2c_slave_tx[3] == 0xCB && fake_i2c_slave_tx[4] == 0x01, "the hardware identifier of the slave, high byte first");
     TEST_ASSERT(fake_i2c_slave_tx[5] == 0 && fake_i2c_slave_tx[6] == FIRMWARE_VERSION_MAJOR && fake_i2c_slave_tx[7] == 0 && fake_i2c_slave_tx[8] == FIRMWARE_VERSION_MINOR, "the major and the minor version, two bytes each");
@@ -172,22 +171,22 @@ static void test_link(int *failures)
     master_writes(variant, 2);
     TEST_ASSERT(mlx_sensor_variant == MLX_VARIANT_90641, "a two-byte write of the variant register chooses the camera");
     master_write_reg(REG_MLX_SENSOR_VARIANT);
-    HAL_I2C_AddrCallback(&hi2c1, I2C_DIRECTION_TRANSMIT, 0x84);
+    HAL_I2C_AddrCallback(&hi2c1, I2C_DIRECTION_RECEIVE, 0x84);
     TEST_ASSERT(fake_i2c_slave_tx_len == 1 && fake_i2c_slave_tx[0] == MLX_VARIANT_90641, "and reading it gives it back");
 
     mlx_sensor_variant = MLX_VARIANT_NONE;
     master_write_reg(REG_MLX_CAPTURE_STATUS);
-    HAL_I2C_AddrCallback(&hi2c1, I2C_DIRECTION_TRANSMIT, 0x84);
+    HAL_I2C_AddrCallback(&hi2c1, I2C_DIRECTION_RECEIVE, 0x84);
     TEST_ASSERT(fake_i2c_slave_tx[0] == MLX_CAPTURE_ERROR, "with no camera chosen the capture status is the error value");
     uint8_t chunk_select[2] = {REG_MLX_RAW_CHUNK, 5};
     master_writes(chunk_select, 2);
-    HAL_I2C_AddrCallback(&hi2c1, I2C_DIRECTION_TRANSMIT, 0x84);
+    HAL_I2C_AddrCallback(&hi2c1, I2C_DIRECTION_RECEIVE, 0x84);
     int zeros = fake_i2c_slave_tx_len == 32;
     for (int i = 0; i < 32; i++) if (fake_i2c_slave_tx[i]) zeros = 0;
     TEST_ASSERT(zeros, "a chunk with no camera is 32 zero bytes");
     chunk_select[0] = REG_MLX_CALIBRATED_CHUNK;
     master_writes(chunk_select, 2);
-    HAL_I2C_AddrCallback(&hi2c1, I2C_DIRECTION_TRANSMIT, 0x84);
+    HAL_I2C_AddrCallback(&hi2c1, I2C_DIRECTION_RECEIVE, 0x84);
     TEST_ASSERT(fake_i2c_slave_tx_len == 32, "the calibrated chunk is 32 bytes as well");
 
     uint8_t pwm_pulse[4] = {REG_PWM_PULSE, 1, 25, 7};
@@ -216,7 +215,7 @@ static void test_link(int *failures)
     TEST_ASSERT(ads->words[1] == (0x0483 | 0x8000), "a one-byte write of the trigger register starts a conversion");
     ads->words[0] = 0xFFF6;
     master_write_reg(REG_ADS_READ);
-    HAL_I2C_AddrCallback(&hi2c1, I2C_DIRECTION_TRANSMIT, 0x84);
+    HAL_I2C_AddrCallback(&hi2c1, I2C_DIRECTION_RECEIVE, 0x84);
     TEST_ASSERT(fake_i2c_slave_tx_len == 2 && fake_i2c_slave_tx[0] == 0xFF && fake_i2c_slave_tx[1] == 0xF6, "reading the result gives the 16-bit value, high byte first");
 
     // the bootloader entry

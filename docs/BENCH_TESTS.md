@@ -42,9 +42,10 @@ no retry. With the old order the first scan may fail.
 
 ## 2. Slave I2C receive direction and callback
 
-Why: the address callback arms the receive with the HAL direction constant that
-describes the master's direction, which is the inverse of what the slave must
-arm, and the design assumes the receive-complete callback fires on STOP.
+Why: the address callback of the slave bootloader now arms the receive for a
+write by the master (the HAL gives the direction of the master: TRANSMIT is a
+write) and a transmit for a read; the design assumes the receive-complete
+callback fires on STOP, which only the board can confirm.
 
 Steps: write 1, 4 and 8 bytes from the master to the slave; read them back
 through a status register; repeat with a repeated START.
@@ -205,7 +206,7 @@ Some of the behaviour above is exercised on a PC by compiling the real C for the
 | The virtual board | `python tools/fuzz_virtual_board.py` (or `urtc-virtual-board --firmware-repo DIR` of URTC-COMMON, then `URTC_VIRTUAL_PORT=socket://127.0.0.1:7777` in the tester, the flasher or the gateway) | The real receive path of the application behind an SLCAN text port, with the address and undefined-behaviour sanitizers: it never stops on a frame of the specification or a random one, only transmits identifiers a board may send and resets into the bootloader exactly on the magic frame |
 | The twin of the bootloader | `python tools/bootloader_twin.py --check` (`--build-only` prints the command that runs it; `urtc-virtual-board --firmware-bootloader` bridges to it) | The real bootloader of the master (window, main loop, flash that only clears bits until a page is erased, CRC, Ed25519 record, trust table): a signed update is taken; a bad signature, an unknown key, a counter below the floor, a foreign board and a transfer left silent are refused or abandoned |
 | The host suites | `python tools/run_host_tests.py` | The logic of the firmware against a fake HAL |
-| The model of the slave bootloader | `python tools/slave_bootloader_twin.py --check` (Python only, no compiler) | The logic of the expansion slave's bootloader written from its C: the register protocol, the update states, the confirmation by the master, the rollback floor, the metadata log, the resume of a cut copy (about 400 power cuts over one update), the ten-second silence rule and the jump rules. It also reproduces four properties of the code as built that tests 2, 10 and 15 have to confirm on a board: the direction constant of the address callback, the loss of short writes if the HAL reports the early STOP as an error, no listening window before a valid application, and the work and the 200 ms delay inside the I2C event callback |
+| The model of the slave bootloader | `python tools/slave_bootloader_twin.py --check` (Python only, no compiler) | The logic of the expansion slave's bootloader written from its C: the register protocol, the update states, the confirmation by the master, the rollback floor, the metadata log, the resume of a cut copy (about 400 power cuts over one update), the ten-second silence rule and the jump rules. It also models the four properties that tests 2, 10 and 15 have to confirm on a board, each with the code before its fix as an option: the direction of the address callback (fixed), the loss of short writes if the HAL reports the early STOP as an error (still open), the listening window before a valid application (added, 600 ms, a build parameter) and the work of END and of the confirmation, and the 200 ms pause, which now run in the main loop instead of the I2C event callback (START still erases inside it) |
 | The flasher against the twin | the tests of URTC-FLASHER (`tests/test_bootloader_twin.py`) | The flasher unchanged against the real bootloader, with the image and its `.imgsig` file |
 
 On a plain PC these tools compile only on request: `ALLOW_LOCAL_BUILD=1` allows it (inside WSL on Windows, because the fake flash needs a 64-bit Linux), and the CI always may. Without a compiler they say SKIPPED (exit status 2), never passed. The bootloader of the expansion slave is a model written from its source, not its compiled code; the bus timing, the interrupt priorities and the real flash are not simulated, and bench tests 1 to 15 stay as they are.

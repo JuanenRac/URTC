@@ -159,14 +159,14 @@
         {
           "name": "tests/",
           "desc": {
-            "en": "46 C host test suites",
-            "es": "46 suites de pruebas de host en C",
-            "de": "46 C-Host-Testsuiten",
-            "fr": "46 suites de tests hôte en C",
-            "it": "46 suite di test host in C",
-            "zh": "46 个 C 主机测试套件",
-            "ja": "46 の C ホストテストスイート",
-            "pt": "46 conjuntos de testes de host em C"
+            "en": "48 C host test suites",
+            "es": "48 suites de pruebas de host en C",
+            "de": "48 C-Host-Testsuiten",
+            "fr": "48 suites de tests hôte en C",
+            "it": "48 suite di test host in C",
+            "zh": "48 个 C 主机测试套件",
+            "ja": "48 の C ホストテストスイート",
+            "pt": "48 conjuntos de testes de host em C"
           }
         },
         {

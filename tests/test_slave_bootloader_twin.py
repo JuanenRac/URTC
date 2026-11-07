@@ -89,17 +89,21 @@ class SourceTests(unittest.TestCase):
 
     def test_the_properties_the_model_reproduces_are_still_in_the_source(self):
         main, protocol = text(BOOT / "slaveboot_main.c"), text(BOOT / "slaveboot_protocol.c")
-        # the direction constant that describes the master reading arms the receive
-        self.assertRegex(main, r"if \(TransferDirection == I2C_DIRECTION_RECEIVE\) \{\s*//[^\n]*\n\s*HAL_I2C_Slave_Seq_Receive_IT")
-        # no window: the application is entered straight after the validity check in main()
-        self.assertRegex(main, r"if \(ApplicationIsValid\(\)\) \{\s*JumpToApplication\(\);")
+        # the direction constant that describes the master writing arms the receive
+        self.assertRegex(main, r"if \(TransferDirection == I2C_DIRECTION_TRANSMIT\) \{\s*//[^\n]*\n\s*HAL_I2C_Slave_Seq_Receive_IT")
+        # the window: the application is entered after ListenWindowExpired says so, and not when an update has started
+        self.assertIn("ListenWindowExpired(window_start, HAL_GetTick(), SLAVEBOOT_LISTEN_WINDOW_MS)", main)
+        self.assertIn("if (!update_started) JumpToApplication();", main)
+        self.assertRegex(text(BOOT / "slaveboot_common.h"), r"#define SLAVEBOOT_LISTEN_WINDOW_MS\s+" + str(twin.SlaveBootloader.__dataclass_fields__["listen_window_ms"].default) + "u")
         # a short write is expected to reach the receive-complete callback, which reads the count from XferCount
         self.assertIn("sizeof(rx_buffer) - hi2c->XferCount", main)
-        # the work is done in the callbacks themselves, and the pause before the reset is a HAL_Delay inside the one of the confirmation
-        self.assertIn("HAL_Delay(200)", protocol)
-        self.assertRegex(protocol, r"HAL_Delay\(200\);[^\n]*\n\s*NVIC_SystemReset\(\);")
+        # END and the confirmation are only queued by the callbacks; the pause before the reset is waited out by the main loop, never by a HAL_Delay
+        self.assertNotIn("HAL_Delay(", protocol)
+        self.assertIn("QueueEndUpdate(&rx_buffer[1])", main)
+        self.assertIn("QueueConfirm(&rx_buffer[1])", main)
+        self.assertIn("ServiceDeferred();", main)
+        self.assertIn("RESET_PAUSE_MS 200u", protocol)
         self.assertIn("Flash_ErasePages(BACKUP_APP_ADDR, pages_needed)", protocol)
-        self.assertIn("HandleConfirm(&rx_buffer[1])", main)
         # the ST HAL default places the tick below every other interrupt
         hal_conf = ROOT / "build" / "common" / "HAL_Include" / "stm32f3xx_hal_conf.h"
         if hal_conf.is_file():
@@ -145,14 +149,14 @@ class ModelTests(unittest.TestCase):
         self.assertEqual(problems, [])
         self.assertEqual(len(known), 5)
 
-    def test_the_address_callback_as_built_makes_every_register_unreachable(self):
-        chip = twin.SlaveBootloader(twin.Flash())
+    def test_the_address_callback_before_the_fix_made_every_register_unreachable(self):
+        chip = twin.SlaveBootloader(twin.Flash(), direction_fixed=False)
         chip.boot()
         self.assertEqual(chip.master_write(bytes([twin.REG_STATUS])), 0)
         self.assertIsNone(chip.master_read(1))
         self.assertIsNone(chip.read_register(twin.REG_QUERY_VERSION, 10))
 
-    def test_with_the_direction_inverted_every_register_answers(self):
+    def test_with_the_direction_fixed_every_register_answers(self):
         chip = twin.SlaveBootloader(twin.Flash(), direction_fixed=True)
         chip.boot()
         self.assertEqual(chip.read_register(twin.REG_QUERY_VERSION, 10)[0], 1)

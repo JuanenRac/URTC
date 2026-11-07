@@ -177,6 +177,20 @@ table: it can raise the compiled floor of the counter and mark a key revoked
 the table holds the current and the next key; release with the current one
 until the fleet has the bootloader that holds the next one.
 
+Signed rotation command (off by default). A bootloader built with
+URTC_BL_ROTATION_COMMAND=1 trusts only the current key of its table until the
+host sends a 100-byte command on 0x7EC (15 chunks, the high bit of the index
+set), signed with the current key, that names the new current key, a window
+(seconds, at most URTC_BL_ROTATION_MAX_WINDOW_S, seven days by default) during
+which the previous key still verifies, the time of the host and a counter. The
+bootloader only verifies; it does not answer the command. 0x7EA operation 05
+returns the state (number of keys, flags, seconds left) on 0x7EB and the valid
+ids on 0x7ED. The rotation is held in RAM: a reset goes back to the current key
+alone and the host sends the command again. Built as it ships (option at 0)
+every key of the table verifies, the command is not read and operation 05 is
+not answered. The table still bounds everything: a command can only choose
+among the keys the table holds.
+
 Recovery image (golden). It is kept on the host, not on the board: there is no
 flash for a third slot. The host reinstalls it by the normal path.
 

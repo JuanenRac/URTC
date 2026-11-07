@@ -19,8 +19,8 @@ class SuiteListTests(unittest.TestCase):
         self.assertEqual(sorted(set(listed)), on_disk)
         # a test is listed twice only to run it on the copy of a driver the expansion slave carries, or to build the bootloader with the programmable serial on
         again = [suite.name for suite in runner.SUITES if listed.count(suite.test) > 1]
-        self.assertTrue(all(name.startswith("mlx_") or name.startswith("bootloader_boot") for name in again), again)
-        self.assertTrue(all(name.endswith("_slave") or name.endswith("_serial") or f"{name}_slave" in {item.name for item in runner.SUITES} or f"{name}_serial" in {item.name for item in runner.SUITES}
+        self.assertTrue(all(name.startswith("mlx_") or name.startswith("bootloader_boot") or name.startswith("bootloader_rotation") for name in again), again)
+        self.assertTrue(all(name.endswith("_slave") or name.endswith("_serial") or name.startswith("bootloader_rotation") or f"{name}_slave" in {item.name for item in runner.SUITES} or f"{name}_serial" in {item.name for item in runner.SUITES}
                             for name in again), again)
         self.assertEqual(len({suite.name for suite in runner.SUITES}), len(runner.SUITES))
 

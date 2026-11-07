@@ -167,6 +167,61 @@
    ]
   },
   {
+   "name": "bootloader_rotation",
+   "test": "tests/test_bootloader_rotation.c",
+   "sources": [
+    "tests/host_hal/fake_hal.c",
+    "src/F303-master/boot/bootloader_protocol.c",
+    "src/F303-master/boot/bootloader_flash.c",
+    "src/F303-master/boot/bootloader_crypto.c",
+    "src/F303-master/boot/bootloader_trust.c",
+    "src/F303-master/boot/bootloader_ed25519.c"
+   ],
+   "includes": [
+    "tests",
+    "tests/host_hal",
+    "src/F303-master/boot",
+    "src/common",
+    "tests/vectors"
+   ],
+   "extra": [
+    "-Wno-cpp",
+    "-Wno-int-to-pointer-cast"
+   ],
+   "defines": [
+    "-DURTC_HOST_TEST",
+    "-DURTC_TRUST_DEV",
+    "-DURTC_BL_ROTATION_COMMAND=1"
+   ]
+  },
+  {
+   "name": "bootloader_rotation_off",
+   "test": "tests/test_bootloader_rotation.c",
+   "sources": [
+    "tests/host_hal/fake_hal.c",
+    "src/F303-master/boot/bootloader_protocol.c",
+    "src/F303-master/boot/bootloader_flash.c",
+    "src/F303-master/boot/bootloader_crypto.c",
+    "src/F303-master/boot/bootloader_trust.c",
+    "src/F303-master/boot/bootloader_ed25519.c"
+   ],
+   "includes": [
+    "tests",
+    "tests/host_hal",
+    "src/F303-master/boot",
+    "src/common",
+    "tests/vectors"
+   ],
+   "extra": [
+    "-Wno-cpp",
+    "-Wno-int-to-pointer-cast"
+   ],
+   "defines": [
+    "-DURTC_HOST_TEST",
+    "-DURTC_TRUST_DEV"
+   ]
+  },
+  {
    "name": "slaveboot_crypto",
    "test": "tests/test_slaveboot_crypto.c",
    "sources": [

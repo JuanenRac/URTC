@@ -198,11 +198,12 @@ class WorkLog:
 @dataclass
 class SlaveBootloader:
     flash: Flash
-    direction_fixed: bool = False                 # False: the address callback as built (see the module note)
+    direction_fixed: bool = True                  # True: the address callback arms a receive for a write by the master; False: the callback before the fix (see the module note)
     short_write: str = "callback"                 # "callback" (the design) or "hal_error" (the HAL as the comment in slaveboot_main.c fears)
     tick_preempts_isr: bool = False               # the SysTick is below the I2C event interrupt (the default of the HAL), so HAL_Delay inside it never ends
-    listen_window_ms: int = 0                     # 0: a valid application is entered at once (as built)
+    listen_window_ms: int = 600                   # SLAVEBOOT_LISTEN_WINDOW_MS; 0: a valid application is entered at once (the code before the window)
     tick: int = 1000
+    defer_heavy_work: bool = True                 # END and CONFIRM only queue in the interrupt and run in the main loop; False: the code before, all of it inside the interrupt
 
     # the state of slaveboot_protocol.c / slaveboot_main.c (RAM: lost at every reset)
     current_status: int = STATUS_LISTENING
@@ -243,6 +244,8 @@ class SlaveBootloader:
         self._work = WorkLog("")
         self.hashed = 0
         self.window_end: int | None = None
+        self.deferred: tuple[str, bytes] | None = None
+        self.reset_due_at: int | None = None
 
     # ---- flash helpers (slaveboot_flash.c) --------------------------------------------------------------------------------------------------------
     def erase_pages(self, address: int, count: int) -> bool:
@@ -370,14 +373,17 @@ class SlaveBootloader:
 
     def reboot(self) -> "SlaveBootloader":
         """A reset: the RAM is lost, the flash stays. The options of this model carry over."""
-        return SlaveBootloader(self.flash, self.direction_fixed, self.short_write, self.tick_preempts_isr, self.listen_window_ms, self.tick)
+        return SlaveBootloader(self.flash, self.direction_fixed, self.short_write, self.tick_preempts_isr, self.listen_window_ms, self.tick, self.defer_heavy_work)
 
     # ---- time: the main loop (HAL_Delay(50), the ten-second rule) ------------------------------------------------------------------------------------
     def advance(self, milliseconds: int) -> None:
         end = self.tick + milliseconds
         while self.tick < end:
             self.tick = min(end, self.tick + LOOP_MS)
-            if self.window_end is not None and self.tick >= self.window_end and not self.in_progress:
+            self.service()
+            if self.window_end is not None and (self.in_progress or self.failed or self.busy()):
+                self.window_end = None          # an update started inside the window: the main loop takes over and never enters the application behind it
+            if self.window_end is not None and self.tick >= self.window_end:
                 self.window_end = None
                 self.listening = False
                 self.jump_to_application()      # the window closed with no update started: the application is entered
@@ -560,7 +566,10 @@ class SlaveBootloader:
             return
         self.current_status = STATUS_VERIFY_OK
         self.progress = 100
-        # HAL_Delay(200) followed by NVIC_SystemReset(), inside the I2C event interrupt
+        if self.defer_heavy_work:
+            self.reset_due_at = self.tick          # ServiceDeferred() resets the chip 200 ms later, from the main loop
+            return
+        # HAL_Delay(200) followed by NVIC_SystemReset(), inside the I2C event interrupt (the code before the heavy work left the interrupt)
         self._work.delay_ms = 200
         if self.tick_preempts_isr:
             self.tick += 200
@@ -604,6 +613,12 @@ class SlaveBootloader:
         n = len(received)
         if n == 1:
             self.pending_read_register = register
+        elif self.defer_heavy_work and self.busy():
+            pass                                   # a step runs in the main loop, or the reset is due: writes wait
+        elif self.defer_heavy_work and register == REG_END_UPDATE and n == 9:
+            self.queue("end", received[1:])
+        elif self.defer_heavy_work and register == REG_CONFIRM and n == 33:
+            self.queue("confirm", received[1:])
         elif register == REG_START_UPDATE and n == 9:
             self.start_update(received[1:])
         elif register == REG_DIGEST_EXPECTED and n == 33:
@@ -618,8 +633,42 @@ class SlaveBootloader:
             self.end_update(received[1:])
         self.log.append(self._work)
 
+    # ---- the heavy steps out of the interrupt (QueueEndUpdate / QueueConfirm / ServiceDeferred) -----------------------------------------------------------------
+    def busy(self) -> bool:
+        return self.deferred is not None or self.reset_due_at is not None
+
+    def queue(self, kind: str, data: bytes) -> None:
+        if self.busy() or not self.in_progress or self.failed:
+            return
+        if kind == "end":
+            if self.awaiting_confirm:
+                return
+            self.last_activity = self.tick
+            self.current_status = STATUS_VERIFYING
+        else:
+            if not self.awaiting_confirm:
+                return
+            self.last_activity = self.tick
+        self.deferred = (kind, bytes(data))
+
+    def service(self) -> None:
+        """ServiceDeferred(): one pass of the main loop."""
+        if self.deferred is not None:
+            kind, data = self.deferred
+            self._work = WorkLog("main loop " + kind)
+            if kind == "end":
+                self.end_update(data)
+            else:
+                self.confirm(data)
+            self.log.append(self._work)
+            self.deferred = None
+        if self.reset_due_at is not None and self.tick - self.reset_due_at >= 200:
+            self.reset_due_at = None
+            self.reset_cause = "software"
+
     def master_write(self, payload: bytes) -> int:
         """A write by the master (start, address with the write bit, bytes, stop). Returns how many bytes the slave accepted."""
+        self.service()                     # the main loop runs between two transactions
         self._addr_callback(I2C_DIRECTION_TRANSMIT)
         if self.armed != "receive":
             return 0                       # the slave is armed to transmit: it does not take the bytes
@@ -631,6 +680,7 @@ class SlaveBootloader:
 
     def master_read(self, count: int) -> bytes | None:
         """A read by the master. None when the slave is not armed to transmit (the bus would hang on the stretched clock)."""
+        self.service()
         self._addr_callback(I2C_DIRECTION_RECEIVE)
         if self.armed != "transmit":
             return None
@@ -674,6 +724,7 @@ class Master:
 
     def end(self, crc: int | None = None) -> None:
         self.slave.write_register(REG_END_UPDATE, struct.pack(">IHH", self.crc if crc is None else crc, self.major, self.minor_field))
+        self.slave.advance(LOOP_MS)              # the main loop runs the checks that the interrupt queued
 
     def status(self) -> int:
         raw = self.slave.read_register(REG_STATUS, 1)
@@ -690,6 +741,7 @@ class Master:
         if tag is None:
             tag = confirm_tag(self.nonce() if nonce is None else nonce, self.digest, self.hardware_id, self.major, self.minor_field, len(self.image), self.counter)
         self.slave.write_register(REG_CONFIRM, tag)
+        self.slave.advance(300)                  # the main loop writes the update and, 200 ms after, resets the chip
 
     def run(self, *, confirm: bool = True) -> int:
         """The whole exchange; returns the status after it."""
@@ -712,6 +764,15 @@ def installed_chip(image_size: int = 3000, counter: int = 1, major: int = 0, min
 
 
 # ---- the scenarios --------------------------------------------------------------------------------------------------------------------------------------
+def boot_through_window(chip: "SlaveBootloader") -> str:
+    """boot() and, when the chip listens first, the wait for the window to close: ``"jumped"`` or ``"listening"``."""
+    verdict = chip.boot()
+    if verdict == "window":
+        chip.advance(chip.listen_window_ms + 50)
+        return "jumped" if chip.jumped else "listening"
+    return verdict
+
+
 def run_checks() -> tuple[list[str], list[str]]:
     """Returns (problems, known): the behaviours that differ from the design (problems) and the ones that reproduce a property of the code as built (known)."""
     problems: list[str] = []
@@ -741,9 +802,9 @@ def run_checks() -> tuple[list[str], list[str]]:
     expect(flash.read(MAIN_APP_ADDR, 8) == b"\xff" * 8, "the main slot was touched before the confirmation")
     expect(slave.metadata_read() is None, "the metadata was written before the confirmation")
     m.send_confirmation()
-    expect(slave.reset_cause == "iwdg", "with the SysTick below the I2C interrupt the reset after HAL_Delay is the watchdog")
+    expect(slave.reset_cause == "software", "the reset after a confirmed update is the software one, taken by the main loop 200 ms after")
     after = slave.reboot()
-    expect(after.boot() == "jumped", "the new application was not entered after the reset")
+    expect(boot_through_window(after) == "jumped", "the new application was not entered after the reset")
     meta = after.metadata_read()
     expect(meta is not None and meta.state == META_STATE_APP_VALID and meta.counter == 3 and meta.size == 3000, f"installed metadata is wrong: {meta}")
     expect(flash.read(MAIN_APP_ADDR, 3000) == image, "the main slot does not hold the image")
@@ -866,7 +927,7 @@ def run_checks() -> tuple[list[str], list[str]]:
             pass
         flash.cut_after = None
         after = SlaveBootloader(flash, direction_fixed=True)
-        verdict = after.boot()
+        verdict = boot_through_window(after)
         if verdict == "jumped":
             held = flash.read(MAIN_APP_ADDR, 3000)
             if held == old_image:
@@ -900,7 +961,7 @@ def run_checks() -> tuple[list[str], list[str]]:
     pending = SlaveBootloader(flash, direction_fixed=True)
     state = pending.metadata_read()
     expect(state is not None and state.state == META_STATE_COPY_PENDING, "a cut in the middle of the copy must leave the pending-copy record")
-    expect(pending.boot() == "jumped" and flash.read(MAIN_APP_ADDR, 3000) == new_image, "the next boot must finish the copy and enter the new application")
+    expect(boot_through_window(pending) == "jumped" and flash.read(MAIN_APP_ADDR, 3000) == new_image, "the next boot must finish the copy and enter the new application")
     meta = pending.metadata_read()
     expect(meta is not None and meta.state == META_STATE_APP_VALID and meta.counter == 2, "after the resume the record must be valid with the new counter")
 
@@ -935,7 +996,7 @@ def run_checks() -> tuple[list[str], list[str]]:
     # an application flashed with a programmer (no metadata) is adopted; a blob with bad vectors is not entered
     flash = Flash()
     flash.write_blob(MAIN_APP_ADDR, application_image(APP_MAX_SIZE))
-    expect(SlaveBootloader(flash, direction_fixed=True).boot() == "jumped", "an application flashed with a programmer must be adopted and entered")
+    expect(boot_through_window(SlaveBootloader(flash, direction_fixed=True)) == "jumped", "an application flashed with a programmer must be adopted and entered")
     flash = Flash()
     flash.write_blob(MAIN_APP_ADDR, application_image(2000, valid_vectors=False))
     expect(SlaveBootloader(flash, direction_fixed=True).boot() == "listening", "a main slot whose first word is not a stack pointer must not be entered")
@@ -945,32 +1006,37 @@ def run_checks() -> tuple[list[str], list[str]]:
     flash.write_blob(MAIN_APP_ADDR, bytes(garbage))
     expect(SlaveBootloader(flash, direction_fixed=True).boot() == "listening", "a reset vector outside the slot must not be entered")
 
-    # ---- properties of the code as built (reproduced, not hidden) -------------------------------------------------------------------------------------
-    # 1. no listening window: a valid application is entered at once, so the bootloader cannot be reached after a reset
-    chip = installed_chip()
-    verdict = chip.boot()
-    expect(verdict == "jumped", "as built a valid application is entered without a window")
-    known.append("window: a chip with a valid application enters it at once after every reset, so the bootloader (and the update that needs it) is not reachable until a window is added")
-    windowed = installed_chip(listen_window_ms=600)
+    # ---- what the source does about the properties that the model reproduced (the code before each fix stays available as an option) ----------------------------
+    # 1. the listening window: a valid application is entered only after it, so the bootloader can be reached after a reset
+    before = installed_chip(listen_window_ms=0)
+    expect(before.boot() == "jumped", "with no window (the code before it) a valid application is entered at once")
+    windowed = installed_chip()
     expect(windowed.boot() == "window" and windowed.listening and not windowed.jumped, "with a window the bootloader listens before it enters the application")
     windowed.advance(650)
     expect(windowed.jumped and not windowed.listening, "a window that closes with no update started must enter the application")
-    busy = installed_chip(listen_window_ms=600)
+    busy = installed_chip()
     busy.boot()
     Master(busy, application_image(3000, seed=4), minor=5, counter=2).start()
     busy.advance(650)
     expect(not busy.jumped and busy.in_progress, "an update started inside the window must not be cut by it")
+    failed = installed_chip()
+    failed.boot()
+    Master(failed, application_image(3000, seed=4), minor=5, counter=2).start()
+    failed.write_register(REG_END_UPDATE, struct.pack(">IHH", 0, 0, 0))     # END with nothing received: the update fails inside the window
+    failed.advance(700)
+    expect(not failed.jumped, "an update that failed inside the window must not be followed by a jump into the application")
+    known.append("window: FIXED in the source (SLAVEBOOT_LISTEN_WINDOW_MS, 600 ms): a chip with a valid application listens before it enters it; to confirm on a board: restart the slave and start an update inside the window (test 10)")
 
-    # 2. the direction: over a real HAL, as built, the master's write is answered as a read and its read as a write
-    chip = SlaveBootloader(Flash())
-    chip.boot()
-    wrote = chip.master_write(bytes([REG_PROGRESS]))
-    expect(wrote == 0 and chip.pending_read_register == 0xFF, "as built a write by the master must not reach the register pointer (the callback arms a transmit)")
-    expect(chip.master_read(1) is None, "as built a read by the master finds the slave armed to receive and gets nothing")
-    fixed = SlaveBootloader(Flash(), direction_fixed=True)
+    # 2. the direction: the callback arms a receive for a write by the master
+    before = SlaveBootloader(Flash(), direction_fixed=False)
+    before.boot()
+    wrote = before.master_write(bytes([REG_PROGRESS]))
+    expect(wrote == 0 and before.pending_read_register == 0xFF, "the callback before the fix: a write by the master must not reach the register pointer (it armed a transmit)")
+    expect(before.master_read(1) is None, "the callback before the fix: a read by the master finds the slave armed to receive and gets nothing")
+    fixed = SlaveBootloader(Flash())
     fixed.boot()
-    expect(fixed.read_register(REG_STATUS, 1) == bytes([STATUS_LISTENING]), "with the direction inverted the status read works")
-    known.append("direction: as built, over the HAL a write by the master arms a transmit and a read arms a receive, so no register is reachable (the test to run on a board: write 1, 4 and 8 bytes and read them back)")
+    expect(fixed.read_register(REG_STATUS, 1) == bytes([STATUS_LISTENING]), "with the direction fixed the status read works")
+    known.append("direction: FIXED in the source (a write by the master, direction TRANSMIT in the HAL, arms the receive); to confirm on a board: write 1, 4 and 8 bytes and read them back (test 2)")
 
     # 3. the short write: only writes that fill the 33-byte buffer arrive if the HAL reports the early STOP as an error
     chip = SlaveBootloader(Flash(), direction_fixed=True, short_write="hal_error")
@@ -988,22 +1054,34 @@ def run_checks() -> tuple[list[str], list[str]]:
     known.append("short write: if the HAL reports a STOP before 33 bytes through the error path, the pointer write, START, END and the counter are lost and only 33-byte writes (digest, confirmation) arrive")
 
     # 4. the work done inside the interrupt, and the delay that cannot end
-    chip = SlaveBootloader(Flash(), direction_fixed=True)
+    chip = SlaveBootloader(Flash(), defer_heavy_work=False)
     chip.boot()
     mm = Master(chip, application_image(APP_MAX_SIZE), counter=1)
     mm.run()
     work = {entry.callback: entry for entry in chip.log}
-    start, confirm = work["write 0x01"], work["write 0x0A"]
-    expect(start.pages_erased == 27, f"START erases the 27 pages of the backup slot inside the callback, saw {start.pages_erased}")
-    expect(confirm.pages_erased >= 27 and confirm.bytes_hashed >= 2 * APP_MAX_SIZE and confirm.delay_ms == 200,
-           f"the confirmation hashes, erases and copies inside the callback: {confirm}")
-    expect(chip.reset_cause == "iwdg", "the delay inside the interrupt ends in the watchdog when the SysTick is below it")
-    chip = SlaveBootloader(Flash(), direction_fixed=True, tick_preempts_isr=True)
+    expect(work["write 0x0A"].delay_ms == 200 and chip.reset_cause == "iwdg", "the code before: the delay inside the interrupt ends in the watchdog when the SysTick is below it")
+    chip = SlaveBootloader(Flash())
     chip.boot()
-    Master(chip, application_image(3000), counter=1).run()
-    expect(chip.reset_cause == "software", "with the tick able to preempt, the reset is the software one")
-    known.append(f"interrupt work: START erases {start.pages_erased} pages, the confirmation hashes {confirm.bytes_hashed} bytes and copies {confirm.pages_erased} pages inside the I2C event callback "
-                 "(the master's clock is stretched for all of it); the 200 ms delay there ends in the watchdog unless the SysTick can preempt the interrupt")
+    mm = Master(chip, application_image(APP_MAX_SIZE), counter=1)
+    mm.run()
+    chip.advance(300)
+    work = {entry.callback: entry for entry in chip.log}
+    start, confirm_isr, confirm_loop = work["write 0x01"], work["write 0x0A"], work["main loop confirm"]
+    expect(start.pages_erased == 27, f"START still erases the 27 pages of the backup slot inside the callback (the master relies on the stretched clock), saw {start.pages_erased}")
+    expect(confirm_isr.pages_erased == 0 and confirm_isr.bytes_hashed == 0 and confirm_isr.delay_ms == 0, f"the confirmation does no work inside the callback: {confirm_isr}")
+    expect(confirm_loop.pages_erased >= 27 and confirm_loop.bytes_hashed >= 2 * APP_MAX_SIZE and confirm_loop.delay_ms == 0, f"the main loop hashes, erases and copies: {confirm_loop}")
+    expect(work["main loop end"].bytes_hashed >= APP_MAX_SIZE and work["write 0x04"].bytes_hashed == 0, "END is hashed in the main loop, not in the callback")
+    expect(chip.reset_cause == "software", "the reset comes from the main loop, 200 ms after the update, whatever the priority of the tick")
+    chip = SlaveBootloader(Flash())
+    chip.boot()
+    mm = Master(chip, application_image(3000), counter=1)
+    mm.start(); mm.send_digest(); mm.send_counter(); mm.send_data(); mm.end()      # noqa: E702
+    before_busy = chip.write_register(REG_DATA, b"\x01" * 8)
+    expect(before_busy == 9, "the data write is accepted by the callback")
+    chip.advance(LOOP_MS)
+    expect(chip.current_status == STATUS_AWAIT_CONFIRM, "the main loop finishes the checks and the chip waits for the confirmation")
+    known.append(f"interrupt work: START still erases {start.pages_erased} pages inside the I2C event callback (the master paces its data by the stretched clock, so START stays there); END and the confirmation "
+                 "(hashes, copy, 200 ms pause) now run in the main loop and the reset comes from it; to confirm on a board: a full update with the logic analyser on the clock (test 15)")
     return problems, known
 
 

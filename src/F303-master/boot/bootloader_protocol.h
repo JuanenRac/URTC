@@ -69,6 +69,14 @@ void HandleEndUpdate(uint8_t *data);
 // (nothing is sent by a head the command is not meant for).
 void HandleSerialChunk(uint8_t *data);
 
+// CAN_ID_BOOTLOADER_SIGNATURE_CHUNK (0x7EC) with the high bit of the index set - one of the 15 chunks of the signed command that rotates the signing key. Does
+// nothing unless the bootloader is built with URTC_BL_ROTATION_COMMAND=1 (off by default); HandleSigChunk passes such chunks here.
+void HandleRotationChunk(uint8_t *data);
+#ifdef URTC_HOST_TEST
+// Host tests only: forget the rotation state so that it is read again from the trust table.
+void Rotation_ResetForTest(void);
+#endif
+
 // Addressing by serial number (0x7EA): BlSelect_Accepts says whether a frame
 // with this identifier is for this bootloader now, BlSelect_OnFrame handles a
 // 0x7EA command and sends the 0x7EB answer when there is one.

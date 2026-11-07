@@ -135,7 +135,8 @@ void I2C1_ER_IRQHandler(void) {
 // -----------------------------------------------------------------------
 void HAL_I2C_AddrCallback(I2C_HandleTypeDef *hi2c, uint8_t TransferDirection, uint16_t AddrMatchCode) {
     (void)AddrMatchCode;
-    if (TransferDirection == I2C_DIRECTION_RECEIVE) {
+    // The direction is the one of the MASTER (STM32 HAL): TRANSMIT is a write by the master, which this slave receives; RECEIVE is a read by the master.
+    if (TransferDirection == I2C_DIRECTION_TRANSMIT) {
         // Master is about to WRITE to us.
         HAL_I2C_Slave_Seq_Receive_IT(hi2c, rx_buffer, sizeof(rx_buffer), I2C_LAST_FRAME);
     } else {
@@ -192,6 +193,9 @@ void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef *hi2c) {
     if (bytes_received == 0) return; // shouldn't happen (AddrCallback always requests >0), guarded anyway rather than risk reading rx_buffer[0] from a transaction that never actually sent anything
 
     uint8_t reg = rx_buffer[0];
+    if (bytes_received > 1 && DeferredBusy()) {
+        return;   // a step runs in the main loop (or the reset is due): writes wait; the pointer write and the reads of the status stay possible
+    }
     if (bytes_received == 1) {
         // Register-pointer-only write - the master is telling us what
         // it's about to read next, not writing data to reg.
@@ -205,7 +209,7 @@ void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef *hi2c) {
                 if (bytes_received == 33) HandleDigestExpected(&rx_buffer[1]);
                 break;
             case REG_CONFIRM:
-                if (bytes_received == 33) HandleConfirm(&rx_buffer[1]);
+                if (bytes_received == 33) QueueConfirm(&rx_buffer[1]);   // the hashing and the copy run in the main loop
                 break;
             case REG_RECORD_COUNTER:
                 if (bytes_received == 5) HandleRecordCounter(&rx_buffer[1]);
@@ -214,7 +218,7 @@ void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef *hi2c) {
                 HandleData(&rx_buffer[1], bytes_received - 1);
                 break;
             case REG_END_UPDATE:
-                if (bytes_received == 9) HandleEndUpdate(&rx_buffer[1]);
+                if (bytes_received == 9) QueueEndUpdate(&rx_buffer[1]);   // the hashing runs in the main loop
                 break;
             default:
                 break; // unrecognized register - ignored rather than NACKed after the fact (I2C has no clean way to retroactively NACK a transaction already accepted at the address-match stage)
@@ -252,18 +256,31 @@ int main(void) {
     MX_IWDG_Init();
     MX_I2C1_Init_Slave();
 
+    HAL_I2C_EnableListen_IT(&hi2c1);
+
     if (ApplicationIsValid()) {
-        JumpToApplication();
+        // A valid application is entered only after a listening window (SLAVEBOOT_LISTEN_WINDOW_MS): the master that wants to update the chip restarts it
+        // and starts the update inside the window. An update that has started is never cut by the window.
+        const uint32_t window_start = HAL_GetTick();
+        uint8_t update_started = 0;
+        while (!ListenWindowExpired(window_start, HAL_GetTick(), SLAVEBOOT_LISTEN_WINDOW_MS)) {
+            HAL_IWDG_Refresh(&hiwdg);
+            ServiceDeferred();
+            if (update_in_progress || update_failed || DeferredBusy()) {
+                update_started = 1;   // the main loop below takes over: it serves the update, gives up a silent one and never enters a half-written application
+                break;
+            }
+        }
+        if (!update_started) JumpToApplication();
         // Only reachable if JumpToApplication's own sanity checks
         // rejected the app despite ApplicationIsValid() passing - falls
         // through to listening below rather than looping forever with
         // nothing listening on the link bus.
     }
 
-    HAL_I2C_EnableListen_IT(&hi2c1);
-
     while (1) {
         HAL_IWDG_Refresh(&hiwdg);
+        ServiceDeferred();
         HAL_Delay(50);
 
         // Without this, an update interrupted mid-transfer (link cable

@@ -122,6 +122,13 @@ extern I2C_HandleTypeDef hi2c1;
 #define REG_COUNTER_FLOOR        URTC_SLAVE_BOOT_REG_COUNTER_FLOOR // read-only, 4 bytes, big-endian: the rollback floor this slave keeps (the higher of the compiled floor and the counter of the installed image). The master reads it before it verifies the record, and refuses a record below it
 #define REG_RECORD_COUNTER       URTC_SLAVE_BOOT_REG_RECORD_COUNTER // write-only, 4 bytes, big-endian: the signed counter of the record the master verified for this session. Sent before REG_END_UPDATE is relayed; the confirmation is bound to it and a counter below the floor is refused
 
+// How long, after a reset, this bootloader listens on the link bus before it enters a valid application (milliseconds). Without a window a chip with an
+// application could never be reached: the application is entered at once after every reset. An update that STARTs inside the window is never cut by it. 0
+// turns the window off (the application is entered at once). Build with -DSLAVEBOOT_LISTEN_WINDOW_MS=<n> to change it.
+#ifndef SLAVEBOOT_LISTEN_WINDOW_MS
+#define SLAVEBOOT_LISTEN_WINDOW_MS 600u
+#endif
+
 #define STATUS_LISTENING     URTC_STATUS_LISTENING // waiting for REG_START_UPDATE
 #define STATUS_ERASING       URTC_STATUS_ERASING // erasing the backup slot
 #define STATUS_RECEIVING     URTC_STATUS_RECEIVING // writing firmware data into the backup slot

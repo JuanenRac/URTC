@@ -36,7 +36,7 @@ void I2CLink_Init(void) {
 
 void HAL_I2C_AddrCallback(I2C_HandleTypeDef *hi2c, uint8_t TransferDirection, uint16_t AddrMatchCode) {
     (void)AddrMatchCode;
-    if (TransferDirection == I2C_DIRECTION_RECEIVE) {
+    if (TransferDirection == I2C_DIRECTION_TRANSMIT) {   // the direction is the MASTER's: it transmits, so this slave receives
         HAL_I2C_Slave_Seq_Receive_IT(hi2c, rx_buffer, sizeof(rx_buffer), I2C_LAST_FRAME);
     } else {
         uint8_t len = 1;

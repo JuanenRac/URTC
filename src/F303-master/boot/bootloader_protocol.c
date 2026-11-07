@@ -15,6 +15,8 @@
 #include "urtc_version_wire.h"
 #include "urtc_bl_select.h"
 #include "urtc_bl_serial.h"
+#include "urtc_key_rotation.h"
+#include "urtc_key_rotation_cmd.h"
 
 static uint8_t CAN_WaitForFreeMailbox(void) {
     // 50 attempts x 1ms = 50ms max - a small fraction of the ~800ms IWDG
@@ -90,6 +92,156 @@ void CAN_SendHeartbeat(uint8_t status, uint8_t progress_percent) {
     txHeader.TransmitGlobalTime = DISABLE;
     HAL_CAN_AddTxMessage(&hcan, &txHeader, txData, &mailbox);
 }
+
+// ---------------------------------------------------------------------------
+// Rotation of the signing key (urtc_key_rotation.h / urtc_key_rotation_cmd.h). It is OFF in the build: with URTC_BL_ROTATION_COMMAND at 0 (the default) every key
+// of the trust table verifies exactly as before, the command is not read and 0x7EA operation 05 is not answered. Turned on, the bootloader keeps a rotation
+// state in RAM: the current key of the table only, until a command signed by that key (the HOST signs, with its time) names the new current key and a window
+// during which the previous key still verifies. The window runs on the uptime of this bootloader shifted by the time of the host. A reset forgets the command and
+// goes back to the current key alone (fail closed); the host sends the command again after a reset.
+// ---------------------------------------------------------------------------
+#ifndef URTC_BL_ROTATION_COMMAND
+#define URTC_BL_ROTATION_COMMAND 0
+#endif
+#ifndef URTC_BL_ROTATION_MAX_WINDOW_S
+#define URTC_BL_ROTATION_MAX_WINDOW_S (7u * 86400u)
+#endif
+#define ROT_CHUNK_COUNT 15u    // 15 chunks of 7 bytes carry the 100-byte command on 0x7EC, the high bit of the index set
+#define ROT_CHUNK_BYTES 7u
+#define ROT_ALL_CHUNKS  0x7FFFu
+
+static void CAN_SendKeyIdFrame(const uint8_t *id) {
+    if (!CAN_WaitForFreeMailbox()) return;
+    CAN_TxHeaderTypeDef txHeader;
+    uint8_t data[TRUST_KEY_ID_SIZE];
+    uint32_t mailbox;
+    memcpy(data, id, sizeof data);
+    txHeader.StdId = CAN_ID_KEY_ID;
+    txHeader.IDE = CAN_ID_STD;
+    txHeader.RTR = CAN_RTR_DATA;
+    txHeader.DLC = TRUST_KEY_ID_SIZE;
+    txHeader.TransmitGlobalTime = DISABLE;
+    HAL_CAN_AddTxMessage(&hcan, &txHeader, data, &mailbox);
+}
+
+#if URTC_BL_ROTATION_COMMAND
+static urtc_krc_state_t rot_state;
+static uint8_t rot_ready = 0;
+static uint8_t rot_record[ROT_CHUNK_COUNT * ROT_CHUNK_BYTES];
+static uint16_t rot_chunks = 0;
+
+static uint32_t rot_uptime_s(void) {
+    return HAL_GetTick() / 1000u;   // wraps after 49 days of uptime: the arithmetic of the rotation is modulo 2^32 and a window is far shorter
+}
+
+static uint32_t rot_now(void) {
+    return rot_uptime_s() + rot_state.clock_offset;
+}
+
+// Starts from the trust table: only its current key is valid until a command says otherwise.
+static void rot_load(void) {
+    if (rot_ready) return;
+    const TrustKeys_t *trust = Trust_Active();
+    memset(&rot_state, 0, sizeof rot_state);
+    rot_state.key_count = (trust->count <= URTC_KRC_MAX_KEYS) ? trust->count : URTC_KRC_MAX_KEYS;
+    for (size_t i = 0; i < rot_state.key_count; i++) {
+        memcpy(rot_state.key_id[i], trust->key_id[i], URTC_KR_KEY_ID_SIZE);
+        memcpy(rot_state.key_public[i], trust->keys[i], URTC_ED25519_PUBLIC_KEY_SIZE);
+    }
+    if (rot_state.key_count > 0u) {
+        memcpy(rot_state.rotation.current, rot_state.key_id[0], URTC_KR_KEY_ID_SIZE);
+    }
+    rot_state.allow = 1u;
+    rot_state.max_window_s = URTC_BL_ROTATION_MAX_WINDOW_S;
+    rot_chunks = 0;
+    rot_ready = 1;
+}
+#endif
+
+// The public keys that may verify an image right now (current key first). Returns how many.
+static uint8_t Rotation_AcceptedKeys(uint8_t out[TRUST_MAX_KEYS][URTC_ED25519_PUBLIC_KEY_SIZE]) {
+    const TrustKeys_t *trust = Trust_Active();
+#if URTC_BL_ROTATION_COMMAND
+    rot_load();
+    if (trust->count == 0u) return 0;
+    uint8_t ids[URTC_KR_MAX_ANNOUNCED][URTC_KR_KEY_ID_SIZE];
+    const size_t n = urtc_kr_active(&rot_state.rotation, rot_now(), ids);
+    uint8_t kept = 0;
+    for (size_t i = 0; i < n && kept < TRUST_MAX_KEYS; i++) {
+        const int at = urtc_krc_find(&rot_state, ids[i]);
+        if (at >= 0) memcpy(out[kept++], rot_state.key_public[at], URTC_ED25519_PUBLIC_KEY_SIZE);
+    }
+    return kept;
+#else
+    memcpy(out, trust->keys, sizeof(trust->keys));
+    return trust->count;
+#endif
+}
+
+// The ids announced on 0x7ED: the current key only, or (with the command built in) the keys valid now.
+static void Rotation_SendKeyIds(void) {
+#if URTC_BL_ROTATION_COMMAND
+    rot_load();
+    uint8_t ids[URTC_KR_MAX_ANNOUNCED][URTC_KR_KEY_ID_SIZE];
+    uint8_t status[URTC_KR_STATUS_SIZE];
+    const size_t n = urtc_kr_announce(&rot_state.rotation, rot_now(), ids, status);
+    for (size_t i = 0; i < n; i++) CAN_SendKeyIdFrame(ids[i]);
+#else
+    CAN_SendKeyIdFrame(Trust_Active()->key_id[0]);
+#endif
+}
+
+// 0x7EA operation 05: the state of the rotation on 0x7EB (7 bytes: 05, number of keys, flags, seconds left), then the ids on 0x7ED. Not answered when the
+// command is not built in, so that a host reads "no data" from a bootloader that has no rotation.
+static void Rotation_SendStatus(void) {
+#if URTC_BL_ROTATION_COMMAND
+    rot_load();
+    if (Trust_Active()->count == 0u) return;
+    uint8_t ids[URTC_KR_MAX_ANNOUNCED][URTC_KR_KEY_ID_SIZE];
+    uint8_t status[URTC_KR_STATUS_SIZE];
+    const size_t n = urtc_kr_announce(&rot_state.rotation, rot_now(), ids, status);
+    if (!CAN_WaitForFreeMailbox()) return;
+    CAN_TxHeaderTypeDef txHeader;
+    uint32_t mailbox;
+    txHeader.StdId = URTC_BL_ID_RESP;
+    txHeader.IDE = CAN_ID_STD;
+    txHeader.RTR = CAN_RTR_DATA;
+    txHeader.DLC = URTC_KR_STATUS_SIZE;
+    txHeader.TransmitGlobalTime = DISABLE;
+    HAL_CAN_AddTxMessage(&hcan, &txHeader, status, &mailbox);
+    for (size_t i = 0; i < n; i++) CAN_SendKeyIdFrame(ids[i]);
+#endif
+}
+
+// A chunk of the signed rotation command (0x7EC with the high bit of the index set). Silent: the host asks the state with 0x7EA operation 05.
+void HandleRotationChunk(uint8_t *data) {
+#if URTC_BL_ROTATION_COMMAND
+    if (update_in_progress) return;          // the keys do not change under a transfer
+    const uint8_t index = (uint8_t)(data[0] & 0x7Fu);
+    if (index >= ROT_CHUNK_COUNT) return;
+    rot_load();
+    memcpy(&rot_record[index * ROT_CHUNK_BYTES], data + 1, ROT_CHUNK_BYTES);
+    rot_chunks = (uint16_t)(rot_chunks | (1u << index));
+    if (rot_chunks != ROT_ALL_CHUNKS) return;
+    rot_chunks = 0;
+    urtc_krc_state_t next;
+    if (urtc_krc_decide(&rot_state, rot_record, URTC_KRC_RECORD_SIZE, rot_uptime_s(), &next) == URTC_KRC_OK) {
+        rot_state = next;
+    }
+    memset(rot_record, 0, sizeof rot_record);
+#else
+    (void)data;
+#endif
+}
+
+#ifdef URTC_HOST_TEST
+void Rotation_ResetForTest(void) {
+#if URTC_BL_ROTATION_COMMAND
+    rot_ready = 0;
+    rot_chunks = 0;
+#endif
+}
+#endif
 
 // Version query (0x7F8) response, sent as 0x7F9 - shared between both
 // listening loops in main() below. byte0=1 marks this as the bootloader
@@ -167,19 +319,11 @@ void HandleVersionQuery(void) {
     }
 
     // The identifier of the key this bootloader trusts (the current one), so that a flashing tool can compare it with the key that signed the image before it
-    // sends anything. A bootloader that trusts nobody sends nothing: the tool reads "no data", never a difference.
+    // sends anything. A bootloader that trusts nobody sends nothing: the tool reads "no data", never a difference. With the rotation command built in, the
+    // keys announced are the ones valid right now (the current key, then the previous one while its window runs).
     const TrustKeys_t *trust = Trust_Active();
-    if (trust->count > 0u && CAN_WaitForFreeMailbox()) {
-        CAN_TxHeaderTypeDef txH4;
-        txH4.StdId = CAN_ID_KEY_ID;
-        txH4.IDE = CAN_ID_STD;
-        txH4.RTR = CAN_RTR_DATA;
-        txH4.DLC = TRUST_KEY_ID_SIZE;
-        txH4.TransmitGlobalTime = DISABLE;
-        uint8_t txD4[TRUST_KEY_ID_SIZE];
-        memcpy(txD4, trust->key_id[0], sizeof(txD4));
-        uint32_t mb4;
-        HAL_CAN_AddTxMessage(&hcan, &txH4, txD4, &mb4);
+    if (trust->count > 0u) {
+        Rotation_SendKeyIds();
     }
 }
 
@@ -634,6 +778,10 @@ void HandleReadbackStart(void) {
 }
 
 void HandleSigChunk(uint8_t *data) {
+    if ((data[0] & 0x80u) != 0u) {           // the high bit marks a chunk of the rotation command, not of an image record
+        HandleRotationChunk(data);
+        return;
+    }
     if (!update_in_progress || update_failed) return;
     uint8_t index = data[0];
     if (index >= SIG_CHUNK_COUNT) return;
@@ -730,12 +878,14 @@ void HandleEndUpdate(uint8_t *data) {
     uint32_t counter_floor = Trust_MinCounter();
     if (have_current && current_meta.counter > counter_floor) counter_floor = current_meta.counter;
 
-    const TrustKeys_t *trust = Trust_Active();
+    uint8_t accepted[TRUST_MAX_KEYS][URTC_ED25519_PUBLIC_KEY_SIZE];
+    memset(accepted, 0, sizeof accepted);
+    const uint8_t accepted_count = Rotation_AcceptedKeys(accepted);
     urtc_auth_context_t auth;
     memset(&auth, 0, sizeof(auth));
     auth.policy = URTC_AUTH_DEFAULT_POLICY;
-    auth.keys = (const uint8_t (*)[URTC_ED25519_PUBLIC_KEY_SIZE])trust->keys;
-    auth.key_count = trust->count;
+    auth.keys = (const uint8_t (*)[URTC_ED25519_PUBLIC_KEY_SIZE])accepted;
+    auth.key_count = accepted_count;
     auth.hardware_id = THIS_HARDWARE_ID;
     auth.installed_counter = counter_floor;
     // The version rule is applied below with the comparison that tolerates a legacy flasher (no patch number); urtc_auth_decide does the rest.
@@ -877,6 +1027,11 @@ uint8_t BlSelect_Accepts(uint16_t can_id) {
 }
 
 void BlSelect_OnFrame(const uint8_t *data, uint8_t dlc) {
+    if (dlc == 1u && data[0] == URTC_KR_STATUS_OP) {
+        // operation 05 is answered by the head that is selected, or by every head when nobody addresses them
+        if (BlSelect_Accepts((uint16_t)URTC_BL_LEGACY_FIRST)) Rotation_SendStatus();
+        return;
+    }
     urtc_bl_reply_t reply;
     urtc_bl_node_on_cmd(&bl_node, HAL_GetTick(), data, dlc, update_in_progress, &reply);
     if (!reply.send || !CAN_WaitForFreeMailbox()) return;

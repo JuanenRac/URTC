@@ -41,8 +41,8 @@ static void world(void)
 
 static void master_writes(const uint8_t *bytes, uint32_t count)
 {
-    // the call the firmware reads as "the master writes" (see the note in tests/test_slave.c about the direction); the bytes go into its buffer
-    HAL_I2C_AddrCallback(&hi2c1, I2C_DIRECTION_RECEIVE, I2C_SLAVE_ADDRESS << 1);
+    // the HAL announces a write by the master with the direction TRANSMIT (the direction of the master); the bytes go into the buffer of the firmware
+    HAL_I2C_AddrCallback(&hi2c1, I2C_DIRECTION_TRANSMIT, I2C_SLAVE_ADDRESS << 1);
     for (uint32_t i = 0; i < count && i < fake_i2c_slave_rx_len; i++) fake_i2c_slave_rx_buffer[i] = bytes[i];
     hi2c1.XferCount = fake_i2c_slave_rx_len - count;
     HAL_I2C_SlaveRxCpltCallback(&hi2c1);
@@ -51,17 +51,17 @@ static void master_writes(const uint8_t *bytes, uint32_t count)
 static uint8_t read_register(uint8_t reg)
 {
     master_writes(&reg, 1);
-    HAL_I2C_AddrCallback(&hi2c1, I2C_DIRECTION_TRANSMIT, I2C_SLAVE_ADDRESS << 1);
+    HAL_I2C_AddrCallback(&hi2c1, I2C_DIRECTION_RECEIVE, I2C_SLAVE_ADDRESS << 1);
     return fake_i2c_slave_tx[0];
 }
 
 static void test_link(int *failures)
 {
     world();
-    HAL_I2C_AddrCallback(&hi2c1, I2C_DIRECTION_RECEIVE, 0x84);
-    TEST_ASSERT(fake_i2c_slave_rx_count == 1 && fake_i2c_slave_rx_len == 33, "KNOWN: the direction RECEIVE starts a receive of up to 33 bytes (the register and 32 bytes of data); see the note on the direction in test_slave.c");
     HAL_I2C_AddrCallback(&hi2c1, I2C_DIRECTION_TRANSMIT, 0x84);
-    TEST_ASSERT(fake_i2c_slave_tx_count == 1 && fake_i2c_slave_tx_len == 1 && fake_i2c_slave_tx[0] == STATUS_LISTENING, "with no register chosen the answer is the status");
+    TEST_ASSERT(fake_i2c_slave_rx_count == 1 && fake_i2c_slave_rx_len == 33, "a write by the master (direction TRANSMIT, the one of the master) starts a receive of up to 33 bytes (the register and 32 bytes of data)");
+    HAL_I2C_AddrCallback(&hi2c1, I2C_DIRECTION_RECEIVE, 0x84);
+    TEST_ASSERT(fake_i2c_slave_tx_count == 1 && fake_i2c_slave_tx_len == 1 && fake_i2c_slave_tx[0] == STATUS_LISTENING, "with no register chosen a read by the master gets the status");
 
     TEST_ASSERT(read_register(REG_STATUS) == STATUS_LISTENING && fake_i2c_slave_tx_len == 1, "register 0: the status");
     update_progress_percent = 42;
@@ -101,6 +101,23 @@ static void test_link(int *failures)
       uint8_t short_counter[4] = {REG_RECORD_COUNTER, 0, 0, 9};
       master_writes(short_counter, 4);
       TEST_ASSERT(update_in_progress == 1 && !update_failed, "register 12 takes exactly four bytes while the update is receiving; a short write is ignored"); }
+    // a deferred step blocks the writes that would change the state it is working on, but not the pointer write
+    {
+        uint8_t digest[33];
+        digest[0] = REG_DIGEST_EXPECTED;
+        memset(&digest[1], 0, 32);
+        master_writes(digest, 33);
+        uint8_t f[8] = {0};
+        QueueEndUpdate(f);                 // the status is verifying and a step is queued (the checks fail later; only the queue matters here)
+        uint32_t seen = update_bytes_received;
+        uint8_t blocked[9] = {REG_DATA, 1, 2, 3, 4, 5, 6, 7, 8};
+        master_writes(blocked, 9);
+        TEST_ASSERT(DeferredBusy() && update_bytes_received == seen, "while a step is queued the data writes of the master are ignored");
+        TEST_ASSERT(read_register(REG_STATUS) == STATUS_VERIFYING, "and the status can be read");
+        ServiceDeferred();
+        TEST_ASSERT(!DeferredBusy(), "the main loop runs the queued step");
+        update_failed = 0; update_in_progress = 1; current_status = STATUS_RECEIVING;
+    }
     uint8_t data[9] = {REG_DATA, 1, 2, 3, 4, 5, 6, 7, 8};
     master_writes(data, 9);
     TEST_ASSERT(update_bytes_received == 8, "a data command hands its eight bytes to the update");

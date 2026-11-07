@@ -57,6 +57,18 @@ void BuildCounterFloorResponse(uint8_t out[4]);
 // AbortUnconfirmed(): fail closed, reason VERIFY_FAIL_REASON_NOT_CONFIRMED, main slot untouched.
 extern uint8_t update_awaiting_confirm;
 void AbortUnconfirmed(void);
+// The heavy steps run in the main loop, not in the I2C event interrupt (the clock of the master was stretched for all of the work, and the 200 ms pause before
+// the reset cannot end under an interrupt that the SysTick cannot preempt). The interrupt only copies the bytes: QueueEndUpdate and QueueConfirm take the
+// same arguments as HandleEndUpdate and HandleConfirm and check the same entry conditions; ServiceDeferred (called by every pass of the main loop) runs the
+// queued step and, 200 ms after a confirmed update has been written, resets the chip. While a step is queued or the reset is due, DeferredBusy() is 1 and the
+// interrupt ignores every register write except the pointer write (the master reads REG_STATUS until it changes).
+void QueueEndUpdate(uint8_t *data);
+void QueueConfirm(uint8_t *data);
+void ServiceDeferred(void);
+uint8_t DeferredBusy(void);
+// The listening window at start-up: 1 when the window that started at `start` (milliseconds) has run out at `now`. `window_ms` 0 means no window. An update in
+// progress, or a step or a reset still pending, always keeps the chip in the bootloader.
+uint8_t ListenWindowExpired(uint32_t start, uint32_t now, uint32_t window_ms);
 // REG_CHALLENGE: the 16-byte nonce of the session in progress, or zeros when there is none.
 void BuildChallengeResponse(uint8_t out[16]);
 

@@ -232,6 +232,13 @@ static uint32_t current_page_index = 0;
 uint8_t  update_in_progress = 0;
 uint8_t  update_failed = 0;
 uint32_t update_last_activity_tick = 0;
+// The steps that the interrupt hands to the main loop (QueueEndUpdate, QueueConfirm) and the reset that follows a confirmed update.
+#define RESET_PAUSE_MS 200u
+enum { DEFER_NONE = 0, DEFER_END = 1, DEFER_CONFIRM = 2 };
+static volatile uint8_t deferred_op = DEFER_NONE;
+static uint8_t deferred_data[32];
+static volatile uint8_t reset_due = 0;
+static volatile uint32_t reset_due_tick = 0;
 
 static uint8_t FlushPageBuffer(void) {
     uint32_t page_addr = BACKUP_APP_ADDR + (current_page_index * FLASH_PAGE_SIZE);
@@ -558,6 +565,50 @@ void HandleConfirm(uint8_t *data) {
 
     current_status = STATUS_VERIFY_OK;
     update_progress_percent = 100;
-    HAL_Delay(200); // brief pause so a master polling REG_STATUS has a real chance to observe STATUS_VERIFY_OK before the reset below
-    NVIC_SystemReset();
+    // A brief pause so a master polling REG_STATUS has a real chance to observe STATUS_VERIFY_OK before the reset: ServiceDeferred() waits it out in the main
+    // loop (a HAL_Delay here, inside the interrupt, never ended when the SysTick could not preempt it) and then resets.
+    reset_due_tick = HAL_GetTick();
+    reset_due = 1;
+}
+
+// ---- the heavy steps out of the interrupt --------------------------------------------------------------------------------------------------------
+void QueueEndUpdate(uint8_t *data) {
+    if (deferred_op != DEFER_NONE || reset_due) return;
+    if (!update_in_progress || update_failed || update_awaiting_confirm) return;   // the entry conditions of HandleEndUpdate
+    memcpy(deferred_data, data, 8);
+    update_last_activity_tick = HAL_GetTick();
+    current_status = STATUS_VERIFYING;
+    deferred_op = DEFER_END;
+}
+
+void QueueConfirm(uint8_t *data) {
+    if (deferred_op != DEFER_NONE || reset_due) return;
+    if (!update_in_progress || update_failed || !update_awaiting_confirm) return;  // the entry conditions of HandleConfirm
+    memcpy(deferred_data, data, URTC_SLAVE_CONFIRM_TAG_SIZE);
+    update_last_activity_tick = HAL_GetTick();
+    deferred_op = DEFER_CONFIRM;
+}
+
+uint8_t DeferredBusy(void) {
+    return (deferred_op != DEFER_NONE || reset_due) ? 1u : 0u;
+}
+
+void ServiceDeferred(void) {
+    const uint8_t op = deferred_op;
+    if (op != DEFER_NONE) {
+        uint8_t copy[32];
+        memcpy(copy, deferred_data, sizeof copy);
+        if (op == DEFER_END) HandleEndUpdate(copy);
+        else HandleConfirm(copy);
+        deferred_op = DEFER_NONE;     // cleared last: the interrupt keeps ignoring writes while the step runs
+    }
+    if (reset_due && (uint32_t)(HAL_GetTick() - reset_due_tick) >= RESET_PAUSE_MS) {
+        reset_due = 0;
+        NVIC_SystemReset();
+    }
+}
+
+uint8_t ListenWindowExpired(uint32_t start, uint32_t now, uint32_t window_ms) {
+    if (update_in_progress || DeferredBusy()) return 0;
+    return (uint32_t)(now - start) >= window_ms ? 1u : 0u;
 }

@@ -74,12 +74,21 @@ static void make_tag(uint32_t size, uint16_t vmaj, uint16_t vminfield, const uin
     if (flip) tag[0] ^= 0x01;
 }
 
+// What the main loop does after a confirmed update: it waits out the pause and resets (the interrupt only sets it up).
+static void finish_reset(void)
+{
+    ServiceDeferred();
+    fake_tick += 250;
+    ServiceDeferred();
+}
+
 static void confirm_now(uint32_t size, uint16_t vmaj, uint16_t vminfield, int flip)
 {
     uint8_t nonce[16], tag[32];
     BuildChallengeResponse(nonce);
     make_tag(size, vmaj, vminfield, 0, nonce, flip, tag);
     HandleConfirm(tag);
+    finish_reset();
 }
 
 static void put_be32(uint8_t *p, uint32_t v) { p[0] = (uint8_t)(v >> 24); p[1] = (uint8_t)(v >> 16); p[2] = (uint8_t)(v >> 8); p[3] = (uint8_t)v; }
@@ -143,6 +152,8 @@ static int main_slot_blank(void)
 
 static void fresh(void)
 {
+    fake_tick += 1000;
+    ServiceDeferred();     // whatever an earlier scenario left queued or due is run out before the next one starts
     fake_flash_erase_all();
     fake_hal_reset_recording();
     update_in_progress = 0;
@@ -182,6 +193,85 @@ static Upd good(uint32_t size, uint16_t vmaj, uint16_t vmin)
 {
     Upd u = { 0, 0, 0, THIS_HARDWARE_ID, size, vmaj, vmin, 32 };
     return u;
+}
+
+// The heavy steps run in the main loop, not in the interrupt (URTC-BUG-015), and the listening window decides when the application is entered.
+static void test_deferred_and_window(int *failures)
+{
+    // END: the interrupt only queues it; the hashing and the checks run when the main loop does
+    fresh();
+    {
+        Upd u = good(3000, 0, urtc_minor_field_pack(5, 1));
+        make_image(u.size);
+        uint8_t digest[32];
+        sign_image(u.size, digest);
+        start_update(u.size, THIS_HARDWARE_ID);
+        HandleDigestExpected(digest);
+        send_data(u.size, 32);
+        uint8_t f[8];
+        put_be32(f, ref_crc32(image, u.size));
+        f[4] = 0; f[5] = 0; f[6] = (uint8_t)(urtc_minor_field_pack(5, 1) >> 8); f[7] = (uint8_t)urtc_minor_field_pack(5, 1);
+        uint8_t c[4];
+        put_be32(c, g_counter);
+        HandleRecordCounter(c);
+        QueueEndUpdate(f);
+        TEST_ASSERT(current_status == STATUS_VERIFYING && DeferredBusy() && !update_awaiting_confirm, "END is only queued by the interrupt: the status says verifying and nothing is checked yet");
+        QueueEndUpdate(f);
+        TEST_ASSERT(DeferredBusy(), "a second END while the first is queued changes nothing");
+        ServiceDeferred();
+        TEST_ASSERT(current_status == STATUS_AWAIT_CONFIRM && update_awaiting_confirm && !DeferredBusy(), "the main loop runs the checks and the chip waits for the confirmation");
+
+        // CONFIRM: queued, then run; the copy happens in the main loop and the reset comes after the pause, without a delay in the interrupt
+        uint8_t nonce[16], tag[32];
+        BuildChallengeResponse(nonce);
+        make_tag(u.size, 0, urtc_minor_field_pack(5, 1), 0, nonce, 0, tag);
+        QueueConfirm(tag);
+        TEST_ASSERT(DeferredBusy() && main_slot_blank() && !Metadata_Read(&(FirmwareMetadata_t){0}) && fake_reset_count == 0, "CONFIRM is only queued: the main slot and the metadata are untouched");
+        QueueConfirm(tag);
+        uint32_t before_tick = fake_tick;
+        ServiceDeferred();
+        TEST_ASSERT(fake_tick == before_tick, "the confirmed update waits no time inside the step: there is no delay to end under an interrupt");
+        TEST_ASSERT(current_status == STATUS_VERIFY_OK && main_slot_equals_image(3000) && fake_reset_count == 0 && DeferredBusy(), "the copy is done and the reset is due but not taken yet");
+        fake_tick += 199;
+        ServiceDeferred();
+        TEST_ASSERT(fake_reset_count == 0, "199 ms after the update the chip has not reset: the master has time to read the status");
+        fake_tick += 1;
+        ServiceDeferred();
+        TEST_ASSERT(fake_reset_count == 1 && !DeferredBusy(), "200 ms after, the main loop resets the chip once");
+        ServiceDeferred();
+        TEST_ASSERT(fake_reset_count == 1, "and only once");
+    }
+
+    // the entry conditions are those of the handlers: nothing is queued out of turn
+    fresh();
+    { uint8_t f[8] = {0}; uint8_t tag[32] = {0}; QueueEndUpdate(f); QueueConfirm(tag); }
+    TEST_ASSERT(!DeferredBusy() && current_status == STATUS_LISTENING, "END and CONFIRM with no update open queue nothing");
+    fresh();
+    start_update(1000, THIS_HARDWARE_ID);
+    { uint8_t tag[32] = {0}; QueueConfirm(tag); }
+    TEST_ASSERT(!DeferredBusy(), "CONFIRM before END queues nothing");
+
+    // a wrong confirmation queued and run still fails closed
+    fresh();
+    { Upd u = good(2000, 0, urtc_minor_field_pack(3, 0)); u.no_confirm = 1; run_update(u); }
+    {
+        uint8_t tag[32];
+        memset(tag, 0x5A, sizeof tag);
+        QueueConfirm(tag);
+        ServiceDeferred();
+        TEST_ASSERT(current_status == STATUS_VERIFY_FAIL && verify_fail_reason == VERIFY_FAIL_REASON_NOT_CONFIRMED && main_slot_blank() && !DeferredBusy(), "a wrong confirmation that was queued fails the update, as when it ran at once");
+    }
+
+    // the listening window
+    fresh();
+    TEST_ASSERT(!ListenWindowExpired(1000, 1599, 600) && ListenWindowExpired(1000, 1600, 600), "the window of 600 ms expires at 600 ms");
+    TEST_ASSERT(ListenWindowExpired(0xFFFFFF00u, 0x00000200u, 600), "and across the wrap of the millisecond counter");
+    TEST_ASSERT(!ListenWindowExpired(0xFFFFFF00u, 0x00000050u, 600), "a counter that wrapped but has not run 600 ms is still inside the window");
+    TEST_ASSERT(ListenWindowExpired(1000, 1000, 0), "a window of 0 means the application is entered at once");
+    update_in_progress = 1;
+    TEST_ASSERT(!ListenWindowExpired(1000, 99999, 600), "an update in progress is never cut by the window");
+    update_in_progress = 0;
+    TEST_ASSERT(SLAVEBOOT_LISTEN_WINDOW_MS > 0 && SLAVEBOOT_LISTEN_WINDOW_MS <= 5000, "the window of the build is positive and short");
 }
 
 int main(void)
@@ -641,6 +731,8 @@ int main(void)
     seed_metadata(META_STATE_APP_VALID, 0, 3, 100);   // legacy field, no patch
     BuildVersionExtResponse(e);
     TEST_ASSERT(e[1] == URTC_PATCH_UNKNOWN, "legacy metadata (no patch flag): the patch is unknown, never 0");
+
+    test_deferred_and_window(failures);
 
     if (fails == 0) {
         printf("  OK   all expansion slave bootloader update host tests passed\n");
