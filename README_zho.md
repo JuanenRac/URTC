@@ -34,7 +34,7 @@
 
 > **⚠️ 安全提示（设计阶段，尚无板卡运行过此固件）：** 本板驱动一个**10W 雕刻激光二极管**以及多个加热级（T12 电烙铁头、3D 打印机热端）。制作和使用它意味着要操作在缺乏适当安全措施（针对该激光二极管波长的护目镜、热防护、可及的电源切断装置）时可能造成**烧伤、火灾或眼部伤害**的设备。这是一个按原样分享的爱好者/创客项目——自行承担构建和使用的风险，不要仅仅因为固件带有看门狗机制就跳过基本的安全规范（这些是软件看门狗，从未在真实板卡上运行过）。
 
-> **安全与安防现状:**本生态系统不是经认证的安全系统,目前也不存在已组装的 URTC 电路板。主板的引导程序使用 CRC32 和针对公钥表的 Ed25519 签名来验证固件镜像，不保存任何秘密；扩展从板的引导程序检查 CRC32 和无密钥的 SHA-256，只安装由验证 Ed25519 记录的主板通过内部链路总线确认过的镜像（它通过该总线信任主板）。官方构建的公钥表在创建镜像签名密钥之前为空，因此官方主引导程序目前不会安装任何东西；台架构建信任一个公开的开发密钥，所以任何人都能制作出这种引导程序会接受的镜像；尚未向真实板卡传输任何内容。在依赖此处任何说法来保障人身安全之前,请先阅读[安全基线](https://github.com/JuanenRac/URTC-DOCS/blob/main/docs/SECURITY_BASELINE.md)和[威胁模型](https://github.com/JuanenRac/URTC-DOCS/blob/main/docs/THREAT_MODEL.md)。
+> **安全与安防现状:**本生态系统不是经认证的安全系统,目前也不存在已组装的 URTC 板卡。主板的引导程序使用 CRC32 和针对公钥表的 Ed25519 签名来验证固件镜像，不保存任何秘密；扩展从板的引导程序检查 CRC32 和无密钥的 SHA-256，只安装由验证 Ed25519 记录的主板通过内部链路总线确认过的镜像（它通过该总线信任主板）。官方构建的公钥表在创建镜像签名密钥之前为空，因此官方主引导程序目前不会安装任何东西；台架构建信任一个公开的开发密钥，所以任何人都能制作出这种引导程序会接受的镜像；尚未向真实板卡传输任何内容。在依赖此处任何说法来保障人身安全之前,请先阅读[安全基线](https://github.com/JuanenRac/URTC-DOCS/blob/main/docs/SECURITY_BASELINE.md)和[威胁模型](https://github.com/JuanenRac/URTC-DOCS/blob/main/docs/THREAT_MODEL.md)。
 
 ## 📋 速览
 
@@ -57,27 +57,27 @@
 | --- | :---: | --- |
 | 软件 | 🟡 | 可编译并通过电脑上的测试；在真实工具头上的运行仍待进行。 |
 | 测试 | 🟢 | 每次推送时测试套件都会在 CI 中通过。 |
-| 真实硬件 | 🟠 | 尚未在真实板子上运行：台架测试仍待进行。 |
+| 真实硬件 | 🟠 | 尚未在真实板卡上运行：台架测试仍待进行。 |
 | 安全 | 🟡 | 发布版使用 Ed25519 签名，并在使用前检查；密钥的处理没有他人审阅过。 |
 | 接口与协议 | 🟡 | 提供的路由或消息已有文档，并用客户端测试过；尚未被所有客户端使用 |
-| 更新 | 🟠 | 镜像通过 CAN 总线由引导程序更新；签名更新、被篡改的签名和外来硬件 ID 已用为 PC 编译的引导程序测试，从未在板子上测试 |
+| 更新 | 🟠 | 镜像通过 CAN 总线由引导程序更新；签名更新、被篡改的签名和外来硬件 ID 已用为 PC 编译的引导程序测试，从未在板卡上测试 |
 | 文档 | 🟡 | 提供八种语言的 README 和参考文档；翻译未经母语者审阅。 |
 
 <!-- /urtc-section:status_firmware -->
 
 ## 🎯 概述
 
-大家好！我想分享一个我一直在开发的项目，叫做 URTC（通用机器人工具控制器）。它是一块单体式、高度集成的控制板，专为扩展机械臂和自动化装置的能力而设计，非常适合像 PAROL6 和 Faze4 这样的平台——这两款开源机械臂由 [Source-Robotics](https://source-robotics.com/)（[GitHub](https://github.com/Source-Robotics)）设计开发。
+大家好！我想分享一个我一直在开发的项目，叫做 URTC（通用机器人工具控制器）。它是一块单体式、高度集成的板卡，专为扩展机械臂和自动化装置的能力而设计，非常适合像 PAROL6 和 Faze4 这样的平台——这两款开源机械臂由 [Source-Robotics](https://source-robotics.com/)（[GitHub](https://github.com/Source-Robotics)）设计开发。
 
 **URTC 是一个独立的、非官方的项目。** 它不是由 Source-Robotics 开发或认可的——它是一款兼容的工具头控制器，设计用来与 PAROL6 和 Faze4 良好协作，同样基于 CAN 的架构也可以开放用于适配其他机械臂平台。
 
 以下是关于它是什么、能做什么，以及它目前所管理的硬件生态系统的完整分解。
 
-URTC 是一块由 STM32 微控制器（STM32F303CCT6，LQFP48）驱动的一体化、紧凑型控制板。它通过 CAN 总线与主机器人控制器通信，旨在让工具头或轴端以低延迟执行复杂任务（延迟从未在真实板卡上测量过，也不保证硬实时）。它配备了一块板载 OLED 显示屏用于即时诊断——动画开机画面、每个工具的动画图标、双色面板上的实时遥测——一个单像素 RGB 状态 LED，加上一圈可寻址 RGB LED 环用于摄像头照明，一个 20 针扩展接口用于附加板，一块板载 F-RAM 在断电时保留当前工具的设定值，以及专用的模拟和大电流电源级。
+URTC 是一块由 STM32 微控制器（STM32F303CCT6，LQFP48）驱动的一体化、紧凑型板卡。它通过 CAN 总线与主机器人控制器通信，旨在让工具头或轴端以低延迟执行复杂任务（延迟从未在真实板卡上测量过，也不保证硬实时）。它配备了一块板载 OLED 显示屏用于即时诊断——动画开机画面、每个工具的动画图标、双色面板上的实时遥测——一个单像素 RGB 状态 LED，加上一圈可寻址 RGB LED 环用于摄像头照明，一个 20 针扩展接口用于附加板，一块板载 F-RAM 在断电时保留当前工具的设定值，以及专用的模拟和大电流电源级。
 
 ## 🧩 在 URTC 中的角色
 
-URTC 是板子及其固件：生态系统中安装在机器人工具头上、负责干活的部分，带有 CAN 引导程序，可通过同一根线更新应用程序。家族中的其他一切都围绕它建立。URTC-COMMON 把它的 CAN 协议作为数据只写一次，URTC-FLASHER 和 URTC-TESTER 从电脑更新并测试它（URTC-WEB-STUDIO 在浏览器中两者都能做），URTC-GATEWAY 可以放在它的总线前面，URTC-SMART-RACK 存放工具头，URTC-VISION-TOOL 是一个做检测的工具头，URTC-UPDATER 让各程序保持最新，URTC-DOCS 保存架构和已被证明的内容。它面向 PAROL6 和 Faze4 这样的机械臂，是一个独立的非官方项目。目前还没有焊装完成的板子。
+URTC 是板卡及其固件：生态系统中安装在机器人工具头上、负责干活的部分，带有 CAN 引导程序，可通过同一根线更新应用程序。家族中的其他一切都围绕它建立。URTC-COMMON 把它的 CAN 协议作为数据只写一次，URTC-FLASHER 和 URTC-TESTER 从电脑更新并测试它（URTC-WEB-STUDIO 在浏览器中两者都能做），URTC-GATEWAY 可以放在它的总线前面，URTC-SMART-RACK 存放工具头，URTC-VISION-TOOL 是一个做检测的工具头，URTC-UPDATER 让各程序保持最新，URTC-DOCS 保存架构和已被证明的内容。它面向 PAROL6 和 Faze4 这样的机械臂，是一个独立的非官方项目。目前还没有焊装完成的板卡。
 
 ## 🏛️ 架构
 
@@ -229,7 +229,7 @@ URTC 的核心优势在于其极强的多功能性。板卡采用可扩展矩阵
 
 <img src="images/OLED_DIRECT_MOUNT.jpg" width="220">
 
-一块没有独立分线 PCB 的裸面板——仅有玻璃基板及其 30 针 FPC 排线，直接焊入 `CONN_OLED2` 封装（`FPC30`，WiseChip UG-2864，本文档中对应原理图所称的 `LCD1`——见 `BOM/BOM.TXT` 和 `URTC_NETLIST.TXT`）。这 30 针中只有一部分实际接线——其余是该面板的并行接口总线（`D2`–`D7`、`RW`、`E/!RD`），由于本板始终仅通过 I2C 与其通信，故留空未接：
+一块没有独立分线 PCB 的裸面板——仅有玻璃ボード及其 30 针 FPC 排线，直接焊入 `CONN_OLED2` 封装（`FPC30`，WiseChip UG-2864，本文档中对应原理图所称的 `LCD1`——见 `BOM/BOM.TXT` 和 `URTC_NETLIST.TXT`）。这 30 针中只有一部分实际接线——其余是该面板的并行接口总线（`D2`–`D7`、`RW`、`E/!RD`），由于本板始终仅通过 I2C 与其通信，故留空未接：
 
 | CONN_OLED2 引脚 | 网络 | 功能 |
 |---|---|---|
@@ -334,11 +334,11 @@ URTC 的核心优势在于其极强的多功能性。板卡采用可扩展矩阵
 ## 🔒 安全与防护
 
 - **热失控保护**（`thermal_guard.c`，自应用 0.3.2 起）用于烙铁／热风和 3D 热端：对*实测*温度的 MAXTEMP（T12 449 °C，热端 310 °C）、加热监视（加热器开启时温度必须真正上升——可检测松脱的热敏电阻或烙铁头）以及保温检查（达到目标后，加热器开启时不得长时间下降）。一旦故障即切断加热器、锁定板卡错误，并通过 `0x111` 的第 4 字节报告原因。已在主机上用模拟加热器测试（`tests/test_thermal_guard.c`）。 这些限值从未在真实加热器上测量过，这一切也从未在真实板卡上运行过。
-- **围绕硬件的固件逻辑的主机测试**（`tools/run_host_tests.py`，50 个测试套件）：除引导程序、热保护和分发器外，13 种工具的真实 CAN 处理程序（`firmware_can_*.c`）、加热器控制回路（`firmware_control_thermal.c`：ADC 换算、不可能的读数、设定值上限、迟滞、加热器卡死、保护触发的故障）、故障记录器（`firmware_blackbox.c`，与 URTC-COMMON 由自身模型写出的场景逐字节比对，并检查其 CAN 读出）、由跳线识别工具、错误门之后的命令以及热像仪命令，都针对模拟 HAL（`tests/host_hal/`）编译，并在地址与未定义行为检查器及 `gcc -fanalyzer` 下运行；`--coverage-floor`（CI 中为 `URTC_COVERAGE_FLOOR`）要求执行的行数达到一定比例（测试套件编译的 83 个固件源文件的行为 94.0%（86 个中有 3 个需要开发板），其中现在包括应用程序的启动与主循环、OLED 驱动及其画面、状态 LED、中断处理程序、扩展接口的总线、三种热像仪、扩展从机以及两个引导程序的主程序；CI 的下限为 90）。以上均未在开发板上运行过。
+- **围绕硬件的固件逻辑的主机测试**（`tools/run_host_tests.py`，50 个测试套件）：除引导程序、热保护和分发器外，13 种工具的真实 CAN 处理程序（`firmware_can_*.c`）、加热器控制回路（`firmware_control_thermal.c`：ADC 换算、不可能的读数、设定值上限、迟滞、加热器卡死、保护触发的故障）、故障记录器（`firmware_blackbox.c`，与 URTC-COMMON 由自身模型写出的场景逐字节比对，并检查其 CAN 读出）、由跳线识别工具、错误门之后的命令以及热像仪命令，都针对模拟 HAL（`tests/host_hal/`）编译，并在地址与未定义行为检查器及 `gcc -fanalyzer` 下运行；`--coverage-floor`（CI 中为 `URTC_COVERAGE_FLOOR`）要求执行的行数达到一定比例（测试套件编译的 83 个固件源文件的行为 94.0%（86 个中有 3 个需要板卡），其中现在包括应用程序的启动与主循环、OLED 驱动及其画面、状态 LED、中断处理程序、扩展接口的总线、三种热像仪、扩展从机以及两个引导程序的主程序；CI 的下限为 90）。以上均未在板卡上运行过。
 - **诊断：** `0x111` 的第 5 字节报告上次复位原因（bit0 = 硬件看门狗触发）；`0x1AA`/`0x1AB` 返回保存在 F-RAM 中的累计计数——热故障次数、最后一次故障代码和加热器总开启时间（自 0.3.3 起）；黑匣子采样也会记录热故障代码。
 - **固件签名：** 主板的引导程序不保存任何秘密：它依据公钥表（`keys/image_trust.json`）验证 Ed25519 记录，该表以带公开开发密钥的台架表或在创建镜像签名密钥之前为空的官方表的形式编译进去。扩展从板的引导程序在更新路径中不保存任何签名密钥：只有当主板验证 Ed25519 记录后，在该更新会话中确认了这个确切的镜像，才会安装，并通过内部链路总线信任主板（参见 [`docs/SLAVE_BOOT_CONFIRMATION.md`](docs/SLAVE_BOOT_CONFIRMATION.md)）；它不含任何密钥，也没有 HMAC 例程，并在仅追加日志中保存自己的签名回滚计数器，主板同样读取并强制执行该计数器。`firmware/` 中的每个镜像都附带 `<bin>.sha256` 和 `<bin>.manifest.json`，因此 URTC Flasher 和 URTC Web Studio 完全不携带密钥。参见 [`docs/FIRMWARE_SIGNING.TXT`](docs/FIRMWARE_SIGNING.TXT)。正式发布的每个文件还带有分离式 Ed25519 发布签名（`<文件>.sig`，公钥见 [`docs/RELEASE_SIGNING.md`](docs/RELEASE_SIGNING.md)）；刷写器和 Web Studio 在签名存在时会进行验证。
 - **CAN 总线：** 不验证发送方——任何节点都可以控制工具。使用激光、加热器或焊接设备的安装**必须**配备独立于 MCU 的硬件联锁和封闭总线：[`docs/CAN_THREAT_MODEL.TXT`](docs/CAN_THREAT_MODEL.TXT)。
-- **同一 CAN 总线上的多个工具头（默认关闭）：** 一个持久开关（CAN `0x1AC` 设置，`0x1AD` 读取，F-RAM 记录见 [`docs/EEPROM.TXT`](docs/EEPROM.TXT)）会启用由五个 ID 跳线得到的节点地址、发现机制和选择规则：只有被选中的工具头才执行命令，未被选中的工具头绝不动作。开关关闭时（这是默认值，空白的 F-RAM 读出的也是关闭），电路板的行为与单个工具头完全相同，帧和标识符不变。已在固件中实现，仅在计算机上测试，尚未在电路板上试验。设计和帧见 URTC-COMMON（`docs/MULTINODE.md`）以及 [`docs/CANBUS.TXT`](docs/CANBUS.TXT) 的附录。
+- **同一 CAN 总线上的多个工具头（默认关闭）：** 一个持久开关（CAN `0x1AC` 设置，`0x1AD` 读取，F-RAM 记录见 [`docs/EEPROM.TXT`](docs/EEPROM.TXT)）会启用由五个 ID 跳线得到的节点地址、发现机制和选择规则：只有被选中的工具头才执行命令，未被选中的工具头绝不动作。开关关闭时（这是默认值，空白的 F-RAM 读出的也是关闭），板卡的行为与单个工具头完全相同，帧和标识符不变。已在固件中实现，仅在计算机上测试，尚未在板卡上试验。设计和帧见 URTC-COMMON（`docs/MULTINODE.md`）以及 [`docs/CANBUS.TXT`](docs/CANBUS.TXT) 的附录。
 - **引导程序的应答范围与从机补丁号：** 回读（`0x7FE`）和降级授权（`0x7FD`）只在由应用程序接受 `0x7F0` 后启动的引导程序会话中应答（或在没有有效应用程序的板上）；正常上电后会被忽略，编译选项可关闭此限制。扩展从机把补丁号放在版本寄存器的第十个字节中，主机用 `0x222` 转发（字节为 0 表示未发送，与旧从机相同）。第三个字节携带次版本号的低字节，程序因此可以显示完整版本。已在源码中实现并在主机上测试；目前还没有固件映像包含它。
 
 ## 🔌 接口
@@ -397,7 +397,7 @@ URTC 的闪存被拆分为两个独立部分，因此板卡可以通过它已经
 
 ## 🧪 测试
 
-围绕硬件的固件逻辑在电脑上测试：`python tools/run_host_tests.py` 用主机编译器、模拟 HAL 以及 AddressSanitizer 和 UBSan（带 `-fanalyzer`）构建并运行 50 个 C 测试套件（`tests/test_*.c`），涵盖引导程序、热保护、分发器、13 种工具的真实 CAN 处理程序、加热器控制回路和黑匣子等。CI 还会编译并链接四个二进制文件，并在固件源码已执行行的覆盖率低于下限时失败。这一切都没有在板子上运行过：目前没有焊装完成的板子，主机测试也无法证明时序、驱动或功率级能正常工作。`python tools/c_quality.py` 增加了三项电路板编译器不会做的检查：用电脑的编译器对测试套件构建的每个源文件加 `-Wconversion`、cppcheck，以及注释块长度上限（原样引入的传感器驱动不在其内，每项理由写在 `tools/c_quality.json` 中）。
+围绕硬件的固件逻辑在电脑上测试：`python tools/run_host_tests.py` 用主机编译器、模拟 HAL 以及 AddressSanitizer 和 UBSan（带 `-fanalyzer`）构建并运行 50 个 C 测试套件（`tests/test_*.c`），涵盖引导程序、热保护、分发器、13 种工具的真实 CAN 处理程序、加热器控制回路和黑匣子等。CI 还会编译并链接四个二进制文件，并在固件源码已执行行的覆盖率低于下限时失败。这一切都没有在板卡上运行过：目前没有焊装完成的板卡，主机测试也无法证明时序、驱动或功率级能正常工作。`python tools/c_quality.py` 增加了三项板卡编译器不会做的检查：用电脑的编译器对测试套件构建的每个源文件加 `-Wconversion`、cppcheck，以及注释块长度上限（原样引入的传感器驱动不在其内，每项理由写在 `tools/c_quality.json` 中）。
 
 ## 🏗️ 构建与发布
 
@@ -432,7 +432,7 @@ URTC 的闪存被拆分为两个独立部分，因此板卡可以通过它已经
 ```text
 URTC/
 ├── src/                                               四个固件组件及其共用部分
-├── PCB/                                               原理图和板子设计
+├── PCB/                                               原理图和板卡设计
 ├── BOM/                                               主板和六种扩展板的物料清单
 ├── 3D/                                                3D 模型
 ├── ani/                                               OLED 的动画
@@ -484,14 +484,14 @@ README 和文本提供英语、西班牙语、法语、意大利语、德语、�
 URTC 由相互独立的仓库组成，每个仓库都有自己的版本、测试和 README。以下是按组划分的家族：
 
 * **URTC Tool Platform:**
-  * **URTC** (本仓库) - 工具头电路板的固件(25 个工具配置、CAN 引导程序)以及 CAN 协议参考。
+  * **URTC** (本仓库) - 工具头板卡的固件(25 个工具配置、CAN 引导程序)以及 CAN 协议参考。
   * [URTC-COMMON](https://github.com/JuanenRac/URTC-COMMON) - 只写一次的 CAN 协议数据(规范、生成的表格、一致性向量)以及各程序共享的代码。
-  * [URTC-FLASHER](https://github.com/JuanenRac/URTC-FLASHER) - 通过 CAN 或 SWD/JTAG 更新电路板固件的桌面工具。
+  * [URTC-FLASHER](https://github.com/JuanenRac/URTC-FLASHER) - 通过 CAN 或 SWD/JTAG 更新板卡固件的桌面工具。
   * [URTC-GATEWAY](https://github.com/JuanenRac/URTC-GATEWAY) - 位于 CAN 总线前的网关:只放行列表中的标识符,限制其速率,并要求会话密钥。
   * [URTC-SMART-RACK](https://github.com/JuanenRac/URTC-SMART-RACK) - 用于带预热和生命周期跟踪的工具架的、与硬件无关的 C 逻辑和命令协议。
-  * [URTC-TESTER](https://github.com/JuanenRac/URTC-TESTER) - 桌面实时 CAN 总线测试器,显示电路板所报告工具配置的控件和遥测。
+  * [URTC-TESTER](https://github.com/JuanenRac/URTC-TESTER) - 桌面实时 CAN 总线测试器,显示板卡所报告工具配置的控件和遥测。
   * [URTC-VISION-TOOL](https://github.com/JuanenRac/URTC-VISION-TOOL) - C 语言的传感器帧协议,以及用于检测工具头的 Python 热成像/RGB 配套程序。
-  * [URTC-WEB-STUDIO](https://github.com/JuanenRac/URTC-WEB-STUDIO) - 通过 Web Serial 和 SLCAN 烧录并测试电路板的浏览器应用,无需安装。
+  * [URTC-WEB-STUDIO](https://github.com/JuanenRac/URTC-WEB-STUDIO) - 通过 Web Serial 和 SLCAN 烧录并测试板卡的浏览器应用,无需安装。
 * **Ecosystem Operations:**
   * [URTC-DEVTOOLS](https://github.com/JuanenRac/URTC-DEVTOOLS) - 家族共用的仓库工具，作为带版本的整套工具，并用锁文件区分被改动的副本和已过时的副本。
   * [URTC-DOCS](https://github.com/JuanenRac/URTC-DOCS) - 生态系统的架构、接口、安全基线和生成的目录,以及比较所有仓库的工具。
@@ -515,7 +515,7 @@ URTC 由相互独立的仓库组成，每个仓库都有自己的版本、测试
 
 * 提交 Pull Request 之前请运行 `URTC_CI=1 python tools/ci_validate.py`：必须通过。参见 [CONTRIBUTING.md](CONTRIBUTING.md) 和[行为准则](CODE_OF_CONDUCT.md)。
 * README 有八种语言：修改文字时要同步修改全部八个文件，与其他仓库共用的章节由 URTC-COMMON 的 `tools/readme_sections.py` 写入。
-* 不要把仅仅构建过的东西描述为已在板子上运行。
+* 不要把仅仅构建过的东西描述为已在板卡上运行。
 * 请私下报告漏洞：[SECURITY.md](SECURITY.md)。问题、想法和报告：electrohobby3d@gmail.com（[SUPPORT.md](SUPPORT.md)）。
 
 ## 👤 作者
