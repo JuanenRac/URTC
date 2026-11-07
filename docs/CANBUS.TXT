@@ -2115,7 +2115,7 @@ Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_do
 
 C. Field layouts and examples
 
-[[ BEGIN GENERATED layouts sha256=ce21adb204fe64c4f222eb2600b3f12ee5610df30f16bcd7031ce99963e1b9e6 ]]
+[[ BEGIN GENERATED layouts sha256=127dd6fb040eb64b1883e7ce36ff7a1898afaa53709739802024e5f46a757b92 ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 ### 0x095 IMPACT_EVENT - Impact register (touch probe, maximum priority)
@@ -3502,6 +3502,7 @@ request, DLC 8: The record is key id (8) + counter (4) + signature (64) = 76 byt
 Example first chunk: data 0000000000000000 (index=0, data=00000000000000)
 
 Note: Sent to the selected (or only) bootloader after START_UPDATE, next to the HMAC chunks. The record is described in the design of the bootloader authentication.
+Note: An index from 0x80 to 0x8E is a chunk of a signed rotation command instead of a chunk of an image signature: 100 bytes (signer key id, new current key id, previous key id, window seconds, host time, counter, Ed25519 signature) in 15 frames, seven bytes each after the index, the last one padded with zeros. A bootloader that does not know it ignores it. See docs/BOOTLOADER_AUTH.md.
 
 ### 0x7ED BOOTLOADER_KEY_ID - Identifier of the signing key a bootloader trusts
 

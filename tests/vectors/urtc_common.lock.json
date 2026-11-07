@@ -18,6 +18,10 @@
       "from": "generated/ed25519_vectors.h",
       "sha256": "59450f928dc5b0d6d337b446c541b529193e535d86861a34ce7d5eadeb1c4892"
     },
+    "key_rotation_command_vectors.h": {
+      "from": "generated/key_rotation_command_vectors.h",
+      "sha256": "46e131ca9be3f3b1fea798a374527730e7d6f66aad5ebe956c0f4ce907caabeb"
+    },
     "key_rotation_vectors.h": {
       "from": "generated/key_rotation_vectors.h",
       "sha256": "6a6325078c3bfc167677c8ca226faf96feca0fffcaf9d16158678952d8b20542"
@@ -37,6 +41,10 @@
     "test_key_rotation.c": {
       "from": "tests/c/test_key_rotation.c",
       "sha256": "653a5a2903841dd1cc8c4336db91f9627c440c8ad32c1862f732cf698ab7297e"
+    },
+    "test_key_rotation_cmd.c": {
+      "from": "tests/c/test_key_rotation_cmd.c",
+      "sha256": "efbffea53255f2ddb644553122876e176d8de5daabb4cbedd7785f14555f6aeb"
     },
     "urtc_fw_vectors.h": {
       "from": "generated/urtc_fw_vectors.h",

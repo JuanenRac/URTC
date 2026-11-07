@@ -110,6 +110,19 @@
    "std": "c11"
   },
   {
+   "name": "key_rotation_cmd",
+   "test": "tests/test_key_rotation_cmd.c",
+   "sources": [
+    "src/common/urtc_ed25519.c"
+   ],
+   "includes": [
+    "tests",
+    "tests/vectors",
+    "src/common"
+   ],
+   "std": "c11"
+  },
+  {
    "name": "bootloader_crypto",
    "test": "tests/test_bootloader_crypto.c",
    "sources": [

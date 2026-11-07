@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **Host suite for the signed rotation command:** `tests/test_key_rotation_cmd.c` holds `src/common/urtc_key_rotation_cmd.h`, the decision a bootloader takes on the command that starts a rotation of the signing key, to the shared vectors (46 suites). The notes of `0x7EC` in the CAN tables describe the command. No bootloader uses it yet.
+
 - **The copies of the shared CAN tables are refreshed:** `docs/CANBUS.TXT`, `src/common/urtc_can_ids.h` and the fuzz corpus now include the key rotation status frames (operation `05` of `0x7EA` and its seven-byte answer on `0x7EB`). The bootloaders do not send them yet.
 
 - **A host suite for the rotation of the signing key (45 host suites):** `tests/test_key_rotation.c` holds `src/common/urtc_key_rotation.h` (which fingerprints a bootloader accepts and announces while a rotation is in progress, with a configurable window) to the shared vectors of URTC-COMMON. No bootloader uses it yet and nothing is built for the board; the documented suite counters say 45.

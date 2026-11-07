@@ -29,6 +29,10 @@
     "urtc_key_rotation.h": {
       "from": "firmware_base/urtc_key_rotation.h",
       "sha256": "7541ff2be58f1d1ba01df3c14de5c71c1e5e1183e062772e1fe46bac3e43c5a1"
+    },
+    "urtc_key_rotation_cmd.h": {
+      "from": "firmware_base/urtc_key_rotation_cmd.h",
+      "sha256": "c386bba4ef2e4a06844ecfebe9db648b3a4ca660c729c9e27b50ba9daa16e152"
     }
   }
 }
