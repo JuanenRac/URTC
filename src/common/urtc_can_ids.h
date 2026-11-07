@@ -326,6 +326,14 @@
 #define URTC_HEALTH_INFO_FW_PATCH_OFFSET 3u
 #define URTC_HEALTH_INFO_FW_BUILD_OFFSET 4u
 #define URTC_HEALTH_INFO_UPTIME_S_OFFSET 5u
+#define URTC_CAN_ID_CRASH_DUMP_QUERY 0x1BCu  /* Request the fault capture of the last crash (stacked registers kept across the reset) */
+#define URTC_DLC_CRASH_DUMP_QUERY_MIN 1u
+#define URTC_DLC_CRASH_DUMP_QUERY_MAX 8u
+#define URTC_CRASH_DUMP_QUERY_OPERATION_OFFSET 0u
+#define URTC_CAN_ID_CRASH_DUMP_RESP 0x1BDu  /* The fault capture of the last crash */
+#define URTC_DLC_CRASH_DUMP_RESP_MIN 8u
+#define URTC_DLC_CRASH_DUMP_RESP_MAX 8u
+#define URTC_CRASH_DUMP_RESP_DATA_OFFSET 0u
 #define URTC_CAN_ID_SPOT_WELD_CMD 0x1C0u  /* Spot welder timed pulse */
 #define URTC_DLC_SPOT_WELD_CMD_MIN 3u
 #define URTC_DLC_SPOT_WELD_CMD_MAX 3u

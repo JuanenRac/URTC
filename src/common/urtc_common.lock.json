@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "urtc_common_version": "0.2.3",
+  "urtc_common_version": "0.2.4",
   "files": {
     "urtc_auth.h": {
       "from": "firmware_base/urtc_auth.h",
@@ -16,7 +16,7 @@
     },
     "urtc_can_ids.h": {
       "from": "generated/urtc_can_ids.h",
-      "sha256": "7fbe0ff097d1d6e749d05dbea5b272292fe45a6d54208419ae1abcc16400a2f5"
+      "sha256": "1e3b7318fad90af910c03c53a25c9001a38649d35613d46e1b97a8763355d4ee"
     },
     "urtc_ed25519.c": {
       "from": "firmware_base/urtc_ed25519.c",

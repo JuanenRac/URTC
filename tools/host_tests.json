@@ -986,6 +986,43 @@
     "-Wno-cpp",
     "-Wno-int-to-pointer-cast"
    ]
+  },
+  {
+   "name": "crash_dump",
+   "test": "tests/test_crash_dump.c",
+   "sources": [
+    "src/F303-master/crash_dump.c"
+   ],
+   "includes": [
+    "tests",
+    "src/F303-master",
+    "src/common"
+   ],
+   "std": "c11"
+  },
+  {
+   "name": "crash_dump_glue",
+   "test": "tests/test_crash_dump_glue.c",
+   "sources": [
+    "tests/host_hal/fake_hal.c",
+    "tests/host_hal/fake_state.c",
+    "src/F303-master/crash_dump.c",
+    "src/F303-master/firmware_crash_dump.c",
+    "src/F303-master/firmware_interrupts_fault.c"
+   ],
+   "includes": [
+    "tests",
+    "tests/host_hal",
+    "src/F303-master",
+    "src/common"
+   ],
+   "extra": [
+    "-Wno-cpp",
+    "-Wno-int-to-pointer-cast"
+   ],
+   "defines": [
+    "-DURTC_CRASH_DUMP=1"
+   ]
   }
  ]
 }

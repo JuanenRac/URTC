@@ -129,7 +129,7 @@ uint32_t HAL_GetTick(void);
 
 typedef struct { uint32_t TypeErase, PageAddress, NbPages; } FLASH_EraseInitTypeDef;
 typedef struct { uint32_t CTRL, LOAD, VAL; } SysTick_Type;
-typedef struct { uint32_t ICSR, VTOR; } SCB_Type;
+typedef struct { uint32_t ICSR, VTOR, CFSR, HFSR, MMFAR, BFAR; } SCB_Type;
 extern SysTick_Type fake_systick;
 extern SCB_Type fake_scb;
 #define SysTick (&fake_systick)

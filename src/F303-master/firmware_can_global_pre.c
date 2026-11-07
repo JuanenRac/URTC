@@ -14,6 +14,7 @@
 #include "firmware_can_global.h"
 #include "firmware_expansion_i2c.h"
 #include "firmware_blackbox.h"
+#include "firmware_crash_dump.h"
 #include "firmware_thermal_stats.h"
 #include "urtc_version_wire.h"
 #include "urtc_boot_session.h"
@@ -333,6 +334,14 @@ void Handle_CAN_GlobalCommands_PreErrorGate(void) {
         if (rxHeader.StdId == URTC_CAN_ID_BLACKBOX_QUERY && rxHeader.DLC >= 1) {
             BlackBox_HandleReadbackRequest(rxData[0]);
         }
+
+        // Crash capture (0x1BC query / 0x1BD answer): the registers the last HardFault left, read-only and answered whatever the active tool or the error
+        // state. Present only in a firmware built with URTC_CRASH_DUMP=1; otherwise 0x1BC is an identifier the firmware does not know.
+#if URTC_CRASH_DUMP
+        if (rxHeader.StdId == URTC_CAN_ID_CRASH_DUMP_QUERY && rxHeader.DLC >= 1) {
+            CrashDump_HandleQuery(rxData[0]);
+        }
+#endif
 
         // Lifetime thermal counters (0x1AA query / 0x1AB answer) - read-only,
         // answered whatever the active tool or error state, like 0x110.

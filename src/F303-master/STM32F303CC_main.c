@@ -30,6 +30,7 @@
 #include "firmware_can_thermalinspection.h"
 #include "firmware_persistence.h"
 #include "firmware_blackbox.h"
+#include "firmware_crash_dump.h"
 #include "firmware_multinode.h"
 #include "firmware_features.h"
 #include "urtc_can_ids.h"
@@ -228,6 +229,7 @@ int main(void) {
                                  (__HAL_RCC_GET_FLAG(RCC_FLAG_LPWRRST) ? 0x20 : 0) |
                                  (__HAL_RCC_GET_FLAG(RCC_FLAG_OBLRST)  ? 0x40 : 0));
     __HAL_RCC_CLEAR_RESET_FLAGS(); // so the NEXT reset reports only its own cause
+    CrashDump_AppBoot(last_reset_cause); // checks the record a crash may have left in RAM (does nothing unless built with URTC_CRASH_DUMP=1)
     SystemClock_Config();
 
     MX_GPIO_Init_Early();

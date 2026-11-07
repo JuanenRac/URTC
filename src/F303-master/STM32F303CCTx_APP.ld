@@ -100,6 +100,16 @@ SECTIONS
     __bss_end__ = _ebss;
   } >RAM
 
+  /* Crash capture (URTC_CRASH_DUMP=1): the one variable placed here is not cleared at start-up, so the registers a HardFault leaves can be read after the
+   * reset that follows it. With the switch off nothing is placed here, the section is empty and the layout is the one it always was. */
+  .noinit (NOLOAD) :
+  {
+    . = ALIGN(4);
+    *(.noinit)
+    *(.noinit*)
+    . = ALIGN(4);
+  } >RAM
+
   ._user_heap_stack :
   {
     . = ALIGN(8);

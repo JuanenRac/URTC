@@ -1991,18 +1991,18 @@ GENERATED REFERENCE (from the specification in URTC-COMMON)
 
 A. Summary
 
-[[ BEGIN GENERATED summary sha256=d3ec04f05bfe3413e0495e5eb9c40cf2b407c98e4afc03fdeefbd3884805302a ]]
+[[ BEGIN GENERATED summary sha256=f091a1026f70c318637f3fed8773157b6e83a9ee3fc07f59d79a9abdd2a2d556 ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 URTC CAN protocol: protocol version 1, byte order big.
-104 identifiers, 25 tool profiles, 22 enumerations, 37 constants, 4 magic payloads, 27 registers of the expansion slave.
+106 identifiers, 25 tool profiles, 22 enumerations, 37 constants, 4 magic payloads, 27 registers of the expansion slave.
 
 Machine-readable specification of the CAN bus protocol of the URTC tool head: every identifier with its direction, length rule and payload layout, the magic payloads, the registers of the expansion slave, the version procedures and the SLCAN subset the host tools rely on. All multi-byte fields are big-endian.
 [[ END GENERATED summary ]]
 
 B. Index of identifiers
 
-[[ BEGIN GENERATED index sha256=3afc5c5b9deb7f13027e7d1311758ca2acee52e82a70129a5c376d3888df2cf0 ]]
+[[ BEGIN GENERATED index sha256=87910a842a015b7d8273d994526e33eb6ed4ddff859fc83fd88dbcb7a3808431 ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 | ID | Name | Direction | DLC | Tools | Group | Title |
@@ -2057,6 +2057,8 @@ Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_do
 | 0x1B9 | PID_CONFIG | host to board | 7 | any | configuration | Gains of the heater PID and start of its relay autotune |
 | 0x1BA | PID_STATE_RESP | both ways | any / 8 | any | configuration | The heater PID: gains in force, state and output |
 | 0x1BB | HEALTH_INFO | board to host | 8 | any | diagnostics | Identity and life of the board: protocol byte, last reset cause, firmware version and uptime (sent with the health frame) |
+| 0x1BC | CRASH_DUMP_QUERY | host to board | 1-8 | any | diagnostics | Request the fault capture of the last crash (stacked registers kept across the reset) |
+| 0x1BD | CRASH_DUMP_RESP | board to host | 8 | any | diagnostics | The fault capture of the last crash |
 | 0x1C0 | SPOT_WELD_CMD | host to board | 3 | 14 | welding | Spot welder timed pulse |
 | 0x1D0 | UV_CURING_CMD | host to board | 1 | 18 | uv | UV curing LED duty |
 | 0x1E0 | HOTAIR_CMD | host to board | 3 | 19 | hotair | Hot-air nozzle setpoint and blower duty |
@@ -2115,7 +2117,7 @@ Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_do
 
 C. Field layouts and examples
 
-[[ BEGIN GENERATED layouts sha256=127dd6fb040eb64b1883e7ce36ff7a1898afaa53709739802024e5f46a757b92 ]]
+[[ BEGIN GENERATED layouts sha256=422f9e174d926bdea7408982d0a32dd3f8fc4f8653b93db218bba202c50ff523 ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 ### 0x095 IMPACT_EVENT - Impact register (touch probe, maximum priority)
@@ -2898,6 +2900,34 @@ response, DLC 8
 Example board running 0.4.4 for one hour after a power-on: data 0108040400000E10 (protocol_version=1, reset_cause=8, fw_minor=4, fw_patch=4, fw_build=0, uptime_s=3600)
 
 Note: Sent every ten seconds, right after a health frame, by a board whose health feature runs. It adds what the one-second health frame has no room for.
+
+### 0x1BC CRASH_DUMP_QUERY - Request the fault capture of the last crash (stacked registers kept across the reset)
+
+host to board; handled by the application; tools: any; answered even while a critical error is declared; read only.
+
+request, DLC 1-8
+
+| Byte | Width | Type | Field | Values | Note |
+|---|---|---|---|---|---|
+| 0 | 1 | u8 | operation | 0..0 | 0 reads the record. Other values get no answer. |
+
+Example read the capture: data 00 (operation=0)
+
+Note: Answered only by a firmware built with the crash capture switched on (URTC_CRASH_DUMP); any other firmware ignores it, as it ignores an identifier it does not know. Answered with six frames of 0x1BD.
+
+### 0x1BD CRASH_DUMP_RESP - The fault capture of the last crash
+
+board to host; handled by the application; tools: any.
+
+response, DLC 8: Six consecutive frames of eight bytes, concatenated in order, are the 48-byte record, sent as the firmware keeps it (little-endian words): magic 'CRSH' (4), crash counter since power-up (4), PC, LR, xPSR of the stacked frame (4 each), CFSR, HFSR, MMFAR, BFAR (4 each), stack pointer of the frame (4), reset cause (1, the bit field of 0x1BB), kind (1: 0 no crash, 1 crash with its frame, 2 crash whose stack was not readable), record version (1, value 1), reserved (1, zero), CRC-32 of the first 44 bytes (4).
+
+| Byte | Width | Type | Field | Values | Note |
+|---|---|---|---|---|---|
+| 0 | 8 | bytes | data |  |  |
+
+Example one of the six frames: data 4352534800000000 (data=4352534800000000)
+
+Note: The record lives in RAM that survives a reset (it is checked by its CRC and cleared at a power-on), so a crash that ended in a watchdog reset can be read after the board is back. The host believes it only when the magic, the version and the CRC agree.
 
 ### 0x1C0 SPOT_WELD_CMD - Spot welder timed pulse
 
