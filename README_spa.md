@@ -371,16 +371,16 @@ La flash de URTC está dividida en 2 piezas independientes, para que la placa pu
 
 ### Configuración inicial — requiere JTAG/SWD (una vez)
 
-El bootloader solo puede entrar al chip mediante programación física — no hay forma de flashear por CAN una placa que todavía no tiene un bootloader instalado. Este es un paso único:
+El bootloader solo puede entrar al chip mediante programación física — no hay forma de grabar por CAN una placa que todavía no tiene un bootloader instalado. Este es un paso único:
 
 1. Abre el proyecto en **STM32CubeIDE** (construido y probado contra el target STM32F303CC), o usa **STM32CubeProgrammer** directamente con los binarios compilados de abajo.
-2. Flashea **ambas** imágenes por SWD (ST-Link) mediante el header `STM_JTAG` integrado — cada archivo `.hex` tiene su dirección de destino incrustada, así que la mayoría de las herramientas (incluyendo STM32CubeProgrammer) pueden cargar ambas en la misma sesión:
+2. Graba **ambas** imágenes por SWD (ST-Link) mediante el header `STM_JTAG` integrado — cada archivo `.hex` tiene su dirección de destino incrustada, así que la mayoría de las herramientas (incluyendo STM32CubeProgrammer) pueden cargar ambas en la misma sesión:
    * `URTC_MAIN_BOOTLOADER_v<version>.hex` → `0x08000000`
    * `URTC_MAIN_FIRMWARE_v<version>.hex` → `0x08008000`
 3. Establece la identidad de la herramienta mediante los jumpers de soldadura de ID antes de encender - la placa los lee una vez al arrancar, como siempre. Cinco jumpers (ID0-ID4), cubriendo el espacio completo de 32 direcciones (31 direcciones de herramienta directas, más la dirección reservada `11111` de configuración libre - ver la sección de Matriz de Herramientas de arriba).
 4. Enciende. El bootloader escucha durante ~600ms, no ve nada, y salta directamente a la aplicación — desde aquí en adelante, todo se comporta exactamente como se describe en el resto de este README. La ventana empieza después de que el bootloader haya comprobado la aplicación almacenada, y una herramienta que quiera actualizar debe enviar dentro de ella su trama de inicio de actualización (0x7F1); el estado de escucha (0x7F5 = 0x01) se envía cuando la ventana termina sin salto, no al empezar.
 
-**El header JTAG nunca se quita ni se deshabilita.** Siempre está ahí como respaldo — si una actualización CAN alguna vez sale mal, o simplemente lo prefieres, puedes reflashear cualquiera de las 2 imágenes por SWD en cualquier momento.
+**El header JTAG nunca se quita ni se deshabilita.** Siempre está ahí como respaldo — si una actualización CAN alguna vez sale mal, o simplemente lo prefieres, puedes volver a grabar cualquiera de las 2 imágenes por SWD en cualquier momento.
 
 **Dos pulsadores integrados, BOOT y RESET**, también están ahí para recuperación — RESET es un reset de hardware ordinario (`NRST`), y BOOT pone `BOOT0` en alto, que es una decisión a nivel de chip tomada *antes* de que nada de este repositorio corra en absoluto: normalmente (no mantenido) el chip arranca desde la flash hacia el propio bootloader de este proyecto como se describió arriba; mantenido durante el reset, arranca hacia el propio bootloader de System Memory de fábrica de ST en su lugar (recuperación por USB DFU/UART, completamente separado de cualquier cosa de aquí). Ver `src/F303-master/README.md` sección 4a para el detalle técnico completo.
 
@@ -400,7 +400,7 @@ y traducciones:
 - [URTC Tester](https://github.com/JuanenRac/URTC-TESTER)
 
 También existe una alternativa basada en web que cubre terreno similar
-(monitorización en vivo, análisis CAN, flasheo OTA, inspección térmica)
+(monitorización en vivo, análisis CAN, grabación OTA, inspección térmica)
 sin instalar nada localmente: [URTC Web Studio](https://github.com/JuanenRac/URTC-WEB-STUDIO).
 
 <!-- urtc-section:compatibility -->
@@ -426,7 +426,7 @@ Dos formas de ir desde el código fuente de este repositorio hasta los 4 binario
 Después de cualquier cambio en el código fuente del firmware (o antes de confiar en un incremento de versión), ejecuta **`check_version_consistency.sh`** desde la raíz del repositorio: lee las constantes de versión de las Pistas A/E (firmware de la placa principal, aplicación del esclavo de expansión) como fuente de verdad y comprueba cada ubicación que documenta `VERSION_CHECKLIST.txt` para esa etiqueta de versión, reportando cualquier discrepancia — solo reporta, no arregla nada por sí mismo. `VERSION_CHECKLIST.txt` es la referencia completa para las 5 pistas de versión independientes que lleva este proyecto (firmware principal, hardware/PCB, bootloader principal, aplicación del esclavo de expansión, bootloader del esclavo de expansión) y exactamente qué hay que tocar al incrementar cualquiera de ellas.
 
 El firmware y el bootloader se versionan y publican de forma
-independiente - flashear un bootloader nuevo no implica una versión de
+independiente - grabar un bootloader nuevo no implica una versión de
 aplicación nueva y viceversa, así que cada uno tiene su propio historial
 en su propio archivo en vez de un número de versión combinado que
 implicaría que siempre se mueven juntos:
