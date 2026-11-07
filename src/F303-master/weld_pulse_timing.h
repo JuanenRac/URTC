@@ -40,7 +40,9 @@ static inline uint16_t urtc_weld_clamp_ms(uint16_t raw_ms)
     uint32_t v = raw_ms;
     if (v > URTC_WELD_PULSE_MAX_MS) v = URTC_WELD_PULSE_MAX_MS;
     if (v > URTC_WELD_PULSE_HARD_MAX_MS) v = URTC_WELD_PULSE_HARD_MAX_MS;
+#if URTC_WELD_PULSE_MIN_MS > 0u
     if (v < URTC_WELD_PULSE_MIN_MS) v = URTC_WELD_PULSE_MIN_MS;
+#endif
     return (uint16_t)v;
 }
 
