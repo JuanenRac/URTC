@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "urtc_common_version": "0.1.9",
+  "urtc_common_version": "0.2.3",
   "files": {
     "bl_serial_vectors.h": {
       "from": "generated/bl_serial_vectors.h",
@@ -18,6 +18,10 @@
       "from": "generated/ed25519_vectors.h",
       "sha256": "59450f928dc5b0d6d337b446c541b529193e535d86861a34ce7d5eadeb1c4892"
     },
+    "key_rotation_vectors.h": {
+      "from": "generated/key_rotation_vectors.h",
+      "sha256": "6a6325078c3bfc167677c8ca226faf96feca0fffcaf9d16158678952d8b20542"
+    },
     "multinode_scenarios.h": {
       "from": "generated/multinode_scenarios.h",
       "sha256": "342bef555390e3476e6cba2edcdcb5c50b3db52a25d095c330334f9b2f061df8"
@@ -29,6 +33,10 @@
     "test_bootloader_auth.c": {
       "from": "tests/c/test_bootloader_auth.c",
       "sha256": "a5046d8b61b76a27418d7bd48634c8ce6b632c183ad03cab0893165eb137cee8"
+    },
+    "test_key_rotation.c": {
+      "from": "tests/c/test_key_rotation.c",
+      "sha256": "653a5a2903841dd1cc8c4336db91f9627c440c8ad32c1862f732cf698ab7297e"
     },
     "urtc_fw_vectors.h": {
       "from": "generated/urtc_fw_vectors.h",

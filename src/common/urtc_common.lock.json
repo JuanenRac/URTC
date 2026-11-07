@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "urtc_common_version": "0.1.9",
+  "urtc_common_version": "0.2.3",
   "files": {
     "urtc_auth.h": {
       "from": "firmware_base/urtc_auth.h",
@@ -25,6 +25,10 @@
     "urtc_ed25519.h": {
       "from": "firmware_base/urtc_ed25519.h",
       "sha256": "2aab47618c2e67407dfc27a246668263711e457da36a7d34653a445dd29a5529"
+    },
+    "urtc_key_rotation.h": {
+      "from": "firmware_base/urtc_key_rotation.h",
+      "sha256": "7541ff2be58f1d1ba01df3c14de5c71c1e5e1183e062772e1fe46bac3e43c5a1"
     }
   }
 }

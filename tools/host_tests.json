@@ -99,6 +99,17 @@
    "std": "c11"
   },
   {
+   "name": "key_rotation",
+   "test": "tests/test_key_rotation.c",
+   "sources": [],
+   "includes": [
+    "tests",
+    "tests/vectors",
+    "src/common"
+   ],
+   "std": "c11"
+  },
+  {
    "name": "bootloader_crypto",
    "test": "tests/test_bootloader_crypto.c",
    "sources": [
