@@ -82,7 +82,7 @@ URTC est la carte et son firmware : la partie de l'écosystème qui se trouve su
 ## 🏛️ Architecture
 
 <p align="center">
-  <img src="images/architecture.svg" alt="Architecture de URTC : qui l'utilise, ce qu'il contient et de quoi il dépend" width="100%">
+  <img src="images/architecture.svg" alt="Architecture d'URTC : qui l'utilise, ce qu'il contient et de quoi il dépend" width="100%">
 </p>
 
 Comment les parties de ce dépôt s'articulent : qui l'utilise, ce qu'il contient et de quoi il dépend. L'image est dessinée à partir de `docs/architecture.json` et vérifiée par rapport au code.
@@ -146,7 +146,7 @@ La force principale d'URTC est son extrême polyvalence. Au lieu de changer d'é
 
 Pour gérer une aussi grande variété d'applications, le matériel d'URTC est entièrement équipé pour contrôler :
 
-* **Moteurs pas à pas NEMA :** les NEMA 8, 11, 14, et 17 fonctionnent directement via le TMC2209 embarqué, tout comme les NEMA 23 et 34 — jusqu'à **2,0 A** sur n'importe lequel d'entre eux via l'étage de pilotage de la carte principale. Pour les NEMA 23/34 à leur couple nominal complet, un TMC5160 sur le connecteur d'extension (voir ci-dessous) supporte jusqu'à **10A**, mise à l'échelle du courant selon les MOSFETs externes/résistance de mesure choisis pour cette carte — la limite embarquée de 2,0 A ne s'applique plus une fois le moteur déplacé vers le pilote d'extension.
+* **Moteurs pas à pas NEMA :** les NEMA 8, 11, 14, et 17 fonctionnent directement via le TMC2209 embarqué, tout comme les NEMA 23 et 34 — jusqu'à **2,0 A** sur n'importe lequel d'entre eux via l'étage de pilotage de la carte principale. Pour les NEMA 23/34 à leur couple nominal complet, un TMC5160 sur le connecteur d'extension (voir ci-dessous) supporte jusqu'à **10 A**, mise à l'échelle du courant selon les MOSFETs externes/résistance de mesure choisis pour cette carte — la limite embarquée de 2,0 A ne s'applique plus une fois le moteur déplacé vers le pilote d'extension.
 * **Moteurs BLDC 3 phases / moteurs gimbal** pour un mouvement de haute précision.
 * **Moteurs avec capteurs à effet Hall et tachymètres** pour un contrôle en boucle fermée.
 * **Entrées dédiées** pour capteurs de proximité optiques réflectifs comme le TCRT5000, plus une entrée générique de fin de course active-bas partagée entre quatre profils d'outils.
@@ -157,9 +157,9 @@ Un connecteur 20 broches, séparé des connecteurs spécifiques aux outils, pour
 
 | Broches | Signal |
 |---|---|
-| 4 | 24V |
-| 1 | 3.3V |
-| 1 | 5V |
+| 4 | 24 V |
+| 1 | 3,3 V |
+| 1 | 5 V |
 | 3 | GND |
 | 2 | I2C bit-bang (SCL/SDA) — son propre bus, séparé de l'I2C2 matériel de l'OLED/F-RAM |
 | 3 | STEP/DIR/EN — universel pour l'une ou l'autre des puces pilotes ci-dessous |
@@ -177,9 +177,9 @@ Le détail complet broche par broche — quelle broche du MCU porte quel signal,
 
 #### Les 6 variantes de carte d'extension
 
-4 des 6 variantes de carte d'extension embarquent un pilote de moteur pas à pas — soit un TMC2209 (jusqu'à 2A/bobine, MOSFETs de puissance intégrés) soit un TMC5160A (jusqu'à 10A+/bobine, nécessite 8 MOSFETs de puissance externes que le pilote lui-même n'inclut pas). Indépendamment de ce choix de pilote, une carte porteuse de pilote est soit **basique** (pilote + connecteurs seulement, pas de MCU — STEP/DIR/EN routés directement depuis la carte principale) soit **avancée** (ajoute un second microcontrôleur, STM32F303CBT6, plus 2 puces de capteurs locaux — un ADC 16 bits ADS1115 et une caméra thermique de la famille MLX9064x — et génération PWM locale pour les outils dont la temporisation doit être générée directement au niveau de la tête d'outil plutôt que routé sur un câble). 2×2 combinaisons, plus 2 cartes basiques supplémentaires uniquement capteurs (ADS1115 ou MLX9064x, câblées directement au STM32F303CC de la carte principale, sans pilote ni MCU esclave) pour un outil n'ayant besoin que de l'une de ces 2 puces et de rien d'autre qu'une carte avancée porterait aussi — 6 cartes au total — voir `BOM/BOM_EXPANSION_*.TXT` (6 fichiers), `docs/EXPANSION.TXT`, et `docs/PINOUT_SLAVE.txt`.
+4 des 6 variantes de carte d'extension embarquent un pilote de moteur pas à pas — soit un TMC2209 (jusqu'à 2A/bobine, MOSFETs de puissance intégrés) soit un TMC5160A (jusqu'à 10A+/bobine, nécessite 8 MOSFETs de puissance externes que le pilote lui-même n'inclut pas). Indépendamment de ce choix de pilote, une carte porteuse de pilote est soit **basique** (pilote + connecteurs seulement, pas de MCU — STEP/DIR/EN routés directement depuis la carte principale) soit **avancée** (ajoute un second microcontrôleur, STM32F303CBT6, plus 2 puces de capteurs locaux — un ADC 16 bits ADS1115 et une caméra thermique de la famille MLX9064x — et génération PWM locale pour les outils dont la temporisation doit être générée directement au niveau de la tête d'outil plutôt que routée sur un câble). 2×2 combinaisons, plus 2 cartes basiques supplémentaires uniquement capteurs (ADS1115 ou MLX9064x, câblées directement au STM32F303CC de la carte principale, sans pilote ni MCU esclave) pour un outil n'ayant besoin que de l'une de ces 2 puces et de rien d'autre qu'une carte avancée porterait aussi — 6 cartes au total — voir `BOM/BOM_EXPANSION_*.TXT` (6 fichiers), `docs/EXPANSION.TXT`, et `docs/PINOUT_SLAVE.txt`.
 
-Le STM32F303CBT6 propre de la variante avancée parle à la carte principale via le bus I2C bit-bang existant du connecteur d'extension ci-dessus — carte principale en maître, puce esclave répondant comme un véritable esclave I2C matériel — et pilote son propre second bus I2C, local uniquement, pour les 2 puces de capteurs. Elle dispose de son propre bootloader et firmware applicatif, mis à jour de la même manière que la carte principale (CAN-OTA depuis `URTC Flasher`), simplement relayé via cette liaison I2C plutôt que d'atteindre directement la puce esclave. Voir `src/F303-slave/README.md` et `src/F303-slave/boot/README.md` pour le détail technique complet.
+Le STM32F303CBT6 de la variante avancée parle à la carte principale via le bus I2C bit-bang existant du connecteur d'extension ci-dessus — carte principale en maître, puce esclave répondant comme un véritable esclave I2C matériel — et pilote son propre second bus I2C, local uniquement, pour les 2 puces de capteurs. Elle dispose de son propre bootloader et firmware applicatif, mis à jour de la même manière que la carte principale (CAN-OTA depuis `URTC Flasher`), simplement relayé via cette liaison I2C plutôt que d'atteindre directement la puce esclave. Voir `src/F303-slave/README.md` et `src/F303-slave/boot/README.md` pour le détail technique complet.
 
 ### Persistance des paramètres
 
@@ -191,17 +191,17 @@ Une F-RAM FM24CL64B embarquée (64Kbit, I2C) conserve un instantané mis à jour
 
 Grâce à sa logique de commutation dynamique, le firmware gère nativement les têtes d'outils suivantes :
 
-1. **Station de soudage (T12) :** contrôle de la température avec hystérésis (tout ou rien, pas de PID) utilisant un retour ADC direct pour gérer les panne T12 standards, plus un dévidoir motorisé alimentant le fil de soudure dans le joint (partage `CONN_MOT` et son protocole pas à pas avec les outils de mouvement simple ci-dessous - échange l'entrée de fin de course générique propre à cet outil pour lui faire de la place). [Configuration cavaliers/câblage →](images/TOOL_SOLDERING_IRON.png)
+1. **Station de soudage (T12) :** contrôle de la température avec hystérésis (tout ou rien, pas de PID) utilisant un retour ADC direct pour gérer les pannes T12 standards, plus un dévidoir motorisé alimentant le fil de soudure dans le joint (partage `CONN_MOT` et son protocole pas à pas avec les outils de mouvement simple ci-dessous - échange l'entrée de fin de course générique propre à cet outil pour lui faire de la place). [Configuration cavaliers/câblage →](images/TOOL_SOLDERING_IRON.png)
 2. **Distributeur de pâte à souder SMT :** contrôle d'avance millimétrique pour un dépôt précis de pâte à souder sur les PCB. [Configuration cavaliers/câblage →](images/TOOL_PASTE_DISPENSER.png)
 3. **Distributeur de pâte thermique / liquide :** gestion de la fluidité pour pâtes à haute viscosité ou adhésifs liquides. [Configuration cavaliers/câblage →](images/TOOL_LIQUID_DISPENSER.png)
 4. **Tournevis électrique intelligent :** contrôle de rotation et d'arrêt via l'interface pas à pas. Prévu : arrêt sur limites de couple (aucune mesure de couple n'existe encore). [Configuration cavaliers/câblage →](images/TOOL_SCREWDRIVER.png)
 5. **Pince à vide / pneumatique :** contrôle de pompe à vide et lecture du niveau de pression pour des opérations Pick-and-Place sûres. [Configuration cavaliers/câblage →](images/TOOL_VACUUM_PICKUP.png)
 6. **Perceuse (BL4260) :** contrôle de vitesse PWM, inversion de sens, et freinage électrique dynamique avec lecture RPM en direct, sur sa propre ligne dédiée d'activation/freinage, indépendante de l'activation du pilote de l'outil pas à pas. Entrée de fin de course générique disponible. [Configuration cavaliers/câblage →](images/TOOL_DRILL.png)
 7. **Pince gimbal :** manipulation à haute sensibilité utilisant des moteurs gimbal brushless 3 phases. [Configuration cavaliers/câblage →](images/TOOL_GRIPPER_GIMBAL.png)
-8. **Pince NEMA :** force de serrage robuste contrôlée via un moteur pas à pas robuste. [Configuration cavaliers/câblage →](images/TOOL_GRIPPER_NEMA.png)
+8. **Pince NEMA :** force de serrage robuste contrôlée via un moteur pas à pas de forte puissance. [Configuration cavaliers/câblage →](images/TOOL_GRIPPER_NEMA.png)
 9. **Système AOI (Inspection Optique Automatisée) :** contrôle stroboscopique synchrone du réseau d'éclairage LED pour la capture de caméra de vision industrielle. Entrée de fin de course générique disponible. [Configuration cavaliers/câblage →](images/TOOL_AOI_INSPECTION.png)
-10. **Diode laser de gravure (10W optique) :** modulation PWM de la puissance du faisceau avec un watchdog CAN logiciel qui verrouille la sortie laser si la communication avec l'hôte est perdue (compilé, jamais exécuté sur une vraie carte, et ne remplace pas un verrouillage matériel indépendant). Entrée de fin de course générique disponible. [Configuration cavaliers/câblage →](images/TOOL_LASER_ENGRAVER.png)
-11. **Hotend d'impression 3D :** contrôle tout ou rien avec hystérésis de la cartouche chauffante, lecture de thermistance NTC, contrôle de l'extrudeur, et un ventilateur de refroidissement de couche dédié piloté en PWM 25kHz (4 fils, retour tachymétrique, propre watchdog de communication) — le tout intégré en un seul bloc. [Configuration cavaliers/câblage →](images/TOOL_3D_PRINTER.png)
+10. **Diode laser de gravure (10 W optique) :** modulation PWM de la puissance du faisceau avec un watchdog CAN logiciel qui verrouille la sortie laser si la communication avec l'hôte est perdue (compilé, jamais exécuté sur une vraie carte, et ne remplace pas un verrouillage matériel indépendant). Entrée de fin de course générique disponible. [Configuration cavaliers/câblage →](images/TOOL_LASER_ENGRAVER.png)
+11. **Hotend d'impression 3D :** contrôle tout ou rien avec hystérésis de la cartouche chauffante, lecture de thermistance NTC, contrôle de l'extrudeur, et un ventilateur de refroidissement de couche dédié piloté en PWM 25 kHz (4 fils, retour tachymétrique, propre watchdog de communication) — le tout intégré en un seul bloc. [Configuration cavaliers/câblage →](images/TOOL_3D_PRINTER.png)
 12. **Sonde de scanner 3D :** entrée d'interruption matérielle ultra-rapide (EXTI) avec priorité absolue pour la numérisation de surface en temps réel et la détection d'impact sans latence. Couvre aussi le palpage tactile de métrologie - le même chemin matériel, une sonde physique différente sur la même tête d'outil. [Configuration cavaliers/câblage →](images/TOOL_SCAN_PROBE.png)
 13. **Tête Pick & Place SMT :** axe A rotatif pour un alignement correct des pastilles, sur la même interface pas à pas que les distributeurs de pâte/liquide et les deux pinces ci-dessus. [Configuration cavaliers/câblage →](images/TOOL_SMT_PICKPLACE.png)
 14. **Électroaimant robuste :** contrôle de préhension marche/arrêt pour pièces ferromagnétiques, à partir de la sortie chauffante du T12 réutilisée comme pilote GPIO générique. [Configuration cavaliers/câblage →](images/TOOL_ELECTROMAGNET.png)
@@ -262,7 +262,7 @@ Le même panneau pré-monté sur une petite carte porteuse avec un connecteur 4 
 | Broche module OLED | Broche CONN_OLED | Signal |
 |---|---|---|
 | GND | 1 | Masse |
-| VDD | 2 | +3.3V (alimentation logique de l'écran) |
+| VDD | 2 | +3,3 V (alimentation logique de l'écran) |
 | SCK | 3 | SCL — PA9, I2C2 matériel |
 | SDA | 4 | SDA — PA10, I2C2 matériel |
 
@@ -331,8 +331,8 @@ Séparée de l'OLED et de l'anneau d'éclairage 8 pixels, `CONN_LED1` porte une 
 **Automatique par défaut, contournable par l'hôte à la demande.** Le firmware colore cette LED de lui-même, selon une priorité à trois niveaux :
 
 * 🔴 **Rouge** — un défaut matériel est actif (`system_error_flag`). L'emporte toujours, quoi qu'il se passe par ailleurs.
-* 🔵 **Bleu** — la carte fonctionne activement : une trame CAN (n'importe quel ID) est arrivée dans les 1.5 dernières secondes.
-* 🟢 **Vert** — inactive, en attente de commandes : aucun trafic CAN depuis plus de 1.5 secondes.
+* 🔵 **Bleu** — la carte fonctionne activement : une trame CAN (n'importe quel ID) est arrivée dans les 1,5 dernières secondes.
+* 🟢 **Vert** — inactive, en attente de commandes : aucun trafic CAN depuis plus de 1,5 seconde.
 
 Le maître peut toujours contourner cela à tout moment en envoyant l'ID CAN `0x100` (DLC 8) avec l'intensité rouge, verte et bleue comme les trois premiers octets (0-255 chacune — couleur 24 bits complète, pas seulement les trois automatiques). Une couleur envoyée par l'hôte tient pendant 10 secondes avant de revenir au schéma automatique — assez longtemps pour être réellement vue, assez court pour que la carte ne reste pas bloquée à afficher une couleur personnalisée périmée si l'hôte arrête de la mettre à jour. Renvoyer `0x100` (que ce soit la même couleur ou une nouvelle) rafraîchit cette fenêtre de 10 secondes, donc un hôte voulant garder le contrôle personnalisé n'a qu'à continuer à l'envoyer périodiquement. Un défaut matériel interrompt toujours un contournement actif — le rouge est toujours prioritaire sur toute couleur que l'hôte avait réglée.
 
@@ -341,7 +341,7 @@ Voir `docs/CANBUS.TXT` (ID `0x100`) pour la disposition exacte des octets, qui p
 ## 🔒 Sécurité et protection
 
 - **Protection contre l'emballement thermique** (`thermal_guard.c`, depuis l'application 0.3.2) sur le fer à souder / air chaud et la buse 3D : un MAXTEMP sur la température *mesurée* (449 °C T12, 310 °C buse), une surveillance de chauffe (la température doit réellement monter quand la chauffe est active - détecte une thermistance ou une panne desserrée) et un contrôle de maintien (une fois la consigne atteinte, pas de chute prolongée avec la chauffe active). Un défaut coupe la chauffe, verrouille l'erreur de la carte et en indique la cause dans l'octet 4 de `0x111`. Testé sur l'hôte avec une chauffe simulée (`tests/test_thermal_guard.c`). Ses limites n'ont jamais été mesurées sur un vrai élément chauffant, et rien de tout cela n'a tourné sur une carte.
-- **Tests hôte de la logique du firmware autour du matériel** (`tools/run_host_tests.py`, 50 suites) : outre le bootloader, la garde thermique et le répartiteur, les vrais gestionnaires CAN des 13 outils (`firmware_can_*.c`), les boucles de régulation du chauffage (`firmware_control_thermal.c` : conversion de l'ADC, mesures impossibles, plafonds de consigne, hystérésis, chauffage bloqué, défauts de la garde), l'enregistreur de défauts (`firmware_blackbox.c`, comparé octet par octet aux scénarios que URTC-COMMON écrit depuis son propre modèle, et sa lecture CAN), l'identification de l'outil par les cavaliers, les commandes après la porte d'erreur et les commandes de la caméra thermique sont compilés contre une fausse HAL (`tests/host_hal/`) et exécutés sous les sanitizers d'adresse et de comportement indéfini et `gcc -fanalyzer` ; `--coverage-floor` (`URTC_COVERAGE_FLOOR` dans la CI) les tient à une part de lignes exécutées (94,0 pour cent des lignes des 83 sources du firmware que les suites compilent (3 sur 86 demandent la carte), ce qui inclut maintenant le démarrage et la boucle principale de l'application, le pilote de l'OLED et ses écrans, la LED d'état, les gestionnaires d'interruption, les bus du connecteur d'extension, les trois caméras thermiques, l'esclave d'extension et les programmes principaux des deux bootloaders ; le plancher de la CI est de 90). Rien de cela n'a tourné sur une carte.
+- **Tests hôte de la logique du firmware autour du matériel** (`tools/run_host_tests.py`, 50 suites) : outre le bootloader, la protection thermique et le répartiteur, les vrais gestionnaires CAN des 13 outils (`firmware_can_*.c`), les boucles de régulation du chauffage (`firmware_control_thermal.c` : conversion de l'ADC, mesures impossibles, plafonds de consigne, hystérésis, chauffage bloqué, défauts de la protection), l'enregistreur de défauts (`firmware_blackbox.c`, comparé octet par octet aux scénarios que URTC-COMMON écrit depuis son propre modèle, et sa lecture CAN), l'identification de l'outil par les cavaliers, les commandes après la porte d'erreur et les commandes de la caméra thermique sont compilés contre une fausse HAL (`tests/host_hal/`) et exécutés sous les sanitizers d'adresse et de comportement indéfini et `gcc -fanalyzer` ; `--coverage-floor` (`URTC_COVERAGE_FLOOR` dans la CI) les tient à une part de lignes exécutées (94,0 pour cent des lignes des 83 sources du firmware que les suites compilent (3 sur 86 demandent la carte), ce qui inclut maintenant le démarrage et la boucle principale de l'application, le pilote de l'OLED et ses écrans, la LED d'état, les gestionnaires d'interruption, les bus du connecteur d'extension, les trois caméras thermiques, l'esclave d'extension et les programmes principaux des deux bootloaders ; le plancher de la CI est de 90). Rien de cela n'a tourné sur une carte.
 - **Diagnostic :** l'octet 5 de `0x111` indique la cause du dernier redémarrage (bit0 = le watchdog matériel s'est déclenché) ; `0x1AA`/`0x1AB` renvoient des compteurs de vie conservés en F-RAM - défauts thermiques, code du dernier défaut et durée totale de chauffe (depuis 0.3.3) ; les échantillons de la boîte noire enregistrent le code de défaut thermique.
 - **Signature du firmware :** le bootloader de la carte principale ne détient aucun secret : il vérifie un enregistrement Ed25519 contre une table de clés publiques (`keys/image_trust.json`), compilée en table de banc avec une clé publique de développement ou en table officielle, vide tant que la clé de signature des images n'est pas créée. Le bootloader de l'extension esclave ne contient aucune clé de signature dans son chemin de mise à jour : il n'installe une image que lorsque la carte principale, après avoir vérifié l'enregistrement Ed25519, lui confirme cette image exacte dans cette session de mise à jour, et il fait confiance à la carte principale à travers le bus de liaison interne (voir [`docs/SLAVE_BOOT_CONFIRMATION.md`](docs/SLAVE_BOOT_CONFIRMATION.md)) ; il ne contient ni clé ni routine HMAC, et tient son propre compteur anti-retour signé dans un journal en ajout seul, que la carte principale lit et applique aussi. Chaque image de `firmware/` est livrée avec `<bin>.sha256` et `<bin>.manifest.json`, si bien qu'URTC Flasher et URTC Web Studio ne portent aucune clé. Voir [`docs/FIRMWARE_SIGNING.TXT`](docs/FIRMWARE_SIGNING.TXT). Chaque fichier d'une release officielle porte aussi une signature de release Ed25519 détachée (`<fichier>.sig`, clé publique dans [`docs/RELEASE_SIGNING.md`](docs/RELEASE_SIGNING.md)) ; le flasher et le web studio la vérifient lorsqu'elle est présente.
 - **Bus CAN :** il n'authentifie pas l'émetteur - n'importe quel nœud peut commander les outils. Les installations avec laser, chauffe ou soudure **doivent** avoir un verrouillage matériel indépendant du MCU et un bus fermé : [`docs/CAN_THREAT_MODEL.TXT`](docs/CAN_THREAT_MODEL.TXT).
@@ -350,7 +350,7 @@ Voir `docs/CANBUS.TXT` (ID `0x100`) pour la disposition exacte des octets, qui p
 
 ## 🔌 Interfaces
 
-Une fois le bootloader en place, la mise à jour de l'application ne nécessite plus du tout d'accès physique à la carte — il suffit d'envoyer le nouveau build de firmware sur la même ligne CAN ombilicale qui porte déjà les commandes vers la tête d'outil.
+Une fois le bootloader en place, la mise à jour de l'application ne nécessite plus du tout d'accès physique à la carte — il suffit d'envoyer le nouveau build de firmware sur le même câble CAN qui porte déjà les commandes vers la tête d'outil.
 
 **La séquence de mise à jour :**
 
@@ -370,7 +370,7 @@ Une fois le bootloader en place, la mise à jour de l'application ne nécessite 
 
 ## 🚀 Démarrage rapide
 
-Le flash d'URTC est divisé en deux parties indépendantes, de sorte que la carte puisse être reprogrammée via le même cordon ombilical CAN qu'elle utilise déjà pour tout le reste — sans jamais avoir besoin d'un accès physique au connecteur JTAG/SWD après la configuration initiale.
+Le flash d'URTC est divisé en deux parties indépendantes, de sorte que la carte puisse être reprogrammée via le même câble CAN qu'elle utilise déjà pour tout le reste — sans jamais avoir besoin d'un accès physique au connecteur JTAG/SWD après la configuration initiale.
 
 ### Configuration initiale — nécessite JTAG/SWD (une seule fois)
 
@@ -537,7 +537,7 @@ URTC est fait de dépôts indépendants, chacun avec sa version, ses tests et so
 * Avant une pull request, lancez `URTC_CI=1 python tools/ci_validate.py` : il doit réussir. Voir [CONTRIBUTING.md](CONTRIBUTING.md) et le [code de conduite](CODE_OF_CONDUCT.md).
 * Le README existe en huit langues : une modification du texte se fait dans les huit fichiers, et les sections partagées avec d'autres dépôts sont écrites par `tools/readme_sections.py` d'URTC-COMMON.
 * Ne décrivez pas comme fonctionnant sur une carte ce qui a seulement été compilé.
-* Signalez une vulnérabilité en privé : [SECURITY.md](SECURITY.md). Questions, idées et rapports : electrohobby3d@gmail.com ([SUPPORT.md](SUPPORT.md)).
+* Signalez une vulnérabilité en privé : [SECURITY.md](SECURITY.md). Questions, idées et signalements : electrohobby3d@gmail.com ([SUPPORT.md](SUPPORT.md)).
 
 ## 👤 AUTEUR
 
