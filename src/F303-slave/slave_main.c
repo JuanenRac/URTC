@@ -139,20 +139,10 @@ int main(void) {
 
     while (1) {
         HAL_IWDG_Refresh(&hiwdg);
-        // Serviced right after a fresh IWDG reload, not after PWM_Tick/the
-        // link-comms-loss check below: a real MLX90640/90641 capture (the
-        // only thing this can ever actually run - see its own comment)
-        // can take a real, measured >500ms, and starting it with the full
-        // ~0.8s watchdog budget just refreshed is what keeps this loop
-        // from starving the IWDG the way running that same capture inside
-        // I2C1's own ISR used to (see MLX_TriggerCapture's own comment,
-        // slave_i2c_sensors.c). PWM_Tick and the link-comms-loss failsafe
-        // just below it still always run at least once per loop
-        // iteration - a capture in flight delays their next check by its
-        // own duration, exactly as it would delay this same reload above
-        // by one iteration if a capture were ever in flight across a
-        // refresh - a real, bounded, documented trade-off, not silently
-        // dropped safety coverage.
+        // Serviced right after a fresh IWDG reload. A capture of the thermal camera is a state machine (slave_mlx_capture.h): each pass of this loop
+        // does at most one small step of it (start the measurement, ask whether the frame is ready, read it, calibrate it), so the wait for the camera
+        // (up to about half a second) costs the loop nothing and PWM_Tick and the link-comms-loss failsafe just below still run on every pass. What is
+        // left in one step is the library call that reads the frame or calibrates it; its duration on the real chip is still to be measured.
         MLX_ServiceCapture();
         PWM_Tick();
 

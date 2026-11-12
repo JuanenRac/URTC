@@ -36,6 +36,7 @@
 #include "stm32f3xx_hal.h"
 #include "slave_common.h"
 #include "slave_i2c_sensors.h"
+#include "slave_mlx_capture.h"
 
 // -----------------------------------------------------------------------
 // Generic I2C2 master transport
@@ -152,18 +153,22 @@ static void MLX90640_DoInit(void) {
     // real capture attempt reports against that state.
 }
 
-static void MLX90640_DoTriggerCapture(void) {
-    mlx90640_capture_status = MLX_CAPTURE_BUSY;
+// The four joints of a capture (slave_mlx_capture.h): MLX_ServiceCapture runs them one per pass of the main loop.
+static int MLX90640_CaptureTrigger(void) {
+    return MLX90640_TriggerMeasurement(MLX90640_I2C_ADDR);
+}
 
-    if (MLX90640_TriggerMeasurement(MLX90640_I2C_ADDR) < 0) {
-        mlx90640_capture_status = MLX_CAPTURE_ERROR;
-        return;
-    }
-    if (MLX90640_GetFrameData(MLX90640_I2C_ADDR, mlx90640_frame_data) < 0) {
-        mlx90640_capture_status = MLX_CAPTURE_ERROR;
-        return;
-    }
+static int MLX90640_CaptureDataReady(void) {
+    uint16_t status = 0;
+    if (MLX90640_I2CRead(MLX90640_I2C_ADDR, MLX90640_STATUS_REG, 1, &status) != MLX90640_NO_ERROR) return -1;
+    return MLX90640_GET_DATA_READY(status) ? 1 : 0;
+}
 
+static int MLX90640_CaptureReadFrame(void) {
+    return MLX90640_GetFrameData(MLX90640_I2C_ADDR, mlx90640_frame_data);   // the camera has already said the frame is ready: no waiting inside the library
+}
+
+static void MLX90640_CaptureCalibrate(void) {
     float ta = MLX90640_GetTa(mlx90640_frame_data, &mlx90640_params);
     // tr defaults to ta-8 per Melexis's own reference examples,
     // emissivity 0.95 is a common non-reflective PCB/solder-mask
@@ -172,8 +177,6 @@ static void MLX90640_DoTriggerCapture(void) {
     float tr = ta - 8.0f;
     float emissivity = 0.95f;
     MLX90640_CalculateTo(mlx90640_frame_data, &mlx90640_params, emissivity, tr, mlx90640_calibrated_frame);
-
-    mlx90640_capture_status = MLX_CAPTURE_READY;
 }
 
 static void MLX90640_DoGetRawChunk(uint8_t chunk_index, uint8_t out[32]) {
@@ -266,24 +269,26 @@ static void MLX90641_DoInit(void) {
     }
 }
 
-static void MLX90641_DoTriggerCapture(void) {
-    mlx90641_capture_status = MLX_CAPTURE_BUSY;
+// The four joints of a capture, as for the MLX90640 above.
+static int MLX90641_CaptureTrigger(void) {
+    return MLX90641_TriggerMeasurement(MLX90641_I2C_ADDR);
+}
 
-    if (MLX90641_TriggerMeasurement(MLX90641_I2C_ADDR) < 0) {
-        mlx90641_capture_status = MLX_CAPTURE_ERROR;
-        return;
-    }
-    if (MLX90641_GetFrameData(MLX90641_I2C_ADDR, mlx90641_frame_data) < 0) {
-        mlx90641_capture_status = MLX_CAPTURE_ERROR;
-        return;
-    }
+static int MLX90641_CaptureDataReady(void) {
+    uint16_t status = 0;
+    if (MLX90641_I2CRead(MLX90641_I2C_ADDR, 0x8000, 1, &status) != 0) return -1;   // status register, bit 3 = new data (the vendored library reads it the same way)
+    return (status & 0x0008) ? 1 : 0;
+}
 
+static int MLX90641_CaptureReadFrame(void) {
+    return MLX90641_GetFrameData(MLX90641_I2C_ADDR, mlx90641_frame_data);
+}
+
+static void MLX90641_CaptureCalibrate(void) {
     float ta = MLX90641_GetTa(mlx90641_frame_data, &mlx90641_params);
     float tr = ta - 8.0f;
     float emissivity = 0.95f;
     MLX90641_CalculateTo(mlx90641_frame_data, &mlx90641_params, emissivity, tr, mlx90641_calibrated_frame);
-
-    mlx90641_capture_status = MLX_CAPTURE_READY;
 }
 
 static void MLX90641_DoGetRawChunk(uint8_t chunk_index, uint8_t out[32]) {
@@ -450,6 +455,12 @@ void Sensors_Init(void) {
 static volatile uint8_t mlx_capture_requested = 0;
 static volatile uint8_t mlx_init_requested = 0;
 
+// The capture in flight (main loop only) and the camera it belongs to; the joints of each camera are the functions above.
+static MlxCapture mlx_capture;
+static uint8_t mlx_capture_variant = MLX_VARIANT_NONE;
+static const MlxCaptureOps mlx90640_capture_ops = { MLX90640_CaptureTrigger, MLX90640_CaptureDataReady, MLX90640_CaptureReadFrame, MLX90640_CaptureCalibrate };
+static const MlxCaptureOps mlx90641_capture_ops = { MLX90641_CaptureTrigger, MLX90641_CaptureDataReady, MLX90641_CaptureReadFrame, MLX90641_CaptureCalibrate };
+
 void MLX_RequestInit(void) {
     mlx_init_requested = 1;
 }
@@ -487,15 +498,31 @@ void MLX_TriggerCapture(void) {
 void MLX_ServiceCapture(void) {
     if (mlx_init_requested) {
         mlx_init_requested = 0;
+        if (mlx_capture_active(&mlx_capture)) {   // the capture in flight belonged to the camera that was chosen before
+            mlx_capture_abort(&mlx_capture);
+            mlx90640_capture_status = MLX_CAPTURE_IDLE;
+            mlx90641_capture_status = MLX_CAPTURE_IDLE;
+        }
         Sensors_Init();          // the sensor the master has just chosen; a capture requested meanwhile runs after it
+    }
+    uint32_t now = HAL_GetTick();
+    if (mlx_capture_active(&mlx_capture)) {
+        // One small step of the capture in flight (see slave_mlx_capture.h): the loop is back at the watchdog, the PWM tick and the failsafe after each.
+        const MlxCaptureOps *ops = (mlx_capture_variant == MLX_VARIANT_90640) ? &mlx90640_capture_ops : &mlx90641_capture_ops;
+        volatile uint8_t *status = (mlx_capture_variant == MLX_VARIANT_90640) ? &mlx90640_capture_status : &mlx90641_capture_status;
+        int result = mlx_capture_step(&mlx_capture, ops, now);
+        if (result == MLX_CAPTURE_STEP_DONE) *status = MLX_CAPTURE_READY;
+        else if (result == MLX_CAPTURE_STEP_ERROR) *status = MLX_CAPTURE_ERROR;
+        return;
     }
     if (!mlx_capture_requested) return;
     mlx_capture_requested = 0;
-    if (mlx_sensor_variant == MLX_VARIANT_90640) {
-        MLX90640_DoTriggerCapture();
-    } else if (mlx_sensor_variant == MLX_VARIANT_90641) {
-        MLX90641_DoTriggerCapture();
-    }
+    if (mlx_sensor_variant != MLX_VARIANT_90640 && mlx_sensor_variant != MLX_VARIANT_90641) return;
+    mlx_capture_variant = mlx_sensor_variant;
+    const MlxCaptureOps *ops = (mlx_capture_variant == MLX_VARIANT_90640) ? &mlx90640_capture_ops : &mlx90641_capture_ops;
+    volatile uint8_t *status = (mlx_capture_variant == MLX_VARIANT_90640) ? &mlx90640_capture_status : &mlx90641_capture_status;
+    *status = MLX_CAPTURE_BUSY;
+    if (mlx_capture_begin(&mlx_capture, ops, now) == MLX_CAPTURE_STEP_ERROR) *status = MLX_CAPTURE_ERROR;
 }
 
 uint8_t MLX_GetCaptureStatus(void) {

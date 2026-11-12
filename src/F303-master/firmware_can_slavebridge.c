@@ -105,7 +105,7 @@ void Handle_CAN_SlaveBridge(void) {
         // payload itself, the slave's own firmware does, same reasoning
         // as every other passthrough in this project not duplicating a
         // check its destination already makes correctly.
-        ExpansionI2C_SlaveWriteRegister(REG_APP_ENTER_BOOTLOADER, rxData, 4);
+        ExpansionI2C_AppWriteRegister(REG_APP_ENTER_BOOTLOADER, rxData, 4);
 
     } else if (rxHeader.StdId == URTC_CAN_ID_SLAVE_START_UPDATE && rxHeader.DLC == 8) {
         // Resets any partial accumulation left behind by an aborted/retried
@@ -241,7 +241,7 @@ void Handle_CAN_SlaveBridge(void) {
         // Only the registers and payload lengths listed in urtc_slave_regs.h
         // are relayed; anything else is dropped without an answer.
         if (urtc_slave_app_write_allowed(rxData[0], (uint8_t)(rxHeader.DLC - 1))) {
-            ExpansionI2C_SlaveWriteRegister(rxData[0], &rxData[1], (uint8_t)(rxHeader.DLC - 1));
+            ExpansionI2C_AppWriteRegister(rxData[0], &rxData[1], (uint8_t)(rxHeader.DLC - 1));
         }
 
     } else if (rxHeader.StdId == URTC_CAN_ID_SLAVE_REG_READ && rxHeader.DLC == 2) {
@@ -261,7 +261,7 @@ void Handle_CAN_SlaveBridge(void) {
         // companion instead.
         uint8_t response[URTC_SLAVE_APP_VERSION_LEN > 8 ? URTC_SLAVE_APP_VERSION_LEN : 8];
         uint8_t is_version = (reg == URTC_SLAVE_APP_VERSION_REG);
-        if (ExpansionI2C_SlaveReadRegister(reg, response, is_version ? (uint8_t)URTC_SLAVE_APP_VERSION_LEN : len)) {
+        if (ExpansionI2C_AppReadRegister(reg, response, is_version ? (uint8_t)URTC_SLAVE_APP_VERSION_LEN : len)) {
             SendCanResponse(URTC_CAN_ID_SLAVE_REG_READ, response, len);
             if (is_version) {
                 // Accepted when the slave sends one (1..127); a slave application

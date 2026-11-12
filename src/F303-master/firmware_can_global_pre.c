@@ -306,7 +306,7 @@ void Handle_CAN_GlobalCommands_PreErrorGate(void) {
         if (rxHeader.StdId == URTC_CAN_ID_SET_MLX_VARIANT && rxHeader.DLC >= 1 && rxData[0] <= 3) {
             mlx_sensor_variant = rxData[0];
             if (expansion_board_type == 3 || expansion_board_type == 4) {
-                ExpansionI2C_SlaveWriteRegister(0x14, &rxData[0], 1); // REG_MLX_SENSOR_VARIANT, see slave_common.h - rxData[0] holds the same value just assigned to mlx_sensor_variant above, without that variable's volatile qualifier
+                ExpansionI2C_AppWriteRegister(0x14, &rxData[0], 1); // REG_MLX_SENSOR_VARIANT, see slave_common.h - rxData[0] holds the same value just assigned to mlx_sensor_variant above, without that variable's volatile qualifier
             }
         }
         if (rxHeader.StdId == URTC_CAN_ID_SET_MLX_VARIANT || rxHeader.StdId == URTC_CAN_ID_MLX_VARIANT_RESP) {

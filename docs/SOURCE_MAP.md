@@ -158,7 +158,7 @@ Every file of the repository with a line on what it does: the annotated tree tha
 │   ├── seal_image.py            The step after the link: fills in the length and the CRC-32 of the header an application image carries inside it
 │   ├── verify_release_set.py    Checks a folder of signed release assets (digests, signatures against the registered public key) before the workflow publishes them
 │   ├── run_host_tests.py        Executor of the host test suites (ctest where cmake is installed, shared with the other firmware repositories), with the sanitizers, the analysis and a coverage floor
-│   ├── host_tests.json          The 53 suites: sources, include folders and flags
+│   ├── host_tests.json          The 58 suites: sources, include folders and flags
 │   ├── c_quality.py / c_quality.json  Checks the compiler of the board does not make: `-Wconversion` with the host compiler, cppcheck and the length of comment blocks (what is excluded and why, and the limits, are in the JSON)
 │   ├── gen_build_scripts.py / build_plan.json  Writes the pinned vendor sources, the compiler and linker flags and the HAL modules into build_firmware.sh and build_firmware.bat from one file (`--check` in CI)
 │   ├── bootloader_twin.py / changelog_section.py / fuzz_virtual_board.py The twin of the bootloader (build and drive); the text of one CHANGELOG section for a release; a fuzz run of the virtual board

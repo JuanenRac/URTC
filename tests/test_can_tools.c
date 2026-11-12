@@ -34,6 +34,7 @@ void WeldPulse_Tick(void);
 // ---- recorders for the modules this suite does not link --------------------------------------------------------------------
 static uint8_t i2c_writes, i2c_reg, i2c_len, i2c_data[8];
 static uint8_t slave_read_ok, slave_read_value[2];
+static uint8_t i2c_checked_calls;   // which of the two families of calls the handlers made (the checked ones carry the CRC-8 of the link)
 uint8_t ExpansionI2C_SlaveWriteRegister(uint8_t reg, const uint8_t *data, uint8_t len)
 {
     i2c_writes++;
@@ -54,6 +55,22 @@ uint8_t ExpansionI2C_SlaveReadRegister(uint8_t reg, uint8_t *data, uint8_t len)
     memcpy(data, slave_read_value, len);
     return 1;
 }
+uint8_t ExpansionI2C_SlaveWriteRegisterCrc(uint8_t reg, const uint8_t *data, uint8_t len)
+{
+    i2c_checked_calls++;
+    return ExpansionI2C_SlaveWriteRegister(reg, data, len);
+}
+uint8_t ExpansionI2C_SlaveReadRegisterCrc(uint8_t reg, uint8_t *data, uint8_t len)
+{
+    i2c_checked_calls++;
+    return ExpansionI2C_SlaveReadRegister(reg, data, len);
+}
+uint8_t ExpansionI2C_SlaveReadRegisterWithParamCrc(uint8_t reg, uint8_t param, uint8_t *data, uint8_t len)
+{
+    (void)param;
+    i2c_checked_calls++;
+    return ExpansionI2C_SlaveReadRegister(reg, data, len);
+}
 static int ads_configured, ads_triggered, ads_read;
 static uint16_t ads_config;
 static int16_t ads_result;
@@ -69,6 +86,7 @@ static void quiet(void)
 {
     fake_hal_reset_recording();
     i2c_writes = 0;
+    i2c_checked_calls = 0;
     ads_configured = ads_triggered = ads_read = 0;
     noted = 0;
     boot_sequence_active = 0;
@@ -398,6 +416,11 @@ static void expansion(int *failures)
     RX(0x231, 3, pwm);
     Handle_CAN_PasteJetting();
     TEST_ASSERT(i2c_writes == 2 && i2c_reg == 0x31, "0x231 writes the pulse register");
+#if URTC_SLAVE_LINK_CRC
+    TEST_ASSERT(i2c_checked_calls == 2, "built with the link check byte, both register writes go through the checked call");
+#else
+    TEST_ASSERT(i2c_checked_calls == 0, "built without the link check byte, no register write goes through the checked call");
+#endif
     RX(0x231, 2, pwm);
     Handle_CAN_PasteJetting();
     TEST_ASSERT(i2c_writes == 2, "a frame of the wrong length writes nothing");

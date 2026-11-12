@@ -334,7 +334,7 @@ URTC 的核心优势在于其极强的多功能性。板卡采用可扩展矩阵
 ## 🔒 安全与防护
 
 - **热失控保护**（`thermal_guard.c`，自应用 0.3.2 起）用于烙铁／热风和 3D 热端：对*实测*温度的 MAXTEMP（T12 449 °C，热端 310 °C）、加热监视（加热器开启时温度必须真正上升——可检测松脱的热敏电阻或烙铁头）以及保温检查（达到目标后，加热器开启时不得长时间下降）。一旦故障即切断加热器、锁定板卡错误，并通过 `0x111` 的第 4 字节报告原因。已在主机上用模拟加热器测试（`tests/test_thermal_guard.c`）。这些限值从未在真实加热器上测量过，这一切也从未在真实板卡上运行过。
-- **围绕硬件的固件逻辑的主机测试**（`tools/run_host_tests.py`，53 个测试套件）：除引导程序、热保护和调度器外，13 种工具的真实 CAN 处理程序（`firmware_can_*.c`）、加热器控制回路（`firmware_control_thermal.c`：ADC 换算、不可能的读数、设定值上限、迟滞、加热器卡死、保护触发的故障）、故障记录器（`firmware_blackbox.c`，与 URTC-COMMON 由自身模型写出的场景逐字节比对，并检查其 CAN 读出）、由跳线识别工具、错误门之后的命令以及热像仪命令，都针对模拟 HAL（`tests/host_hal/`）编译，并在地址与未定义行为检查器及 `gcc -fanalyzer` 下运行；`--coverage-floor`（CI 中为 `URTC_COVERAGE_FLOOR`）要求执行的行数达到一定比例（测试套件编译的 83 个固件源文件的行为 94.0%（88 个中有 3 个需要板卡，2 个只含数据，即头槽位），其中现在包括应用程序的启动与主循环、OLED 驱动及其画面、状态 LED、中断处理程序、扩展接口的总线、三种热像仪、扩展从机以及两个引导程序的主程序；CI 的下限为 90）。以上均未在板卡上运行过。
+- **围绕硬件的固件逻辑的主机测试**（`tools/run_host_tests.py`，58 个测试套件）：除引导程序、热保护和调度器外，13 种工具的真实 CAN 处理程序（`firmware_can_*.c`）、加热器控制回路（`firmware_control_thermal.c`：ADC 换算、不可能的读数、设定值上限、迟滞、加热器卡死、保护触发的故障）、故障记录器（`firmware_blackbox.c`，与 URTC-COMMON 由自身模型写出的场景逐字节比对，并检查其 CAN 读出）、由跳线识别工具、错误门之后的命令以及热像仪命令，都针对模拟 HAL（`tests/host_hal/`）编译，并在地址与未定义行为检查器及 `gcc -fanalyzer` 下运行；`--coverage-floor`（CI 中为 `URTC_COVERAGE_FLOOR`）要求执行的行数达到一定比例（测试套件编译的 83 个固件源文件的行为 94.0%（88 个中有 3 个需要板卡，2 个只含数据，即头槽位），其中现在包括应用程序的启动与主循环、OLED 驱动及其画面、状态 LED、中断处理程序、扩展接口的总线、三种热像仪、扩展从机以及两个引导程序的主程序；CI 的下限为 90）。以上均未在板卡上运行过。
 - **诊断：** `0x111` 的第 5 字节报告上次复位原因（bit0 = 硬件看门狗触发）；`0x1AA`/`0x1AB` 返回保存在 F-RAM 中的累计计数——热故障次数、最后一次故障代码和加热器总开启时间（自 0.3.3 起）；黑匣子采样也会记录热故障代码。
 - **固件签名：** 主板的引导程序不保存任何秘密：它依据公钥表（`keys/image_trust.json`）验证 Ed25519 记录，该表以带公开开发密钥的台架表或在创建镜像签名密钥之前为空的官方表的形式编译进去。扩展从机的引导程序在更新路径中不保存任何签名密钥：只有当主板验证 Ed25519 记录后，在该更新会话中确认了这个确切的镜像，才会安装，并通过内部链路总线信任主板（参见 [`docs/SLAVE_BOOT_CONFIRMATION.md`](docs/SLAVE_BOOT_CONFIRMATION.md)）；它不含任何密钥，也没有 HMAC 例程，并在仅追加日志中保存自己的签名回滚计数器，主板同样读取并强制执行该计数器。`firmware/` 中的每个镜像都附带 `<bin>.sha256` 和 `<bin>.manifest.json`，因此 URTC Flasher 和 URTC Web Studio 完全不携带密钥。参见 [`docs/FIRMWARE_SIGNING.TXT`](docs/FIRMWARE_SIGNING.TXT)。正式发布的每个文件还带有分离式 Ed25519 发布签名（`<文件>.sig`，公钥见 [`docs/RELEASE_SIGNING.md`](docs/RELEASE_SIGNING.md)）；刷写器和 Web Studio 在签名存在时会进行验证。
 - **镜像内部的头：** 应用镜像在向量表之后的固定偏移 `0x200` 处用 32 字节携带自己的身份信息：它面向的硬件、四段式版本、整个镜像的长度和 CRC-32。固件输出该槽位（`firmware_image_slot.c`、`slave_image_slot.c`），链接脚本把它放到位，若向量表没有在它之前结束则链接失败；长度和 CRC-32 由 `tools/seal_image.py` 在链接之后填入。闪存映射、向量表和镜像长度都不变，签名记录与以前完全一样地对封印后的文件生成，引导程序也不变。以上均尚未在板卡上运行过。
@@ -398,7 +398,7 @@ URTC 的闪存被拆分为两个独立部分，因此板卡可以通过它已经
 
 ## 🧪 测试
 
-围绕硬件的固件逻辑在电脑上测试：`python tools/run_host_tests.py` 用主机编译器、模拟 HAL 以及 AddressSanitizer 和 UBSan（带 `-fanalyzer`）构建并运行 53 个 C 测试套件（`tests/test_*.c`），涵盖引导程序、热保护、调度器、13 种工具的真实 CAN 处理程序、加热器控制回路和黑匣子等。CI 还会编译并链接四个二进制文件，并在固件源码已执行行的覆盖率低于下限时失败。这一切都没有在板卡上运行过：目前没有焊装完成的板卡，主机测试也无法证明时序、驱动或功率级能正常工作。`python tools/c_quality.py` 增加了三项板卡编译器不会做的检查：用电脑的编译器对测试套件构建的每个源文件加 `-Wconversion`、cppcheck，以及注释块长度上限（原样引入的传感器驱动不在其内，每项理由写在 `tools/c_quality.json` 中）。
+围绕硬件的固件逻辑在电脑上测试：`python tools/run_host_tests.py` 用主机编译器、模拟 HAL 以及 AddressSanitizer 和 UBSan（带 `-fanalyzer`）构建并运行 58 个 C 测试套件（`tests/test_*.c`），涵盖引导程序、热保护、调度器、13 种工具的真实 CAN 处理程序、加热器控制回路和黑匣子等。CI 还会编译并链接四个二进制文件，并在固件源码已执行行的覆盖率低于下限时失败。这一切都没有在板卡上运行过：目前没有焊装完成的板卡，主机测试也无法证明时序、驱动或功率级能正常工作。`python tools/c_quality.py` 增加了三项板卡编译器不会做的检查：用电脑的编译器对测试套件构建的每个源文件加 `-Wconversion`、cppcheck，以及注释块长度上限（原样引入的传感器驱动不在其内，每项理由写在 `tools/c_quality.json` 中）。
 
 ## 🏗️ 构建与发布
 
@@ -433,13 +433,13 @@ URTC 的闪存被拆分为两个独立部分，因此板卡可以通过它已经
 ```text
 URTC/
 ├── src/                                               四个固件组件及其共用部分
-├── PCB/                                               原理图和板卡设计
+├── PCB/                                               原理图和板子设计
 ├── BOM/                                               主板和六种扩展板的物料清单
 ├── 3D/                                                3D 模型
 ├── ani/                                               OLED 的动画
 ├── keys/                                              只有公钥，绝无私钥
 ├── docs/                                              CAN 协议、引脚、签名、威胁模型、数据手册
-├── tests/                                             53 个 C 主机测试套件
+├── tests/                                             58 个 C 主机测试套件
 ├── tools/                                             主机测试运行器、发布工具、共用检查
 ├── images/                                            横幅和本 README 的图片
 ├── .github/                                           CI 工作流以及 Issue 和 Pull Request 模板
@@ -457,7 +457,7 @@ URTC/
 ├── firmware_signing.py                                为镜像签名
 ├── generate_manifest.py                               写出镜像的清单
 ├── VERSION_CHECKLIST.txt                              四个版本的机制
-└── LICENSE.md ruff.toml                               硬件许可证和 lint 设置
+└── LICENSE.md ruff.toml mypy.ini                      硬件许可证、lint 与类型检查设置
 ```
 
 </details>

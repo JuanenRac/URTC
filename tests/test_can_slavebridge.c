@@ -32,12 +32,14 @@ uint8_t rxData[8];
 
 // ---- scripted I2C slave -----------------------------------------------------
 #define MAX_WRITES 512
-typedef struct { uint8_t reg; uint8_t len; uint8_t data[40]; } WriteRecord;
+typedef struct { uint8_t reg; uint8_t len; uint8_t data[40]; uint8_t checked; } WriteRecord;
 static WriteRecord writes[MAX_WRITES];
 static int write_count;
 static uint8_t reg_value[256][16];
 static uint8_t reg_readable[256];
 static int read_count;
+static int checked_reads;      // reads that went through the call with the check byte of the link
+static int via_crc;            // set by the checked write call around the recorder it shares with the plain one
 
 static int fail_data_writes_from = -1;   // when >= 0: the data writes (register 0x03) after this many succeed no more
 static int data_writes_seen;
@@ -48,6 +50,7 @@ uint8_t ExpansionI2C_SlaveWriteRegister(uint8_t reg, const uint8_t *data, uint8_
     if (write_count < MAX_WRITES) {
         writes[write_count].reg = reg;
         writes[write_count].len = len;
+        writes[write_count].checked = (uint8_t)via_crc;
         memcpy(writes[write_count].data, data, len > 40 ? 40 : len);
         write_count++;
     }
@@ -62,9 +65,31 @@ uint8_t ExpansionI2C_SlaveReadRegister(uint8_t reg, uint8_t *data, uint8_t len)
     return 1;
 }
 
+uint8_t ExpansionI2C_SlaveWriteRegisterCrc(uint8_t reg, const uint8_t *data, uint8_t len)
+{
+    via_crc = 1;
+    uint8_t ok = ExpansionI2C_SlaveWriteRegister(reg, data, len);
+    via_crc = 0;
+    return ok;
+}
+
+uint8_t ExpansionI2C_SlaveReadRegisterCrc(uint8_t reg, uint8_t *data, uint8_t len)
+{
+    checked_reads++;
+    return ExpansionI2C_SlaveReadRegister(reg, data, len);
+}
+
+uint8_t ExpansionI2C_SlaveReadRegisterWithParamCrc(uint8_t reg, uint8_t param, uint8_t *data, uint8_t len)
+{
+    (void)param;
+    checked_reads++;
+    return ExpansionI2C_SlaveReadRegister(reg, data, len);
+}
+
 static void clear(void)
 {
     fake_hal_reset_recording();
+    checked_reads = 0;
     write_count = 0;
     read_count = 0;
     memset(reg_value, 0, sizeof reg_value);
@@ -299,6 +324,36 @@ void run_can_slavebridge_tests(int *failures)
 {
     uint8_t eight[8] = { 1, 2, 3, 4, 5, 6, 7, 8 };
     uint8_t magic[4] = { 0xB0, 0x07, 0x1D, 0x5A };
+
+    // ---- which calls carry the check byte of the link ----------------------------------------------------------------------------------------------
+    // Only the registers of the slave APPLICATION do (the enter-bootloader order and the generic frames 0x220 / 0x221); the registers of the slave
+    // bootloader have no check byte, so the update path always uses the plain calls. With URTC_SLAVE_LINK_CRC=0 nothing uses the checked calls.
+    {
+        const int crc = URTC_SLAVE_LINK_CRC;
+        uint8_t pwm[4] = { 0x30, 0x01, 0x02, 0x03 };
+        clear();
+        rx(0x210, 4, magic);
+        TEST_ASSERT(write_count == 1 && writes[0].checked == crc, "the enter-bootloader order, a write to an application register, follows the link switch");
+        clear();
+        rx(0x220, 4, pwm);
+        TEST_ASSERT(write_count == 1 && writes[0].reg == 0x30 && writes[0].checked == crc, "a generic register write (0x220) follows the link switch");
+        clear();
+        reg_readable[0x00] = 1;
+        uint8_t rd[2] = { 0x00, 1 };
+        rx(0x221, 2, rd);
+        TEST_ASSERT(read_count == 1 && checked_reads == crc, "a generic register read (0x221) follows the link switch");
+        clear();
+        rx(0x211, 8, eight);
+        rx(0x214, 8, eight);
+        rx(0x213, 8, eight);
+        int none_checked = write_count >= 3;
+        for (int i = 0; i < write_count; i++) if (writes[i].checked) none_checked = 0;
+        TEST_ASSERT(none_checked, "the update frames (start, end, data) are bootloader registers and never carry a check byte");
+        clear();
+        reg_readable[0x00] = 1;
+        rx(0x215, 0, 0);
+        TEST_ASSERT(checked_reads == 0, "the bootloader status read never carries a check byte");
+    }
 
     // ---- plain forwarding ----------------------------------------------------
     clear();

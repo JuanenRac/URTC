@@ -26,8 +26,8 @@
 
 void Handle_CAN_PasteJetting(void) {
     if (rxHeader.StdId == URTC_CAN_ID_PASTE_JETTING_CONFIG && rxHeader.DLC == 3 && !boot_sequence_active) {
-        ExpansionI2C_SlaveWriteRegister(REG_APP_PWM_CONFIGURE, rxData, 3);
+        ExpansionI2C_AppWriteRegister(REG_APP_PWM_CONFIGURE, rxData, 3);
     } else if (rxHeader.StdId == URTC_CAN_ID_PASTE_JETTING_PULSE && rxHeader.DLC == 3 && !boot_sequence_active) {
-        ExpansionI2C_SlaveWriteRegister(REG_APP_PWM_PULSE, rxData, 3);
+        ExpansionI2C_AppWriteRegister(REG_APP_PWM_PULSE, rxData, 3);
     }
 }

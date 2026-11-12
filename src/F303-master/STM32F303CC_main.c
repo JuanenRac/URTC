@@ -440,7 +440,7 @@ int main(void) {
     // to relay to.
     HAL_IWDG_Refresh(&hiwdg); // after whichever MLX9064x Direct_Init() ran above, same reasoning as the refreshes right after HAL_IWDG_Init()
     if (expansion_board_type == 3 || expansion_board_type == 4) {
-        ExpansionI2C_SlaveWriteRegister(0x14, (uint8_t*)&mlx_sensor_variant, 1); // REG_MLX_SENSOR_VARIANT
+        ExpansionI2C_AppWriteRegister(0x14, (uint8_t*)&mlx_sensor_variant, 1); // REG_MLX_SENSOR_VARIANT
     }
     // Expansion connector's bit-banged SPI bus - see the function's own
     // comment and PINOUT_CONNECTORS.TXT for why this isn't a hardware

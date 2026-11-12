@@ -28,7 +28,7 @@ int16_t ADS1115_ReadResult(void);
 // for REG_MLX_RAW_CHUNK/REG_MLX_CALIBRATED_CHUNK in slave_common.h.
 //
 // MLX_TriggerCapture is safe to call from the I2C1 ISR: for the 90640/90641
-// it only flags the slow capture, which MLX_ServiceCapture runs. Call
+// it only flags the slow capture, which MLX_ServiceCapture runs as a state machine (slave_mlx_capture.h), a small step per call. Call
 // MLX_ServiceCapture once per main-loop iteration (slave_main.c).
 void MLX_TriggerCapture(void);
 void MLX_ServiceCapture(void);

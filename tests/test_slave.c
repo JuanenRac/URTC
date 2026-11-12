@@ -306,6 +306,16 @@ static void test_variant_write_initialises_the_sensor(int *failures)
     TEST_ASSERT(fake_i2c_bus.starts > after_init, "a new choice initialises again");
 }
 
+// A capture is a state machine that does one small step per call (slave_mlx_capture.h) and asks the camera whether the frame is ready only every few
+// milliseconds: the main loop is played here by calling the service with the clock moving, until the capture has finished.
+static void settle_capture(void)
+{
+    for (int pass = 0; pass < 64; pass++) {
+        fake_tick += 5;
+        MLX_ServiceCapture();
+    }
+}
+
 static void test_camera_640(int *failures)
 {
     static uint16_t ee[MLX90640_EEPROM_DUMP_NUM];
@@ -327,9 +337,9 @@ static void test_camera_640(int *failures)
     TEST_ASSERT(MLX_GetCaptureStatus() == MLX_CAPTURE_IDLE, "nothing is captured before it is asked for");
     MLX_TriggerCapture();
     TEST_ASSERT(MLX_GetCaptureStatus() == MLX_CAPTURE_BUSY, "a trigger from the master only marks the capture busy (it is slow, and the master is waiting on an interrupt)");
-    MLX_ServiceCapture();
+    settle_capture();
     TEST_ASSERT(MLX_GetCaptureStatus() == MLX_CAPTURE_READY, "the main loop does the capture: ready");
-    MLX_ServiceCapture();
+    settle_capture();
     TEST_ASSERT(MLX_GetCaptureStatus() == MLX_CAPTURE_READY, "and a second service call with nothing requested leaves it alone");
     MLX_GetRawChunk(0, chunk);
     TEST_ASSERT(chunk[0] == 0x01 && chunk[1] == 0x00 && chunk[2] == 0x01 && chunk[3] == 0x01, "raw chunk 0 is the first pixel words of the frame");
@@ -345,13 +355,13 @@ static void test_camera_640(int *failures)
 
     mlx->clear_trigger_on_reset = 0;
     MLX_TriggerCapture();
-    MLX_ServiceCapture();
+    settle_capture();
     TEST_ASSERT(MLX_GetCaptureStatus() == MLX_CAPTURE_ERROR, "a sensor that does not start the measurement is an error");
     world();
     mlx_sensor_variant = MLX_VARIANT_90640;
     Sensors_Init();
     MLX_TriggerCapture();
-    MLX_ServiceCapture();
+    settle_capture();
     TEST_ASSERT(MLX_GetCaptureStatus() == MLX_CAPTURE_ERROR, "with no sensor it is an error too");
 }
 
@@ -361,6 +371,8 @@ static void test_camera_641(int *failures)
     world();
     mlx_sensor_variant = MLX_VARIANT_90641;
     m641.word0 = 0x2000; m641.to_value = 21.0f;
+    mlx = fake_i2c_bus_add(0x33, FAKE_I2C_MLX);                   // the camera itself is the library double above; the bus only answers the ready bit
+    mlx->words16[0x8000] = 0x0008;
     Sensors_Init();
     TEST_ASSERT(m641.extract_calls == 1, "a readable EEPROM is turned into parameters");
     m641.dump_rc = -1;
@@ -368,7 +380,7 @@ static void test_camera_641(int *failures)
     TEST_ASSERT(m641.extract_calls == 1, "an unreadable one is not");
     MLX_TriggerCapture();
     TEST_ASSERT(MLX_GetCaptureStatus() == MLX_CAPTURE_BUSY, "busy until the main loop has done the capture");
-    MLX_ServiceCapture();
+    settle_capture();
     TEST_ASSERT(MLX_GetCaptureStatus() == MLX_CAPTURE_READY && m641.to_calls == 1, "ready after it");
     MLX_GetRawChunk(0, chunk);
     TEST_ASSERT(chunk[0] == 0x20 && chunk[1] == 0x00 && chunk[3] == 0x01, "raw chunk 0");
@@ -379,20 +391,20 @@ static void test_camera_641(int *failures)
     MLX_GetCalibratedChunk(0, chunk);
     TEST_ASSERT((int16_t)((chunk[0] << 8) | chunk[1]) == 2100 && (int16_t)((chunk[2] << 8) | chunk[3]) == 2200, "calibrated values are hundredths of a degree");
     m641.to_value = 400.0f;
-    MLX_TriggerCapture(); MLX_ServiceCapture(); MLX_GetCalibratedChunk(0, chunk);
+    MLX_TriggerCapture(); settle_capture(); MLX_GetCalibratedChunk(0, chunk);
     TEST_ASSERT((int16_t)((chunk[0] << 8) | chunk[1]) == 32767, "values beyond the 16-bit range are clamped");
     m641.to_value = -400.0f;
-    MLX_TriggerCapture(); MLX_ServiceCapture(); MLX_GetCalibratedChunk(0, chunk);
+    MLX_TriggerCapture(); settle_capture(); MLX_GetCalibratedChunk(0, chunk);
     TEST_ASSERT((int16_t)((chunk[0] << 8) | chunk[1]) == -32768, "at both ends");
     MLX_GetCalibratedChunk(12, chunk);
     zeros = 1;
     for (int i = 0; i < 32; i++) if (chunk[i]) zeros = 0;
     TEST_ASSERT(zeros, "a calibrated chunk beyond the last is zeros");
     m641.trigger_rc = -9;
-    MLX_TriggerCapture(); MLX_ServiceCapture();
+    MLX_TriggerCapture(); settle_capture();
     TEST_ASSERT(MLX_GetCaptureStatus() == MLX_CAPTURE_ERROR, "a trigger that fails is an error");
     m641.trigger_rc = 0; m641.frame_rc = -8;
-    MLX_TriggerCapture(); MLX_ServiceCapture();
+    MLX_TriggerCapture(); settle_capture();
     TEST_ASSERT(MLX_GetCaptureStatus() == MLX_CAPTURE_ERROR, "and so is a frame that cannot be read");
 }
 

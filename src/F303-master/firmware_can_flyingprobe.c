@@ -53,14 +53,14 @@ void Handle_CAN_FlyingProbe(void) {
             // the bitfields (gain, mux, data rate), same "generic
             // passthrough" reasoning as the SPI passthrough to the
             // expansion driver.
-            ExpansionI2C_SlaveWriteRegister(REG_APP_ADS_CONFIGURE, rxData, 2);
+            ExpansionI2C_AppWriteRegister(REG_APP_ADS_CONFIGURE, rxData, 2);
         }
 
     } else if (rxHeader.StdId == URTC_CAN_ID_ADS1115_TRIGGER && !boot_sequence_active) {
         if (expansion_board_type == 5) {
             ADS1115_Direct_TriggerConversion();
         } else {
-            ExpansionI2C_SlaveWriteRegister(REG_APP_ADS_TRIGGER, rxData, 0);
+            ExpansionI2C_AppWriteRegister(REG_APP_ADS_TRIGGER, rxData, 0);
         }
 
     } else if (rxHeader.StdId == URTC_CAN_ID_ADS1115_RESULT) {
@@ -72,7 +72,7 @@ void Handle_CAN_FlyingProbe(void) {
             result[1] = (uint8_t)(((uint16_t)raw) & 0xFF);
             got_result = 1;
         } else {
-            got_result = ExpansionI2C_SlaveReadRegister(REG_APP_ADS_READ, result, 2);
+            got_result = ExpansionI2C_AppReadRegister(REG_APP_ADS_READ, result, 2);
         }
         if (got_result && HAL_CAN_GetTxMailboxesFreeLevel(&hcan) > 0) {
             CAN_TxHeaderTypeDef txH;

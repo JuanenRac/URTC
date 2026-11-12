@@ -304,6 +304,25 @@
    ]
   },
   {
+   "name": "can_slavebridge_link_crc",
+   "test": "tests/test_can_slavebridge.c",
+   "sources": [
+    "tests/host_hal/fake_hal.c",
+    "src/F303-master/firmware_can_slavebridge.c",
+    "src/F303-master/firmware_slave_attest.c",
+    "src/common/urtc_ed25519.c"
+   ],
+   "includes": [
+    "tests",
+    "tests/host_hal",
+    "src/F303-master",
+    "src/common"
+   ],
+   "defines": [
+    "-DURTC_SLAVE_LINK_CRC=1"
+   ]
+  },
+  {
    "name": "can_dispatch",
    "test": "tests/test_can_dispatch.c",
    "sources": [
@@ -431,6 +450,40 @@
    ]
   },
   {
+   "name": "can_tools_link_crc",
+   "test": "tests/test_can_tools.c",
+   "sources": [
+    "tests/host_hal/fake_hal.c",
+    "tests/host_hal/fake_state.c",
+    "src/F303-master/firmware_can_soldering.c",
+    "src/F303-master/firmware_can_hotair.c",
+    "src/F303-master/firmware_can_laser.c",
+    "src/F303-master/firmware_can_drill.c",
+    "src/F303-master/firmware_can_uvcuring.c",
+    "src/F303-master/firmware_can_electromagnet.c",
+    "src/F303-master/firmware_can_aoi.c",
+    "src/F303-master/firmware_can_printer3d.c",
+    "src/F303-master/firmware_can_pastejetting.c",
+    "src/F303-master/firmware_can_crimping.c",
+    "src/F303-master/firmware_can_weldpulse.c",
+    "src/F303-master/firmware_can_flyingprobe.c",
+    "src/F303-master/firmware_can_motion.c"
+   ],
+   "includes": [
+    "tests",
+    "tests/host_hal",
+    "src/F303-master",
+    "src/common"
+   ],
+   "extra": [
+    "-Wno-cpp",
+    "-Wno-int-to-pointer-cast"
+   ],
+   "defines": [
+    "-DURTC_SLAVE_LINK_CRC=1"
+   ]
+  },
+  {
    "name": "blackbox",
    "test": "tests/test_blackbox.c",
    "sources": [
@@ -544,6 +597,32 @@
    "extra": [
     "-Wno-cpp",
     "-Wno-int-to-pointer-cast"
+   ]
+  },
+  {
+   "name": "sensors_inspection_link_crc",
+   "test": "tests/test_sensors_inspection.c",
+   "sources": [
+    "tests/host_hal/fake_hal.c",
+    "tests/host_hal/fake_state.c",
+    "src/F303-master/firmware_control_sensors.c",
+    "src/F303-master/firmware_can_thermalinspection.c",
+    "src/F303-master/firmware_thermal_stats.c",
+    "src/F303-master/thermal_stats.c",
+    "src/F303-master/firmware_fram.c"
+   ],
+   "includes": [
+    "tests",
+    "tests/host_hal",
+    "src/F303-master",
+    "src/common"
+   ],
+   "extra": [
+    "-Wno-cpp",
+    "-Wno-int-to-pointer-cast"
+   ],
+   "defines": [
+    "-DURTC_SLAVE_LINK_CRC=1"
    ]
   },
   {
@@ -802,6 +881,16 @@
    "defines": [
     "-Dmain=slave_main_entry"
    ]
+  },
+  {
+   "name": "slave_mlx_capture",
+   "test": "tests/test_slave_mlx_capture.c",
+   "sources": [],
+   "includes": [
+    "tests",
+    "src/F303-slave"
+   ],
+   "std": "c11"
   },
   {
    "name": "slave_link_crc",

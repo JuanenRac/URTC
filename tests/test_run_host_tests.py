@@ -17,10 +17,13 @@ class SuiteListTests(unittest.TestCase):
         listed = sorted(suite.test for suite in runner.SUITES)
         on_disk = sorted(path.relative_to(ROOT).as_posix() for path in (ROOT / "tests").glob("test_*.c"))
         self.assertEqual(sorted(set(listed)), on_disk)
-        # a test is listed twice only to run it on the copy of a driver the expansion slave carries, or to build the bootloader with the programmable serial on
+        # a test is listed twice only to run it on the copy of a driver the expansion slave carries, to build the bootloader with the programmable serial on,
+        # or to run the master callers of the slave with the check byte of the I2C link on (the suite of the same name plus _link_crc)
+        names = {item.name for item in runner.SUITES}
         again = [suite.name for suite in runner.SUITES if listed.count(suite.test) > 1]
-        self.assertTrue(all(name.startswith("mlx_") or name.startswith("bootloader_boot") or name.startswith("bootloader_rotation") for name in again), again)
-        self.assertTrue(all(name.endswith("_slave") or name.endswith("_serial") or name.startswith("bootloader_rotation") or f"{name}_slave" in {item.name for item in runner.SUITES} or f"{name}_serial" in {item.name for item in runner.SUITES}
+        linked = lambda name: name.endswith("_link_crc") or f"{name}_link_crc" in names   # noqa: E731
+        self.assertTrue(all(name.startswith("mlx_") or name.startswith("bootloader_boot") or name.startswith("bootloader_rotation") or linked(name) for name in again), again)
+        self.assertTrue(all(name.endswith("_slave") or name.endswith("_serial") or name.startswith("bootloader_rotation") or linked(name) or f"{name}_slave" in names or f"{name}_serial" in names
                             for name in again), again)
         self.assertEqual(len({suite.name for suite in runner.SUITES}), len(runner.SUITES))
 

@@ -90,7 +90,7 @@ void Handle_CAN_ThermalInspection(void) {
         if (expansion_board_type == 6 && (mlx_sensor_variant == MLX_VARIANT_90640 || mlx_sensor_variant == MLX_VARIANT_90641 || mlx_sensor_variant == MLX_VARIANT_90642)) {
             if (thermal_capture_pending == 0) thermal_capture_pending = mlx_sensor_variant;   // a trigger while one is running is not queued twice
         } else if (expansion_board_type != 6) {
-            ExpansionI2C_SlaveWriteRegister(REG_APP_MLX_TRIGGER_CAPTURE, rxData, 0);
+            ExpansionI2C_AppWriteRegister(REG_APP_MLX_TRIGGER_CAPTURE, rxData, 0);
         }
         // expansion_board_type==6 && mlx_sensor_variant==MLX_VARIANT_NONE:
         // no sensor configured, deliberately does nothing - see this
@@ -120,7 +120,7 @@ void Handle_CAN_ThermalInspection(void) {
             status = MLX_CAPTURE_ERROR;
             got_status = 1;
         } else {
-            got_status = ExpansionI2C_SlaveReadRegister(REG_APP_MLX_CAPTURE_STATUS, &status, 1);
+            got_status = ExpansionI2C_AppReadRegister(REG_APP_MLX_CAPTURE_STATUS, &status, 1);
         }
         if (got_status && HAL_CAN_GetTxMailboxesFreeLevel(&hcan) > 0) {
             CAN_TxHeaderTypeDef txH;
@@ -144,7 +144,7 @@ void Handle_CAN_ThermalInspection(void) {
         } else if (expansion_board_type == 6 && mlx_sensor_variant == MLX_VARIANT_90642) {
             MLX90642_Direct_GetRawChunk(rxData[0], chunk);
             SendChunkFrames(URTC_CAN_ID_THERMAL_RAW_CHUNK, chunk);
-        } else if (expansion_board_type != 6 && ExpansionI2C_SlaveReadRegisterWithParam(REG_APP_MLX_RAW_CHUNK, rxData[0], chunk, 32)) {
+        } else if (expansion_board_type != 6 && ExpansionI2C_AppReadRegisterWithParam(REG_APP_MLX_RAW_CHUNK, rxData[0], chunk, 32)) {
             SendChunkFrames(URTC_CAN_ID_THERMAL_RAW_CHUNK, chunk);
         }
         // expansion_board_type==6 && MLX_VARIANT_NONE: no response, same
@@ -161,7 +161,7 @@ void Handle_CAN_ThermalInspection(void) {
         } else if (expansion_board_type == 6 && mlx_sensor_variant == MLX_VARIANT_90642) {
             MLX90642_Direct_GetCalibratedChunk(rxData[0], chunk);
             SendChunkFrames(URTC_CAN_ID_THERMAL_CAL_CHUNK, chunk);
-        } else if (expansion_board_type != 6 && ExpansionI2C_SlaveReadRegisterWithParam(REG_APP_MLX_CALIBRATED_CHUNK, rxData[0], chunk, 32)) {
+        } else if (expansion_board_type != 6 && ExpansionI2C_AppReadRegisterWithParam(REG_APP_MLX_CALIBRATED_CHUNK, rxData[0], chunk, 32)) {
             SendChunkFrames(URTC_CAN_ID_THERMAL_CAL_CHUNK, chunk);
         }
         // expansion_board_type==6 && MLX_VARIANT_NONE: no response, same

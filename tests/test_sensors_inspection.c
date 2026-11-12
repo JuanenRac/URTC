@@ -49,8 +49,19 @@ uint8_t ExpansionI2C_SlaveReadRegisterWithParam(uint8_t reg, uint8_t param, uint
     return 1;
 }
 
+// the calls with the check byte of the link (URTC_SLAVE_LINK_CRC=1): the same recorders, and a count of how many went that way
+static int checked_calls;
+uint8_t ExpansionI2C_SlaveWriteRegisterCrc(uint8_t reg, const uint8_t *data, uint8_t len) { checked_calls++; return ExpansionI2C_SlaveWriteRegister(reg, data, len); }
+uint8_t ExpansionI2C_SlaveReadRegisterCrc(uint8_t reg, uint8_t *data, uint8_t len) { checked_calls++; return ExpansionI2C_SlaveReadRegister(reg, data, len); }
+uint8_t ExpansionI2C_SlaveReadRegisterWithParamCrc(uint8_t reg, uint8_t param, uint8_t *data, uint8_t len)
+{
+    checked_calls++;
+    return ExpansionI2C_SlaveReadRegisterWithParam(reg, param, data, len);
+}
+
 static void world(void)
 {
+    checked_calls = 0;
     fake_hal_reset_recording();
     memset(calls, 0, sizeof calls);
     memset(last_chunk_index, 0, sizeof last_chunk_index);
@@ -172,6 +183,7 @@ static void inspection_trigger(int *failures)
     rx(0x250, 0, 0);
     Handle_CAN_ThermalInspection();
     TEST_ASSERT(i2c_write_calls == 1 && i2c_register == 0x10, "any other board relays the trigger to the expansion board (register 0x10)");
+    TEST_ASSERT(checked_calls == URTC_SLAVE_LINK_CRC, "the relayed trigger goes through the checked call exactly when the link switch is on");
     world();
     boot_sequence_active = 1;
     expansion_board_type = 0;
@@ -252,6 +264,7 @@ static void inspection_chunks(int *failures)
     rx(0x252, 1, 5);
     Handle_CAN_ThermalInspection();
     TEST_ASSERT(i2c_register == 0x12 && i2c_param == 5, "any other board: the raw chunk is read from register 0x12 with the chunk index");
+    TEST_ASSERT(checked_calls == URTC_SLAVE_LINK_CRC, "the chunk read goes through the checked call exactly when the link switch is on");
     expect_chunk(failures, 0x253, 0xC0, "and relayed as four frames");
     world();
     rx(0x254, 1, 6);

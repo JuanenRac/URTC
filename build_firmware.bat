@@ -240,6 +240,17 @@ set "LDCOMMON=-mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard -specs=
 
 set "HAL_MODULES=stm32f3xx_hal stm32f3xx_hal_adc stm32f3xx_hal_adc_ex stm32f3xx_hal_can stm32f3xx_hal_cortex stm32f3xx_hal_dac stm32f3xx_hal_dac_ex stm32f3xx_hal_dma stm32f3xx_hal_flash stm32f3xx_hal_flash_ex stm32f3xx_hal_gpio stm32f3xx_hal_i2c stm32f3xx_hal_i2c_ex stm32f3xx_hal_iwdg stm32f3xx_hal_pwr stm32f3xx_hal_pwr_ex stm32f3xx_hal_rcc stm32f3xx_hal_rcc_ex stm32f3xx_hal_spi stm32f3xx_hal_tim stm32f3xx_hal_tim_ex"
 REM BUILD_PLAN_END flags
+REM URTC_SLAVE_LINK_CRC=1 builds the master and the expansion slave with the check byte of their application link (src/common/urtc_link_crc.h); the default, 0,
+REM leaves the link byte for byte what it always was. Both sides of one board set must be built with the same value; the official releases leave it at 0.
+if not defined URTC_SLAVE_LINK_CRC goto :link_crc_done
+if "%URTC_SLAVE_LINK_CRC%"=="0" goto :link_crc_done
+if "%URTC_SLAVE_LINK_CRC%"=="1" (
+    set "CFLAGS=%CFLAGS% -DURTC_SLAVE_LINK_CRC=1"
+    goto :link_crc_done
+)
+echo URTC_SLAVE_LINK_CRC must be 0 or 1 ^(got '%URTC_SLAVE_LINK_CRC%'^)
+exit /b 1
+:link_crc_done
 
 set /a HAL_COUNT=0
 for %%f in (%HAL_MODULES%) do (
