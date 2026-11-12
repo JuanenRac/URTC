@@ -73,7 +73,7 @@ static void test_can(int *failures)
     memset(&hcan, 0, sizeof hcan);
     MX_CAN_Init();
     TEST_ASSERT(hcan.Instance == CAN && fake_can_inits == 1, "CAN1 is initialised once");
-    double quanta = 1.0 + fake_can_init.TimeSeg1 + fake_can_init.TimeSeg2;
+    double quanta = 1.0 + CAN_BS1_TQ_OF(fake_can_init.TimeSeg1) + CAN_BS2_TQ_OF(fake_can_init.TimeSeg2);
     double bit_rate = APB1_HZ / fake_can_init.Prescaler / quanta;
     TEST_ASSERT(bit_rate == (double)URTC_CAN_BITRATE_BPS, "the bit rate the peripheral gets from the 32 MHz clock is exactly the rate of the specification of the bus");
 #if defined(URTC_CAN_LEGACY_500K) && URTC_CAN_LEGACY_500K
@@ -81,10 +81,10 @@ static void test_can(int *failures)
 #else
     TEST_ASSERT(URTC_CAN_BITRATE_BPS == 1000000u && URTC_BITRATE == 1000000u && fake_can_init.Prescaler == 2, "the default build runs at 1 Mbit/s (32 MHz / 2 / 16 time quanta)");
 #endif
-    double sample = (1.0 + fake_can_init.TimeSeg1) / quanta;
+    double sample = (1.0 + CAN_BS1_TQ_OF(fake_can_init.TimeSeg1)) / quanta;
     TEST_ASSERT(sample >= 0.80 && sample <= 0.90, "the sample point is at 87.5 percent of the bit");
     TEST_ASSERT(sample * 1000.0 >= (double)URTC_CAN_SAMPLE_POINT_MIN_PERMILLE, "the sample point is not below the floor of the specification");
-    TEST_ASSERT(fake_can_init.SyncJumpWidth <= fake_can_init.TimeSeg2 && fake_can_init.Mode == CAN_MODE_NORMAL, "the jump width does not exceed the second segment, and the mode is normal (not loop-back)");
+    TEST_ASSERT(CAN_SJW_TQ_OF(fake_can_init.SyncJumpWidth) <= CAN_BS2_TQ_OF(fake_can_init.TimeSeg2) && fake_can_init.Mode == CAN_MODE_NORMAL, "the jump width does not exceed the second segment, and the mode is normal (not loop-back)");
     TEST_ASSERT(fake_can_init.AutoBusOff == ENABLE && fake_can_init.AutoRetransmission == ENABLE && fake_can_init.TimeTriggeredMode == DISABLE && fake_can_init.ReceiveFifoLocked == DISABLE && fake_can_init.TransmitFifoPriority == ENABLE, "the bus recovers by itself, frames are repeated, the FIFO is not locked and the oldest request goes first");
     TEST_ASSERT(fake_can_filters == 1 && fake_can_filter.FilterBank == 0 && fake_can_filter.FilterActivation == ENABLE && fake_can_filter.FilterFIFOAssignment == CAN_RX_FIFO0, "one filter, active, into FIFO 0");
     TEST_ASSERT(fake_can_filter.FilterIdHigh == 0 && fake_can_filter.FilterIdLow == 0 && fake_can_filter.FilterMaskIdHigh == 0 && fake_can_filter.FilterMaskIdLow == 0 && fake_can_filter.FilterMode == CAN_FILTERMODE_IDMASK, "its mask is zero: every identifier is accepted and sorted in the firmware");

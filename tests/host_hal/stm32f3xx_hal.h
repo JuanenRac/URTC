@@ -262,7 +262,9 @@ uint32_t HAL_GetUIDw2(void);
 // ---- the start-up configuration of the peripherals (firmware_init_*.c) --------------------------------------------------------------------
 // The handles carry their Init structures and every HAL_*_Init call records a copy of what it was given, so a test reads the configuration back.
 // The values of the constants are the ones the firmware's arithmetic needs, not ST's register values: a divider is its divisor (RCC_HCLK_DIV2 is 2),
-// a time-quanta setting is the number of quanta (CAN_BS1_13TQ is 13), a sampling time is in tenths of a cycle. The firmware only ever passes the names.
+// a CAN time-quanta setting is the register field of the chip, the encoding of the real HAL (a count n is written n - 1 at bit 16 for BS1, 20 for BS2 and 24 for SJW), so the
+// calculated timing of the firmware (can_bit_timing.h) and the named constants meet in the same encoding; CAN_BS1_TQ_OF() and the two next ones read a field back as a count of
+// quanta. A sampling time is in tenths of a cycle. The firmware only ever passes the names.
 typedef struct { uint32_t OscillatorType, HSIState, HSICalibrationValue; struct { uint32_t PLLState, PLLSource, PLLMUL; } PLL; } RCC_OscInitTypeDef;
 typedef struct { uint32_t ClockType, SYSCLKSource, AHBCLKDivider, APB1CLKDivider, APB2CLKDivider; } RCC_ClkInitTypeDef;
 typedef struct { uint32_t PeriphClockSelection, I2c1ClockSelection, I2c2ClockSelection; } RCC_PeriphCLKInitTypeDef;
@@ -298,11 +300,14 @@ typedef struct { uint32_t FilterIdHigh, FilterIdLow, FilterMaskIdHigh, FilterMas
 extern CAN_TypeDef fake_can_regs;
 #define CAN (&fake_can_regs)
 #define CAN_MODE_NORMAL 0u
-#define CAN_SJW_1TQ 1u
-#define CAN_SJW_2TQ 2u
+#define CAN_SJW_1TQ 0x00000000u
+#define CAN_SJW_2TQ 0x01000000u
 #define CAN_FILTER_FIFO0 0u
-#define CAN_BS1_13TQ 13u
-#define CAN_BS2_2TQ 2u
+#define CAN_BS1_13TQ 0x000C0000u
+#define CAN_BS2_2TQ 0x00100000u
+#define CAN_BS1_TQ_OF(field) ((((field) >> 16) & 0xFu) + 1u)
+#define CAN_BS2_TQ_OF(field) ((((field) >> 20) & 0x7u) + 1u)
+#define CAN_SJW_TQ_OF(field) ((((field) >> 24) & 0x3u) + 1u)
 #define CAN_FILTERMODE_IDMASK 0u
 #define CAN_FILTERSCALE_32BIT 1u
 #define CAN_IT_RX_FIFO0_MSG_PENDING 0x02u
