@@ -1023,6 +1023,53 @@
    "defines": [
     "-DURTC_CRASH_DUMP=1"
    ]
+  },
+  {
+   "name": "image_header",
+   "test": "tests/test_image_header.c",
+   "sources": [],
+   "includes": [
+    "tests",
+    "tests/vectors",
+    "src/common"
+   ],
+   "std": "c11"
+  },
+  {
+   "name": "image_slot_master",
+   "test": "tests/test_image_slot_master.c",
+   "sources": [
+    "tests/host_hal/fake_hal.c",
+    "src/F303-master/firmware_image_slot.c"
+   ],
+   "includes": [
+    "tests",
+    "tests/host_hal",
+    "src/F303-master",
+    "src/common"
+   ],
+   "extra": [
+    "-Wno-cpp",
+    "-Wno-int-to-pointer-cast"
+   ]
+  },
+  {
+   "name": "image_slot_slave",
+   "test": "tests/test_image_slot_slave.c",
+   "sources": [
+    "tests/host_hal/fake_hal.c",
+    "src/F303-slave/slave_image_slot.c"
+   ],
+   "includes": [
+    "tests",
+    "tests/host_hal",
+    "src/F303-slave",
+    "src/common"
+   ],
+   "extra": [
+    "-Wno-cpp",
+    "-Wno-int-to-pointer-cast"
+   ]
   }
  ]
 }

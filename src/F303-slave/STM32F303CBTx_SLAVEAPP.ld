@@ -32,6 +32,16 @@ SECTIONS
     . = ALIGN(4);
   } >FLASH
 
+  /* The header of the image (docs/IMAGE_HEADER.md of URTC-COMMON): 32 bytes at the fixed offset 0x200 of the image, after the vector table. The firmware emits the
+   * slot (the image slot source file); tools/seal_image.py fills in its length and CRC-32 after the link. Nothing else moves: the vector table is still at the start
+   * of the image and the image is no longer than before (the gap up to 0x200 is zeros in the .bin). */
+  .urtc_image_header ORIGIN(FLASH) + 0x200 :
+  {
+    KEEP(*(.urtc_image_header))
+  } >FLASH
+  ASSERT(SIZEOF(.isr_vector) <= 0x200, "the vector table does not end before the image header at offset 0x200")
+  ASSERT(SIZEOF(.urtc_image_header) == 32, "the image header slot is missing or is not 32 bytes")
+
   .text :
   {
     . = ALIGN(4);

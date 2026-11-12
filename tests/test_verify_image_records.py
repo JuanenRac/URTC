@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
 import image_trust as trust  # noqa: E402
 import verify_image_records as vir  # noqa: E402
+from image_record import image_header as ih  # noqa: E402
 from image_record import image_sig as sg  # noqa: E402
 
 SEED = hashlib.sha256(b"verify_image_records test key").digest()
@@ -72,6 +73,29 @@ class RecordsTests(unittest.TestCase):
         data[100] ^= 1
         image.write_bytes(bytes(data))
         self.assertTrue(any("bad_signature" in p for p in self.problems()), self.problems())
+
+    def sealed(self, hardware=MAIN_HW, version=(1, 2, 3, 0)):
+        raw = bytearray(range(256)) * 8
+        raw[ih.EMBED_OFFSET:ih.EMBED_OFFSET + 32] = ih.embedded_slot(hardware, version)
+        return ih.seal_embedded(bytes(raw))
+
+    def test_an_image_with_its_header_inside_is_signed_and_verified_like_any_other(self):
+        self.put(payload=self.sealed())   # the record is made over the flat header the bootloaders rebuild and the SHA-256 of the whole sealed file
+        self.assertEqual(self.problems(), [])
+
+    def test_a_sealed_image_that_states_another_version_than_its_name_is_refused(self):
+        self.put(payload=self.sealed(version=(1, 2, 4, 0)))
+        self.assertTrue(any("header inside the image" in p and "wrong_version" in p for p in self.problems()), self.problems())
+
+    def test_a_sealed_image_for_another_board_is_refused(self):
+        self.put(payload=self.sealed(hardware=SLAVE_HW))
+        self.assertTrue(any("wrong_hardware" in p for p in self.problems()), self.problems())
+
+    def test_a_damaged_header_inside_the_image_is_refused_before_the_record_is_looked_at(self):
+        damaged = bytearray(self.sealed())
+        damaged[ih.EMBED_OFFSET + 10] ^= 1
+        self.put(payload=bytes(damaged))
+        self.assertTrue(any("header_bad_header_crc" in p for p in self.problems()), self.problems())
 
     def test_a_record_made_for_the_other_board_is_refused(self):
         self.put(hardware=SLAVE_HW)   # signed as the expansion slave, published as the tool head

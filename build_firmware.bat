@@ -429,6 +429,12 @@ if errorlevel 1 (
     set /a FAIL+=1
     goto :summary
 )
+python "%ROOT%\tools\seal_image.py" main "!OUT!\!APP_NAME!.bin"
+if errorlevel 1 (
+    echo   FAIL main board application: the header inside the image could not be sealed
+    set /a FAIL+=1
+    goto :summary
+)
 copy /y "!OUT!\!APP_NAME!.elf" "%FIRMWARE_OUT%\!APP_NAME!.elf" >nul
 copy /y "!OUT!\!APP_NAME!.bin" "%FIRMWARE_OUT%\!APP_NAME!.bin" >nul
 copy /y "!OUT!\!APP_NAME!.hex" "%FIRMWARE_OUT%\!APP_NAME!.hex" >nul
@@ -549,6 +555,12 @@ if errorlevel 1 (
 arm-none-eabi-objcopy -O ihex "!OUT!\!SLAVE_APP_NAME!.elf" "!OUT!\!SLAVE_APP_NAME!.hex"
 if errorlevel 1 (
     echo   FAIL expansion slave application: objcopy ^(.hex^) failed
+    set /a FAIL+=1
+    goto :summary
+)
+python "%ROOT%\tools\seal_image.py" slave "!OUT!\!SLAVE_APP_NAME!.bin"
+if errorlevel 1 (
+    echo   FAIL expansion slave application: the header inside the image could not be sealed
     set /a FAIL+=1
     goto :summary
 )

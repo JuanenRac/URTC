@@ -397,6 +397,11 @@ arm-none-eabi-g++ $LDCOMMON -fno-exceptions -fno-rtti -fno-unwind-tables -fno-th
     "$BUILD/app_master/startup.o" "$BUILD/app_master/system_stm32f3xx.o" \
     "${objs[@]}" "${hal_objs[@]}" -o "$OUT/${APP_NAME}.elf" 2>&1 | grep -v "not implemented\|note: the message\|in function \`_" || true
 build_bin_hex "$OUT/${APP_NAME}.elf"
+# The header inside the image (docs/IMAGE_HEADER.md of URTC-COMMON): the firmware emits the slot at offset 0x200; the length and the CRC-32 are filled in here.
+if ! python3 "$ROOT/tools/seal_image.py" main "$OUT/${APP_NAME}.bin"; then
+    fail "${APP_NAME}.bin: the header inside the image could not be sealed"
+    echo ""; echo "$PASS passed, $WARN warnings, $FAIL failed"; exit 1
+fi
 cp "$OUT/${APP_NAME}.elf" "$FIRMWARE_OUT/${APP_NAME}.elf"
 cp "$OUT/${APP_NAME}.bin" "$FIRMWARE_OUT/${APP_NAME}.bin"
 cp "$OUT/${APP_NAME}.hex" "$FIRMWARE_OUT/${APP_NAME}.hex"
@@ -449,6 +454,10 @@ arm-none-eabi-g++ $LDCOMMON -fno-exceptions -fno-rtti -fno-unwind-tables -fno-th
     "$BUILD/app_slave/startup.o" "$BUILD/app_slave/system_stm32f3xx.o" \
     "${objs[@]}" "${hal_objs[@]}" -lm -o "$OUT/${SLAVE_APP_NAME}.elf" 2>&1 | grep -v "not implemented\|note: the message\|in function \`_" || true
 build_bin_hex "$OUT/${SLAVE_APP_NAME}.elf"
+if ! python3 "$ROOT/tools/seal_image.py" slave "$OUT/${SLAVE_APP_NAME}.bin"; then
+    fail "${SLAVE_APP_NAME}.bin: the header inside the image could not be sealed"
+    echo ""; echo "$PASS passed, $WARN warnings, $FAIL failed"; exit 1
+fi
 cp "$OUT/${SLAVE_APP_NAME}.elf" "$OUT/${SLAVE_APP_NAME}.bin" "$OUT/${SLAVE_APP_NAME}.hex" "$FIRMWARE_OUT/"
 MLX_PUBLIC_OK=$(arm-none-eabi-nm "$OUT/${SLAVE_APP_NAME}.elf" | grep -cE " T MLX90641_(DumpEE|ExtractParameters|GetFrameData|GetTa|CalculateTo)\b" || true)
 if [ "$MLX_PUBLIC_OK" -ge 5 ]; then

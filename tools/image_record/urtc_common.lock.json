@@ -16,7 +16,7 @@
     },
     "image_header.py": {
       "from": "src/urtc_common/image_header.py",
-      "sha256": "6f00c88ee955bd0c415fc8490b62c18362e4afeb2b328f1c0e04550e7766272e"
+      "sha256": "30ad1d49b4b23be27d462974c6033b8a27fa03e6975303cb44833d4b860ed6fd"
     },
     "image_sig.py": {
       "from": "src/urtc_common/image_sig.py",

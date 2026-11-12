@@ -159,14 +159,14 @@
         {
           "name": "tests/",
           "desc": {
-            "en": "50 C host test suites",
-            "es": "50 suites de pruebas de host en C",
-            "de": "50 C-Host-Testsuiten",
-            "fr": "50 suites de tests hôte en C",
-            "it": "50 suite di test host in C",
-            "zh": "50 个 C 主机测试套件",
-            "ja": "50 の C ホストテストスイート",
-            "pt": "50 conjuntos de testes de host em C"
+            "en": "53 C host test suites",
+            "es": "53 suites de pruebas de host en C",
+            "de": "53 C-Host-Testsuiten",
+            "fr": "53 suites de tests hôte en C",
+            "it": "53 suite di test host in C",
+            "zh": "53 个 C 主机测试套件",
+            "ja": "53 の C ホストテストスイート",
+            "pt": "53 conjuntos de testes de host em C"
           }
         },
         {
@@ -415,17 +415,17 @@
           }
         },
         {
-          "name": "LICENSE.md  ruff.toml",
-          "tree_name": "LICENSE.md ruff.toml",
+          "name": "LICENSE.md  ruff.toml  mypy.ini",
+          "tree_name": "LICENSE.md ruff.toml mypy.ini",
           "desc": {
-            "en": "hardware license and lint settings",
-            "es": "licencia del hardware y ajustes de lint",
-            "de": "Hardware-Lizenz und Lint-Einstellungen",
-            "fr": "licence du matériel et réglages de lint",
-            "it": "licenza dell'hardware e impostazioni di lint",
-            "zh": "硬件许可证和 lint 设置",
-            "ja": "ハードウェアのライセンスと lint 設定",
-            "pt": "licença do hardware e definições de lint"
+            "en": "hardware license, lint and type-check settings",
+            "es": "licencia del hardware, ajustes de lint y de comprobación de tipos",
+            "de": "Hardware-Lizenz, Lint- und Typprüfungs-Einstellungen",
+            "fr": "licence du matériel, réglages de lint et de vérification des types",
+            "it": "licenza dell'hardware, impostazioni di lint e di controllo dei tipi",
+            "zh": "硬件许可证、lint 与类型检查设置",
+            "ja": "ハードウェアのライセンス、lint と型チェックの設定",
+            "pt": "licença do hardware, definições de lint e de verificação de tipos"
           }
         }
       ]

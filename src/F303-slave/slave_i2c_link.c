@@ -33,8 +33,23 @@
 static slave_write_asm_t write_asm;
 #endif
 
-static uint8_t rx_buffer[8]; // largest real write is 4 bytes (1 register + 3 payload, REG_PWM_CONFIGURE/REG_PWM_PULSE) - sized with margin
-static uint8_t tx_buffer[32]; // largest real read is 32 bytes (REG_MLX_RAW_CHUNK/REG_MLX_CALIBRATED_CHUNK)
+// 1 = every write ends with a CRC-8 byte and every answer is followed by one (urtc_link_crc.h); a write whose check does not match is dropped and counted in i2c_link_crc_errors. 0 (default) = the link is what it always was. The master must be built to match, and the bootloader of the slave has no check.
+#ifndef URTC_SLAVE_LINK_CRC
+#define URTC_SLAVE_LINK_CRC 0
+#endif
+#if URTC_SLAVE_LINK_CRC
+#include "urtc_link_crc.h"
+#if URTC_SLAVE_WRITE_REASSEMBLY
+#error "URTC_SLAVE_LINK_CRC checks a write as a whole and cannot be combined with URTC_SLAVE_WRITE_REASSEMBLY"
+#endif
+#define LINK_CRC_BYTES 1
+#else
+#define LINK_CRC_BYTES 0
+#endif
+volatile uint32_t i2c_link_crc_errors = 0;   // writes dropped because their check byte did not match (always 0 with URTC_SLAVE_LINK_CRC=0)
+
+static uint8_t rx_buffer[8 + LINK_CRC_BYTES]; // largest real write is 4 bytes (1 register + 3 payload, REG_PWM_CONFIGURE/REG_PWM_PULSE) - sized with margin; one more for the check byte
+static uint8_t tx_buffer[32 + LINK_CRC_BYTES]; // largest real read is 32 bytes (REG_MLX_RAW_CHUNK/REG_MLX_CALIBRATED_CHUNK); one more for the check byte
 static uint8_t pending_read_register = 0xFF;
 static uint8_t pending_mlx_chunk_index = 0;
 volatile uint32_t i2c_link_last_activity_tick = 0;
@@ -98,6 +113,10 @@ void HAL_I2C_AddrCallback(I2C_HandleTypeDef *hi2c, uint8_t TransferDirection, ui
                 len = 1;
                 break;
         }
+#if URTC_SLAVE_LINK_CRC
+        tx_buffer[len] = urtc_link_crc_answer(pending_read_register, tx_buffer, len);   // the check covers the register that was selected and the data
+        len++;
+#endif
         HAL_I2C_Slave_Seq_Transmit_IT(hi2c, tx_buffer, len, I2C_LAST_FRAME);
     }
 }
@@ -106,6 +125,16 @@ void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef *hi2c) {
     uint32_t bytes_received = sizeof(rx_buffer) - hi2c->XferCount;
     if (bytes_received == 0) return;
     i2c_link_last_activity_tick = HAL_GetTick();
+#if URTC_SLAVE_LINK_CRC
+    {
+        uint8_t body = urtc_link_crc_open(rx_buffer, (uint8_t)bytes_received);
+        if (body == 0) {   // a frame with a wrong or missing check byte changes nothing, not even which register a following read returns
+            i2c_link_crc_errors++;
+            return;
+        }
+        bytes_received = body;
+    }
+#endif
 #if URTC_SLAVE_WRITE_REASSEMBLY
     {
         const uint8_t *msg = 0;

@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented here.
 
+## [Unreleased]
+
+- **The application images carry their own header:** 32 bytes at the fixed offset `0x200`, after the vector table, with the hardware, the version in four components, the length and the CRC-32 of the whole image. The firmware emits the slot (`src/F303-master/firmware_image_slot.c`, `src/F303-slave/slave_image_slot.c`), both linker scripts place it and fail the link if the vector table would not end before it, and `tools/seal_image.py` (called by `build_firmware.sh` and `build_firmware.bat`) fills in the length and the CRC-32 and writes the Intel HEX again from the sealed bytes. The flash map, the vector table and the length of the image do not change; the bootloaders are not changed.
+
+- **The check of the signature records also reads the header inside the image:** `tools/verify_image_records.py` refuses a sealed image whose header does not hold or states another hardware or version than its file name; the record itself is made over the sealed file exactly as before.
+
+- **Three host test suites for the header:** the shared vectors against `urtc_image_header.h` and the two slots against the headers of the firmware, with the seal step tested in Python (the vector table untouched, the same bytes every time, a refusal for another board, another version or a binary with no slot).
+
+- **The tree of the repository lists `mypy.ini`.**
+
 ## [0.4.7] - The Spanish README says "grabar" instead of the calque "flashear": the same word as the window of the programs. (and 23 more changes)
 
 - **The Spanish README says "grabar" instead of the calque "flashear":** the same word as the window of the programs.

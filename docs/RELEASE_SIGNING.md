@@ -62,7 +62,7 @@ The path of an official release, from the build to the published set:
    `release.yml` repeats the check (`tools/verify_release_set.py`) before it publishes. That check needs no key: `tools/verify_image_records.py`
    rebuilds, from the file name and the bytes of each application image, what the bootloader verifies (hardware, version, length, CRC-32, SHA-256,
    counter) and decides as the bootloader would against the release table of `keys/image_trust.json`; it also requires the bootloader of the set to
-   hold exactly that table. The header the record covers is never inside the flashed image.
+   hold exactly that table. The header the record covers is the one the bootloaders rebuild from the update; an image sealed by `tools/seal_image.py` also carries its own header inside, at the offset `0x200`, and the check requires it to state the hardware and the version of the file name (`docs/IMAGE_HEADER.md` of URTC-COMMON). The record is made over the sealed file exactly as before.
 4. The consumers take the record from the release: URTC-FLASHER and URTC-WEB-STUDIO read `<image>.imgsig` next to the image they flash and carry
    it to the bootloader (11 frames of `0x7EC` for the main board, `0x21A` for the slave through the main board). The web studio bundles the
    record of each application image with the image (`scripts/sync-firmware.mjs` downloads and verifies it, and refuses an official set without it

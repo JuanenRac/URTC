@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "urtc_common_version": "0.2.4",
+  "urtc_common_version": "0.2.5",
   "files": {
     "bl_serial_vectors.h": {
       "from": "generated/bl_serial_vectors.h",
@@ -17,6 +17,14 @@
     "ed25519_vectors.h": {
       "from": "generated/ed25519_vectors.h",
       "sha256": "59450f928dc5b0d6d337b446c541b529193e535d86861a34ce7d5eadeb1c4892"
+    },
+    "image_header_embedded_vectors.h": {
+      "from": "generated/image_header_embedded_vectors.h",
+      "sha256": "528b18241c362656a4ed849be120ac9df1fda2ad36735dfe3884c67cd3d95b6d"
+    },
+    "image_header_vectors.h": {
+      "from": "generated/image_header_vectors.h",
+      "sha256": "26a57a5fbe19e752d9ee9b454595bff332f9c205a0b22ffbde02d3b8343a5463"
     },
     "key_rotation_command_vectors.h": {
       "from": "generated/key_rotation_command_vectors.h",
@@ -37,6 +45,10 @@
     "test_bootloader_auth.c": {
       "from": "tests/c/test_bootloader_auth.c",
       "sha256": "a5046d8b61b76a27418d7bd48634c8ce6b632c183ad03cab0893165eb137cee8"
+    },
+    "test_image_header.c": {
+      "from": "tests/c/test_image_header.c",
+      "sha256": "8a6faacc025fe81823c37dc276e620fdf0d0ffb3ac537a5fa0291c5df382d96a"
     },
     "test_key_rotation.c": {
       "from": "tests/c/test_key_rotation.c",

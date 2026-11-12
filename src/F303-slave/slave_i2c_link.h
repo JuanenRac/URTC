@@ -16,4 +16,7 @@ void I2CLink_Init(void);
 // forever with nothing left to command it off.
 extern volatile uint32_t i2c_link_last_activity_tick;
 
+// Writes dropped because the check byte of the link did not match (URTC_SLAVE_LINK_CRC=1; always 0 otherwise).
+extern volatile uint32_t i2c_link_crc_errors;
+
 #endif // SLAVE_I2C_LINK_H

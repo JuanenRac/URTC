@@ -16,7 +16,8 @@ For every ``<image>.imgsig`` in DIR it rebuilds what the bootloader checks and d
   * it covers exactly this binary: the hardware, the version of the file name, the length, the CRC-32 and the SHA-256 of the image;
   * the counter is not below the minimum compiled into the bootloaders.
 
-The header the record covers is never part of the flashed image: it is rebuilt here from the file name and the bytes, as the signing tool does.
+The header the record covers is rebuilt here from the file name and the bytes, as the signing tool does (the bootloaders rebuild it the same way). An image that carries the
+header inside it (sealed by tools/seal_image.py) must also state, inside, the hardware and the version of its name and a length and CRC-32 that hold.
 A main-board bootloader found in the folder must hold exactly the trust table of the flavour, so the keys that signed are the keys it trusts.
 Prints VERIFY_IMAGE_RECORDS=PASS and exits 0 only when every record verifies.
 """
@@ -74,6 +75,11 @@ def check_folder(folder: Path, flavour: str = "release", doc: dict | None = None
             problems.append(f"{record.name}: its image {image.name} is not in the folder")
             continue
         payload = image.read_bytes()
+        # an image with the header inside it (docs/IMAGE_HEADER.md of URTC-COMMON) must state what its file name and its record say; one without is the older form
+        inside = image_header.inspect_image(payload, image_header.POLICY_ACCEPT, hardware_id, version)
+        if not inside.accepted:
+            problems.append(f"{image.name}: the header inside the image does not hold or does not match the file name ({inside.reason})")
+            continue
         verdict = image_sig.verify_image(record.read_bytes().decode("ascii", errors="replace"), table, hardware_id,
                                          header28(hardware_id, version, payload), payload, floor=floor)
         if verdict != "ok":
