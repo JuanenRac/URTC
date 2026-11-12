@@ -16,7 +16,11 @@ from pathlib import Path
 from typing import NoReturn
 
 
-from _doc_policy import check_public_private_boundary
+from _doc_policy import (
+    check_build_scripts_do_not_bump,
+    check_public_private_boundary,
+    check_scripts_do_not_activate_venv,
+)
 from _tracked_names import check_tracked_names
 from _readme_parity import check_readme_section_parity
 
@@ -353,6 +357,12 @@ def main() -> int:
     doc_policy_error = check_public_private_boundary(ROOT)
     if doc_policy_error:
         fail(doc_policy_error)
+    build_bump_error = check_build_scripts_do_not_bump(ROOT)
+    if build_bump_error:
+        fail(build_bump_error)
+    venv_activate_error = check_scripts_do_not_activate_venv(ROOT)
+    if venv_activate_error:
+        fail(venv_activate_error)
 
     names_error = check_tracked_names(ROOT)
 

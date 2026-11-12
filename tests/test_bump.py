@@ -79,8 +79,18 @@ class BuildScriptsDoNotBumpTests(unittest.TestCase):
             text = (ROOT / name).read_text(encoding="utf-8")
             self.assertNotIn("bump_manifest_version", text, name)
             for line in text.splitlines():
-                if "bump_version.py" in line and not line.lstrip().lower().startswith(("#", "rem")):
-                    self.assertIn("--current", line, f"{name}: {line}")
+                if "bump_version" in line and not line.lstrip().lower().startswith(("#", "rem", "echo", "printf")):
+                    self.fail(f"{name}: {line}")
+            self.assertIn("read_header_version.py", text, name)
+
+    def test_the_read_only_reader_prints_the_version_the_header_carries(self):
+        header = ROOT / "src" / "F303-master" / "firmware_common.h"
+        result = subprocess.run([sys.executable, str(ROOT / "tools" / "read_header_version.py"), str(header), "FIRMWARE_VERSION"], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        text = header.read_text(encoding="utf-8")
+        expected = ".".join(re.search(rf"#define FIRMWARE_VERSION_{p}\s+(\d+)", text).group(1) for p in ("MAJOR", "MINOR", "PATCH"))
+        self.assertEqual(result.stdout.strip(), expected)
+        self.assertNotEqual(subprocess.run([sys.executable, str(ROOT / "tools" / "read_header_version.py")], capture_output=True, text=True).returncode, 0)
 
 
 if __name__ == "__main__":

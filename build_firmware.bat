@@ -329,7 +329,7 @@ REM URTC_MAIN_BOOTLOADER_v{MAJOR}.{MINOR}.{PATCH} matches HYDRA-UMC's own
 REM <PREFIX>_v<MAJOR>.<MINOR>.<PATCH> pattern - see CHANGELOG.md for why
 REM this replaced the old unversioned URTC_BOOTLOADER name.
 set "BOOT_VER="
-for /f "usebackq delims=" %%v in (`python "%ROOT%\bump_version.py" --current "!SRC!\bootloader_common.h" BOOTLOADER_VERSION`) do set "BOOT_VER=%%v"
+for /f "usebackq delims=" %%v in (`python "%ROOT%\tools\read_header_version.py" "!SRC!\bootloader_common.h" BOOTLOADER_VERSION`) do set "BOOT_VER=%%v"
 if not defined BOOT_VER (
     echo   FAIL bootloader version lookup failed - see traceback above
     set /a FAIL+=1
@@ -387,7 +387,7 @@ REM pattern as the bootloader above - filename convention
 REM URTC_MAIN_FIRMWARE_v{MAJOR}.{MINOR}.{PATCH} replaces the old
 REM URTC_V{MAJOR}.{MINOR}_F303CC (no PATCH) name.
 set "APP_VER="
-for /f "usebackq delims=" %%v in (`python "%ROOT%\bump_version.py" --current "!SRC!\firmware_common.h" FIRMWARE_VERSION`) do set "APP_VER=%%v"
+for /f "usebackq delims=" %%v in (`python "%ROOT%\tools\read_header_version.py" "!SRC!\firmware_common.h" FIRMWARE_VERSION`) do set "APP_VER=%%v"
 if not defined APP_VER (
     echo   FAIL application version lookup failed - see traceback above
     set /a FAIL+=1
@@ -468,7 +468,7 @@ REM Same read-only version lookup as the main board bootloader above. Same stdou
 REM pattern too - filename convention URTC_SLAVE_BOOTLOADER_v{MAJOR}.
 REM {MINOR}.{PATCH} replaces the old unversioned URTC_SLAVE_BOOTLOADER name.
 set "SLAVE_BOOT_VER="
-for /f "usebackq delims=" %%v in (`python "%ROOT%\bump_version.py" --current "!SRC!\slaveboot_common.h" BOOTLOADER_VERSION`) do set "SLAVE_BOOT_VER=%%v"
+for /f "usebackq delims=" %%v in (`python "%ROOT%\tools\read_header_version.py" "!SRC!\slaveboot_common.h" BOOTLOADER_VERSION`) do set "SLAVE_BOOT_VER=%%v"
 if not defined SLAVE_BOOT_VER (
     echo   FAIL bootloader version lookup failed - see traceback above
     set /a FAIL+=1
@@ -521,7 +521,7 @@ REM Same read-only version lookup as the main board application above. Same stdo
 REM URTC_SLAVE_FIRMWARE_v{MAJOR}.{MINOR}.{PATCH} replaces the old
 REM unversioned URTC_SLAVE_APP name.
 set "SLAVE_APP_VER="
-for /f "usebackq delims=" %%v in (`python "%ROOT%\bump_version.py" --current "!SRC!\slave_common.h" FIRMWARE_VERSION`) do set "SLAVE_APP_VER=%%v"
+for /f "usebackq delims=" %%v in (`python "%ROOT%\tools\read_header_version.py" "!SRC!\slave_common.h" FIRMWARE_VERSION`) do set "SLAVE_APP_VER=%%v"
 if not defined SLAVE_APP_VER (
     echo   FAIL application version lookup failed - see traceback above
     set /a FAIL+=1

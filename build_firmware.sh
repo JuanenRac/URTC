@@ -315,7 +315,7 @@ build_bin_hex() {
 # raise one explicitly first with "python3 bump.py" (see VERSION_CHECKLIST.txt).
 version_or_bump() {
     local header="$1" prefix="$2"
-    python3 "$ROOT/bump_version.py" --current "$header" "$prefix"
+    python3 "$ROOT/tools/read_header_version.py" "$header" "$prefix"
 }
 
 mkdir -p "$FIRMWARE_OUT"

@@ -405,7 +405,7 @@ and the root README's own changelog sections):
     encoded its own version; the 2 bootloaders and the slave application
     were unversioned filenames) - see CHANGELOG.md for when and why.
     build_firmware.sh/.bat compute each name from the header's current
-    MAJOR.MINOR.PATCH (bump_version.py --current, read-only), and
+    MAJOR.MINOR.PATCH (tools/read_header_version.py, read-only), and
     generate_manifest.py globs for <PREFIX>_v*.bin in firmware/ rather
     than reconstructing the exact name, so it can never drift out of
     sync with what the build scripts actually produced.
