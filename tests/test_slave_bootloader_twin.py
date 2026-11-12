@@ -110,6 +110,52 @@ class SourceTests(unittest.TestCase):
             self.assertIn("TICK_INT_PRIORITY            ((uint32_t)(1U<<__NVIC_PRIO_BITS) - 1U)", text(hal_conf))
 
 
+def sealed_slave_image(version=(0, 3, 4, 0)) -> bytes:
+    """What the build leaves for the slave application after the seal step: a valid vector table, zeros up to the fixed offset, the slot, then code."""
+    sys.path.insert(0, str(ROOT / "tools"))
+    from image_record import image_header as ih
+    raw = bytearray(twin.application_image(3000, seed=3))
+    raw[0x08:0x200] = bytes(0x200 - 0x08)
+    raw[ih.EMBED_OFFSET:ih.EMBED_OFFSET + 32] = ih.embedded_slot(twin.HARDWARE_ID, version)
+    return ih.seal_embedded(bytes(raw), twin.HARDWARE_ID, version)
+
+
+class SealedImageTests(unittest.TestCase):
+    """An image the seal step made goes through the model of the slave bootloader like any other: nothing in the bootloader reads the header inside it."""
+
+    def test_a_sealed_image_installs_through_the_confirmed_exchange_and_runs(self):
+        image = sealed_slave_image()
+        chip = twin.SlaveBootloader(twin.Flash(), direction_fixed=True)
+        master = twin.Master(chip, image, 0, 3, 4, 1)
+        self.assertEqual(master.run(), twin.STATUS_VERIFY_OK)
+        chip = chip.reboot()
+        self.assertEqual(twin.boot_through_window(chip), "jumped")
+        meta = chip.metadata_read()
+        self.assertEqual((meta.version_major, twin.minor_field_minor(meta.version_minor), twin.minor_field_patch(meta.version_minor)), (0, 3, 4))
+
+    def test_the_header_inside_the_image_changes_nothing_in_the_digest_check(self):
+        image = sealed_slave_image()
+        changed = bytearray(image)
+        changed[0x210] ^= 1
+        chip = twin.SlaveBootloader(twin.Flash(), direction_fixed=True)
+        master = twin.Master(chip, image, 0, 3, 4, 1)
+        master.start()
+        master.send_digest()
+        master.send_counter()
+        master.send_data(bytes(changed))
+        master.end()
+        self.assertEqual(master.status(), twin.STATUS_VERIFY_FAIL)
+        self.assertIn(master.reason(), (twin.FAIL_CRC32, twin.FAIL_DIGEST))
+
+    def test_a_sealed_image_of_the_other_board_is_refused_by_the_hardware_id(self):
+        image = sealed_slave_image()
+        chip = twin.SlaveBootloader(twin.Flash(), direction_fixed=True)
+        master = twin.Master(chip, image, 0, 3, 4, 1, hardware_id=0x0303CC01)
+        master.start()
+        self.assertEqual(master.status(), twin.STATUS_VERIFY_FAIL)
+        self.assertEqual(master.reason(), twin.FAIL_HARDWARE_ID)
+
+
 class FlashTests(unittest.TestCase):
     def test_bits_only_go_down_until_the_page_is_erased(self):
         flash = twin.Flash()

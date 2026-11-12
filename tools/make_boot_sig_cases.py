@@ -79,6 +79,21 @@ def test_image(size: int) -> bytes:
     return bytes((i * 13 + 5) & 0xFF for i in range(size))
 
 
+SEALED_VERSION = (0, 5, 1, 0)
+SEALED_COUNTER = 5
+
+
+def sealed_main_image() -> bytes:
+    """What the build leaves for the master application: a vector table, zeros up to the fixed offset, the slot the firmware emits, then code; filled in by the
+    seal step (tools/image_record/image_header.py, the one tools/seal_image.py uses). The bootloader never looks inside, so this is the image it is handed."""
+    sys.path.insert(0, str(ROOT / "tools"))
+    from image_record import image_header as ih  # noqa: PLC0415
+    raw = bytearray(range(32)) * 12 + bytearray(2000 - 384)
+    raw[0x188:0x200] = bytes(0x200 - 0x188)
+    raw[ih.EMBED_OFFSET:ih.EMBED_OFFSET + 32] = ih.embedded_slot(THIS_HW, SEALED_VERSION)
+    return ih.seal_embedded(bytes(raw), THIS_HW, SEALED_VERSION)
+
+
 def header28(hw: int, major: int, minor_field: int, size: int, crc: int) -> bytes:
     """What the bootloader rebuilds from START (size, hardware id) and END (CRC, version): the first 28 bytes of the image header."""
     minor = minor_field & 0xFF
@@ -115,7 +130,16 @@ def main(argv: list[str] | None = None) -> int:
     for name, signer, new_current, previous, window_s, host_time, counter in rotation_specs():
         record = krc.sign(seeds[signer], ids[new_current], ids[previous] if previous else None, window_s, host_time, counter)
         rotations.append({"name": name, "record": record.hex()})
-    document = {"about": "Throwaway test keys only; see tools/make_boot_sig_cases.py", "public": publics, "cases": cases, "rotation": rotations}
+    sealed_image = sealed_main_image()
+    sealed_crc = zlib.crc32(sealed_image) & 0xFFFFFFFF
+    sealed_minor = pack(SEALED_VERSION[1], SEALED_VERSION[2])
+    sealed_head = header28(THIS_HW, SEALED_VERSION[0], sealed_minor, len(sealed_image), sealed_crc)
+    sealed_digest = hashlib.sha256(sealed_image).digest()
+    sealed_record = ia.make_record(seeds["dev"], sealed_head, sealed_digest, SEALED_COUNTER)
+    assert ed25519.verify(ed25519.public_key(seeds["dev"]), ia.message(sealed_head, sealed_digest, SEALED_COUNTER, sealed_record[:8]), sealed_record[12:]), "self check"
+    sealed = [{"name": "main_sealed", "size": len(sealed_image), "hardware_id": THIS_HW, "major": SEALED_VERSION[0], "minor_field": sealed_minor,
+               "counter": SEALED_COUNTER, "key": "dev", "crc32": sealed_crc, "image": sealed_image.hex(), "record": sealed_record.hex()}]
+    document = {"about": "Throwaway test keys only; see tools/make_boot_sig_cases.py", "public": publics, "cases": cases, "rotation": rotations, "sealed": sealed}
     text_json = json.dumps(document, indent=1) + "\n"
 
     def arr(hexs: str) -> str:
