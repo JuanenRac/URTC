@@ -346,6 +346,8 @@ See `docs/CANBUS.TXT` (ID `0x100`) for the exact byte layout, which also shares 
 
 ## 🔌 Interfaces
 
+**CAN bus speed:** the bus of the tool heads runs at **1 Mbit/s** (the value is written once, in `spec/can_protocol.json` of URTC-COMMON; the firmware and the bootloader calculate the timing from it for the clock of the chip: exact rate, sample point at 87.5 percent, never below 75 percent). 500 kbit/s stays as the legacy option for early boards: build with `URTC_CAN_LEGACY_500K=1`. **Compatibility note:** every board and every adapter of one bus must run at the same speed (a bus that mixes speeds does not work and the tools warn about it); at 1 Mbit/s the trunk should stay under about 25 m with stubs of a few centimetres and a 120 ohm termination at each end, while 500 kbit/s tolerates about 100 m. Nothing here has run on a real bus.
+
 Once the bootloader is in place, updating the application no longer needs physical access to the board at all — just send the new firmware build over the same umbilical CAN line already carrying commands to the tool head.
 
 **The update sequence:**

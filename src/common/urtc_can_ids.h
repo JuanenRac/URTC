@@ -14,7 +14,11 @@
 #define URTC_PROTOCOL_VERSION 1
 
 /* --- constants --- */
-#define URTC_BITRATE 0x7A120u  /* Fixed bus bitrate */
+#define URTC_BITRATE 0xF4240u  /* Default bus bit rate of the tool heads */
+#define URTC_BITRATE_LEGACY 0x7A120u  /* Bit rate of the early boards, kept as the legacy option */
+#define URTC_CAN_SAMPLE_POINT_PERMILLE 0x36Bu  /* Wanted sample point of the bit */
+#define URTC_CAN_SAMPLE_POINT_MIN_PERMILLE 0x2EEu  /* Lowest sample point a timing may have */
+#define URTC_CAN_SJW_TQ 0x2u  /* Wanted synchronisation jump width */
 #define URTC_STANDARD_ID_MAX 0x7FFu  /* Highest standard 11-bit identifier */
 #define URTC_DLC_MAX 0x8u  /* Classic CAN payload limit */
 #define URTC_HARDWARE_ID_MAIN 0x303CC01u  /* HardwareID of the tool-head board (STM32F303CCT6, revision 1) */

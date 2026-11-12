@@ -9,23 +9,36 @@
 //   2. how much oscillator error that setting tolerates, by the two conditions of the CAN specification (urtc_can_bt_tolerance_ppm);
 //   3. whether the clock actually in use is good enough (urtc_can_bt_diag), given its own accuracy in ppm: the HSI of the chip is about +-1 percent
 //      after the factory trim, a crystal a few tens of ppm.
-// The firmware uses the fixed 500 kbit/s setting it always had. The calculation only replaces that setting when the build asks for it
-// (URTC_CAN_BT_FROM_CONFIG=1, with URTC_CAN_BITRATE_BPS, URTC_CAN_SAMPLE_PERMILLE and URTC_CAN_SJW_TQ); and a crystal replaces the HSI only with URTC_USE_HSE=1.
+// The bus of the tool heads runs at 1 Mbit/s. The rate, the wanted sample point and the jump width are written once, in spec/can_protocol.json of URTC-COMMON
+// (URTC_BITRATE, URTC_CAN_SAMPLE_POINT_PERMILLE, URTC_CAN_SJW_TQ of src/common/urtc_can_ids.h), and the timing is calculated from them for the clock of the
+// chip: exact, with a sample point not below URTC_CAN_SAMPLE_POINT_MIN_PERMILLE. 500 kbit/s stays as the legacy option for early boards: build with
+// URTC_CAN_LEGACY_500K=1 (every board of one bus must be built the same way). URTC_CAN_BITRATE_BPS, URTC_CAN_SAMPLE_PERMILLE and URTC_CAN_SJW_TQ can still
+// be overridden for a bench build; a crystal replaces the HSI only with URTC_USE_HSE=1.
 // =============================================================================
 #ifndef URTC_CAN_BIT_TIMING_H
 #define URTC_CAN_BIT_TIMING_H
 
 #include <stdint.h>
+#include "urtc_can_ids.h"
 
 #ifndef URTC_CAN_BITRATE_BPS
-#define URTC_CAN_BITRATE_BPS 500000u
+#if defined(URTC_CAN_LEGACY_500K) && URTC_CAN_LEGACY_500K
+#define URTC_CAN_BITRATE_BPS URTC_BITRATE_LEGACY
+#define URTC_CAN_BT_FALLBACK_PRESCALER 4u     // 32 MHz / 4 / 16 quanta
+#else
+#define URTC_CAN_BITRATE_BPS URTC_BITRATE
+#define URTC_CAN_BT_FALLBACK_PRESCALER 2u     // 32 MHz / 2 / 16 quanta
+#endif
+#endif
+#ifndef URTC_CAN_BT_FALLBACK_PRESCALER
+#define URTC_CAN_BT_FALLBACK_PRESCALER 2u
 #endif
 #ifndef URTC_CAN_SAMPLE_PERMILLE
-#define URTC_CAN_SAMPLE_PERMILLE 875u
+#define URTC_CAN_SAMPLE_PERMILLE URTC_CAN_SAMPLE_POINT_PERMILLE
 #endif
-#ifndef URTC_CAN_SJW_TQ
-#define URTC_CAN_SJW_TQ 2u
-#endif
+// URTC_CAN_SJW_TQ comes from urtc_can_ids.h (the specification) unless a bench build gives another.
+
+_Static_assert(URTC_CAN_SAMPLE_PERMILLE >= URTC_CAN_SAMPLE_POINT_MIN_PERMILLE, "the sample point of the bus is below the floor of the specification");
 
 typedef struct {
     uint32_t prescaler;   // 1..1024

@@ -16,9 +16,13 @@
 #include "../can_bit_timing.h"
 
 #ifndef URTC_CAN_BT_FROM_CONFIG
-#define URTC_CAN_BT_FROM_CONFIG 0   // 1 = bit timing calculated from the configuration (same macros as the application); 0 = the fixed 500 kbit/s
+#define URTC_CAN_BT_FROM_CONFIG 1   // 1 = bit timing calculated from the specification of the bus (same macros as the application); 0 = the fixed 500 kbit/s
 #endif
 #include "urtc_boot_session.h"
+
+#ifndef URTC_CAN_BOOT_SJW_TQ
+#define URTC_CAN_BOOT_SJW_TQ 1u
+#endif
 
 CAN_HandleTypeDef hcan;
 IWDG_HandleTypeDef hiwdg;
@@ -89,8 +93,9 @@ static void MX_CAN_Init(void) {
 #if URTC_CAN_BT_FROM_CONFIG
     {
         urtc_can_bt_t bt;
-        if (urtc_can_bt_compute(32000000u, URTC_CAN_BITRATE_BPS, URTC_CAN_SAMPLE_PERMILLE, URTC_CAN_SJW_TQ, &bt) != URTC_CAN_BT_OK) {
-            bt.prescaler = 4; bt.bs1 = 13; bt.bs2 = 2; bt.sjw = 1;
+        // the bootloader keeps the jump width of 1 quantum it always had (a bench build can still ask for another through URTC_CAN_BOOT_SJW_TQ)
+        if (urtc_can_bt_compute(32000000u, URTC_CAN_BITRATE_BPS, URTC_CAN_SAMPLE_PERMILLE, URTC_CAN_BOOT_SJW_TQ, &bt) != URTC_CAN_BT_OK) {
+            bt.prescaler = URTC_CAN_BT_FALLBACK_PRESCALER; bt.bs1 = 13; bt.bs2 = 2; bt.sjw = 1;
         }
         hcan.Init.Prescaler = bt.prescaler;
         hcan.Init.SyncJumpWidth = URTC_CAN_HAL_SJW(bt.sjw);

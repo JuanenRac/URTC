@@ -348,6 +348,8 @@ Ver `docs/CANBUS.TXT` (ID `0x100`) para a disposição exata dos bytes, que tamb
 
 ## 🔌 Interfaces
 
+**Velocidade do barramento CAN:** o barramento das cabeças de ferramenta funciona a **1 Mbit/s** (o valor está escrito uma só vez, em `spec/can_protocol.json` do URTC-COMMON; o firmware e o bootloader calculam a temporização a partir dele para o relógio do chip: débito exato, ponto de amostragem a 87,5 por cento, nunca abaixo de 75 por cento). 500 kbit/s fica como opção herdada para placas antigas: compile com `URTC_CAN_LEGACY_500K=1`. **Nota de compatibilidade:** todas as placas e adaptadores de um mesmo barramento têm de funcionar à mesma velocidade (um barramento que mistura velocidades não funciona e as ferramentas avisam); a 1 Mbit/s o tronco deve ficar abaixo de cerca de 25 m, com derivações de poucos centímetros e uma terminação de 120 ohm em cada extremo, enquanto 500 kbit/s tolera cerca de 100 m. Nada disto correu num barramento real.
+
 Assim que o bootloader está instalado, atualizar a aplicação deixa de precisar de acesso físico à placa — basta enviar a nova build de firmware pelo mesmo cabo CAN que já transporta comandos para a cabeça da ferramenta.
 
 **A sequência de atualização:**

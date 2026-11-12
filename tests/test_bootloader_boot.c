@@ -18,6 +18,7 @@
 #include "bootloader_oled.h"
 #include "bootloader_protocol.h"
 #include "urtc_boot_session.h"
+#include "../can_bit_timing.h"
 #include "bl_serial_vectors.h"
 #include "urtc_bl_serial.h"
 #include "test_runner.h"
@@ -204,7 +205,8 @@ static void test_main_loop(int *failures)
     TEST_ASSERT(fake_hal_inits == 1 && fake_rcc_calls == 2 && fake_rcc_osc.PLL.PLLMUL == RCC_PLL_MUL16 && fake_rcc_clk.APB1CLKDivider == RCC_HCLK_DIV2, "the HAL is started and the clocks are the ones of the application");
     TEST_ASSERT(fake_iwdg_inits == 1 && fake_iwdg_prescaler == IWDG_PRESCALER_32 && fake_iwdg_reload == 999, "the watchdog is armed for one second");
     double quanta = 1.0 + fake_can_init.TimeSeg1 + fake_can_init.TimeSeg2;
-    TEST_ASSERT(32000000.0 / fake_can_init.Prescaler / quanta == 500000.0 && fake_can_init.SyncJumpWidth == CAN_SJW_1TQ && fake_can_init.AutoBusOff == ENABLE && fake_can_init.AutoRetransmission == ENABLE, "CAN runs at 500 kbit/s and recovers from bus-off by itself");
+    TEST_ASSERT(32000000.0 / fake_can_init.Prescaler / quanta == (double)URTC_CAN_BITRATE_BPS && fake_can_init.SyncJumpWidth == CAN_SJW_1TQ && fake_can_init.AutoBusOff == ENABLE && fake_can_init.AutoRetransmission == ENABLE, "CAN runs at the rate of the specification of the bus (1 Mbit/s unless built as legacy) and recovers from bus-off by itself");
+    TEST_ASSERT((1000.0 * (1.0 + fake_can_init.TimeSeg1) / quanta) >= (double)URTC_CAN_SAMPLE_POINT_MIN_PERMILLE, "the sample point of the bootloader is not below the floor of the specification");
     TEST_ASSERT(fake_can_init.TransmitFifoPriority == DISABLE, "the transmit mailboxes are sent in the order of their identifiers (the application sends them in the order of the requests)");
     TEST_ASSERT(fake_can_filters == 1 && fake_can_filter.FilterMaskIdHigh == 0 && fake_can_filter.FilterMaskIdLow == 0 && fake_can_filter.FilterFIFOAssignment == CAN_FILTER_FIFO0 && fake_can_starts == 1, "one filter that accepts everything into FIFO 0, and the controller is started");
     TEST_ASSERT(fake_i2c_probes == 1, "the display is probed once");

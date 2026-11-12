@@ -349,6 +349,8 @@ Siehe `docs/CANBUS.TXT` (ID `0x100`) für die exakte Byte-Belegung, die sich die
 
 ## 🔌 Schnittstellen
 
+**CAN-Bus-Geschwindigkeit:** Der Bus der Werkzeugköpfe läuft mit **1 Mbit/s** (der Wert steht nur einmal, in `spec/can_protocol.json` von URTC-COMMON; Firmware und Bootloader berechnen daraus die Zeitsteuerung für den Takt des Chips: exakte Rate, Abtastpunkt bei 87,5 Prozent, nie unter 75 Prozent). 500 kbit/s bleibt als Altoption für frühe Platinen: mit `URTC_CAN_LEGACY_500K=1` bauen. **Kompatibilitätshinweis:** Alle Platinen und Adapter eines Busses müssen dieselbe Geschwindigkeit verwenden (ein Bus mit gemischten Geschwindigkeiten funktioniert nicht, und die Werkzeuge warnen davor); bei 1 Mbit/s sollte der Hauptstrang unter etwa 25 m bleiben, mit Stichleitungen von wenigen Zentimetern und je einem 120-Ohm-Abschluss an beiden Enden, bei 500 kbit/s sind etwa 100 m möglich. Nichts davon ist auf einem echten Bus gelaufen.
+
 Sobald der Bootloader vorhanden ist, benötigt die Aktualisierung der Anwendung überhaupt keinen physischen Zugriff mehr auf die Platine — schicken Sie einfach den neuen Firmware-Build über dieselbe CAN-Leitung, die bereits Befehle zum Werkzeugkopf trägt.
 
 **Die Update-Sequenz:**

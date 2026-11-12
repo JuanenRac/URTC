@@ -75,9 +75,15 @@ static void test_can(int *failures)
     TEST_ASSERT(hcan.Instance == CAN && fake_can_inits == 1, "CAN1 is initialised once");
     double quanta = 1.0 + fake_can_init.TimeSeg1 + fake_can_init.TimeSeg2;
     double bit_rate = APB1_HZ / fake_can_init.Prescaler / quanta;
-    TEST_ASSERT(bit_rate == 500000.0, "32 MHz / 4 / 16 time quanta is 500 kbit/s, the rate of the whole family");
+    TEST_ASSERT(bit_rate == (double)URTC_CAN_BITRATE_BPS, "the bit rate the peripheral gets from the 32 MHz clock is exactly the rate of the specification of the bus");
+#if defined(URTC_CAN_LEGACY_500K) && URTC_CAN_LEGACY_500K
+    TEST_ASSERT(URTC_CAN_BITRATE_BPS == 500000u && fake_can_init.Prescaler == 4, "the legacy build runs at 500 kbit/s (32 MHz / 4 / 16 time quanta)");
+#else
+    TEST_ASSERT(URTC_CAN_BITRATE_BPS == 1000000u && URTC_BITRATE == 1000000u && fake_can_init.Prescaler == 2, "the default build runs at 1 Mbit/s (32 MHz / 2 / 16 time quanta)");
+#endif
     double sample = (1.0 + fake_can_init.TimeSeg1) / quanta;
     TEST_ASSERT(sample >= 0.80 && sample <= 0.90, "the sample point is at 87.5 percent of the bit");
+    TEST_ASSERT(sample * 1000.0 >= (double)URTC_CAN_SAMPLE_POINT_MIN_PERMILLE, "the sample point is not below the floor of the specification");
     TEST_ASSERT(fake_can_init.SyncJumpWidth <= fake_can_init.TimeSeg2 && fake_can_init.Mode == CAN_MODE_NORMAL, "the jump width does not exceed the second segment, and the mode is normal (not loop-back)");
     TEST_ASSERT(fake_can_init.AutoBusOff == ENABLE && fake_can_init.AutoRetransmission == ENABLE && fake_can_init.TimeTriggeredMode == DISABLE && fake_can_init.ReceiveFifoLocked == DISABLE && fake_can_init.TransmitFifoPriority == ENABLE, "the bus recovers by itself, frames are repeated, the FIFO is not locked and the oldest request goes first");
     TEST_ASSERT(fake_can_filters == 1 && fake_can_filter.FilterBank == 0 && fake_can_filter.FilterActivation == ENABLE && fake_can_filter.FilterFIFOAssignment == CAN_RX_FIFO0, "one filter, active, into FIFO 0");
@@ -212,6 +218,20 @@ static void test_can_bit_timing(int *failures)
                 "the calculation gives back the fixed 500 kbit/s setting of the firmware (prescaler 4, 13 + 2 quanta, jump width 2)");
     TEST_ASSERT(urtc_can_bt_rate(32000000u, &bt) == 500000u && urtc_can_bt_sample_permille(&bt) == 875u, "its rate and sample point are exact");
     TEST_ASSERT(urtc_can_bt_compute(32000000u, 250000u, 875u, 2u, &bt) == URTC_CAN_BT_OK && urtc_can_bt_rate(32000000u, &bt) == 250000u, "250 kbit/s is exact too");
+    TEST_ASSERT(urtc_can_bt_compute(32000000u, URTC_BITRATE, URTC_CAN_SAMPLE_POINT_PERMILLE, URTC_CAN_SJW_TQ, &bt) == URTC_CAN_BT_OK && bt.prescaler == 2 && bt.bs1 == 13 && bt.bs2 == 2 && bt.sjw == 2,
+                "the specification's own rate, sample point and jump width give the 1 Mbit/s timing of the heads (prescaler 2, 13 + 2 quanta, jump width 2)");
+    TEST_ASSERT(urtc_can_bt_rate(32000000u, &bt) == 1000000u && urtc_can_bt_sample_permille(&bt) == 875u && urtc_can_bt_sample_permille(&bt) >= URTC_CAN_SAMPLE_POINT_MIN_PERMILLE,
+                "1 Mbit/s is exact (0 ppm of rate error) with the sample point at 87.5 percent, above the 75 percent floor");
+    TEST_ASSERT(urtc_can_bt_tolerance_ppm(&bt) == 4854u, "the oscillator tolerance is the same at 1 Mbit/s as at 500 kbit/s (same 16 quanta)");
+    TEST_ASSERT(urtc_can_bt_compute(32000000u, URTC_BITRATE_LEGACY, URTC_CAN_SAMPLE_POINT_PERMILLE, URTC_CAN_SJW_TQ, &bt) == URTC_CAN_BT_OK && bt.prescaler == 4 && URTC_BITRATE_LEGACY == 500000u,
+                "the legacy rate of the specification gives the 500 kbit/s timing of the early boards"
+    );
+    {
+        // a bus of mixed speeds: the two settings differ, so a head built for one cannot talk to a head built for the other
+        urtc_can_bt_t fast, slow;
+        TEST_ASSERT(urtc_can_bt_compute(32000000u, URTC_BITRATE, 875u, 2u, &fast) == URTC_CAN_BT_OK && urtc_can_bt_compute(32000000u, URTC_BITRATE_LEGACY, 875u, 2u, &slow) == URTC_CAN_BT_OK
+                    && fast.prescaler != slow.prescaler && urtc_can_bt_rate(32000000u, &fast) == 2u * urtc_can_bt_rate(32000000u, &slow), "the two speeds of the family are told apart by their timing, and one is exactly twice the other");
+    }
     TEST_ASSERT(urtc_can_bt_compute(32000000u, 300000u, 875u, 2u, &bt) == URTC_CAN_BT_ERR_NO_FIT, "a rate that no setting gives exactly is refused, never approximated");
     TEST_ASSERT(urtc_can_bt_compute(0, 500000u, 875u, 2u, &bt) == URTC_CAN_BT_ERR_ARGS && urtc_can_bt_compute(32000000u, 500000u, 950u, 2u, &bt) == URTC_CAN_BT_ERR_ARGS
                 && urtc_can_bt_compute(32000000u, 500000u, 875u, 2u, 0) == URTC_CAN_BT_ERR_ARGS, "bad arguments are refused");

@@ -351,6 +351,8 @@ Voir `docs/CANBUS.TXT` (ID `0x100`) pour la disposition exacte des octets, qui p
 
 ## 🔌 Interfaces
 
+**Vitesse du bus CAN :** le bus des têtes d'outil fonctionne à **1 Mbit/s** (la valeur n'est écrite qu'une fois, dans `spec/can_protocol.json` d'URTC-COMMON ; le firmware et le bootloader en calculent le timing pour l'horloge de la puce : débit exact, point d'échantillonnage à 87,5 pour cent, jamais sous 75 pour cent). 500 kbit/s reste l'option héritée pour les premières cartes : compiler avec `URTC_CAN_LEGACY_500K=1`. **Note de compatibilité :** toutes les cartes et tous les adaptateurs d'un même bus doivent avoir la même vitesse (un bus qui mélange les vitesses ne fonctionne pas et les outils le signalent) ; à 1 Mbit/s le tronc doit rester sous environ 25 m, avec des dérivations de quelques centimètres et une terminaison de 120 ohms à chaque extrémité, alors que 500 kbit/s tolère environ 100 m. Rien de cela n'a tourné sur un vrai bus.
+
 Une fois le bootloader en place, la mise à jour de l'application ne nécessite plus du tout d'accès physique à la carte — il suffit d'envoyer le nouveau build de firmware sur le même câble CAN qui porte déjà les commandes vers la tête d'outil.
 
 **La séquence de mise à jour :**

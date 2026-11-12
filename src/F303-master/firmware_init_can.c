@@ -1,5 +1,5 @@
 // =============================================================================
-// URTC Firmware - CAN peripheral initialization (500 kbit/s, no filtering)
+// URTC Firmware - CAN peripheral initialization (1 Mbit/s by default, 500 kbit/s legacy; no filtering)
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
 // GPL-3.0-or-later - see LICENSE
 // =============================================================================
@@ -7,10 +7,11 @@
 #include "firmware_init_can.h"
 #include "can_bit_timing.h"
 
-// 1 = the bit timing is calculated from URTC_CAN_BITRATE_BPS, URTC_CAN_SAMPLE_PERMILLE and URTC_CAN_SJW_TQ for the 32 MHz peripheral clock (a build error if no
-// setting gives that rate exactly). 0 (default) = the fixed 500 kbit/s setting below.
+// 1 (default) = the bit timing is calculated from URTC_CAN_BITRATE_BPS, URTC_CAN_SAMPLE_PERMILLE and URTC_CAN_SJW_TQ (the specification of the bus) for the
+// 32 MHz peripheral clock; an impossible setting falls back to the 16-quanta timing of the default rate. 0 = the fixed 500 kbit/s setting below (the legacy
+// option written by hand, kept for the build that must not use the calculation).
 #ifndef URTC_CAN_BT_FROM_CONFIG
-#define URTC_CAN_BT_FROM_CONFIG 0
+#define URTC_CAN_BT_FROM_CONFIG 1
 #endif
 
 void MX_CAN_Init(void) {
@@ -45,7 +46,7 @@ void MX_CAN_Init(void) {
     {
         urtc_can_bt_t bt;
         if (urtc_can_bt_compute(32000000u, URTC_CAN_BITRATE_BPS, URTC_CAN_SAMPLE_PERMILLE, URTC_CAN_SJW_TQ, &bt) != URTC_CAN_BT_OK) {
-            bt.prescaler = 4; bt.bs1 = 13; bt.bs2 = 2; bt.sjw = 2;   // an impossible setting falls back to the standard 500 kbit/s
+            bt.prescaler = URTC_CAN_BT_FALLBACK_PRESCALER; bt.bs1 = 13; bt.bs2 = 2; bt.sjw = 2;   // an impossible setting falls back to the timing of the default rate
         }
         hcan.Init.Prescaler = bt.prescaler;
         hcan.Init.SyncJumpWidth = URTC_CAN_HAL_SJW(bt.sjw);

@@ -17,6 +17,15 @@ frame version 2 (temperature of the pre-heat command) and the sensor frame versi
 head (timestamp and thermal reading) are big-endian; version 1 of both was little-endian and is
 refused as an unsupported version. Their vectors are in the shared conformance repository.
 
+BUS SPEED NOTE: the bus of the tool heads runs at 1 Mbit/s. The value is written once, in spec/can_protocol.json of the shared
+conformance repository (BITRATE, with BITRATE_LEGACY = 500 kbit/s for early boards and the sample point and jump width beside
+them); the firmware and the bootloader of the master calculate the bit timing from it for the clock of the chip (32 MHz: prescaler 2,
+13 + 2 time quanta, sample point 87.5 percent, never below 75 percent, rate error 0 ppm). A build for the legacy rate uses
+URTC_CAN_LEGACY_500K=1. Every board and adapter of one bus must run at the same speed: a bus that mixes speeds does not work.
+At 1 Mbit/s keep the trunk under about 25 m, the stubs of every head to a few centimetres and a 120 ohm termination at each end;
+500 kbit/s tolerates about 100 m. The expansion slave does not use this bus (it talks I2C to the master).
+
+
 -----------------------------------------------------------------------------
 1. MAXIMUM-PRIORITY COMMANDS (Critical Events / Interrupts)
 -----------------------------------------------------------------------------
@@ -2027,11 +2036,11 @@ GENERATED REFERENCE (from the specification in URTC-COMMON)
 
 A. Summary
 
-[[ BEGIN GENERATED summary sha256=f091a1026f70c318637f3fed8773157b6e83a9ee3fc07f59d79a9abdd2a2d556 ]]
+[[ BEGIN GENERATED summary sha256=8ae913189b064dd0e26b28edf234fbc9048b27ed9a5069e5779b3908cfa929c8 ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 URTC CAN protocol: protocol version 1, byte order big.
-106 identifiers, 25 tool profiles, 22 enumerations, 37 constants, 4 magic payloads, 27 registers of the expansion slave.
+106 identifiers, 25 tool profiles, 22 enumerations, 41 constants, 4 magic payloads, 27 registers of the expansion slave.
 
 Machine-readable specification of the CAN bus protocol of the URTC tool head: every identifier with its direction, length rule and payload layout, the magic payloads, the registers of the expansion slave, the version procedures and the SLCAN subset the host tools rely on. All multi-byte fields are big-endian.
 [[ END GENERATED summary ]]
@@ -4107,12 +4116,16 @@ pid_state - State of the heater PID (prefix PID_STATE_, value)
 
 F. Constants
 
-[[ BEGIN GENERATED constants sha256=b0097fa325f5a40dbd335beba755b16daf6151730e802a518e2051185bf6c867 ]]
+[[ BEGIN GENERATED constants sha256=8aadeff811aac35ddf5ba50645c0e5a243615165c305c6ed36449a5cfccb0fe7 ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 | Name | Value | Unit | Group | Title |
 |---|---|---|---|---|
-| BITRATE | 500000 | bit/s | protocol | Fixed bus bitrate |
+| BITRATE | 1000000 | bit/s | protocol | Default bus bit rate of the tool heads |
+| BITRATE_LEGACY | 500000 | bit/s | protocol | Bit rate of the early boards, kept as the legacy option |
+| CAN_SAMPLE_POINT_PERMILLE | 875 | per mille | protocol | Wanted sample point of the bit |
+| CAN_SAMPLE_POINT_MIN_PERMILLE | 750 | per mille | protocol | Lowest sample point a timing may have |
+| CAN_SJW_TQ | 2 | time quanta | protocol | Wanted synchronisation jump width |
 | STANDARD_ID_MAX | 2047 |  | protocol | Highest standard 11-bit identifier |
 | DLC_MAX | 8 | bytes | protocol | Classic CAN payload limit |
 | HARDWARE_ID_MAIN | 50580481 |  | protocol | HardwareID of the tool-head board (STM32F303CCT6, revision 1) |

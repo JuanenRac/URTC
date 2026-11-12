@@ -348,6 +348,8 @@ Ver `docs/CANBUS.TXT` (ID `0x100`) para la disposición exacta de los bytes, que
 
 ## 🔌 Interfaces
 
+**Velocidad del bus CAN:** el bus de los cabezales funciona a **1 Mbit/s** (el valor se escribe una sola vez, en `spec/can_protocol.json` de URTC-COMMON; el firmware y el bootloader calculan la temporización desde él para el reloj del chip: velocidad exacta, punto de muestreo al 87,5 por ciento y nunca por debajo del 75 por ciento). 500 kbit/s queda como opción heredada para placas antiguas: compila con `URTC_CAN_LEGACY_500K=1`. **Nota de compatibilidad:** todas las placas y adaptadores de un mismo bus deben ir a la misma velocidad (un bus que mezcla velocidades no funciona y las herramientas avisan); a 1 Mbit/s el tronco debe quedarse por debajo de unos 25 m, con derivaciones de pocos centímetros y una terminación de 120 ohmios en cada extremo, mientras que 500 kbit/s tolera unos 100 m. Nada de esto ha corrido en un bus real.
+
 Una vez que el bootloader está en su lugar, actualizar la aplicación ya no necesita acceso físico a la placa en absoluto — solo envía la build de firmware nueva por la misma línea CAN umbilical que ya lleva comandos al cabezal de herramienta.
 
 **La secuencia de actualización:**
