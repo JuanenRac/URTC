@@ -16,6 +16,7 @@
 #include "firmware_expansion_spi.h"
 #include "firmware_ads1115.h"
 #include "fake_i2c_bus.h"
+#include "urtc_link_crc.h"
 #include "test_runner.h"
 
 // ---- the I2C bus: the model of tests/host_hal/fake_i2c_bus.c, with the expansion slave and an ADS1115 on it ----------------------------------------
@@ -68,6 +69,54 @@ static void test_register_write_and_read(int *failures)
 
     in[0] = 0x77;
     TEST_ASSERT(ExpansionI2C_SlaveReadRegister(0x20, in, 1) == 1 && in[0] == 0x11, "a one-byte read answers with a NACK of the last byte and still returns it");
+}
+
+// ---- the same calls with the check byte of the application link (urtc_link_crc.h) -------------------------------------------------------------
+// The model of the slave is a register file, not the firmware of the slave (tests/test_slave_link_crc.c plays that end): what is asserted here is what the master puts on
+// the wire and what it does with the answer.
+static void test_checked_register_calls(int *failures)
+{
+    i2c_world(1, 0);
+    const uint8_t out[3] = {0xDE, 0xAD, 0xBE};
+    TEST_ASSERT(ExpansionI2C_SlaveWriteRegisterCrc(0x10, out, 3) == 1, "a checked register write is acknowledged");
+    const uint8_t sent[4] = {0x10, 0xDE, 0xAD, 0xBE};
+    TEST_ASSERT(fake_i2c_bus.seen[1] == 0x10 && fake_i2c_bus.seen[2] == 0xDE && fake_i2c_bus.seen[3] == 0xAD && fake_i2c_bus.seen[4] == 0xBE, "the wire carries the register and the payload as before");
+    TEST_ASSERT(fake_i2c_bus.seen[5] == urtc_link_crc8(0, sent, 4), "and the check byte of the register and the payload after them");
+    TEST_ASSERT(ExpansionI2C_SlaveWriteRegisterCrc(0x10, out, 32) == 0, "a payload that cannot fit a frame with its check byte is refused before anything is sent");
+
+    // the selection is a checked write of the register alone; the model stores that check byte at the register and advances to the next one
+    i2c_world(1, 0);
+    uint8_t answer[3] = {0x11, 0x22, 0x33};
+    uint8_t read_back[3] = {0};
+    for (int i = 0; i < 3; i++) dev_expansion->mem[0x21 + i] = answer[i];
+    dev_expansion->mem[0x24] = urtc_link_crc_answer(0x20, answer, 3);
+    TEST_ASSERT(ExpansionI2C_SlaveReadRegisterCrc(0x20, read_back, 3) == 1, "a checked read is accepted when the check byte of the answer matches the register and the data");
+    TEST_ASSERT(read_back[0] == 0x11 && read_back[1] == 0x22 && read_back[2] == 0x33, "and the data come back");
+    const uint8_t reg20 = 0x20;
+    TEST_ASSERT(fake_i2c_bus.seen[1] == 0x20 && fake_i2c_bus.seen[2] == urtc_link_crc8(0, &reg20, 1), "the selection carries the register and its own check byte");
+
+    i2c_world(1, 0);
+    for (int i = 0; i < 3; i++) dev_expansion->mem[0x21 + i] = answer[i];
+    dev_expansion->mem[0x24] = (uint8_t)(urtc_link_crc_answer(0x20, answer, 3) ^ 0x04u);
+    uint8_t untouched[3] = {0xEE, 0xEE, 0xEE};
+    TEST_ASSERT(ExpansionI2C_SlaveReadRegisterCrc(0x20, untouched, 3) == 0 && untouched[0] == 0xEE && untouched[2] == 0xEE, "an answer with a wrong check byte is refused and the buffer of the caller is left alone");
+    i2c_world(1, 0);
+    for (int i = 0; i < 3; i++) dev_expansion->mem[0x21 + i] = answer[i];
+    dev_expansion->mem[0x24] = urtc_link_crc_answer(0x21, answer, 3);
+    TEST_ASSERT(ExpansionI2C_SlaveReadRegisterCrc(0x20, untouched, 3) == 0, "an answer whose check byte belongs to another register is refused");
+    TEST_ASSERT(ExpansionI2C_SlaveReadRegisterCrc(0x20, untouched, 0) == 0 && ExpansionI2C_SlaveReadRegisterCrc(0x20, untouched, 33) == 0, "a read of no bytes, or of more than a frame holds, is refused");
+
+    i2c_world(1, 0);
+    dev_expansion->mem[0x32] = 0xAA; dev_expansion->mem[0x33] = 0xBB;       // the model stores the parameter at 0x30 and the check byte at 0x31, and the read goes on from 0x32
+    uint8_t pair[2] = {0xAA, 0xBB};
+    dev_expansion->mem[0x34] = urtc_link_crc_answer(0x30, pair, 2);
+    uint8_t got[2] = {0};
+    TEST_ASSERT(ExpansionI2C_SlaveReadRegisterWithParamCrc(0x30, 0x5A, got, 2) == 1 && got[0] == 0xAA && got[1] == 0xBB, "a checked read with a parameter works the same way");
+    const uint8_t selected[2] = {0x30, 0x5A};
+    TEST_ASSERT(fake_i2c_bus.seen[1] == 0x30 && fake_i2c_bus.seen[2] == 0x5A && fake_i2c_bus.seen[3] == urtc_link_crc8(0, selected, 2), "its selection carries the register, the parameter and the check byte");
+
+    i2c_world(0, 0);
+    TEST_ASSERT(ExpansionI2C_SlaveWriteRegisterCrc(0x01, out, 1) == 0 && ExpansionI2C_SlaveReadRegisterCrc(0x01, untouched, 2) == 0, "with no device neither checked call succeeds");
 }
 
 static void test_no_device_and_stuck_clock(int *failures)
@@ -186,6 +235,7 @@ void run_expansion_bus_tests(int *failures)
 {
     test_i2c_init(failures);
     test_register_write_and_read(failures);
+    test_checked_register_calls(failures);
     test_no_device_and_stuck_clock(failures);
     test_ads1115(failures);
     test_spi(failures);

@@ -16,6 +16,8 @@
 // ============================================================================
 #include "firmware_common.h"
 #include "firmware_expansion_i2c.h"
+#include "urtc_link_crc.h"
+#include "urtc_link_crc.h"
 
 // Address the expansion slave chip (STM32F303CBT6, advanced boards only)
 // answers on this same physical bus, in BOTH its bootloader and
@@ -249,4 +251,50 @@ uint8_t ExpansionI2C_SlaveReadRegisterWithParam(uint8_t reg, uint8_t param, uint
     return ack && !ExpansionI2C_HadTimeout();
 }
 
+// ---- the same three calls with the check byte of the application link (urtc_link_crc.h) ----------------------------------------------------------
+// Only for an expansion slave whose application was built with URTC_SLAVE_LINK_CRC=1: its bootloader has no check byte. Each returns 1 only when the bytes were
+// acknowledged AND (for a read) the check byte of the answer matches the register that was selected and the data; on a mismatch the caller's buffer is
+// left alone, so a corrupted answer is never mistaken for a reading.
 
+// One transaction: `out` bytes written, then (when in_len > 0) a repeated START and in_len bytes read, ACKing every byte but the last.
+static uint8_t ExpansionI2C_Transaction(const uint8_t *out, uint8_t out_len, uint8_t *in, uint8_t in_len) {
+    ExpansionI2C_Start();
+    uint8_t ack = ExpansionI2C_WriteByte((EXPANSION_SLAVE_I2C_ADDR << 1) | 0);
+    for (uint8_t i = 0; i < out_len && ack; i++) ack = ExpansionI2C_WriteByte(out[i]);
+    if (ack && in_len > 0) {
+        ExpansionI2C_Start();
+        ack = ExpansionI2C_WriteByte((EXPANSION_SLAVE_I2C_ADDR << 1) | 1);
+        for (uint8_t i = 0; ack && i < in_len; i++) in[i] = ExpansionI2C_ReadByte(i < (in_len - 1));
+    }
+    ExpansionI2C_Stop();
+    return ack && !ExpansionI2C_HadTimeout();
+}
+
+uint8_t ExpansionI2C_SlaveWriteRegisterCrc(uint8_t reg, const uint8_t *data, uint8_t len) {
+    if (len > URTC_LINK_CRC_MAX_FRAME - 2u) return 0;   // register + payload + check byte must fit the frame
+    uint8_t frame[URTC_LINK_CRC_MAX_FRAME];
+    frame[0] = reg;
+    for (uint8_t i = 0; i < len; i++) frame[1 + i] = data[i];
+    uint8_t total = urtc_link_crc_seal(frame, (uint8_t)(len + 1u));
+    return ExpansionI2C_Transaction(frame, total, 0, 0);
+}
+
+static uint8_t ExpansionI2C_CheckedRead(uint8_t *select, uint8_t select_len, uint8_t reg, uint8_t *data, uint8_t len) {
+    if (len == 0 || len > URTC_LINK_CRC_MAX_FRAME - 1u) return 0;
+    uint8_t total = urtc_link_crc_seal(select, select_len);
+    uint8_t answer[URTC_LINK_CRC_MAX_FRAME];
+    if (!ExpansionI2C_Transaction(select, total, answer, (uint8_t)(len + 1u))) return 0;
+    if (urtc_link_crc_answer(reg, answer, len) != answer[len]) return 0;
+    for (uint8_t i = 0; i < len; i++) data[i] = answer[i];
+    return 1;
+}
+
+uint8_t ExpansionI2C_SlaveReadRegisterCrc(uint8_t reg, uint8_t *data, uint8_t len) {
+    uint8_t select[3] = {reg, 0, 0};
+    return ExpansionI2C_CheckedRead(select, 1, reg, data, len);
+}
+
+uint8_t ExpansionI2C_SlaveReadRegisterWithParamCrc(uint8_t reg, uint8_t param, uint8_t *data, uint8_t len) {
+    uint8_t select[3] = {reg, param, 0};
+    return ExpansionI2C_CheckedRead(select, 2, reg, data, len);
+}

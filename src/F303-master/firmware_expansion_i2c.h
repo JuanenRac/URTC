@@ -17,5 +17,9 @@ uint8_t ExpansionI2C_HadTimeout(void);
 uint8_t ExpansionI2C_SlaveWriteRegister(uint8_t reg, const uint8_t *data, uint8_t len);
 uint8_t ExpansionI2C_SlaveReadRegister(uint8_t reg, uint8_t *data, uint8_t len);
 uint8_t ExpansionI2C_SlaveReadRegisterWithParam(uint8_t reg, uint8_t param, uint8_t *data, uint8_t len);
+// The same three with the check byte of the application link (urtc_link_crc.h); only for an application built with URTC_SLAVE_LINK_CRC=1.
+uint8_t ExpansionI2C_SlaveWriteRegisterCrc(uint8_t reg, const uint8_t *data, uint8_t len);
+uint8_t ExpansionI2C_SlaveReadRegisterCrc(uint8_t reg, uint8_t *data, uint8_t len);
+uint8_t ExpansionI2C_SlaveReadRegisterWithParamCrc(uint8_t reg, uint8_t param, uint8_t *data, uint8_t len);
 
 #endif // FIRMWARE_EXPANSION_I2C_H

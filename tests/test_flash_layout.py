@@ -63,6 +63,20 @@ class FlashLayoutTests(unittest.TestCase):
         self.assertIn("SCB->VTOR = URTC_MASTER_MAIN_APP_ADDR;", main)
         self.assertNotIn("0x08008000", re.sub(r"//.*", "", main))
 
+    def test_every_other_place_that_spells_the_application_address_agrees(self) -> None:
+        """The manifest generator, the documents and the readme of the firmware spell the address out; each one is held to the header too."""
+        address = f"0x{layout()['URTC_MASTER_MAIN_APP_ADDR']:08X}"
+        generator = (ROOT / "generate_manifest.py").read_text(encoding="utf-8")
+        self.assertIn(f'"flash_address": "{address}"', generator)
+        for name in ("docs/SOURCE_MAP.md", "src/F303-master/README.md", "src/F303-master/boot/README.md", "README.md"):
+            text = (ROOT / name).read_text(encoding="utf-8")
+            spelled = set(re.findall(r"0x0800[0-9A-Fa-f]{4}", text))
+            self.assertIn(address, spelled, name)
+        linker = (SRC / "F303-master" / "STM32F303CCTx_APP.ld").read_text(encoding="utf-8")
+        self.assertIn(address, linker)
+        bootloader_linker = (SRC / "F303-master" / "boot" / "STM32F303CCTx_BOOTLOADER.ld").read_text(encoding="utf-8")
+        self.assertIn(address, bootloader_linker, "the bootloader script names the application address in its comment")
+
 
 if __name__ == "__main__":
     unittest.main()
