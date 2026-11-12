@@ -62,6 +62,14 @@ jobs:
         run: |
           chmod +x build_firmware.sh
           ./build_firmware.sh
+      - name: Compile both boards with the check byte of the I2C link switched on (compile only, the host suites ran above)
+        if: ${{ hashFiles('build_firmware.sh') != '' }}
+        env:
+          URTC_CI: "1"
+          URTC_SLAVE_LINK_CRC: "1"
+          HYDRA_UMC_SKIP_HOST_TESTS: "1"
+        shell: bash
+        run: ./build_firmware.sh --clean
       - name: Check that every version tag agrees
         if: ${{ hashFiles('check_version_consistency.sh') != '' }}
         shell: bash
