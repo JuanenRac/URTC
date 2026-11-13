@@ -109,6 +109,19 @@ class SourceTests(unittest.TestCase):
         if hal_conf.is_file():
             self.assertIn("TICK_INT_PRIORITY            ((uint32_t)(1U<<__NVIC_PRIO_BITS) - 1U)", text(hal_conf))
 
+    def test_the_bridge_publishes_a_version_only_when_the_slave_answers_as_its_bootloader(self):
+        bridge = text(ROOT / "src" / "F303-master" / "firmware_can_slavebridge.c")
+        marker = int(re.search(r"#define SLAVE_BOOT_VERSION_MARKER\s+(0x[0-9A-Fa-f]+|\d+)", bridge).group(1), 0)
+        answer = twin.SlaveBootloader(twin.Flash(), direction_fixed=True)
+        answer.boot()
+        # the model of the bootloader opens its version answer with the marker the bridge waits for
+        self.assertEqual(answer.read_register(twin.REG_QUERY_VERSION, 10)[0], marker)
+        # the application answers a register it does not know with its idle status (0): that is not the marker, so the bridge must refuse it
+        self.assertNotEqual(marker, 0)
+        self.assertRegex(bridge, r"ExpansionI2C_SlaveReadRegister\(REG_BOOT_QUERY_VERSION, version, 10\) && version\[0\] == SLAVE_BOOT_VERSION_MARKER")
+        # and the source of the bootloader still builds the answer with that first byte
+        self.assertIn(f"out[0] = 0x{marker:02x};", text(BOOT / "slaveboot_protocol.c"))
+
 
 def sealed_slave_image(version=(0, 3, 4, 0)) -> bytes:
     """What the build leaves for the slave application after the seal step: a valid vector table, zeros up to the fixed offset, the slot, then code."""

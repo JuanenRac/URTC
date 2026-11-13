@@ -473,6 +473,22 @@ void run_can_slavebridge_tests(int *failures)
     rx(0x217, 0, 0);
     TEST_ASSERT(fake_tx_count == 0, "a slave that does not answer the version query produces neither 0x217 nor 0x218");
 
+    // the slave runs its application: it answers register 6 with its idle status in the first byte and nothing meaningful after it
+    clear();
+    reg_readable[0x06] = 1;
+    memcpy(reg_value[0x06], version, 10);
+    reg_value[0x06][0] = 0x00;
+    reg_readable[0x08] = 1;
+    reg_value[0x08][0] = 0x01;
+    rx(0x217, 0, 0);
+    TEST_ASSERT(fake_tx_count == 0, "a slave whose answer does not start with the bootloader marker (its application is running) produces neither 0x217 nor 0x218");
+    reg_value[0x06][0] = 0x02;
+    rx(0x217, 0, 0);
+    TEST_ASSERT(fake_tx_count == 0, "and any first byte but the marker is refused, not only zero");
+    reg_value[0x06][0] = 0x01;
+    rx(0x217, 0, 0);
+    TEST_ASSERT(tx(0x217) && tx(0x217)->dlc == 8, "with the marker the version goes out as before");
+
     // ---- generic register access ---------------------------------------------
     clear();
     uint8_t wr[4] = { 0x20, 0x84, 0x83, 0 };
