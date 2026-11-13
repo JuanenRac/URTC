@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **Notes for the next board revision:** `PCB/CAMBIOS_PROXIMA_REVISION.md` lists two changes that need a new board (the stepper driver enable apart from the laser interlock, and pull-downs on the MOSFET gates).
+
 - **The MLX90640 capture can read both sub-pages (build option, off by default):** the sensor measures half of its pixels per frame in a chess pattern and the library calculates only the pixels of the sub-page that came, so a capture left half of the image from an earlier capture or at zero. With `URTC_MLX90640_TWO_SUBPAGES=1` a capture triggers and reads frames until both sub-pages have been calculated into the same image (at most four frames; a sensor that repeats one sub-page, or a bus that fails in between, ends in an error rather than a half image reported as ready) and refreshes the watchdog between the frames, since two frames take longer than its period. Two host suites build it both ways against a sensor double that alternates the sub-page; the default behaves as before. Simulation only: the step mode, the refresh rate and the real timing are still to be checked with a sensor on a board.
 
 - **The screen of the inspection head names the light modes the right way round:** the mode of the command 0x150 is 0x01 for the strobe and 0x02 for the continuous light, as the documentation and the handler say, but the screen showed 0x01 as fixed and 0x02 as strobe (and the yellow strip said scanning for the continuous light). The host test of the render checks the three modes.
