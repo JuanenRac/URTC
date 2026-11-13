@@ -18,7 +18,7 @@
 
 TIM_HandleTypeDef htim1, htim2, htim3;
 volatile ToolMode_t active_tool;
-volatile uint8_t system_error_flag;
+volatile uint8_t system_error_flag, system_error_reason;
 volatile uint16_t target_temperature;
 volatile uint8_t laser_power_setpoint, drill_speed, layer_fan_duty, uv_curing_duty, hotair_blower_duty, hotend_fan_duty;
 volatile uint32_t laser_last_kick_tick, drill_last_kick_tick, solder_iron_last_kick_tick, hotend_heater_last_kick_tick;
