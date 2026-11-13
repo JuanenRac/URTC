@@ -114,6 +114,7 @@ static void test_power_up(int *failures)
     TEST_ASSERT(fake_scb.VTOR == 0x08008000UL && fake_hal_inits == 1, "the vector table points at the application, and the HAL is started");
     TEST_ASSERT(fake_rcc_calls == 3 && fake_rcc_osc.PLL.PLLMUL == RCC_PLL_MUL16, "the clocks are configured");
     TEST_ASSERT(fake_iwdg_inits == 1 && fake_iwdg_prescaler == IWDG_PRESCALER_32 && fake_iwdg_reload == 999, "the watchdog is armed for one second");
+    TEST_ASSERT(fake_iwdg_window == IWDG_WINDOW_DISABLE && fake_iwdg_window_violations == 0, "the watchdog has no window (a global handle would give 0, and every refresh would then reset the chip)");
     TEST_ASSERT(fake_can_inits == 1 && fake_can_starts == 1 && fake_adc_inits == 1 && fake_adc_channel.Channel == ADC_CHANNEL_1, "the CAN controller is started and the ADC reads the thermocouple channel");
     TEST_ASSERT(fake_tim_base_inits == 1 && fake_tim_base_starts_it == 1 && fake_spi_inits == 1 && fake_dma_inits == 1, "the step timer, the SPI and the DMA of the status LED are set up");
     TEST_ASSERT(fake_i2c_probes == 1 && i2c_frames > 100, "the display is probed, the splash screen and the tool screen are drawn");

@@ -386,6 +386,7 @@ int main(void) {
     hiwdg.Instance = IWDG;
     hiwdg.Init.Prescaler = IWDG_PRESCALER_32;
     hiwdg.Init.Reload = 999; // (999+1) * 32 / 40000 ~= 800ms @ ~40kHz LSI
+    hiwdg.Init.Window = IWDG_WINDOW_DISABLE; // the handle is global, so the window would be 0: on the chip the HAL writes it to the window register and a refresh above it resets - no window
     HAL_IWDG_Init(&hiwdg);
 
     // Graphics subsystem init via hardware I2C2 - initializes the I2C2
