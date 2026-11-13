@@ -58,8 +58,8 @@ static uint16_t tool_temperature_c(void)
 
 uint8_t Safety_HandleClearError(void)
 {
-    static const uint8_t magic[4] = URTC_MAGIC_CLEAR_ERROR_INIT;
-    if (rxHeader.StdId != URTC_CAN_ID_CLEAR_ERROR || rxHeader.DLC != 4 || memcmp(rxData, magic, sizeof magic) != 0) return 0;
+    if (rxHeader.StdId != URTC_CAN_ID_CLEAR_ERROR || rxHeader.DLC != 4 ||
+        !(rxData[0] == 0x43 && rxData[1] == 0x4C && rxData[2] == 0x45 && rxData[3] == 0x52)) return 0;   // "CLER", written out like the other magic payloads so the comparison with the specification can read it
     uint8_t reason = system_error_reason ? system_error_reason : (uint8_t)URTC_ERROR_REASON_UNKNOWN;
     last_clear_result = FwSafe_ClearDecision(Features_Active(FEAT_CLEAR_ERROR), system_error_flag, reason, tool_temperature_c(), actuators_off());
     if (last_clear_result == URTC_CLEAR_ERROR_CLEARED) {
