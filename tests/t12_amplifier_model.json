@@ -1,0 +1,9 @@
+{
+  "_note": "Estimates for the host model of the T12 amplifier recovery, NOT measurements of a real cartridge or board. Replace them with the values read on an oscilloscope on the amplifier output.",
+  "transient_counts": 600,
+  "tau_us_candidates": [50, 150, 400, 1000],
+  "adc_full_scale_counts": 4095,
+  "temperature_full_scale_c": 450,
+  "accepted_error_c": 0.5,
+  "control_cycle_ms": 20
+}
