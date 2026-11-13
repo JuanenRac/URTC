@@ -84,6 +84,7 @@ int16_t ADS1115_Direct_ReadResult(void) { ads_read++; return ads_result; }
 static uint32_t noted_steps;
 static int noted;
 void Features_NoteMove(uint32_t steps) { noted++; noted_steps = steps; }
+uint8_t Features_Active(uint8_t feature_bit) { (void)feature_bit; return 0; }   // every switch off: the 0x120 handler reads only the plain frame
 
 // ---- helpers ----------------------------------------------------------------------------------------------------------------
 static void quiet(void)
