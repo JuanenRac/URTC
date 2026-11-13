@@ -5,6 +5,7 @@ All notable changes to this project are documented here.
 ## [Unreleased]
 
 - **The position of the solder wire feeder saturates instead of wrapping:** it is the sum of the commanded steps, and a command can carry up to 4 billion steps, so the plain addition could pass the range of the 32-bit position (undefined behaviour) and come out with the other sign. `spool_position.c` adds in 64 bits and stops at the end of the range; its host suite checks the ends of the range, the largest command and a sweep with a fixed seed against a model.
+- **A command that arrives while the watchdog reads the clock no longer cuts the output:** the kick of each communication watchdog is written by the CAN interrupt, which could run between the read of the clock and the read of the kick; the unsigned difference then read about four billion milliseconds, the laser, drill, heaters, fans or lamp were cut and a critical error was latched until the next reset. A kick that is newer than the clock now has age zero; the host tests cover it for every watchdog and across the wrap of the counter.
 
 - **The manual host test workflow measures the coverage of the firmware logic with gcov and fails under 93 percent:** the 58 C suites execute 93.9 percent of the lines of the 83 firmware sources they compile (the floor is the measured value, never above it); an empty floor runs the suites without the measurement.
 

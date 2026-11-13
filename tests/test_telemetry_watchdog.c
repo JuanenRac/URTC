@@ -137,6 +137,23 @@ static void test_cases(int *failures)
         c->run();
         snprintf(label, sizeof label, "%s watchdog: still trips right after the wrap-around", c->name);
         TEST_ASSERT(system_error_flag == 1 && c->is_off(), label);
+
+        // The kick arrives from the CAN interrupt between the read of the clock and the read of the kick: it is a few milliseconds newer than the clock.
+        // The difference is then negative, not four billion: the command that has just arrived must not cut the output.
+        reset_all();
+        active_tool = c->tool;
+        fake_tick = 20000;
+        c->arm();
+        fake_tick = 20000 - 3;
+        c->run();
+        snprintf(label, sizeof label, "%s watchdog: a kick newer than the clock read does not trip it", c->name);
+        TEST_ASSERT(!system_error_flag && !c->is_off(), label);
+        fake_tick = 0;
+        c->arm();
+        fake_tick = 0xFFFFFFFFu;
+        c->run();
+        snprintf(label, sizeof label, "%s watchdog: a kick just after the wrap-around does not trip it either", c->name);
+        TEST_ASSERT(!system_error_flag && !c->is_off(), label);
     }
 }
 
