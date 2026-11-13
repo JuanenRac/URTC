@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **The screen paints only what changed:** the display driver keeps a copy of what each page shows and sends a write only when its pixels differ from the copy, so a line whose text is the same as at the last pass costs no 129-byte transaction on the bus that the F-RAM shares. A page is trusted only after a write that covered the whole page; the start-up, a transfer that failed and `OLED_ForceFullRedraw` make the next writes go out in full, and a skipped write sends the cursor again before the next one that is real. The bus speed and the bytes of a write that is sent are unchanged. The host suite of the render checks the skip, the line that changes, the cursor after a skip, the recovery after a failed transfer and that the second pass of a tool screen sends fewer frames. The copy takes 1 KB of RAM; the code is built only in the CI and has not been run on a board.
+
 - **The screen of the inspection head names the light modes the right way round:** the mode of the command 0x150 is 0x01 for the strobe and 0x02 for the continuous light, as the documentation and the handler say, but the screen showed 0x01 as fixed and 0x02 as strobe (and the yellow strip said scanning for the continuous light). The host test of the render checks the three modes.
 
 - **The rpm of the drill and the two fans divides by the real time between two readings:** the figure assumed exactly 150 ms, but the block that calls it also renders the screen and talks I2C, so the real window was longer and the rpm read high. A window outside 50 to 1000 ms (the first reading, or one after another tool was active) uses the nominal 150 ms; the host suite covers the edges of the window and the largest pulse count.
