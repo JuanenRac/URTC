@@ -151,36 +151,49 @@
 170 000000FFFFFF valid extruder_steps=16777215
 170 - invalid length 0
 170 78 invalid length 1
-170 2114 invalid length 2
-170 2B4456 invalid length 3
-170 556D89AA invalid length 4
-170 82BCADAE3A invalid length 5
-170 9578FA4535A414 invalid length 7
-170 D025C24B40AE3AC1 invalid length 8
+170 21142B invalid length 3
+170 4456556D invalid length 4
+170 89AA82BCAD invalid length 5
+170 AE3A9578FA4535 invalid length 7
+170 A414D025C24B40AE invalid length 8
+170 00C8 valid example
+170 0000 valid example
+170 0000 valid nozzle_setpoint_c=0
+170 0096 valid nozzle_setpoint_c=150
+170 012C valid nozzle_setpoint_c=300
+170 012D invalid nozzle_setpoint_c=301 outside the range
+170 FFFF invalid nozzle_setpoint_c=65535 outside the range
+170 - invalid length 0
+170 3A invalid length 1
+170 C12772 invalid length 3
+170 2988BA97 invalid length 4
+170 3AEA8D3717 invalid length 5
+170 9706072ED33A14 invalid length 7
+170 607AD7523BE6557B invalid length 8
 173 FF valid example
 173 00 valid power=0
 173 01 valid power=1
 173 FF valid power=255
 173 - invalid length 0
-173 2772 invalid length 2
-173 2988BA invalid length 3
-173 973AEA8D invalid length 4
-173 3717970607 invalid length 5
-173 2ED33A14607A invalid length 6
-173 D7523BE6557B51 invalid length 7
-173 34DEC19681F4A133 invalid length 8
+173 5134 invalid length 2
+173 DEC196 invalid length 3
+173 81F4A133 invalid length 4
+173 6AA2140D05 invalid length 5
+173 97A3E6C8A0CC invalid length 6
+173 2020A2E939806E invalid length 7
+173 F0B6845D6A9D657E invalid length 8
 178 FF valid example
 178 00 valid power=0
 178 01 valid power=1
 178 FF valid power=255
 178 - invalid length 0
-178 6AA2 invalid length 2
-178 140D05 invalid length 3
-178 97A3E6C8 invalid length 4
-178 A0CC2020A2 invalid length 5
-178 E939806EF0B6 invalid length 6
-178 845D6A9D657EB8 invalid length 7
-178 298F2DE52EAD74C7 invalid length 8
+178 B829 invalid length 2
+178 8F2DE5 invalid length 3
+178 2EAD74C7 invalid length 4
+178 9D15A75FA2 invalid length 5
+178 9B7DAB332F7D invalid length 6
+178 700A7CCD258924 invalid length 7
+178 260B0594B7FCF04E invalid length 8
 180 03010203 valid example
 180 0100000000000000 valid count=1
 180 0400000000000000 valid count=4
@@ -189,18 +202,18 @@
 180 0800000000000000 invalid count=8 outside the range
 180 FF00000000000000 invalid count=255 outside the range
 180 - invalid length 0
-180 9D invalid length 1
+180 33 invalid length 1
 182 - valid example
 190 - valid example
 192 E3A5E0FF valid example
 192 - invalid length 0
-192 15 invalid length 1
-192 A75F invalid length 2
-192 A29B7D invalid length 3
-192 AB332F7D70 invalid length 5
-192 0A7CCD258924 invalid length 6
-192 260B0594B7FCF0 invalid length 7
-192 4E33A727585B4C48 invalid length 8
+192 A7 invalid length 1
+192 2758 invalid length 2
+192 5B4C48 invalid length 3
+192 A39C369640 invalid length 5
+192 694810A1695B invalid length 6
+192 99DD50187E8120 invalid length 7
+192 E4DC80E0E805CAAD invalid length 8
 1A0 04 valid example
 1A0 0000000000000000 valid board_type=0
 1A0 0100000000000000 valid board_type=1
@@ -247,13 +260,13 @@
 1AC 000000000001 valid instance=1
 1AC 0000000000FF valid instance=255
 1AC - invalid length 0
-1AC A3 invalid length 1
-1AC 9C36 invalid length 2
-1AC 964069 invalid length 3
-1AC 4810A169 invalid length 4
-1AC 5B99DD5018 invalid length 5
-1AC 7E8120E4DC80E0 invalid length 7
-1AC E805CAAD5784F80C invalid length 8
+1AC 57 invalid length 1
+1AC 84F8 invalid length 2
+1AC 0CD509 invalid length 3
+1AC 1FB54640 invalid length 4
+1AC 46848DCBCD invalid length 5
+1AC 582D77F8035AA2 invalid length 7
+1AC E0737AA0FDF573D3 invalid length 8
 1AD - valid example
 1AE 4645415400 valid example
 1AE 464541540A valid example
@@ -263,13 +276,13 @@
 1AE 0000000010 invalid features=16 outside the range
 1AE 00000000FF invalid features=255 outside the range
 1AE - invalid length 0
-1AE D5 invalid length 1
-1AE 091F invalid length 2
-1AE B54640 invalid length 3
-1AE 46848DCB invalid length 4
-1AE CD582D77F803 invalid length 6
-1AE 5AA2E0737AA0FD invalid length 7
-1AE F573D3AC8C701824 invalid length 8
+1AE AC invalid length 1
+1AE 8C70 invalid length 2
+1AE 1824BC invalid length 3
+1AE 51689F98 invalid length 4
+1AE 99BE54ED2B3F invalid length 6
+1AE C15A4F80DA6F1A invalid length 7
+1AE FDC9B2C454142E82 invalid length 8
 1AF - valid example
 1B0 01 valid example
 1B0 00 valid coil=0
@@ -277,13 +290,13 @@
 1B0 02 invalid coil=2 outside the range
 1B0 FF invalid coil=255 outside the range
 1B0 - invalid length 0
-1B0 BC51 invalid length 2
-1B0 689F98 invalid length 3
-1B0 99BE54ED invalid length 4
-1B0 2B3FC15A4F invalid length 5
-1B0 80DA6F1AFDC9 invalid length 6
-1B0 B2C454142E8233 invalid length 7
-1B0 882A4729E37BC3DD invalid length 8
+1B0 3388 invalid length 2
+1B0 2A4729 invalid length 3
+1B0 E37BC3DD invalid length 4
+1B0 CB54A6E040 invalid length 5
+1B0 F96C3DDCD13C invalid length 6
+1B0 978E7FC10261E0 invalid length 7
+1B0 0A0F7C856958914B invalid length 8
 1B9 03200014009600 valid example
 1B9 00000000000001 valid example
 1B9 00000000000000 valid kp_x100=0
@@ -300,13 +313,13 @@
 1B9 000000000000FF valid action=255
 1B9 00000000000004 invalid action=4 not in pid_action
 1B9 - invalid length 0
-1B9 CB invalid length 1
-1B9 54A6 invalid length 2
-1B9 E040F9 invalid length 3
-1B9 6C3DDCD1 invalid length 4
-1B9 3C978E7FC1 invalid length 5
-1B9 0261E00A0F7C invalid length 6
-1B9 856958914B668B9F invalid length 8
+1B9 66 invalid length 1
+1B9 8B9F invalid length 2
+1B9 80E456 invalid length 3
+1B9 B6FBD73E invalid length 4
+1B9 6AC4689137 invalid length 5
+1B9 0C3C06974526 invalid length 6
+1B9 BF9FDFB6A5003FE2 invalid length 8
 1BA - valid example
 1BC 00 valid example
 1BC 0000000000000000 valid operation=0
@@ -325,25 +338,25 @@
 1C0 0007D1 invalid duration_ms=2001 outside the range
 1C0 00FFFF invalid duration_ms=65535 outside the range
 1C0 - invalid length 0
-1C0 80 invalid length 1
-1C0 E456 invalid length 2
-1C0 B6FBD73E invalid length 4
-1C0 6AC4689137 invalid length 5
-1C0 0C3C06974526 invalid length 6
-1C0 BF9FDFB6A5003F invalid length 7
-1C0 E2E6B39CCCADFC39 invalid length 8
+1C0 E6 invalid length 1
+1C0 B39C invalid length 2
+1C0 CCADFC39 invalid length 4
+1C0 C1C368018E invalid length 5
+1C0 65ECD19C57E6 invalid length 6
+1C0 65B801C7DACFAC invalid length 7
+1C0 22FC7E940AD04FCB invalid length 8
 1D0 80 valid example
 1D0 00 valid duty=0
 1D0 01 valid duty=1
 1D0 FF valid duty=255
 1D0 - invalid length 0
-1D0 C1C3 invalid length 2
-1D0 68018E invalid length 3
-1D0 65ECD19C invalid length 4
-1D0 57E665B801 invalid length 5
-1D0 C7DACFAC22FC invalid length 6
-1D0 7E940AD04FCB8A invalid length 7
-1D0 5B2505B287D29B4D invalid length 8
+1D0 8A5B invalid length 2
+1D0 2505B2 invalid length 3
+1D0 87D29B4D invalid length 4
+1D0 EC84F856EF invalid length 5
+1D0 178A32D823B5 invalid length 6
+1D0 22E20A54522FCD invalid length 7
+1D0 8D9B6A6A79AA8923 invalid length 8
 1E0 012CC8 valid example
 1E0 000000 valid setpoint_c=0
 1E0 00DE00 valid setpoint_c=222
@@ -354,13 +367,13 @@
 1E0 000001 valid blower_duty=1
 1E0 0000FF valid blower_duty=255
 1E0 - invalid length 0
-1E0 EC invalid length 1
-1E0 84F8 invalid length 2
-1E0 56EF178A invalid length 4
-1E0 32D823B522 invalid length 5
-1E0 E20A54522FCD invalid length 6
-1E0 8D9B6A6A79AA89 invalid length 7
-1E0 2326BCEF1956988A invalid length 8
+1E0 26 invalid length 1
+1E0 BCEF invalid length 2
+1E0 1956988A invalid length 4
+1E0 B676C8CC58 invalid length 5
+1E0 F784A871847D invalid length 6
+1E0 0FCEA2DD7F8961 invalid length 7
+1E0 2554E34B86EB5346 invalid length 8
 1F0 01000001F4 valid example
 1F0 0000000000 valid direction=0
 1F0 0100000000 valid direction=1
@@ -370,13 +383,13 @@
 1F0 0000000001 valid steps=1
 1F0 00FFFFFFFF valid steps=4294967295
 1F0 - invalid length 0
-1F0 B6 invalid length 1
-1F0 76C8 invalid length 2
-1F0 CC58F7 invalid length 3
-1F0 84A87184 invalid length 4
-1F0 7D0FCEA2DD7F invalid length 6
-1F0 89612554E34B86 invalid length 7
-1F0 EB534646E1B89ECD invalid length 8
+1F0 46 invalid length 1
+1F0 E1B8 invalid length 2
+1F0 9ECD7B invalid length 3
+1F0 3B699C22 invalid length 4
+1F0 3674CBA4FC33 invalid length 6
+1F0 5F171C0B6E11FD invalid length 7
+1F0 E2AF8C3C583071CC invalid length 8
 200 0100FA valid example
 200 010000 valid fire=1
 200 000000 invalid fire=0 outside the range
@@ -389,22 +402,22 @@
 200 0007D1 invalid duration_ms=2001 outside the range
 200 00FFFF invalid duration_ms=65535 outside the range
 200 - invalid length 0
-200 7B invalid length 1
-200 3B69 invalid length 2
-200 9C223674 invalid length 4
-200 CBA4FC335F invalid length 5
-200 171C0B6E11FD invalid length 6
-200 E2AF8C3C583071 invalid length 7
-200 CC77FDE6C1567678 invalid length 8
+200 77 invalid length 1
+200 FDE6 invalid length 2
+200 C1567678 invalid length 4
+200 91ECC76CE7 invalid length 5
+200 84A9FE386D28 invalid length 6
+200 170702F5A3C493 invalid length 7
+200 64CC514D0F07C64A invalid length 8
 210 B0071D5A valid example
 210 - invalid length 0
-210 91 invalid length 1
-210 ECC7 invalid length 2
-210 6CE784 invalid length 3
-210 A9FE386D28 invalid length 5
-210 170702F5A3C4 invalid length 6
-210 9364CC514D0F07 invalid length 7
-210 C64A1DC2824228EC invalid length 8
+210 1D invalid length 1
+210 C282 invalid length 2
+210 4228EC invalid length 3
+210 9B07121F42 invalid length 5
+210 158C3CDD2E61 invalid length 6
+210 0EFF428E62E5C7 invalid length 7
+210 A889857C7D1E59B3 invalid length 8
 211 000004000303CB01 valid example
 211 0000000000000000 valid total_size=0
 211 0000000100000000 valid total_size=1
@@ -413,22 +426,22 @@
 211 0000000000000001 valid hardware_id=1
 211 00000000FFFFFFFF valid hardware_id=4294967295
 211 - invalid length 0
-211 9B invalid length 1
-211 0712 invalid length 2
-211 1F4215 invalid length 3
-211 8C3CDD2E invalid length 4
-211 610EFF428E invalid length 5
-211 62E5C7A88985 invalid length 6
-211 7C7D1E59B3DB1F invalid length 7
+211 DB invalid length 1
+211 1FB4 invalid length 2
+211 D366D9 invalid length 3
+211 23882580 invalid length 4
+211 5A314D1E68 invalid length 5
+211 DB161B2EF0BD invalid length 6
+211 32A0144010E241 invalid length 7
 212 0001020304050607 valid example
 212 - invalid length 0
-212 B4 invalid length 1
-212 D366 invalid length 2
-212 D92388 invalid length 3
-212 25805A31 invalid length 4
-212 4D1E68DB16 invalid length 5
-212 1B2EF0BD32A0 invalid length 6
-212 144010E241CAE4 invalid length 7
+212 CA invalid length 1
+212 E40C invalid length 2
+212 8A2E80 invalid length 3
+212 A62B9A11 invalid length 4
+212 C41D85A042 invalid length 5
+212 85C23B9B30D9 invalid length 6
+212 7D69A9ADC8F635 invalid length 7
 213 DEADBEEF valid example
 213 - invalid length 0
 214 1234567800000002 valid example
@@ -442,13 +455,13 @@
 214 0000000000000001 valid version_minor_field=1
 214 000000000000FFFF valid version_minor_field=65535
 214 - invalid length 0
-214 0C invalid length 1
-214 8A2E invalid length 2
-214 80A62B invalid length 3
-214 9A11C41D invalid length 4
-214 85A04285C2 invalid length 5
-214 3B9B30D97D69 invalid length 6
-214 A9ADC8F63542E5 invalid length 7
+214 42 invalid length 1
+214 E50F invalid length 2
+214 955066 invalid length 3
+214 BDC7A631 invalid length 4
+214 D1B0402116 invalid length 5
+214 99A0D598A3B4 invalid length 6
+214 8BA6043E4CA2A6 invalid length 7
 215 - valid example
 216 - valid example
 217 - valid example
@@ -460,19 +473,19 @@
 21A 0B00000000000000 invalid index=11 outside the range
 21A FF00000000000000 invalid index=255 outside the range
 21A - invalid length 0
-21A 0F invalid length 1
-21A 9550 invalid length 2
-21A 66BDC7 invalid length 3
-21A A631D1B0 invalid length 4
-21A 40211699A0 invalid length 5
-21A D598A3B48BA6 invalid length 6
-21A 043E4CA2A6A723 invalid length 7
+21A A7 invalid length 1
+21A 23E7 invalid length 2
+21A 8FF5E8 invalid length 3
+21A BAC2281C invalid length 4
+21A 4418FB807D invalid length 5
+21A ADB9BDCE9DED invalid length 6
+21A AE550E4B807144 invalid length 7
 220 3201 valid example
 220 0000000000000000 valid register=0
 220 0100000000000000 valid register=1
 220 FF00000000000000 valid register=255
 220 - invalid length 0
-220 E7 invalid length 1
+220 39 invalid length 1
 221 2202 valid example
 221 0000 valid register=0
 221 0100 valid register=1
@@ -484,13 +497,13 @@
 221 0009 invalid length=9 outside the range
 221 00FF invalid length=255 outside the range
 221 - invalid length 0
-221 8F invalid length 1
-221 F5E8BA invalid length 3
-221 C2281C44 invalid length 4
-221 18FB807DAD invalid length 5
-221 B9BDCE9DEDAE invalid length 6
-221 550E4B80714439 invalid length 7
-221 5ED2193288366885 invalid length 8
+221 5E invalid length 1
+221 D21932 invalid length 3
+221 88366885 invalid length 4
+221 2228256F58 invalid length 5
+221 DD0BBCF99170 invalid length 6
+221 66FC78D9E7BB60 invalid length 7
+221 F62583D06704C2F9 invalid length 8
 230 0103E8 valid example
 230 000000 valid channel=0
 230 010000 valid channel=1
@@ -502,13 +515,13 @@
 230 00FFFF valid frequency_hz=65535
 230 000000 invalid frequency_hz=0 outside the range
 230 - invalid length 0
-230 22 invalid length 1
-230 2825 invalid length 2
-230 6F58DD0B invalid length 4
-230 BCF9917066 invalid length 5
-230 FC78D9E7BB60 invalid length 6
-230 F62583D06704C2 invalid length 7
-230 F927CED914B4EA03 invalid length 8
+230 27 invalid length 1
+230 CED9 invalid length 2
+230 14B4EA03 invalid length 4
+230 6199023D9A invalid length 5
+230 A190D2D19DE7 invalid length 6
+230 9A43E347538104 invalid length 7
+230 D912BCD7CD90092E invalid length 8
 231 003214 valid example
 231 000000 valid channel=0
 231 010000 valid channel=1
@@ -525,25 +538,25 @@
 231 0000FF valid duration_ms=255
 231 000000 invalid duration_ms=0 outside the range
 231 - invalid length 0
-231 61 invalid length 1
-231 9902 invalid length 2
-231 3D9AA190 invalid length 4
-231 D2D19DE79A invalid length 5
-231 43E347538104 invalid length 6
-231 D912BCD7CD9009 invalid length 7
-231 2E2E02C489ED8BBE invalid length 8
+231 2E invalid length 1
+231 02C4 invalid length 2
+231 89ED8BBE invalid length 4
+231 F6ACC6E93B invalid length 5
+231 F7B54AD44B09 invalid length 6
+231 5885BC4193D384 invalid length 7
+231 93D78CDDABF86EFB invalid length 8
 240 8583 valid example
 240 0000 valid config=0
 240 0001 valid config=1
 240 FFFF valid config=65535
 240 - invalid length 0
-240 F6 invalid length 1
-240 ACC6E9 invalid length 3
-240 3BF7B54A invalid length 4
-240 D44B095885 invalid length 5
-240 BC4193D38493 invalid length 6
-240 D78CDDABF86EFB invalid length 7
-240 CDD92E2042694C75 invalid length 8
+240 CD invalid length 1
+240 D92E20 invalid length 3
+240 42694C75 invalid length 4
+240 0D34814FF5 invalid length 5
+240 32CC5F012DDA invalid length 6
+240 1A6FD8B11834D6 invalid length 7
+240 3C878E5BF5186D2C invalid length 8
 241 - valid example
 242 - valid example
 250 - valid example
@@ -555,13 +568,13 @@
 252 30 invalid chunk=48 outside the range
 252 FF invalid chunk=255 outside the range
 252 - invalid length 0
-252 0D34 invalid length 2
-252 814FF5 invalid length 3
-252 32CC5F01 invalid length 4
-252 2DDA1A6FD8 invalid length 5
-252 B11834D63C87 invalid length 6
-252 8E5BF5186D2CC7 invalid length 7
-252 3FE596FEC93BF536 invalid length 8
+252 C73F invalid length 2
+252 E596FE invalid length 3
+252 C93BF536 invalid length 4
+252 4CC5675583 invalid length 5
+252 D593FC6DACF8 invalid length 6
+252 3404B1881CE199 invalid length 7
+252 33758C8A7ED24B42 invalid length 8
 254 00 valid example
 254 00 valid chunk=0
 254 17 valid chunk=23
@@ -569,13 +582,13 @@
 254 30 invalid chunk=48 outside the range
 254 FF invalid chunk=255 outside the range
 254 - invalid length 0
-254 4CC5 invalid length 2
-254 675583 invalid length 3
-254 D593FC6D invalid length 4
-254 ACF83404B1 invalid length 5
-254 881CE1993375 invalid length 6
-254 8C8A7ED24B4283 invalid length 7
-254 63D01D4CD38A8FF5 invalid length 8
+254 8363 invalid length 2
+254 D01D4C invalid length 3
+254 D38A8FF5 invalid length 4
+254 9C88FB6DFF invalid length 5
+254 BCF07BAD5A5C invalid length 6
+254 E64C1DA6456DA1 invalid length 7
+254 FCF5A83C41478373 invalid length 8
 7EA 010000000000 valid example
 7EA 000000000000 valid nbits=0
 7EA 001000000000 valid nbits=16
@@ -586,11 +599,11 @@
 7EA 000000000001 valid prefix=1
 7EA 0000FFFFFFFF valid prefix=4294967295
 7EA - invalid length 0
-7EA 9C88FB invalid length 3
-7EA 6DFFBCF0 invalid length 4
-7EA 7BAD5A5CE6 invalid length 5
-7EA 4C1DA6456DA1FC invalid length 7
-7EA F5A83C414783732D invalid length 8
+7EA 2D1958 invalid length 3
+7EA 3B73669D invalid length 4
+7EA D8A7020A9C invalid length 5
+7EA 702B728FAE89C2 invalid length 7
+7EA 0B3EA8B1473A8049 invalid length 8
 7EA 020102030407 valid example
 7EA 000000000000 valid serial=0
 7EA 000000000100 valid serial=1
@@ -599,18 +612,18 @@
 7EA 000000000001 valid seq=1
 7EA 0000000000FF valid seq=255
 7EA - invalid length 0
-7EA 19583B invalid length 3
-7EA 73669DD8 invalid length 4
-7EA A7020A9C70 invalid length 5
-7EA 2B728FAE89C20B invalid length 7
-7EA 3EA8B1473A804915 invalid length 8
+7EA 15B127 invalid length 3
+7EA 2F3499A2 invalid length 4
+7EA 7F8919B90F invalid length 5
+7EA 2847CCBE7B30A8 invalid length 7
+7EA 8C04A439B4408ACF invalid length 8
 7EA 03 valid example
 7EA - invalid length 0
-7EA B1272F invalid length 3
-7EA 3499A27F invalid length 4
-7EA 8919B90F28 invalid length 5
-7EA 47CCBE7B30A88C invalid length 7
-7EA 04A439B4408ACF2E invalid length 8
+7EA 2EF3D6 invalid length 3
+7EA C99A709A invalid length 4
+7EA 441B38597B invalid length 5
+7EA 6EDE8C0A808A86 invalid length 7
+7EA F240CE35BF23B90F invalid length 8
 7EA 0401 valid example
 7EA 0000 valid part=0
 7EA 0001 valid part=1
@@ -618,18 +631,18 @@
 7EA 0003 invalid part=3 outside the range
 7EA 00FF invalid part=255 outside the range
 7EA - invalid length 0
-7EA F3D6C9 invalid length 3
-7EA 9A709A44 invalid length 4
-7EA 1B38597B6E invalid length 5
-7EA DE8C0A808A86F2 invalid length 7
-7EA 40CE35BF23B90F9D invalid length 8
+7EA 9DE443 invalid length 3
+7EA 4F26486E invalid length 4
+7EA F7ABBA9551 invalid length 5
+7EA 4FC3E1CF3C4A8A invalid length 7
+7EA 97040443C233EB0F invalid length 8
 7EA 05 valid example
 7EA - invalid length 0
-7EA E4434F invalid length 3
-7EA 26486EF7 invalid length 4
-7EA ABBA95514F invalid length 5
-7EA C3E1CF3C4A8A97 invalid length 7
-7EA 040443C233EB0FDD invalid length 8
+7EA DDD88D invalid length 3
+7EA BDD1CFEC invalid length 4
+7EA 1B32F11300 invalid length 5
+7EA 153847B68AB6F2 invalid length 7
+7EA 7D7A36B7513B14A0 invalid length 8
 7EC 0000000000000000 valid example
 7EC 0000000000000000 valid index=0
 7EC 0500000000000000 valid index=5
@@ -638,12 +651,12 @@
 7EC FF00000000000000 invalid index=255 outside the range
 7EC - invalid length 0
 7EC D8 invalid length 1
-7EC 8DBD invalid length 2
-7EC D1CFEC invalid length 3
-7EC 1B32F113 invalid length 4
-7EC 00153847B6 invalid length 5
-7EC 8AB6F27D7A36 invalid length 6
-7EC B7513B14A0D8B1 invalid length 7
+7EC B181 invalid length 2
+7EC 1CDED4 invalid length 3
+7EC C0B796AE invalid length 4
+7EC E179491CAE invalid length 5
+7EC 3A58F9AE3E0B invalid length 6
+7EC F56BC459CB7433 invalid length 7
 7EE 0000000000000000 valid example
 7EE 0000000000000000 valid index=0
 7EE 0500000000000000 valid index=5
@@ -651,22 +664,22 @@
 7EE 0C00000000000000 invalid index=12 outside the range
 7EE FF00000000000000 invalid index=255 outside the range
 7EE - invalid length 0
-7EE 81 invalid length 1
-7EE 1CDE invalid length 2
-7EE D4C0B7 invalid length 3
-7EE 96AEE179 invalid length 4
-7EE 491CAE3A58 invalid length 5
-7EE F9AE3E0BF56B invalid length 6
-7EE C459CB74337FAB invalid length 7
+7EE 7F invalid length 1
+7EE ABA8 invalid length 2
+7EE 7DECF1 invalid length 3
+7EE BDFC63DD invalid length 4
+7EE E1CC3DF988 invalid length 5
+7EE 404C06C0D437 invalid length 6
+7EE 0D265DEAC1934F invalid length 7
 7F0 B0071D5A valid example
 7F0 - invalid length 0
-7F0 A8 invalid length 1
-7F0 7DEC invalid length 2
-7F0 F1BDFC invalid length 3
-7F0 63DDE1CC3D invalid length 5
-7F0 F988404C06C0 invalid length 6
-7F0 D4370D265DEAC1 invalid length 7
-7F0 934F4E368209EDCB invalid length 8
+7F0 4E invalid length 1
+7F0 3682 invalid length 2
+7F0 09EDCB invalid length 3
+7F0 74C8027FD8 invalid length 5
+7F0 515BAF7A2652 invalid length 6
+7F0 59C00B6FDA7814 invalid length 7
+7F0 61277ECBEE3C18C6 invalid length 8
 7F1 000004000303CC01 valid example
 7F1 0000000000000000 valid total_size=0
 7F1 0000000100000000 valid total_size=1
@@ -675,13 +688,13 @@
 7F1 0000000000000001 valid hardware_id=1
 7F1 00000000FFFFFFFF valid hardware_id=4294967295
 7F1 - invalid length 0
-7F1 74 invalid length 1
-7F1 C802 invalid length 2
-7F1 7FD851 invalid length 3
-7F1 5BAF7A26 invalid length 4
-7F1 5259C00B6F invalid length 5
-7F1 DA781461277E invalid length 6
-7F1 CBEE3C18C62D30 invalid length 7
+7F1 2D invalid length 1
+7F1 30F5 invalid length 2
+7F1 177A06 invalid length 3
+7F1 0A9FEE8E invalid length 4
+7F1 D45544A2E5 invalid length 5
+7F1 D555CAC766FD invalid length 6
+7F1 8EB84D848F592A invalid length 7
 7F2 0102030405060708 valid example
 7F2 - invalid length 0
 7F4 DEADBEEF00000003 valid example
@@ -696,50 +709,47 @@
 7F4 0000000000000001 valid version_minor_field=1
 7F4 000000000000FFFF valid version_minor_field=65535
 7F4 - invalid length 0
-7F4 F5 invalid length 1
-7F4 177A invalid length 2
-7F4 060A9F invalid length 3
-7F4 EE8ED455 invalid length 4
-7F4 44A2E5D555 invalid length 5
-7F4 CAC766FD8EB8 invalid length 6
-7F4 4D848F592AB8AC invalid length 7
+7F4 B8 invalid length 1
+7F4 AC49 invalid length 2
+7F4 848281 invalid length 3
+7F4 B2C48EEF invalid length 4
+7F4 064C428173 invalid length 5
+7F4 642465DB7A47 invalid length 6
+7F4 EBC8642A274E1D invalid length 7
 7F7 0001020304050607 valid example
 7F7 - invalid length 0
-7F7 49 invalid length 1
-7F7 8482 invalid length 2
-7F7 81B2C4 invalid length 3
-7F7 8EEF064C invalid length 4
-7F7 4281736424 invalid length 5
-7F7 65DB7A47EBC8 invalid length 6
-7F7 642A274E1D0FCF invalid length 7
+7F7 0F invalid length 1
+7F7 CFC3 invalid length 2
+7F7 D54642 invalid length 3
+7F7 257BC347 invalid length 4
+7F7 9267CBB65B invalid length 5
+7F7 739849B2FB95 invalid length 6
+7F7 2D996AED0B9434 invalid length 7
 7F8 - valid example
 7FB - valid example
 7FD D09E12AD valid example
 7FD - invalid length 0
-7FD C3 invalid length 1
-7FD D546 invalid length 2
-7FD 42257B invalid length 3
-7FD C3479267CB invalid length 5
-7FD B65B739849B2 invalid length 6
-7FD FB952D996AED0B invalid length 7
-7FD 9434BEE3821D1AA1 invalid length 8
+7FD BE invalid length 1
+7FD E382 invalid length 2
+7FD 1D1AA1 invalid length 3
+7FD 51433439DE invalid length 5
+7FD 7D6ACB3E6CC4 invalid length 6
+7FD 4482013D67C1F6 invalid length 7
+7FD 7689135577D28CD7 invalid length 8
 7FE - valid example
 7FF 00000000 valid example
 7FF 00000000 valid page_index=0
 7FF 00000001 valid page_index=1
 7FF FFFFFFFF valid page_index=4294967295
 7FF - invalid length 0
-7FF 51 invalid length 1
-7FF 4334 invalid length 2
-7FF 39DE7D invalid length 3
-7FF 6ACB3E6CC4 invalid length 5
-7FF 4482013D67C1 invalid length 6
-7FF F67689135577D2 invalid length 7
-7FF 8CD7CC8BFC32425F invalid length 8
-252 - random
-221 AC7C302715D8E260 random
-30A C5B86477B821AE1A random
-1A6 92F0 random
+7FF CC invalid length 1
+7FF 8BFC invalid length 2
+7FF 32425F invalid length 3
+7FF 08E816FA6D invalid length 5
+7FF C9AC7C302715 invalid length 6
+7FF D8E2605861C5B8 invalid length 7
+7FF 6477B821AE1AEA16 invalid length 8
+2D4 92F0 random
 7F1 CA random
 230 9AC989B4F019F408 random
 211 8E21 random
@@ -1136,9 +1146,12 @@
 180 9AD3 random
 1A2 FD random
 102 BB4CEBCFA790 random
+7FE 45 random
+178 BAF54B random
+2CB D917 random
 000 - random edge identifier
-000 FF random edge identifier
-000 2745092D69BAF54B random edge identifier
+000 26 random edge identifier
+000 B69F80B8BD9ED0CC random edge identifier
 7FF - random edge identifier
-7FF 59 random edge identifier
-7FF 43D91726B69F80B8 random edge identifier
+7FF F3 random edge identifier
+7FF E0BCA6D34D43F480 random edge identifier

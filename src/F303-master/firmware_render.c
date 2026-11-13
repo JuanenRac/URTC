@@ -480,7 +480,7 @@ void OLED_Render_YellowStrip(void) {
             status_text = (steps_remaining > 0) ? "GRIPPING     " : "READY        ";
             break;
         case TOOL_AOI_INSPECTION:
-            status_text = (aoi_mode == 0x02) ? "SCANNING     " : (aoi_mode == 0x01) ? "LIGHT ON     " : "STANDBY      ";
+            status_text = (aoi_mode == 0x01) ? "STROBING     " : (aoi_mode == 0x02) ? "LIGHT ON     " : "STANDBY      ";
             break;
         case TOOL_LASER_ENGRAVER:
             status_text = (laser_power_setpoint > 0) ? "ENGRAVING    " : "STANDBY      ";
@@ -861,8 +861,9 @@ void Render_ToolScreen(void) {
             break;
         }
         case TOOL_AOI_INSPECTION: {
-            const char* mode_text = (aoi_mode == 0x01) ? "LIGHT: FIXED  " :
-                                   (aoi_mode == 0x02) ? "LIGHT: STROBE " :
+            // 0x150: mode 0x01 is the strobe and 0x02 is the continuous light (docs/CANBUS.TXT, firmware_can_aoi.c); the screen had them the other way round
+            const char* mode_text = (aoi_mode == 0x01) ? "LIGHT: STROBE " :
+                                   (aoi_mode == 0x02) ? "LIGHT: FIXED  " :
                                                          "LIGHT: OFF    ";
             OLED_PrintStr(5, 5, mode_text);
             OLED_PrintStr(6, 5, endstop_triggered ? "ENDSTOP: HIT  " : "ENDSTOP: OPEN ");
