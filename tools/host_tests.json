@@ -36,6 +36,16 @@
    "sanitize": false
   },
   {
+   "name": "meta_ab",
+   "test": "tests/test_meta_ab.c",
+   "sources": [],
+   "includes": [
+    "tests",
+    "src/common"
+   ],
+   "std": "c11"
+  },
+  {
    "name": "thermal_guard",
    "test": "tests/test_thermal_guard.c",
    "sources": [
@@ -52,6 +62,16 @@
   {
    "name": "version_wire",
    "test": "tests/test_version_wire.c",
+   "sources": [],
+   "includes": [
+    "tests",
+    "src/common"
+   ],
+   "std": "c11"
+  },
+  {
+   "name": "can_recovery",
+   "test": "tests/test_can_recovery.c",
    "sources": [],
    "includes": [
     "tests",
