@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **Notes for the next board revision:** `PCB/CAMBIOS_PROXIMA_REVISION.md` lists two changes that need a new board (the stepper driver enable apart from the laser interlock, and pull-downs on the MOSFET gates).
+
 - **The watchdog is started with its window turned off:** the handle of the independent watchdog is a global, so its window was never set and was zero; on this chip the HAL writes that value to the window register and a refresh made while the counter is above the window resets the chip. The master firmware and its bootloader and the expansion slave and its bootloader now set the window to the value that disables it, so every refresh is accepted as before. The fake HAL records the window it is given and counts refreshes that a window narrower than the reload would have turned into a reset; the four start-up tests check it. Simulation only: whether a board really reset on a zero window is still to be confirmed on the bench.
 
 - **The screen of the inspection head names the light modes the right way round:** the mode of the command 0x150 is 0x01 for the strobe and 0x02 for the continuous light, as the documentation and the handler say, but the screen showed 0x01 as fixed and 0x02 as strobe (and the yellow strip said scanning for the continuous light). The host test of the render checks the three modes.
