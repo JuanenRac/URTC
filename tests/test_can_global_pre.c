@@ -32,6 +32,7 @@ uint8_t rxData[8];
 volatile ToolMode_t active_tool;
 volatile uint8_t system_error_flag, can_bus_error_flag, boot_sequence_active;
 volatile uint8_t thermal_fault_code, last_reset_cause;
+volatile uint8_t system_error_reason;
 uint8_t had_valid_recovered_state;
 SavedState_t recovered_state;
 volatile uint8_t expansion_board_type, free_tool_selection, device_serial_number, mlx_sensor_variant;
@@ -50,6 +51,13 @@ uint8_t ExpansionI2C_SlaveWriteRegister(uint8_t reg, const uint8_t *data, uint8_
 }
 static int blackbox_calls, blackbox_chunk;
 void BlackBox_HandleReadbackRequest(uint8_t chunk_index) { blackbox_calls++; blackbox_chunk = chunk_index; }
+// The clear-error glue and the watchdog of the host's silence are tested in test_safety.c; here only that the dispatcher calls them as it must.
+static int host_frames, clear_calls, clear_answers;
+static uint8_t stub_reason, stub_clear_result;
+void Safety_NoteHostFrame(void) { host_frames++; }
+uint8_t Safety_HandleClearError(void) { clear_calls++; return (uint8_t)clear_answers; }
+uint8_t Safety_ErrorReason(void) { return stub_reason; }
+uint8_t Safety_LastClearResult(void) { return stub_clear_result; }
 static int stats_calls;
 void ThermalStats_HandleQuery(void) { stats_calls++; }
 
@@ -58,6 +66,7 @@ static void send(uint32_t id, uint32_t dlc, const uint8_t *data)
 {
     fake_hal_reset_recording();
     i2c_relay_calls = blackbox_calls = stats_calls = 0;
+    host_frames = clear_calls = 0;
     memset(rxData, 0, sizeof rxData);
     if (data) memcpy(rxData, data, dlc);
     rxHeader.StdId = id;
@@ -185,13 +194,31 @@ void run_can_global_pre_tests(int *failures)
     thermal_fault_code = 3; last_reset_cause = 1;
     send(0x110, 0, 0);
     const FakeTxFrame *t = find_tx(0x111);
-    TEST_ASSERT(t && t->dlc == 6, "0x110 is answered with a 6-byte 0x111");
+    TEST_ASSERT(t && t->dlc == 8, "0x110 is answered with an 8-byte 0x111");
     if (t) {
         TEST_ASSERT(t->data[0] == (uint8_t)TOOL_LASER_ENGRAVER, "0x111 byte0 = active tool");
         TEST_ASSERT(t->data[1] == 1 && t->data[2] == 0 && t->data[3] == 1, "0x111 flags: system error, CAN error, boot sequence");
         TEST_ASSERT(t->data[4] == 3, "0x111 byte4 = latched thermal fault code");
         TEST_ASSERT(t->data[5] == 1, "0x111 byte5 = last reset cause");
+        TEST_ASSERT(t->data[6] == 0 && t->data[7] == 0, "0x111 bytes 6 and 7 = no reason and no clear-error command yet");
     }
+    stub_reason = 5; stub_clear_result = 6;
+    send(0x110, 0, 0);
+    t = find_tx(0x111);
+    TEST_ASSERT(t && t->dlc == 8 && t->data[6] == 5 && t->data[7] == 6, "0x111 byte 6 = why the error is latched, byte 7 = what the last clear-error command did");
+    TEST_ASSERT(clear_calls == 0 && host_frames == 1, "a query is a sign of life and is not a clear-error command");
+
+    // ---- clear error 0x1B2 -> 0x111 (even during a critical error, before the gate) ----
+    const uint8_t cler[4] = { 0x43, 0x4C, 0x45, 0x52 };
+    clear_answers = 1;
+    send(0x1B2, 4, cler);
+    t = find_tx(0x111);
+    TEST_ASSERT(clear_calls == 1 && host_frames == 1 && t && t->dlc == 8 && t->data[6] == 5 && t->data[7] == 6, "0x1B2 asks the glue and is answered with the quick state");
+    clear_answers = 0;
+    send(0x1B2, 4, cler);
+    TEST_ASSERT(clear_calls == 1 && find_tx(0x111) == 0, "when the glue says the frame is not a clear-error command nothing is answered");
+    clear_answers = 1;
+    stub_reason = 0; stub_clear_result = 0;
     system_error_flag = 0; boot_sequence_active = 0; thermal_fault_code = 0; last_reset_cause = 0;
     active_tool = TOOL_SOLDERING_IRON;
 
