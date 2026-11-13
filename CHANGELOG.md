@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **A small rise of the setpoint no longer restarts the thermal watch:** the guard that catches a sensor that came loose started its watch over at ANY change of the setpoint, so a host that moved the setpoint a degree at a time (a slider, an external PID) kept the window from ever closing and hid the fault. The watch now restarts only when the setpoint rises by more than 5 degrees (or the heater is commanded off); a lower setpoint keeps the phase it was in. `-DURTC_THERMAL_GUARD_RETARGET_C=<n>` changes the margin, and 0 restores the earlier behaviour. The host suite checks a loose sensor under a creeping setpoint, the edges of the margin, a lower setpoint, a big rise and a healthy heater under a slider.
+
 - **The rpm of the drill and the two fans divides by the real time between two readings:** the figure assumed exactly 150 ms, but the block that calls it also renders the screen and talks I2C, so the real window was longer and the rpm read high. A window outside 50 to 1000 ms (the first reading, or one after another tool was active) uses the nominal 150 ms; the host suite covers the edges of the window and the largest pulse count.
 - **The colour of the status LED is no longer a reason to write the F-RAM:** it is worked out again at every pass of the main loop (blue for a second and a half after each frame), yet it was part of the saved state, so a busy bus wrote the chip every few seconds. The colour that is already on the chip is kept as it is; the host suite checks that a change of the automatic colour writes nothing and that something else that changed is saved with the colour the chip already had.
 

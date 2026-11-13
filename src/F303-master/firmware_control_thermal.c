@@ -24,13 +24,18 @@ volatile uint8_t thermal_fault_code = THERMAL_GUARD_OK;
 // than 449 (the ADC rail guard above refuses anything >= 4090), so on this
 // tool the rail guard IS the MAXTEMP and the ceiling here only documents it;
 // a lower value would trip on the normal +2C overshoot of a 445C setpoint.
+// A new setpoint restarts the watch of the guard only when it rises by more than this many degrees (0: any change does, as it did before). The default of 5 keeps
+// a slider or an external PID that moves the setpoint a degree at a time from hiding a sensor that has come loose. Build with -DURTC_THERMAL_GUARD_RETARGET_C=<n> to change it.
+#ifndef URTC_THERMAL_GUARD_RETARGET_C
+#define URTC_THERMAL_GUARD_RETARGET_C 5
+#endif
 static const ThermalGuardLimits_t T12_GUARD_LIMITS = {
     .max_temp_c = 449, .watch_period_ms = 20000, .watch_min_rise_c = 10, .watch_band_c = 20,
-    .hold_period_ms = 45000, .hold_hysteresis_c = 40,
+    .hold_period_ms = 45000, .hold_hysteresis_c = 40, .retarget_min_rise_c = URTC_THERMAL_GUARD_RETARGET_C,
 };
 static const ThermalGuardLimits_t HOTEND_GUARD_LIMITS = {
     .max_temp_c = 310, .watch_period_ms = 40000, .watch_min_rise_c = 2, .watch_band_c = 10,
-    .hold_period_ms = 40000, .hold_hysteresis_c = 15,
+    .hold_period_ms = 40000, .hold_hysteresis_c = 15, .retarget_min_rise_c = URTC_THERMAL_GUARD_RETARGET_C,
 };
 static ThermalGuard_t t12_guard;
 static ThermalGuard_t hotend_guard;

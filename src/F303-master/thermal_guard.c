@@ -32,8 +32,15 @@ ThermalGuardFault_t ThermalGuard_Check(ThermalGuard_t *g, const ThermalGuardLimi
     // A new setpoint (or the heater being commanded off entirely) starts
     // over: raising the target legitimately drops us back into a heating
     // phase, and lowering it legitimately means a long cool-down.
+    // With retarget_min_rise_c = 0 any change of the setpoint does (the earlier behaviour). With a value, only a rise by MORE than that (or the heater being
+    // commanded off) does: a host that moves the setpoint a degree at a time (a slider, an external PID) used to keep the window from ever closing and so
+    // hid a sensor that had come loose. A lower setpoint, or a rise within the margin, keeps the phase it was in and is judged against the new setpoint.
     if (target_c != g->last_target_c) {
-        ThermalGuard_Reset(g);
+        const uint8_t restart = (lim->retarget_min_rise_c == 0u) || (target_c == 0u) ||
+                                ((uint32_t)target_c > (uint32_t)g->last_target_c + (uint32_t)lim->retarget_min_rise_c);
+        if (restart) {
+            ThermalGuard_Reset(g);
+        }
         g->last_target_c = target_c;
     }
     if (target_c == 0) {
