@@ -4,6 +4,7 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **The colour of the status LED is no longer a reason to write the F-RAM:** it is worked out again at every pass of the main loop (blue for a second and a half after each frame), yet it was part of the saved state, so a busy bus wrote the chip every few seconds. The colour that is already on the chip is kept as it is; the host suite checks that a change of the automatic colour writes nothing and that something else that changed is saved with the colour the chip already had.
 - **A command that arrives while the watchdog reads the clock no longer cuts the output:** the kick of each communication watchdog is written by the CAN interrupt, which could run between the read of the clock and the read of the kick; the unsigned difference then read about four billion milliseconds, the laser, drill, heaters, fans or lamp were cut and a critical error was latched until the next reset. A kick that is newer than the clock now has age zero; the host tests cover it for every watchdog and across the wrap of the counter.
 
 - **The manual host test workflow measures the coverage of the firmware logic with gcov and fails under 93 percent:** the 58 C suites execute 93.9 percent of the lines of the 83 firmware sources they compile (the floor is the measured value, never above it); an empty floor runs the suites without the measurement.
