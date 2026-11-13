@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **The length check of the clear-error command is written like the others:** the identifier and the length are tested together in the form that the comparison of the specification with the firmware reads. Same behaviour.
+
 - **The magic payload of the clear-error command is compared byte by byte, like the others:** the comparison of the specification with the firmware reads the four bytes in the source, and the command compared them through a table. Same behaviour, now readable by that check.
 
 - **The transmit mailboxes are aborted only after a real bus-off:** the main loop aborted the three mailboxes at every error callback, and so threw away answers (0x7F9, 0x7F5...) that were still good after an error that the controller retries by itself. It now does so only when `ESR.BOFF` says the controller was in bus-off, which is the case the abort was written for; the decision is a header with its own host suite. The documentation says that the real recovery is `AutoBusOff` and that `HAL_CAN_Start()` on a started controller does nothing, that `HAL_GetTick()` does not advance inside an interrupt, and a test now fails on any new wait in the code that runs in an interrupt (the one that is known, the poll of the expansion board during its update, is listed with its reason).
