@@ -570,6 +570,73 @@
    ]
   },
   {
+   "name": "t12_settle",
+   "test": "tests/test_t12_settle.c",
+   "sources": [
+    "tests/host_hal/fake_hal.c",
+    "tests/host_hal/fake_state.c",
+    "src/F303-master/firmware_control_thermal.c",
+    "src/F303-master/thermal_guard.c",
+    "src/F303-master/firmware_thermal_stats.c",
+    "src/F303-master/thermal_stats.c",
+    "src/F303-master/firmware_features.c",
+    "src/F303-master/fw_features.c",
+    "src/F303-master/firmware_fram.c",
+    "src/F303-master/pid_control.c",
+    "src/F303-master/health_profile.c",
+    "src/F303-master/hsi_trim.c",
+    "src/F303-master/motion_profile.c"
+   ],
+   "includes": [
+    "tests",
+    "tests/host_hal",
+    "src/F303-master",
+    "src/common"
+   ],
+   "extra": [
+    "-Wno-cpp",
+    "-Wno-int-to-pointer-cast"
+   ],
+   "libs": [
+    "-lm"
+   ]
+  },
+  {
+   "name": "t12_settle_long",
+   "test": "tests/test_t12_settle.c",
+   "sources": [
+    "tests/host_hal/fake_hal.c",
+    "tests/host_hal/fake_state.c",
+    "src/F303-master/firmware_control_thermal.c",
+    "src/F303-master/thermal_guard.c",
+    "src/F303-master/firmware_thermal_stats.c",
+    "src/F303-master/thermal_stats.c",
+    "src/F303-master/firmware_features.c",
+    "src/F303-master/fw_features.c",
+    "src/F303-master/firmware_fram.c",
+    "src/F303-master/pid_control.c",
+    "src/F303-master/health_profile.c",
+    "src/F303-master/hsi_trim.c",
+    "src/F303-master/motion_profile.c"
+   ],
+   "includes": [
+    "tests",
+    "tests/host_hal",
+    "src/F303-master",
+    "src/common"
+   ],
+   "extra": [
+    "-Wno-cpp",
+    "-Wno-int-to-pointer-cast"
+   ],
+   "libs": [
+    "-lm"
+   ],
+   "defines": [
+    "-DURTC_T12_SETTLE_US=2000u"
+   ]
+  },
+  {
    "name": "identify",
    "test": "tests/test_identify.c",
    "sources": [
