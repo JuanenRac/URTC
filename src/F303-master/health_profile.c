@@ -18,15 +18,25 @@ void Health_Encode(const HealthFrame_t *h, uint8_t out[8]) {
     out[7] = (uint8_t)(h->vdda_mv & 0xFF);
 }
 
-void Health_EncodeInfo(uint8_t protocol, uint8_t reset_cause, uint8_t fw_minor, uint8_t fw_patch, uint8_t fw_build, uint32_t uptime_ms, uint8_t out[8]) {
+uint8_t Health_BusRateCode(uint32_t bitrate_bps) {
+    switch (bitrate_bps) {
+        case 1000000u: return URTC_BUS_RATE_MBIT_1;
+        case 500000u:  return URTC_BUS_RATE_KBIT_500;
+        case 250000u:  return URTC_BUS_RATE_KBIT_250;
+        case 125000u:  return URTC_BUS_RATE_KBIT_125;
+        default:       return URTC_BUS_RATE_UNKNOWN;
+    }
+}
+
+void Health_EncodeInfo(uint8_t protocol, uint8_t reset_cause, uint8_t fw_minor, uint8_t fw_patch, uint8_t fw_build, uint8_t bus_rate_code, uint32_t uptime_ms, uint8_t out[8]) {
     uint32_t s = uptime_ms / 1000u;
-    if (s > 0xFFFFFFu) s = 0xFFFFFFu;
+    if (s > 0xFFFFu) s = 0xFFFFu;                  // protocol version 2: 16 bits, stops instead of wrapping
     out[0] = protocol;
     out[1] = reset_cause;
     out[2] = fw_minor;
     out[3] = fw_patch;
     out[4] = fw_build;
-    out[5] = (uint8_t)(s >> 16);
+    out[5] = bus_rate_code;
     out[6] = (uint8_t)(s >> 8);
     out[7] = (uint8_t)s;
 }

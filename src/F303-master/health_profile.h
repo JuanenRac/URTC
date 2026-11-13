@@ -11,6 +11,7 @@
 #define HEALTH_PROFILE_H
 
 #include <stdint.h>
+#include "urtc_can_ids.h"
 
 #define HEALTH_TEMP_NA   (-128)   // no internal temperature available
 #define HEALTH_VDDA_NA   0u       // no analogue supply reading available
@@ -27,8 +28,12 @@ typedef struct {
 // 0x1B8 payload: tec, rec, bus_off_count, hsi_trim, loop_max_ms, temperature plus 40 (0 = not available), vdda (big-endian).
 void Health_Encode(const HealthFrame_t *h, uint8_t out[8]);
 
-// 0x1BB payload: protocol byte, reset cause (bit field of 0x111 byte 5), firmware version minor, patch and build, uptime in seconds (24 bit, big-endian, saturating).
-void Health_EncodeInfo(uint8_t protocol, uint8_t reset_cause, uint8_t fw_minor, uint8_t fw_patch, uint8_t fw_build, uint32_t uptime_ms, uint8_t out[8]);
+// Code of a CAN bit rate for byte 5 of 0x1BB (URTC_BUS_RATE_*): 1 Mbit/s, 500, 250 or 125 kbit/s; anything else is URTC_BUS_RATE_UNKNOWN (not declared).
+uint8_t Health_BusRateCode(uint32_t bitrate_bps);
+
+// 0x1BB payload (protocol version 2): protocol byte, reset cause (bit field of 0x111 byte 5), firmware version minor, patch and build, the code of the bit rate of the
+// bus this board runs at, uptime in seconds (16 bit, big-endian, stopping at 65535 instead of wrapping).
+void Health_EncodeInfo(uint8_t protocol, uint8_t reset_cause, uint8_t fw_minor, uint8_t fw_patch, uint8_t fw_build, uint8_t bus_rate_code, uint32_t uptime_ms, uint8_t out[8]);
 
 // Count a bus-off: call on the rising edge of the bus-off flag.
 uint8_t Health_CountBusOff(uint8_t previous_count);

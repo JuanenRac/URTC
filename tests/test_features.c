@@ -16,6 +16,7 @@
 #include "firmware_common.h"
 #include "firmware_features.h"
 #include "firmware_fram.h"
+#include "can_bit_timing.h"
 #include "health_profile.h"
 #include "urtc_can_ids.h"
 
@@ -207,7 +208,8 @@ static void test_health(int *failures)
         if (info) {
             TEST_ASSERT(info->data[0] == URTC_PROTOCOL_VERSION && info->data[1] == 0x08, "protocol byte and the reset cause the board latched at boot");
             TEST_ASSERT(info->data[2] == FIRMWARE_VERSION_MINOR && info->data[3] == FIRMWARE_VERSION_PATCH && info->data[4] == FIRMWARE_VERSION_BUILD, "firmware version");
-            uint32_t up = ((uint32_t)info->data[5] << 16) | ((uint32_t)info->data[6] << 8) | info->data[7];
+            TEST_ASSERT(info->data[5] == Health_BusRateCode(URTC_CAN_BITRATE_BPS), "the bus rate the board was built for is declared in byte 5");
+            uint32_t up = ((uint32_t)info->data[6] << 8) | info->data[7];
             TEST_ASSERT(up == (5000u + 10u * 1100u) / 1000u, "uptime in seconds from the tick");
         }
         TEST_ASSERT(find_tx(0x1B8) != 0, "the health frame goes out in the same pass");
