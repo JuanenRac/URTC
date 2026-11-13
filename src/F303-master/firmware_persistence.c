@@ -173,7 +173,10 @@ void SavedState_MaybeSave(void) {
         ? (HAL_GPIO_ReadPin(TMC_ENN_PORT, LASER_SAFETY_PIN) == GPIO_PIN_SET) : 0;
     s.layer_fan_power = (active_tool == TOOL_3D_PRINTER) ? layer_fan_duty : 0;
     s.hotend_fan_power = (active_tool == TOOL_3D_PRINTER) ? hotend_fan_duty : 0;
-    s.status_r = led_state_pixel.R; s.status_g = led_state_pixel.G; s.status_b = led_state_pixel.B;
+    // The colour of the status LED is worked out again every pass of the main loop (green, blue for a second and a half after each frame, red on an error), so
+    // what is in RAM is almost never worth keeping, and saving it wrote the F-RAM every few seconds on a busy bus. The colour that is already on the chip is kept
+    // as it is, and a change of the automatic colour is no reason to write.
+    s.status_r = last_saved_state.status_r; s.status_g = last_saved_state.status_g; s.status_b = last_saved_state.status_b;
     s.ring_r = ring_pixels[0].R; s.ring_g = ring_pixels[0].G; s.ring_b = ring_pixels[0].B;
     s.ring_on = (ring_pixels[0].R || ring_pixels[0].G || ring_pixels[0].B) ? 1 : 0;
     s.oled_night_mode = oled_night_mode;
