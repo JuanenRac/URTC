@@ -520,7 +520,8 @@
     "src/F303-master/firmware_can_flyingprobe.c",
     "src/F303-master/firmware_can_motion.c",
     "src/F303-master/firmware_safety.c",
-    "src/F303-master/fw_safety_policy.c"
+    "src/F303-master/fw_safety_policy.c",
+    "src/F303-master/spool_position.c"
    ],
    "includes": [
     "tests",
