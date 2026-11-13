@@ -22,11 +22,16 @@ on:
 
 permissions: {}
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   notify:
     name: Request dashboard refresh
     if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     env:
       DASHBOARD_DISPATCH_TOKEN: ${{ secrets.ECOSYSTEM_DASHBOARD_DISPATCH_TOKEN }}
       CHECKED_REPOSITORY: ${{ github.repository }}

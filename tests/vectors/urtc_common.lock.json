@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "urtc_common_version": "0.2.5",
+  "urtc_common_version": "0.2.6",
   "files": {
     "bl_serial_vectors.h": {
       "from": "generated/bl_serial_vectors.h",
@@ -38,6 +38,10 @@
       "from": "generated/multinode_scenarios.h",
       "sha256": "342bef555390e3476e6cba2edcdcb5c50b3db52a25d095c330334f9b2f061df8"
     },
+    "safety_policy_vectors.h": {
+      "from": "generated/safety_policy_vectors.h",
+      "sha256": "e58b66b683103b643479231b21c7b2cf38917e1a0361e8645e1853c715f7c74b"
+    },
     "signed_image_vectors.h": {
       "from": "generated/signed_image_vectors.h",
       "sha256": "6798cd113b94c1c228793a267b4395e864e81cfa5d07b963ad4f8293b876138a"
@@ -60,7 +64,7 @@
     },
     "urtc_fw_vectors.h": {
       "from": "generated/urtc_fw_vectors.h",
-      "sha256": "60e2d27b248c50a65c9798a4030528f7f4a955bf9ac62dfdb56804621dba7f1e"
+      "sha256": "de0df035fab22d60f03ea79b852acdf7fd1f313c3d5c7a49238464e37124eb5d"
     },
     "urtc_test.h": {
       "from": "firmware_base/urtc_test.h",

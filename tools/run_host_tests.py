@@ -248,7 +248,9 @@ def analysis_sources(selected: list[Suite]) -> list[tuple[Suite, str]]:
 
 
 def analyze_command(suite: Suite, compiler: str, source: str) -> list[str]:
-    cmd = [compiler, f"-std={suite.std}", *(suite.warn or ()), *suite.extra, *suite.defines, "-fanalyzer"]
+    # The fault handlers, the failed start-ups and the loop of the bootloader that waits for the watchdog reset end in a loop that never returns ON PURPOSE;
+    # the newer analyzers report each of them as -Wanalyzer-infinite-loop. That one report is turned off; every other analyzer warning still fails the run.
+    cmd = [compiler, f"-std={suite.std}", *(suite.warn or ()), *suite.extra, *suite.defines, "-fanalyzer", "-Wno-analyzer-infinite-loop"]
     cmd += [f"-I{ROOT / include}" for include in suite.includes]
     return cmd + ["-c", "-o", os.devnull, str(ROOT / source)]
 

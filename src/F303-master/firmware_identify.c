@@ -89,14 +89,14 @@ void Identify_PhysicalTool(void) {
             active_tool = (ToolMode_t)(selection - 1);
         } else {
             active_tool = TOOL_INVALID;
-            system_error_flag = 1;
+            RAISE_SYSTEM_ERROR(URTC_ERROR_REASON_TOOL_ID);
             Identify_ForceInertOutputs();
             HAL_GPIO_WritePin(DRILL_BRAKE_PORT, DRILL_BRAKE_PIN, GPIO_PIN_RESET); // drill brake engaged
             HAL_GPIO_WritePin(T12_PWM_PORT, T12_PWM_PIN, GPIO_PIN_RESET); // heater off
         }
     } else {
         active_tool = TOOL_INVALID;
-        system_error_flag = 1;
+        RAISE_SYSTEM_ERROR(URTC_ERROR_REASON_TOOL_ID);
         // Explicit, redundant safety: force every actuator output to its
         // inert state right now, rather than trusting that no other code
         // path will ever touch them for a tool ID nothing else recognizes.

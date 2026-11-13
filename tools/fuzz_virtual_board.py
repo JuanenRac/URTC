@@ -46,6 +46,7 @@ SOURCES = (
     f"{MASTER}/firmware_thermal_stats.c", f"{MASTER}/thermal_stats.c", f"{MASTER}/firmware_blackbox.c", f"{MASTER}/firmware_fram.c",
     f"{MASTER}/fw_features.c", f"{MASTER}/firmware_features.c", f"{MASTER}/pid_control.c", f"{MASTER}/health_profile.c",
     f"{MASTER}/hsi_trim.c", f"{MASTER}/motion_profile.c",
+    f"{MASTER}/firmware_safety.c", f"{MASTER}/fw_safety_policy.c",
 )
 FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Wno-unused-parameter", "-Wno-cpp", "-Wno-int-to-pointer-cast",
          "-fsanitize=address,undefined", "-fno-sanitize-recover=all", "-g"]
@@ -53,7 +54,7 @@ INCLUDES = ["tests", "tests/host_hal", MASTER, "src/common"]
 MAGIC = bytes.fromhex("B0071D5A")
 FRAME_LINE = re.compile(r"^t([0-7][0-9A-F]{2})([0-8])((?:[0-9A-F]{2}){0,8})$")
 # (tool profile, optional features mask): a tool of each family, features off and all on
-RUNS = ((0, 0), (0, 0x0F), (1, 0), (10, 0x0F), (19, 0x0F), (22, 0), (5, 0x0F))
+RUNS = ((0, 0), (0, 0x0F), (1, 0), (10, 0x0F), (19, 0x0F), (22, 0), (5, 0x0F), (0, 0x7F), (13, 0x70), (10, 0x7F))
 
 
 def load_corpus() -> tuple[list[tuple[int, bytes, str]], set[int]]:
