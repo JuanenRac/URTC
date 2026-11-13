@@ -6,6 +6,31 @@
 #include "firmware_common.h"
 #include "firmware_telemetry_watchdog.h"
 
+// The telemetry runs about every 150 ms, but the block that calls it also renders the screen and talks I2C, so the real time between two calls is longer and
+// varies. Dividing by the real time since the previous call (and not by 150) keeps the figure true. A time outside 50 to 1000 ms (the first call, or a
+// call after the tool was not the active one) is not a window of this measurement, so the nominal 150 ms is used.
+#define RPM_WINDOW_NOMINAL_MS 150u
+#define RPM_WINDOW_MIN_MS 50u
+#define RPM_WINDOW_MAX_MS 1000u
+
+static uint32_t rpm_window_ms(uint32_t *last_tick)
+{
+    uint32_t now = HAL_GetTick();
+    uint32_t window = now - *last_tick;
+    *last_tick = now;
+    if (window < RPM_WINDOW_MIN_MS || window > RPM_WINDOW_MAX_MS) {
+        return RPM_WINDOW_NOMINAL_MS;
+    }
+    return window;
+}
+
+// Revolutions per minute from the pulses counted in `window` milliseconds with `pulses_per_rev` pulses per revolution.
+static uint32_t rpm_from_pulses(uint32_t pulses, uint32_t window, uint32_t pulses_per_rev)
+{
+    uint64_t rpm = ((uint64_t)pulses * 60000u) / ((uint64_t)window * pulses_per_rev);
+    return rpm > 0xFFFFFFFFu ? 0xFFFFFFFFu : (uint32_t)rpm;
+}
+
 void Telemetry_Drill(void) {
     if(active_tool != TOOL_DRILL) return;
     // RPM conversion assumes 1 FG pulse per revolution and this function's
@@ -16,7 +41,8 @@ void Telemetry_Drill(void) {
     uint32_t drill_pulses_captured = drill_rpm_pulses;
     drill_rpm_pulses = 0;
     __enable_irq();
-    drill_actual_rpm = drill_pulses_captured * 400; 
+    static uint32_t drill_last_tick = 0;
+    drill_actual_rpm = rpm_from_pulses(drill_pulses_captured, rpm_window_ms(&drill_last_tick), 1u);
     // Sanity clamp: a single stray noise-triggered pulse count can produce a
     // physically impossible RPM figure. Beyond protecting the CAN telemetry
     // from reporting nonsense, this also keeps the 5-digit case from ever
@@ -33,7 +59,8 @@ void Telemetry_LayerFan(void) {
     uint32_t layer_pulses_captured = layer_fan_rpm_pulses;
     layer_fan_rpm_pulses = 0;
     __enable_irq();
-    layer_fan_actual_rpm = layer_pulses_captured * 200;
+    static uint32_t layer_last_tick = 0;
+    layer_fan_actual_rpm = rpm_from_pulses(layer_pulses_captured, rpm_window_ms(&layer_last_tick), 2u);
     if (layer_fan_actual_rpm > 9999) layer_fan_actual_rpm = 9999; // see drill_actual_rpm above
 }
 
@@ -149,7 +176,8 @@ void Telemetry_HotendFan(void) {
     uint32_t hotend_pulses_captured = hotend_fan_rpm_pulses;
     hotend_fan_rpm_pulses = 0;
     __enable_irq();
-    hotend_fan_actual_rpm = hotend_pulses_captured * 200;
+    static uint32_t hotend_last_tick = 0;
+    hotend_fan_actual_rpm = rpm_from_pulses(hotend_pulses_captured, rpm_window_ms(&hotend_last_tick), 2u);
     if (hotend_fan_actual_rpm > 9999) hotend_fan_actual_rpm = 9999; // see drill_actual_rpm above
 }
 

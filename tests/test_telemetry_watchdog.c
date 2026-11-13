@@ -210,6 +210,54 @@ static void test_hotend_fan_stall(int *failures)
     TEST_ASSERT(!system_error_flag, "the fan stall check only applies to the 3D printer");
 }
 
+static void test_rpm_uses_the_real_window(int *failures)
+{
+    // The telemetry block also renders and talks I2C, so two calls are more than 150 ms apart: the figure divides by the real time.
+    reset_all();
+    active_tool = TOOL_DRILL;
+    fake_tick = 100000;
+    Telemetry_Drill();                              // the first call has no previous one: nominal window
+    fake_tick = 100000 + 300;
+    drill_rpm_pulses = 12;
+    Telemetry_Drill();
+    TEST_ASSERT(drill_actual_rpm == 2400, "drill: 12 pulses in 300 ms are 2400 rpm, not 4800");
+    fake_tick += 150;
+    drill_rpm_pulses = 12;
+    Telemetry_Drill();
+    TEST_ASSERT(drill_actual_rpm == 4800, "drill: 12 pulses in 150 ms are 4800 rpm");
+    fake_tick += 50;
+    drill_rpm_pulses = 2;
+    Telemetry_Drill();
+    TEST_ASSERT(drill_actual_rpm == 2400, "drill: the shortest window that counts (50 ms) is used as it is");
+    fake_tick += 49;
+    drill_rpm_pulses = 12;
+    Telemetry_Drill();
+    TEST_ASSERT(drill_actual_rpm == 4800, "drill: 49 ms is not a window of this measurement, the nominal 150 ms is used");
+    fake_tick += 1000;
+    drill_rpm_pulses = 12;
+    Telemetry_Drill();
+    TEST_ASSERT(drill_actual_rpm == 720, "drill: 1000 ms is the longest window that counts");
+    fake_tick += 1001;
+    drill_rpm_pulses = 12;
+    Telemetry_Drill();
+    TEST_ASSERT(drill_actual_rpm == 4800, "drill: 1001 ms is too long to be one window, the nominal 150 ms is used");
+
+    active_tool = TOOL_3D_PRINTER;
+    fake_tick = 500000;
+    Telemetry_LayerFan();
+    Telemetry_HotendFan();
+    fake_tick += 300;
+    layer_fan_rpm_pulses = 7; hotend_fan_rpm_pulses = 21;
+    Telemetry_LayerFan();
+    Telemetry_HotendFan();
+    TEST_ASSERT(layer_fan_actual_rpm == 700, "layer fan: 7 pulses in 300 ms at 2 pulses per revolution are 700 rpm");
+    TEST_ASSERT(hotend_fan_actual_rpm == 2100, "hotend fan: 21 pulses in 300 ms at 2 pulses per revolution are 2100 rpm");
+    fake_tick += 150;
+    layer_fan_rpm_pulses = 0xFFFFFFFFu;
+    Telemetry_LayerFan();
+    TEST_ASSERT(layer_fan_actual_rpm == 9999, "the largest pulse count does not overflow and is capped");
+}
+
 static void test_rpm_telemetry(int *failures)
 {
     reset_all();
@@ -251,6 +299,7 @@ void run_telemetry_watchdog_tests(int *failures)
     test_shared_families(failures);
     test_hotend_fan_stall(failures);
     test_rpm_telemetry(failures);
+    test_rpm_uses_the_real_window(failures);
 }
 
 int main(void)
