@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **A command that arrives while the watchdog reads the clock no longer cuts the output:** the kick of each communication watchdog is written by the CAN interrupt, which could run between the read of the clock and the read of the kick; the unsigned difference then read about four billion milliseconds, the laser, drill, heaters, fans or lamp were cut and a critical error was latched until the next reset. A kick that is newer than the clock now has age zero; the host tests cover it for every watchdog and across the wrap of the counter.
+
 - **The manual host test workflow measures the coverage of the firmware logic with gcov and fails under 93 percent:** the 58 C suites execute 93.9 percent of the lines of the 83 firmware sources they compile (the floor is the measured value, never above it); an empty floor runs the suites without the measurement.
 
 - **The identity frame declares the bit rate of the bus (protocol version 2):** the master firmware sends the code of the rate it was built for (1 Mbit/s, or 500 kbit/s with `URTC_CAN_LEGACY_500K`) in byte 5 of `0x1BB`, `URTC_PROTOCOL_VERSION` is 2, and the uptime of that frame is 16 bits that stop at 65535 s instead of 24 bits. A tool of the previous protocol version reads the frame with a wrong uptime and no rate; the new tools read both versions. `src/common/urtc_can_ids.h` is the generated header of the new specification, `docs/CANBUS.TXT` is regenerated, and the host test covers the layout, the stop of the uptime and every rate code. The code is built only in the CI; it has not been run on a board.
