@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **The screen of the inspection head names the light modes the right way round:** the mode of the command 0x150 is 0x01 for the strobe and 0x02 for the continuous light, as the documentation and the handler say, but the screen showed 0x01 as fixed and 0x02 as strobe (and the yellow strip said scanning for the continuous light). The host test of the render checks the three modes.
+
 - **The rpm of the drill and the two fans divides by the real time between two readings:** the figure assumed exactly 150 ms, but the block that calls it also renders the screen and talks I2C, so the real window was longer and the rpm read high. A window outside 50 to 1000 ms (the first reading, or one after another tool was active) uses the nominal 150 ms; the host suite covers the edges of the window and the largest pulse count.
 - **The colour of the status LED is no longer a reason to write the F-RAM:** it is worked out again at every pass of the main loop (blue for a second and a half after each frame), yet it was part of the saved state, so a busy bus wrote the chip every few seconds. The colour that is already on the chip is kept as it is; the host suite checks that a change of the automatic colour writes nothing and that something else that changed is saved with the colour the chip already had.
 
