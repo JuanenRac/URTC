@@ -84,6 +84,7 @@ int16_t ADS1115_Direct_ReadResult(void) { ads_read++; return ads_result; }
 static uint32_t noted_steps;
 static int noted;
 void Features_NoteMove(uint32_t steps) { noted++; noted_steps = steps; }
+uint8_t Features_Active(uint8_t feature_bit) { (void)feature_bit; return 0; }   // every switch off: the 0x120 handler reads only the plain frame
 
 // ---- helpers ----------------------------------------------------------------------------------------------------------------
 static void quiet(void)
@@ -392,6 +393,52 @@ static void printer(int *failures)
     RX(0x170, 5, cmd);
     Handle_CAN_3DPrinter();
     TEST_ASSERT(target_temperature == 5, "0x170 with five bytes is ignored");
+
+    // 2 bytes: the heater alone (the keepalive of a heater that is on while the extruder moves) - the setpoint and the watchdog, and the extruder is left alone
+    quiet();
+    steps_remaining = 55;
+    total_steps_setpoint = 55;
+    fake_pin_set(DIR_PORT, DIR_PIN, GPIO_PIN_SET);
+    target_temperature = 0;
+    hotend_heater_last_kick_tick = 0;
+    const uint8_t heater_only[2] = { 0x00, 0xD2 };
+    int writes_before = fake_gpio_write_count; // the set-up above wrote pins: what counts is that the frame writes none
+    RX(0x170, 2, heater_only);
+    Handle_CAN_3DPrinter();
+    TEST_ASSERT(target_temperature == 210 && hotend_heater_last_kick_tick == 1000, "0x170 with two bytes sets the set-point and refreshes the watchdog");
+    TEST_ASSERT(steps_remaining == 55 && total_steps_setpoint == 55 && HAL_GPIO_ReadPin(DIR_PORT, DIR_PIN) == GPIO_PIN_SET && pin_level(DIR_PORT, DIR_PIN) == -1 && fake_gpio_write_count == writes_before,
+                "and a move of the extruder that is under way is left exactly as it was: no stop, no new direction, no pin written");
+    // the frame of 6 bytes with 0 steps is still the stop of the extruder
+    RX(0x170, 6, reverse_stop);
+    Handle_CAN_3DPrinter();
+    TEST_ASSERT(steps_remaining == 0, "the frame of six bytes with zero steps still stops the extruder");
+    // during the boot sequence the two-byte frame still takes the set-point
+    quiet();
+    boot_sequence_active = 1;
+    target_temperature = 0;
+    RX(0x170, 2, heater_only);
+    Handle_CAN_3DPrinter();
+    TEST_ASSERT(target_temperature == 210 && fake_gpio_write_count == 0, "during the boot sequence the heater-only frame takes the set-point too");
+    boot_sequence_active = 0;
+    // a long frame that was cut short (3 to 5 bytes) is not a command
+    for (uint8_t dlc = 3; dlc <= 5; dlc++) {
+        quiet();
+        target_temperature = 7;
+        hotend_heater_last_kick_tick = 0;
+        RX(0x170, dlc, cmd);
+        Handle_CAN_3DPrinter();
+        TEST_ASSERT(target_temperature == 7 && hotend_heater_last_kick_tick != 1000, "0x170 with three to five bytes is ignored");
+    }
+    quiet();
+    target_temperature = 7;
+    RX(0x170, 1, heater_only);
+    Handle_CAN_3DPrinter();
+    TEST_ASSERT(target_temperature == 7, "0x170 with one byte is ignored");
+    // the answer of the bytes that are not part of the frame: a frame longer than 6 keeps working as before
+    quiet();
+    RX(0x170, 8, cmd);
+    Handle_CAN_3DPrinter();
+    TEST_ASSERT(target_temperature == 200 && steps_remaining == 1000, "eight bytes are read as the six-byte layout, as before");
 
     quiet();
     const uint8_t fan[1] = { 0x80 };

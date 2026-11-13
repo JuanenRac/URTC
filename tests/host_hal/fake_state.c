@@ -44,6 +44,7 @@ volatile uint8_t layer_fan_duty;
 volatile uint32_t layer_fan_rpm_pulses;
 volatile uint32_t layer_fan_actual_rpm;
 volatile uint8_t system_error_flag;
+volatile uint8_t system_error_reason;
 // weak: firmware_control_thermal.c defines the real one, and a suite that links it keeps that definition
 __attribute__((weak)) volatile uint8_t thermal_fault_code;
 volatile uint8_t last_reset_cause;
