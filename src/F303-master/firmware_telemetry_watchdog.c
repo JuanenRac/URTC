@@ -64,11 +64,20 @@ void Telemetry_LayerFan(void) {
     if (layer_fan_actual_rpm > 9999) layer_fan_actual_rpm = 9999; // see drill_actual_rpm above
 }
 
+// Milliseconds since the last kick. The kicks are written by the CAN interrupt, which can run between the moment this code reads the clock and the moment it
+// reads the kick: the kick is then "in the future" by a few milliseconds and the unsigned difference would be about 4 billion, so a command that had
+// just arrived cut the output and latched an error. A difference that is negative as a signed number is a kick that is newer than the clock: age zero.
+static inline uint32_t tick_age_ms(uint32_t now, uint32_t kick)
+{
+    uint32_t age = now - kick;
+    return ((int32_t)age < 0) ? 0u : age;
+}
+
 void Watchdog_Safety_Laser(void) {
     if (active_tool != TOOL_LASER_ENGRAVER) return;
     
     // If power is active but the master doesn't refresh the watchdog within 250ms, full shutdown
-    if (laser_power_setpoint > 0 && (HAL_GetTick() - laser_last_kick_tick > 250)) {
+    if (laser_power_setpoint > 0 && (tick_age_ms(HAL_GetTick(), laser_last_kick_tick) > 250)) {
         laser_power_setpoint = 0;
         __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, 0);
         // Per CANBUS.TXT's documented polarity (PB6 LOW = safe/locked, PB6
@@ -89,7 +98,7 @@ void Watchdog_Safety_Laser(void) {
 void Watchdog_Safety_Drill(void) {
     if (active_tool != TOOL_DRILL) return;
 
-    if (drill_speed > 0 && (HAL_GetTick() - drill_last_kick_tick > 250)) {
+    if (drill_speed > 0 && (tick_age_ms(HAL_GetTick(), drill_last_kick_tick) > 250)) {
         drill_speed = 0;
         __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, 0);
         HAL_GPIO_WritePin(DRILL_BRAKE_PORT, DRILL_BRAKE_PIN, GPIO_PIN_RESET); // Brake (LOW, per this tool's polarity)
@@ -106,7 +115,7 @@ void Watchdog_Safety_Drill(void) {
 void Watchdog_Safety_SolderIron(void) {
     if (active_tool != TOOL_SOLDERING_IRON && active_tool != TOOL_HOTAIR_REWORK) return;
 
-    if (target_temperature > 0 && (HAL_GetTick() - solder_iron_last_kick_tick > 250)) {
+    if (target_temperature > 0 && (tick_age_ms(HAL_GetTick(), solder_iron_last_kick_tick) > 250)) {
         target_temperature = 0;
         system_error_flag = 1;
     }
@@ -115,7 +124,7 @@ void Watchdog_Safety_SolderIron(void) {
 void Watchdog_Safety_HotendHeater(void) {
     if (active_tool != TOOL_3D_PRINTER) return;
 
-    if (target_temperature > 0 && (HAL_GetTick() - hotend_heater_last_kick_tick > 250)) {
+    if (target_temperature > 0 && (tick_age_ms(HAL_GetTick(), hotend_heater_last_kick_tick) > 250)) {
         target_temperature = 0;
         system_error_flag = 1;
     }
@@ -133,7 +142,7 @@ void Watchdog_Safety_HotendHeater(void) {
 void Watchdog_Safety_LayerFan(void) {
     if (active_tool != TOOL_3D_PRINTER) return;
 
-    if (layer_fan_duty > 0 && (HAL_GetTick() - layer_fan_last_kick_tick > 1000)) {
+    if (layer_fan_duty > 0 && (tick_age_ms(HAL_GetTick(), layer_fan_last_kick_tick) > 1000)) {
         layer_fan_duty = 0;
         __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, 0);
         system_error_flag = 1;
@@ -146,7 +155,7 @@ void Watchdog_Safety_LayerFan(void) {
 void Watchdog_Safety_UVCuring(void) {
     if (active_tool != TOOL_UV_CURING) return;
 
-    if (uv_curing_duty > 0 && (HAL_GetTick() - uv_curing_last_kick_tick > 250)) {
+    if (uv_curing_duty > 0 && (tick_age_ms(HAL_GetTick(), uv_curing_last_kick_tick) > 250)) {
         uv_curing_duty = 0;
         __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, 0);
         system_error_flag = 1;
@@ -161,7 +170,7 @@ void Watchdog_Safety_UVCuring(void) {
 void Watchdog_Safety_HotAirBlower(void) {
     if (active_tool != TOOL_HOTAIR_REWORK) return;
 
-    if (hotair_blower_duty > 0 && (HAL_GetTick() - hotair_blower_last_kick_tick > 1000)) {
+    if (hotair_blower_duty > 0 && (tick_age_ms(HAL_GetTick(), hotair_blower_last_kick_tick) > 1000)) {
         hotair_blower_duty = 0;
         __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, 0);
         system_error_flag = 1;
@@ -203,7 +212,7 @@ void Watchdog_Safety_HotendFan(void) {
         if (hotend_fan_actual_rpm > 0) {
             // Fan is genuinely turning - keep the stall timer reset
             stall_start_tick = HAL_GetTick();
-        } else if (HAL_GetTick() - stall_start_tick > 3000) {
+        } else if (tick_age_ms(HAL_GetTick(), stall_start_tick) > 3000) {
             // RPM has read exactly 0 for 3 continuous seconds while duty > 0
             system_error_flag = 1;
         }
