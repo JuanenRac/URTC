@@ -88,7 +88,7 @@ static void test_record(int *failures)
     TEST_ASSERT(Feat_ConfigMask(&c) == 0x0A, "a sealed record gives its mask");
     c.mask = 0x0B;
     TEST_ASSERT(!Feat_ConfigIsValid(&c) && Feat_ConfigMask(&c) == 0, "a record changed after sealing is not trusted");
-    c.mask = 0x1A; Feat_ConfigSeal(&c);
+    c.mask = 0x9A; Feat_ConfigSeal(&c);
     TEST_ASSERT(Feat_ConfigMask(&c) == 0, "a bit this firmware does not have makes the whole record untrusted");
     memset(&c, 0xFF, sizeof c);
     TEST_ASSERT(!Feat_ConfigIsValid(&c) && Feat_ConfigMask(&c) == 0, "erased F-RAM (0xFF) is every feature off");
@@ -105,7 +105,7 @@ static void test_record(int *failures)
         bad[i] ^= 0xFF;
         TEST_ASSERT(!Feat_ParseCommand(5, bad, &mask), "any corrupted magic byte is ignored");
     }
-    const uint8_t over[5] = { 0x46, 0x45, 0x41, 0x54, 0x10 };
+    const uint8_t over[5] = { 0x46, 0x45, 0x41, 0x54, 0x80 };
     TEST_ASSERT(!Feat_ParseCommand(5, over, &mask), "an unsupported bit is ignored");
 }
 
@@ -120,7 +120,7 @@ static void test_switches(int *failures)
     send(0x1AF, NULL, 0);
     Features_HandleCommand();
     const FakeTxFrame *r = find_tx(0x1AF);
-    TEST_ASSERT(r && r->dlc == 3 && r->data[0] == 0 && r->data[1] == 0 && r->data[2] == FEAT_SUPPORTED, "0x1AF: stored 0, running 0, supported 0x0F");
+    TEST_ASSERT(r && r->dlc == 3 && r->data[0] == 0 && r->data[1] == 0 && r->data[2] == FEAT_SUPPORTED, "0x1AF: stored 0, running 0, supported 0x7F");
 
     // change: writes the record, reports it, does not act yet
     const uint8_t on[5] = { 0x46, 0x45, 0x41, 0x54, 0x0A };

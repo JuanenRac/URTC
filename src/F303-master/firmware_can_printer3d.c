@@ -5,10 +5,13 @@
 // =============================================================================
 #include "firmware_common.h"
 #include "firmware_can_printer3d.h"
+#include "firmware_safety.h"
 #include "urtc_can_ids.h"
 
 void Handle_CAN_3DPrinter(void) {
-                if (rxHeader.StdId == URTC_CAN_ID_PRINTER_THERMAL_MOTION && rxHeader.DLC >= 6) {
+                // 2 bytes: the setpoint only (the keepalive of a heater that is on while the extruder moves); 6 or more: setpoint, direction and steps. Between 3 and 5
+                // is a long frame that was cut short, which is not a command and is ignored as it always was.
+                if (rxHeader.StdId == URTC_CAN_ID_PRINTER_THERMAL_MOTION && rxHeader.DLC >= 2 && (rxHeader.DLC == 2 || rxHeader.DLC >= 6)) {
                     // Hotend temperature, big-endian (MSB | LSB)
                     // Not gated on boot_sequence_active - starting the heater
                     // pre-warming during the splash is fine (no physical
@@ -16,7 +19,8 @@ void Handle_CAN_3DPrinter(void) {
                     // to wait for the splash to finish.
                     target_temperature = (rxData[0] << 8) | rxData[1];
                     hotend_heater_last_kick_tick = HAL_GetTick();
-                    if (!boot_sequence_active) {
+                    // With 2 bytes there is no extruder part: a move that is under way is left alone (the frame of 6 bytes with 0 steps is the one that stops it).
+                    if (rxHeader.DLC >= 6 && !boot_sequence_active) {
                     __disable_irq();
                     // Clear residual queued steps before a direction change - same reasoning as the 0x120 handler above
                     GPIO_PinState new_dir = (rxData[2] == 0x01) ? GPIO_PIN_SET : GPIO_PIN_RESET;
@@ -32,6 +36,7 @@ void Handle_CAN_3DPrinter(void) {
                     if (extruder_steps > 0) {
                         total_steps_setpoint = extruder_steps;
                         steps_remaining = extruder_steps;
+                        Safety_NoteStepperMove(extruder_steps, 0u);
                         step_pulse_high = 0; // see the 0x120 handler above
                         HAL_GPIO_WritePin(STEP_PORT, STEP_PIN, GPIO_PIN_RESET); // physical pin low too, not just the flag
                         HAL_GPIO_WritePin(TMC_ENN_PORT, TMC_ENN_PIN, GPIO_PIN_RESET);
