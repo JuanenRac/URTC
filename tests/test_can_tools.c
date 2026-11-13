@@ -401,10 +401,11 @@ static void printer(int *failures)
     target_temperature = 0;
     hotend_heater_last_kick_tick = 0;
     const uint8_t heater_only[2] = { 0x00, 0xD2 };
+    int writes_before = fake_gpio_write_count; // the set-up above wrote pins: what counts is that the frame writes none
     RX(0x170, 2, heater_only);
     Handle_CAN_3DPrinter();
     TEST_ASSERT(target_temperature == 210 && hotend_heater_last_kick_tick == 1000, "0x170 with two bytes sets the set-point and refreshes the watchdog");
-    TEST_ASSERT(steps_remaining == 55 && total_steps_setpoint == 55 && pin_level(DIR_PORT, DIR_PIN) == GPIO_PIN_SET && fake_gpio_write_count == 0,
+    TEST_ASSERT(steps_remaining == 55 && total_steps_setpoint == 55 && pin_level(DIR_PORT, DIR_PIN) == GPIO_PIN_SET && fake_gpio_write_count == writes_before,
                 "and a move of the extruder that is under way is left exactly as it was: no stop, no new direction, no pin written");
     // the frame of 6 bytes with 0 steps is still the stop of the extruder
     RX(0x170, 6, reverse_stop);
@@ -422,6 +423,7 @@ static void printer(int *failures)
     for (uint8_t dlc = 3; dlc <= 5; dlc++) {
         quiet();
         target_temperature = 7;
+        hotend_heater_last_kick_tick = 0;
         RX(0x170, dlc, cmd);
         Handle_CAN_3DPrinter();
         TEST_ASSERT(target_temperature == 7 && hotend_heater_last_kick_tick != 1000, "0x170 with three to five bytes is ignored");
