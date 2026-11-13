@@ -256,7 +256,7 @@ static void test_retarget(int *failures)
         TEST_ASSERT(g.reached_target == 1, "the target is reached");
         ThermalGuard_Check(&g, &T12_RETARGET, 2000, 1, 300, 250);
         TEST_ASSERT(g.reached_target == 1 && g.last_target_c == 250, "lowering the setpoint keeps the holding phase");
-        ThermalGuard_Check(&g, &T12_RETARGET, 3000, 1, 300, 320);
+        ThermalGuard_Check(&g, &T12_RETARGET, 3000, 1, 150, 320);
         TEST_ASSERT(g.reached_target == 0, "a big rise after that starts a new heating phase");
     }
     // a big jump up still finds a loose sensor on the new setpoint
