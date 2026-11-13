@@ -16,7 +16,10 @@
 #define FEAT_HEALTH_PROFILE 0x02u
 #define FEAT_HSI_AUTOTRIM   0x04u
 #define FEAT_THERMAL_PID    0x08u
-#define FEAT_SUPPORTED      0x0Fu
+#define FEAT_CLEAR_ERROR    0x10u  // the clear-error command 0x1B2 works
+#define FEAT_COMMS_WATCHDOG 0x20u  // silence of the host cuts a stepper move and, with the next switch, lets the electromagnet go
+#define FEAT_MAGNET_RELEASE 0x40u  // with the communication watchdog: the electromagnet lets go; without it, it holds
+#define FEAT_SUPPORTED      0x7Fu
 
 // States reported in the 0x1BA answer (the enumeration pid_state of the protocol specification).
 #define PID_STATE_OFF_VALUE        0u

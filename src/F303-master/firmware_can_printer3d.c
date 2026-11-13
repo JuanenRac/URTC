@@ -5,6 +5,7 @@
 // =============================================================================
 #include "firmware_common.h"
 #include "firmware_can_printer3d.h"
+#include "firmware_safety.h"
 #include "urtc_can_ids.h"
 
 void Handle_CAN_3DPrinter(void) {
@@ -32,6 +33,7 @@ void Handle_CAN_3DPrinter(void) {
                     if (extruder_steps > 0) {
                         total_steps_setpoint = extruder_steps;
                         steps_remaining = extruder_steps;
+                        Safety_NoteStepperMove(extruder_steps, 0u);
                         step_pulse_high = 0; // see the 0x120 handler above
                         HAL_GPIO_WritePin(STEP_PORT, STEP_PIN, GPIO_PIN_RESET); // physical pin low too, not just the flag
                         HAL_GPIO_WritePin(TMC_ENN_PORT, TMC_ENN_PIN, GPIO_PIN_RESET);
