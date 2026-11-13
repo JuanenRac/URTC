@@ -405,7 +405,7 @@ static void printer(int *failures)
     RX(0x170, 2, heater_only);
     Handle_CAN_3DPrinter();
     TEST_ASSERT(target_temperature == 210 && hotend_heater_last_kick_tick == 1000, "0x170 with two bytes sets the set-point and refreshes the watchdog");
-    TEST_ASSERT(steps_remaining == 55 && total_steps_setpoint == 55 && pin_level(DIR_PORT, DIR_PIN) == GPIO_PIN_SET && fake_gpio_write_count == writes_before,
+    TEST_ASSERT(steps_remaining == 55 && total_steps_setpoint == 55 && HAL_GPIO_ReadPin(DIR_PORT, DIR_PIN) == GPIO_PIN_SET && pin_level(DIR_PORT, DIR_PIN) == -1 && fake_gpio_write_count == writes_before,
                 "and a move of the extruder that is under way is left exactly as it was: no stop, no new direction, no pin written");
     // the frame of 6 bytes with 0 steps is still the stop of the extruder
     RX(0x170, 6, reverse_stop);
