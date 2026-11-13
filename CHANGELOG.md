@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **The position of the solder wire feeder saturates instead of wrapping:** it is the sum of the commanded steps, and a command can carry up to 4 billion steps, so the plain addition could pass the range of the 32-bit position (undefined behaviour) and come out with the other sign. `spool_position.c` adds in 64 bits and stops at the end of the range; its host suite checks the ends of the range, the largest command and a sweep with a fixed seed against a model.
+
 - **The manual host test workflow measures the coverage of the firmware logic with gcov and fails under 93 percent:** the 58 C suites execute 93.9 percent of the lines of the 83 firmware sources they compile (the floor is the measured value, never above it); an empty floor runs the suites without the measurement.
 
 - **The identity frame declares the bit rate of the bus (protocol version 2):** the master firmware sends the code of the rate it was built for (1 Mbit/s, or 500 kbit/s with `URTC_CAN_LEGACY_500K`) in byte 5 of `0x1BB`, `URTC_PROTOCOL_VERSION` is 2, and the uptime of that frame is 16 bits that stop at 65535 s instead of 24 bits. A tool of the previous protocol version reads the frame with a wrong uptime and no rate; the new tools read both versions. `src/common/urtc_can_ids.h` is the generated header of the new specification, `docs/CANBUS.TXT` is regenerated, and the host test covers the layout, the stop of the uptime and every rate code. The code is built only in the CI; it has not been run on a board.

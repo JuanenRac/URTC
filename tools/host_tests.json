@@ -369,6 +369,19 @@
    "std": "c11"
   },
   {
+   "name": "spool_position",
+   "test": "tests/test_spool_position.c",
+   "sources": [
+    "src/F303-master/spool_position.c"
+   ],
+   "includes": [
+    "tests",
+    "src/F303-master",
+    "src/common"
+   ],
+   "std": "c11"
+  },
+  {
    "name": "pid_control",
    "test": "tests/test_pid_control.c",
    "sources": [
@@ -436,7 +449,8 @@
     "src/F303-master/firmware_can_crimping.c",
     "src/F303-master/firmware_can_weldpulse.c",
     "src/F303-master/firmware_can_flyingprobe.c",
-    "src/F303-master/firmware_can_motion.c"
+    "src/F303-master/firmware_can_motion.c",
+    "src/F303-master/spool_position.c"
    ],
    "includes": [
     "tests",
@@ -467,7 +481,8 @@
     "src/F303-master/firmware_can_crimping.c",
     "src/F303-master/firmware_can_weldpulse.c",
     "src/F303-master/firmware_can_flyingprobe.c",
-    "src/F303-master/firmware_can_motion.c"
+    "src/F303-master/firmware_can_motion.c",
+    "src/F303-master/spool_position.c"
    ],
    "includes": [
     "tests",
