@@ -12,12 +12,14 @@
 // The MLX9064x address space is 16-bit word-addressed; a flat map is the
 // simplest faithful model for a host test (128 KiB, host-only).
 static uint16_t g_reg[65536];
+static unsigned g_subpage;   // the sub-page the sensor measures next (used when fake_i2c.alternate_subpage is set)
 struct fake_i2c_state fake_i2c;
 
 void fake_i2c_reset(void)
 {
     memset(g_reg, 0, sizeof(g_reg));
     memset(&fake_i2c, 0, sizeof(fake_i2c));
+    g_subpage = 0;
     fake_i2c.fail_read_at = -1;
     fake_i2c.status_ready_after = -1;
 }
@@ -65,6 +67,7 @@ int MLX90640_I2CRead(uint8_t slaveAddr, uint16_t startAddress,
             poll >= (unsigned)fake_i2c.status_ready_after) {
             s |= MLX90640_STAT_DATA_READY_MASK; // bit 3
         }
+        if (fake_i2c.alternate_subpage) s = (uint16_t)((s & ~1u) | (g_subpage & 1u));
         data[0] = s;
         return MLX90640_NO_ERROR;
     }
@@ -80,5 +83,6 @@ int MLX90640_I2CWrite(uint8_t slaveAddr, uint16_t writeAddress, uint16_t data)
     (void)slaveAddr;
     fake_i2c.write_count++;
     g_reg[writeAddress] = data;
+    if (writeAddress == MLX90640_STATUS_REG && fake_i2c.alternate_subpage) g_subpage ^= 1u;   // the host took the frame: the next one is the other sub-page
     return MLX90640_NO_ERROR;
 }

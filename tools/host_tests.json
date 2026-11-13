@@ -878,6 +878,65 @@
    ]
   },
   {
+   "name": "mlx90640_subpages",
+   "test": "tests/test_mlx90640_subpages.c",
+   "sources": [
+    "tests/host_hal/fake_hal.c",
+    "tests/host_hal/fake_state.c",
+    "tests/fake_mlx90640_i2c.c",
+    "src/F303-master/melexis_mlx90640/MLX90640_API.c",
+    "src/F303-master/melexis_mlx90640/firmware_mlx90640_app.c"
+   ],
+   "includes": [
+    "tests",
+    "tests/host_hal",
+    "src/F303-master",
+    "src/F303-master/melexis_mlx90640",
+    "src/common"
+   ],
+   "extra": [
+    "-Wno-cpp",
+    "-Wno-int-to-pointer-cast"
+   ],
+   "libs": [
+    "-lm"
+   ],
+   "unsanitize": [
+    "-fno-sanitize=shift-base"
+   ]
+  },
+  {
+   "name": "mlx90640_subpages_both",
+   "test": "tests/test_mlx90640_subpages.c",
+   "sources": [
+    "tests/host_hal/fake_hal.c",
+    "tests/host_hal/fake_state.c",
+    "tests/fake_mlx90640_i2c.c",
+    "src/F303-master/melexis_mlx90640/MLX90640_API.c",
+    "src/F303-master/melexis_mlx90640/firmware_mlx90640_app.c"
+   ],
+   "includes": [
+    "tests",
+    "tests/host_hal",
+    "src/F303-master",
+    "src/F303-master/melexis_mlx90640",
+    "src/common"
+   ],
+   "extra": [
+    "-Wno-cpp",
+    "-Wno-int-to-pointer-cast"
+   ],
+   "libs": [
+    "-lm"
+   ],
+   "unsanitize": [
+    "-fno-sanitize=shift-base"
+   ],
+   "defines": [
+    "-DURTC_MLX90640_TWO_SUBPAGES=1"
+   ]
+  },
+  {
    "name": "mlx_bus_slave",
    "test": "tests/test_mlx_bus.c",
    "sources": [
