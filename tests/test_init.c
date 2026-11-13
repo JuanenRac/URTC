@@ -51,10 +51,20 @@ static void test_clocks(int *failures)
     fake_hal_reset_recording();
     SystemClock_Config();
     TEST_ASSERT(fake_rcc_calls == 3, "the oscillator, the clock tree and the peripheral clocks are configured, once each");
+#if URTC_USE_HSE
+    // The build with the crystal (URTC_USE_HSE=1): the PLL takes the crystal undivided and the multiplier gives the same 64 MHz, so every figure below holds unchanged.
+    TEST_ASSERT(fake_rcc_osc.OscillatorType == (RCC_OSCILLATORTYPE_HSE | RCC_OSCILLATORTYPE_HSI) && fake_rcc_osc.HSEState == RCC_HSE_ON && fake_rcc_osc.HSEPredivValue == RCC_HSE_PREDIV_DIV1,
+                "the crystal is switched on, undivided, with the internal oscillator kept as the way back");
+    TEST_ASSERT(fake_rcc_osc.HSIState == RCC_HSI_ON && fake_rcc_osc.PLL.PLLState == RCC_PLL_ON && fake_rcc_osc.PLL.PLLSource == RCC_PLLSOURCE_HSE, "the PLL runs from the crystal");
+    TEST_ASSERT(fake_rcc_osc.PLL.PLLMUL == URTC_HSE_PLLMUL_ENC(URTC_HSE_PLLMUL_VALUE), "the multiplier is the one computed from the crystal, in the encoding of the HAL");
+    double sysclk = (double)URTC_HSE_HZ * (double)URTC_HSE_PLLMUL_VALUE;
+    TEST_ASSERT(sysclk == SYSCLK_HZ, "the crystal times its multiplier is the 64 MHz the timers and the SPI are computed for");
+#else
     TEST_ASSERT(fake_rcc_osc.OscillatorType == RCC_OSCILLATORTYPE_HSI && fake_rcc_osc.HSIState == RCC_HSI_ON, "the internal oscillator is the only one used and it is switched on");
     TEST_ASSERT(fake_rcc_osc.PLL.PLLState == RCC_PLL_ON && fake_rcc_osc.PLL.PLLSource == RCC_PLLSOURCE_HSI, "the PLL runs from it");
     double sysclk = HSI_HZ / 2.0 * fake_rcc_osc.PLL.PLLMUL;
     TEST_ASSERT(sysclk == SYSCLK_HZ, "8 MHz / 2 x 16 is the 64 MHz the timers and the SPI are computed for");
+#endif
     TEST_ASSERT(fake_rcc_clk.SYSCLKSource == RCC_SYSCLKSOURCE_PLLCLK, "the system clock is taken from the PLL");
     double hclk = sysclk / fake_rcc_clk.AHBCLKDivider;
     double pclk1 = hclk / fake_rcc_clk.APB1CLKDivider;
@@ -66,6 +76,33 @@ static void test_clocks(int *failures)
     TEST_ASSERT((fake_rcc_periph.PeriphClockSelection & (RCC_PERIPHCLK_I2C1 | RCC_PERIPHCLK_I2C2)) == (RCC_PERIPHCLK_I2C1 | RCC_PERIPHCLK_I2C2)
                 && fake_rcc_periph.I2c1ClockSelection == RCC_I2C1CLKSOURCE_HSI && fake_rcc_periph.I2c2ClockSelection == RCC_I2C2CLKSOURCE_HSI, "both I2C peripherals run from the 8 MHz internal oscillator, which the timing register below assumes");
 }
+
+#if URTC_USE_HSE
+// A board built for the crystal but without it (or with one that does not start): the oscillator configuration fails once and the board falls back to the
+// internal oscillator, with the same 64 MHz, so it still boots and the clock tree is still configured.
+static void test_clocks_crystal_fallback(int *failures)
+{
+    fake_hal_reset_recording();
+    fake_rcc_osc_fail_next = 1;
+    SystemClock_Config();
+    fake_rcc_osc_fail_next = 0;
+    TEST_ASSERT(fake_rcc_calls == 4, "the failed oscillator configuration is followed by a second one, then the clock tree and the peripheral clocks");
+    TEST_ASSERT(fake_rcc_osc.OscillatorType == RCC_OSCILLATORTYPE_HSI && fake_rcc_osc.HSEState == RCC_HSE_OFF && fake_rcc_osc.PLL.PLLSource == RCC_PLLSOURCE_HSI && fake_rcc_osc.PLL.PLLMUL == RCC_PLL_MUL16,
+                "the way back is the internal oscillator through the PLL at the same multiplier as the build without a crystal, with the crystal off");
+    TEST_ASSERT(HSI_HZ / 2.0 * fake_rcc_osc.PLL.PLLMUL == SYSCLK_HZ && fake_rcc_clk.SYSCLKSource == RCC_SYSCLKSOURCE_PLLCLK && fake_rcc_flash_latency == FLASH_LATENCY_2,
+                "it still gives 64 MHz and the system clock is still taken from the PLL with two flash wait states");
+    // and the fallback is not taken when the crystal starts
+    fake_hal_reset_recording();
+    SystemClock_Config();
+    TEST_ASSERT(fake_rcc_calls == 3 && fake_rcc_osc.HSEState == RCC_HSE_ON, "with a working crystal the oscillator is configured once");
+    // two failures in a row: the second attempt is the last one, nothing loops
+    fake_hal_reset_recording();
+    fake_rcc_osc_fail_next = 5;
+    SystemClock_Config();
+    fake_rcc_osc_fail_next = 0;
+    TEST_ASSERT(fake_rcc_calls == 4, "a fallback that fails too is not retried: the start-up goes on to the clock tree");
+}
+#endif
 
 static void test_can(int *failures)
 {
@@ -258,8 +295,13 @@ static void test_can_bit_timing(int *failures)
     TEST_ASSERT(urtc_can_bt_diag(32000000u, 500000u, &bt, URTC_CLOCK_HSI_PPM, 0, 0) == URTC_CAN_DIAG_FAIL, "an untrimmed internal oscillator at one percent is outside the tolerance");
     TEST_ASSERT(urtc_can_bt_diag(30000000u, 500000u, &bt, 0u, 0, &rate_err) == URTC_CAN_DIAG_FAIL && rate_err < 0, "a clock that does not give the requested rate is reported with its rate error");
     TEST_ASSERT(urtc_can_bt_diag(0, 500000u, &bt, 0u, 0, 0) == URTC_CAN_DIAG_BAD_ARGS, "a zero clock is a bad argument");
+#if URTC_USE_HSE
+    TEST_ASSERT(URTC_USE_HSE == 1 && URTC_HSE_PLLMUL_VALUE == 8u && URTC_HSE_PLLMUL_ENC(8u) == (6u << 18) && URTC_CAN_HAL_BS1(13u) == (12u << 16) && URTC_CAN_HAL_BS2(2u) == (1u << 20),
+                "the crystal build takes the 8 MHz crystal with a multiplier of 8 and the register encodings are those of the HAL");
+#else
     TEST_ASSERT(URTC_USE_HSE == 0 && URTC_HSE_PLLMUL_VALUE == 8u && URTC_HSE_PLLMUL_ENC(8u) == (6u << 18) && URTC_CAN_HAL_BS1(13u) == (12u << 16) && URTC_CAN_HAL_BS2(2u) == (1u << 20),
                 "the crystal is off by default and the register encodings are those of the HAL");
+#endif
 }
 
 // ---- limits, cuts and a fuzz with a fixed seed for the bit timing --------------------------------------------------------------------------
@@ -358,6 +400,9 @@ void run_init_tests(int *failures)
     test_can_bit_timing(failures);
     test_can_bit_timing_limits(failures);
     test_clocks(failures);
+#if URTC_USE_HSE
+    test_clocks_crystal_fallback(failures);
+#endif
     test_can(failures);
     test_buses(failures);
     test_timers(failures);
