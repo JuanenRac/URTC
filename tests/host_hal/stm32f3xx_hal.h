@@ -265,7 +265,13 @@ uint32_t HAL_GetUIDw2(void);
 // a CAN time-quanta setting is the register field of the chip, the encoding of the real HAL (a count n is written n - 1 at bit 16 for BS1, 20 for BS2 and 24 for SJW), so the
 // calculated timing of the firmware (can_bit_timing.h) and the named constants meet in the same encoding; CAN_BS1_TQ_OF() and the two next ones read a field back as a count of
 // quanta. A sampling time is in tenths of a cycle. The firmware only ever passes the names.
-typedef struct { uint32_t OscillatorType, HSIState, HSICalibrationValue; struct { uint32_t PLLState, PLLSource, PLLMUL; } PLL; } RCC_OscInitTypeDef;
+typedef struct { uint32_t OscillatorType, HSEState, HSEPredivValue, HSIState, HSICalibrationValue; struct { uint32_t PLLState, PLLSource, PLLMUL; } PLL; } RCC_OscInitTypeDef;
+#define RCC_OSCILLATORTYPE_HSE 2u   // the crystal of the URTC_USE_HSE=1 builds
+#define RCC_HSE_OFF 0u
+#define RCC_HSE_ON 1u
+#define RCC_HSE_PREDIV_DIV1 0u
+#define RCC_PLLSOURCE_HSE 1u         // the PLL takes the crystal undivided
+extern int fake_rcc_osc_fail_next;   // the next n calls of HAL_RCC_OscConfig fail (a crystal that does not start)
 typedef struct { uint32_t ClockType, SYSCLKSource, AHBCLKDivider, APB1CLKDivider, APB2CLKDivider; } RCC_ClkInitTypeDef;
 typedef struct { uint32_t PeriphClockSelection, I2c1ClockSelection, I2c2ClockSelection; } RCC_PeriphCLKInitTypeDef;
 #define RCC_OSCILLATORTYPE_HSI 1u
@@ -399,6 +405,18 @@ typedef struct { uint32_t OCMode, Pulse, OCPolarity, OCFastMode, OCNPolarity, OC
 #define __HAL_RCC_CAN1_CLK_ENABLE() ((void)0)
 #define __HAL_RCC_PWR_CLK_ENABLE() ((void)0)
 #define __HAL_RCC_SYSCFG_CLK_ENABLE() ((void)0)
+// TIM17 as the registers the one-pulse weld timer writes (URTC_WELD_PULSE_HW_TIMER=1); the test plays its update interrupt by setting SR and calling the handler
+typedef struct { volatile uint32_t CR1, PSC, ARR, EGR, SR, DIER; } FakeTim17Regs;
+extern FakeTim17Regs fake_tim17;
+extern int fake_tim17_clock_enables;
+#define TIM17 (&fake_tim17)
+#define TIM_CR1_CEN 0x1u
+#define TIM_CR1_OPM 0x8u
+#define TIM_EGR_UG 0x1u
+#define TIM_DIER_UIE 0x1u
+#define TIM_SR_UIF 0x1u
+#define TIM1_TRG_COM_TIM17_IRQn 26
+#define __HAL_RCC_TIM17_CLK_ENABLE() (fake_tim17_clock_enables++)
 extern void *fake_tim1_ptr, *fake_tim2_ptr;
 #define TIM1 (fake_tim1_ptr)
 #define TIM2 (fake_tim2_ptr)
