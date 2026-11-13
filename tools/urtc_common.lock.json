@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "urtc_common_version": "0.1.9",
+  "urtc_common_version": "0.2.6",
   "files": {
     "local_build.py": {
       "from": "src/urtc_common/local_build.py",
