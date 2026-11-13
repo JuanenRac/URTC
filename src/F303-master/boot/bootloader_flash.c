@@ -10,6 +10,18 @@
 #include "bootloader_oled.h"
 #include "urtc_bl_serial.h"
 
+// URTC_BL_META_AB=1 keeps the metadata (and the programmed serial) in two alternating pages instead of the append-only log of one page (src/common/urtc_meta_ab.h).
+// Off by default: it needs a second 2 KB page, URTC_MASTER_METADATA_B_ADDR, that the layout of the bootloader does not give today.
+#ifndef URTC_BL_META_AB
+#define URTC_BL_META_AB 0
+#endif
+#if URTC_BL_META_AB
+#include "urtc_meta_ab.h"
+#ifndef URTC_MASTER_METADATA_B_ADDR
+#error "URTC_BL_META_AB=1 needs URTC_MASTER_METADATA_B_ADDR: the address of a free 2 KB page (check that the bootloader image ends before it)"
+#endif
+#endif
+
 static uint32_t crc32_table[256];
 static uint8_t crc32_table_built = 0;
 
@@ -188,6 +200,7 @@ static int32_t meta_find_newest(void) {
     return best;
 }
 
+#if !URTC_BL_META_AB
 uint8_t Metadata_Read(FirmwareMetadata_t *out) {
     int32_t newest = meta_find_newest();
     if (newest < 0) {
@@ -197,6 +210,7 @@ uint8_t Metadata_Read(FirmwareMetadata_t *out) {
     memcpy(out, &meta_slot((uint32_t)newest)->meta, sizeof(*out));
     return 1;
 }
+#endif
 
 // ---- the programmed serial number: two slots after the 28 records of the log ----------------------------------------------------------------------
 #define SERIAL_SLOT_A (METADATA_ADDR + META_RECORD_SLOTS * META_RECORD_SIZE)
@@ -207,17 +221,21 @@ static void serial_slot_words(uint32_t address, uint32_t words[4]) {
     memcpy(words, (const void*)(uintptr_t)address, URTC_SERIAL_SLOT_BYTES);
 }
 
-static uint8_t metadata_page_erase(void) {
+static uint8_t metadata_page_erase_at(uint32_t address) {
     FLASH_EraseInitTypeDef eraseInit;
     uint32_t pageError;
     eraseInit.TypeErase = FLASH_TYPEERASE_PAGES;
-    eraseInit.PageAddress = METADATA_ADDR;
+    eraseInit.PageAddress = address;
     eraseInit.NbPages = 1;
     HAL_FLASH_Unlock();
     __HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_EOP | FLASH_FLAG_WRPERR | FLASH_FLAG_PGERR);
     HAL_StatusTypeDef res = HAL_FLASHEx_Erase(&eraseInit, &pageError);
     HAL_FLASH_Lock();
     return (res == HAL_OK && pageError == 0xFFFFFFFF) ? 1u : 0u;
+}
+
+static uint8_t metadata_page_erase(void) {
+    return metadata_page_erase_at(METADATA_ADDR);
 }
 
 // Programs a blank slot: the serial, its complement and the counter first, the magic last, so a write that is cut leaves no record at all.
@@ -228,13 +246,16 @@ static uint8_t serial_slot_program(uint32_t address, uint32_t serial, uint32_t c
     return Flash_WriteVerified(address, (const uint8_t*)&words[0], 4u);
 }
 
+#if !URTC_BL_META_AB
 uint8_t Serial_ReadNewest(uint32_t *serial, uint32_t *counter) {
     uint32_t a[4], b[4];
     serial_slot_words(SERIAL_SLOT_A, a);
     serial_slot_words(SERIAL_SLOT_B, b);
     return urtc_serial_pick(a, b, serial, counter) ? 1u : 0u;
 }
+#endif
 
+#if !URTC_BL_META_AB
 uint8_t Serial_Store(uint32_t serial, uint32_t counter) {
     uint32_t a[4], b[4];
     serial_slot_words(SERIAL_SLOT_A, a);
@@ -249,9 +270,11 @@ uint8_t Serial_Store(uint32_t serial, uint32_t counter) {
     if (!serial_slot_program(SERIAL_SLOT_A, serial, counter)) return 0;
     return have_meta ? Metadata_EraseAndWrite(&meta) : 1u;
 }
+#endif
 
 // Appends the state as a new record; nothing is erased unless the page is full (then it is erased and the new record is the first of a fresh log).
 // The name is kept from the single-record page this replaced.
+#if !URTC_BL_META_AB
 uint8_t Metadata_EraseAndWrite(const FirmwareMetadata_t *meta) {
     uint32_t generation = 1;
     int32_t newest = meta_find_newest();
@@ -285,3 +308,71 @@ uint8_t Metadata_EraseAndWrite(const FirmwareMetadata_t *meta) {
     record.crc = meta_record_crc(&record);
     return Flash_WriteVerified((uint32_t)(METADATA_ADDR + slot * META_RECORD_SIZE), (const uint8_t*)&record, META_RECORD_SIZE);
 }
+#endif
+
+#if URTC_BL_META_AB
+// ---- metadata in two alternating pages (src/common/urtc_meta_ab.h) ------------------------------------------------------------------------------
+// One record holds the metadata and the programmed serial (the four words of a serial slot), so erasing the page that is rewritten never loses the serial.
+typedef struct {
+    FirmwareMetadata_t meta;
+    uint32_t serial_words[4];
+} MetaAbState_t;
+_Static_assert(sizeof(MetaAbState_t) % 2u == 0u, "the record is programmed by half-words");
+_Static_assert(sizeof(MetaAbState_t) <= URTC_META_AB_MAX_PAYLOAD, "the state fits the record");
+
+static const uint8_t *meta_ab_page_ptr(void *ctx, uint8_t page) {
+    (void)ctx;
+    return (const uint8_t*)(uintptr_t)(page == 0u ? METADATA_ADDR : URTC_MASTER_METADATA_B_ADDR);
+}
+
+static uint8_t meta_ab_erase(void *ctx, uint8_t page) {
+    (void)ctx;
+    return metadata_page_erase_at(page == 0u ? METADATA_ADDR : URTC_MASTER_METADATA_B_ADDR);
+}
+
+static uint8_t meta_ab_program(void *ctx, uint8_t page, uint32_t offset, const uint8_t *data, uint32_t len) {
+    (void)ctx;
+    return Flash_WriteVerified((page == 0u ? METADATA_ADDR : URTC_MASTER_METADATA_B_ADDR) + offset, data, len);
+}
+
+static const UrtcMetaAbOps meta_ab_ops = { meta_ab_page_ptr, meta_ab_erase, meta_ab_program, 0 };
+
+static void meta_ab_load(MetaAbState_t *state) {
+    if (!urtc_meta_ab_read(&meta_ab_ops, sizeof(*state), (uint8_t*)state)) {
+        memset(state, 0, sizeof(*state));
+        memset(state->serial_words, 0xFF, sizeof(state->serial_words)); // no serial yet: the blank slot
+    }
+}
+
+uint8_t Metadata_Read(FirmwareMetadata_t *out) {
+    MetaAbState_t state;
+    meta_ab_load(&state);
+    if (state.meta.magic != METADATA_MAGIC_VALID) {
+        memset(out, 0, sizeof(*out));
+        return 0;
+    }
+    *out = state.meta;
+    return 1;
+}
+
+uint8_t Metadata_EraseAndWrite(const FirmwareMetadata_t *meta) {
+    MetaAbState_t state;
+    meta_ab_load(&state);
+    state.meta = *meta;
+    return urtc_meta_ab_write(&meta_ab_ops, sizeof(state), (const uint8_t*)&state);
+}
+
+uint8_t Serial_ReadNewest(uint32_t *serial, uint32_t *counter) {
+    MetaAbState_t state;
+    uint32_t blank[4] = { 0xFFFFFFFFUL, 0xFFFFFFFFUL, 0xFFFFFFFFUL, 0xFFFFFFFFUL };
+    meta_ab_load(&state);
+    return urtc_serial_pick(state.serial_words, blank, serial, counter) ? 1u : 0u;
+}
+
+uint8_t Serial_Store(uint32_t serial, uint32_t counter) {
+    MetaAbState_t state;
+    meta_ab_load(&state);
+    urtc_serial_slot_pack(serial, counter, state.serial_words);
+    return urtc_meta_ab_write(&meta_ab_ops, sizeof(state), (const uint8_t*)&state);
+}
+#endif
