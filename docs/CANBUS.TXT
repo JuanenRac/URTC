@@ -2051,7 +2051,7 @@ Machine-readable specification of the CAN bus protocol of the URTC tool head: ev
 
 B. Index of identifiers
 
-[[ BEGIN GENERATED index sha256=cf89ac5b99caa5cd3ea386a5dfe28684e61756d8dc18f433dc23ff5e5cd90033 ]]
+[[ BEGIN GENERATED index sha256=cbfb2c0422d2b013af433b7d532f28bfbb11ef43d131c16a9fd1fe358630a5dc ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 | ID | Name | Direction | DLC | Tools | Group | Title |
@@ -2072,7 +2072,7 @@ Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_do
 | 0x155 | AOI_TELEMETRY | board to host | 1 | 8 | aoi | AOI endstop telemetry |
 | 0x160 | LASER_CMD | host to board | 2 | 9 | laser | Laser power and interlock |
 | 0x165 | LASER_TELEMETRY | board to host | 1 | 9 | laser | Laser endstop telemetry |
-| 0x170 | PRINTER_THERMAL_MOTION | host to board | 6 | 10 | printer | Nozzle setpoint and extruder motion |
+| 0x170 | PRINTER_THERMAL_MOTION | host to board | 6 2 | 10 | printer | Nozzle setpoint and extruder motion |
 | 0x173 | PRINTER_LAYERFAN_CMD | host to board | 1 | 10 | printer | Layer fan power |
 | 0x175 | PRINTER_HOTEND_TELEMETRY | board to host | 2 | 10 | printer | Hotend temperature telemetry |
 | 0x177 | PRINTER_LAYERFAN_RPM | board to host | 2 | 10 | printer | Layer fan RPM telemetry |
@@ -2166,7 +2166,7 @@ Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_do
 
 C. Field layouts and examples
 
-[[ BEGIN GENERATED layouts sha256=882ed801b9b32313567b466f6ebbd47d1daba3ab32d2349fea6b810bec6d1187 ]]
+[[ BEGIN GENERATED layouts sha256=fdf307aa7d2660f4e03b4dbc0e43b8fb1ad9eeaa7838216a0bf985d4327eed7a ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 ### 0x095 IMPACT_EVENT - Impact register (touch probe, maximum priority)
@@ -2420,7 +2420,7 @@ Example triggered: data 01 (endstop=1)
 
 ### 0x170 PRINTER_THERMAL_MOTION - Nozzle setpoint and extruder motion
 
-host to board; handled by the application; tools: 10; refused while a critical error is declared; timing: watchdog_ms 250; the firmware accepts DLC 6-8.
+host to board; handled by the application; tools: 10; refused while a critical error is declared; timing: watchdog_ms 250; the firmware accepts DLC 2-8.
 
 request, DLC 6
 
@@ -2434,7 +2434,18 @@ Example 200 C, extrude 16 steps: data 00C801000010 (nozzle_setpoint_c=200, extru
 
 Example heater off: data 000001000000 (nozzle_setpoint_c=0, extruder_direction=1, extruder_steps=0)
 
+request (heater_only), DLC 2: Only the heater: the setpoint is set and the watchdog is refreshed, and a move of the extruder that is under way is left alone. The long frame with 0 steps stops the extruder, so the keepalive of a heater that is on while the extruder moves uses this one.
+
+| Byte | Width | Type | Field | Values | Note |
+|---|---|---|---|---|---|
+| 0 | 2 | u16 | nozzle_setpoint_c | 0..300, C | The hosts offer 0 to 300 C; the firmware hard ceiling is 310 C. |
+
+Example keep a 200 C setpoint alive without touching the extruder: data 00C8 (nozzle_setpoint_c=200)
+
+Example heater off, extruder untouched: data 0000 (nozzle_setpoint_c=0)
+
 Note: The watchdog covers the nozzle setpoint only, not the extruder motion.
+Note: A frame of 2 bytes (heater only) leaves the extruder as it was; a frame of 6 bytes with 0 steps stops it (unchanged).
 Note: Only the extruder steps wait for the boot sequence; the nozzle setpoint is accepted during it.
 
 ### 0x173 PRINTER_LAYERFAN_CMD - Layer fan power
