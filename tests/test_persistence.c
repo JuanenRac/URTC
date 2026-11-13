@@ -210,7 +210,7 @@ static void test_save(int *failures)
     TEST_ASSERT(s.magic == SAVEDSTATE_MAGIC && s.struct_version == SAVEDSTATE_VERSION, "the record starts with the magic and the layout version");
     TEST_ASSERT(s.checksum == ref_crc8(&s, sizeof s - 1), "the stored record carries a valid checksum");
     TEST_ASSERT(s.active_tool_at_save == TOOL_SOLDERING_IRON && s.solder_setpoint == 345 && s.printer_nozzle_setpoint == 0, "soldering iron: the setpoint is saved as the iron's, not the nozzle's");
-    TEST_ASSERT(s.status_r == 9, "the status LED colour is saved");
+    TEST_ASSERT(s.status_r == 0, "the automatic status LED colour is not saved: the chip keeps the colour it had");
 
     reset_world();
     active_tool = TOOL_3D_PRINTER; target_temperature = 215; layer_fan_duty = 80; hotend_fan_duty = 100;
@@ -280,8 +280,28 @@ static void test_save(int *failures)
     solder_spool_position = 0; oled_night_mode = 0; memset((void *)&led_state_pixel, 0, sizeof led_state_pixel);
     target_temperature = 0; layer_fan_duty = 0;
     SavedState_Load();
-    TEST_ASSERT(had_valid_recovered_state && expansion_board_type == 3 && free_tool_selection == 10 && device_serial_number == 99 && mlx_sensor_variant == 1 && solder_spool_position == 4242 && oled_night_mode == 1 && led_state_pixel.G == 22, "a saved state loads back with the same configuration");
+    TEST_ASSERT(had_valid_recovered_state && expansion_board_type == 3 && free_tool_selection == 10 && device_serial_number == 99 && mlx_sensor_variant == 1 && solder_spool_position == 4242 && oled_night_mode == 1 && led_state_pixel.G == 0, "a saved state loads back with the same configuration");
     TEST_ASSERT(recovered_state.printer_nozzle_setpoint == 200 && recovered_state.layer_fan_power == 33 && target_temperature == 0 && layer_fan_duty == 0, "the heater and fan values come back as information only, not as live setpoints");
+}
+
+static void test_the_led_colour_is_not_a_reason_to_write(int *failures)
+{
+    // The colour of the status LED changes by itself (blue for a second and a half after every frame): it must not write the F-RAM, and the colour already on the
+    // chip stays when something else is saved.
+    reset_world();
+    SavedState_t on_chip = sample_record();
+    put_record(&on_chip);
+    SavedState_Load();
+    led_state_pixel.R = 0; led_state_pixel.G = 0; led_state_pixel.B = 255;
+    SavedState_MaybeSave();
+    TEST_ASSERT(fake_fram_write_calls == 0, "a change of the automatic colour alone writes nothing");
+    led_state_pixel.R = 0; led_state_pixel.G = 255; led_state_pixel.B = 0;
+    SavedState_MaybeSave();
+    TEST_ASSERT(fake_fram_write_calls == 0, "and neither does the change back");
+    solder_spool_position = 777;
+    SavedState_MaybeSave();
+    SavedState_t s = stored();
+    TEST_ASSERT(s.solder_spool_position == 777 && s.status_r == 1 && s.status_g == 2 && s.status_b == 3, "something else that changed is saved with the colour the chip already had");
 }
 
 static HardwareConfig_t stored_hw(void)
@@ -381,6 +401,7 @@ void run_persistence_tests(int *failures)
     test_load(failures);
     test_fram_chunks(failures);
     test_save(failures);
+    test_the_led_colour_is_not_a_reason_to_write(failures);
     test_hardware_config(failures);
 }
 
