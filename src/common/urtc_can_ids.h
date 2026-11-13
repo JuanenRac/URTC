@@ -698,6 +698,7 @@
 
 /* Verify-fail reasons only the expansion slave bootloader reports (the others are verify_fail_reason) */
 #define URTC_SLAVE_VERIFY_FAIL_REASON_NOT_CONFIRMED 0x06u
+#define URTC_SLAVE_VERIFY_FAIL_REASON_DIGEST_CHUNK_MISSING 0x07u
 
 /* Answering side */
 #define URTC_RESPONDER_APPLICATION 0x00u
