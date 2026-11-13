@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **Notes for the next board revision:** `PCB/CAMBIOS_PROXIMA_REVISION.md` lists two changes that need a new board (the stepper driver enable apart from the laser interlock, and pull-downs on the MOSFET gates).
+
 - **The wait before reading the T12 thermocouple is a build option:** after the heater is switched off the line and the amplifier need a moment to recover before the conversion starts, and the 10 microseconds the firmware has always waited may sample the transient. `URTC_T12_SETTLE_US` (default 10, no change; at most 5000, a quarter of the control cycle, or the build stops) sets the wait, converted to passes of the counting loop by `t12_settle.h`. Host tests check the conversion, its limits and that the heater is switched off first with the default and with 2000 microseconds, and a small model of the amplifier recovery (its numbers in a configuration file, estimates) shows that the default leaves a large error for every plausible time constant while the maximum brings them all under the accepted error. Simulation only: the right value is measured with an oscilloscope on the amplifier output.
 
 - **The screen of the inspection head names the light modes the right way round:** the mode of the command 0x150 is 0x01 for the strobe and 0x02 for the continuous light, as the documentation and the handler say, but the screen showed 0x01 as fixed and 0x02 as strobe (and the yellow strip said scanning for the continuous light). The host test of the render checks the three modes.
