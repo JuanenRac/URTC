@@ -19,6 +19,7 @@
 #define URTC_CAN_BT_FROM_CONFIG 1   // 1 = bit timing calculated from the specification of the bus (same macros as the application); 0 = the fixed 500 kbit/s
 #endif
 #include "urtc_boot_session.h"
+#include "urtc_boot_return.h"
 
 #ifndef URTC_CAN_BOOT_SJW_TQ
 #define URTC_CAN_BOOT_SJW_TQ 1u
@@ -231,12 +232,24 @@ int main(void) {
     // Either an update was requested, or there's no valid application to
     // jump to - stay here and listen indefinitely.
     CAN_SendStatus(STATUS_LISTENING);
+#if URTC_BL_RETURN_TO_APP_S > 0
+    uint32_t last_frame_tick = HAL_GetTick(); // the way back to a valid application after a silence (off by default, see urtc_boot_return.h)
+#endif
     while (1) {
         HAL_IWDG_Refresh(&hiwdg);
         CAN_RxHeaderTypeDef rxHeader;
         uint8_t rxData[8];
+#if URTC_BL_RETURN_TO_APP_S > 0
+        if (urtc_boot_return_to_app_due(HAL_GetTick() - last_frame_tick, URTC_BL_RETURN_TO_APP_S, app_valid, update_in_progress)) {
+            JumpToApplication();
+            last_frame_tick = HAL_GetTick(); // the jump was refused: wait a whole period before asking again
+        }
+#endif
         if (HAL_CAN_GetRxFifoFillLevel(&hcan, CAN_RX_FIFO0) > 0) {
             if (HAL_CAN_GetRxMessage(&hcan, CAN_RX_FIFO0, &rxHeader, rxData) == HAL_OK) {
+#if URTC_BL_RETURN_TO_APP_S > 0
+                last_frame_tick = HAL_GetTick();
+#endif
                 // Same reasoning as the initial listening window above.
                 if (rxHeader.RTR != CAN_RTR_DATA || rxHeader.IDE != CAN_ID_STD) {
                     continue;

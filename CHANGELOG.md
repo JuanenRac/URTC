@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **The bootloader can go back to a valid application by itself after a failed update, behind a switch that is off by default:** after an aborted transfer (a timeout, a bad signature, a refused rollback) the head stayed in the bootloader until somebody switched it off and on, although the application in the main slot was untouched and valid. Building the bootloader with `URTC_BL_RETURN_TO_APP_S=<seconds>` makes it jump to the application after that many seconds with no frame on the bus and no update in progress; the default is 0 and the new code is not even compiled in. The decision is a header with its own host suite.
+
 - **A command that arrives while the watchdog reads the clock no longer cuts the output:** the kick of each communication watchdog is written by the CAN interrupt, which could run between the read of the clock and the read of the kick; the unsigned difference then read about four billion milliseconds, the laser, drill, heaters, fans or lamp were cut and a critical error was latched until the next reset. A kick that is newer than the clock now has age zero; the host tests cover it for every watchdog and across the wrap of the counter.
 
 - **The manual host test workflow measures the coverage of the firmware logic with gcov and fails under 93 percent:** the 58 C suites execute 93.9 percent of the lines of the 83 firmware sources they compile (the floor is the measured value, never above it); an empty floor runs the suites without the measurement.
