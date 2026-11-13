@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **A pulse of the expansion board lasts as long as it was asked to:** the timed pulses of the PWM outputs counted the passes of the main loop and assumed one millisecond each, but a pass can hold for hundreds of milliseconds while the thermal camera is captured, so a pulse lasted many times longer than requested. They now end when the clock says their time has gone by (the comparison survives the wrap of the counter); a continuous request still has no end of its own. The host suite covers a slow pass, a continuous pulse and the longest pulse across the wrap.
+
 - **The colour of the status LED is no longer a reason to write the F-RAM:** it is worked out again at every pass of the main loop (blue for a second and a half after each frame), yet it was part of the saved state, so a busy bus wrote the chip every few seconds. The colour that is already on the chip is kept as it is; the host suite checks that a change of the automatic colour writes nothing and that something else that changed is saved with the colour the chip already had.
 - **A command that arrives while the watchdog reads the clock no longer cuts the output:** the kick of each communication watchdog is written by the CAN interrupt, which could run between the read of the clock and the read of the kick; the unsigned difference then read about four billion milliseconds, the laser, drill, heaters, fans or lamp were cut and a critical error was latched until the next reset. A kick that is newer than the clock now has age zero; the host tests cover it for every watchdog and across the wrap of the counter.
 

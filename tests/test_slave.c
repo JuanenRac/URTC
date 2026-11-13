@@ -95,12 +95,31 @@ static void test_pwm(int *failures)
     PWM_StopAll();
     fake_tim_pwm_stops = 0;
     PWM_Pulse(1, 50, 3);
-    PWM_Tick(); PWM_Tick();
-    TEST_ASSERT(fake_tim_pwm_stops == 0, "two ticks of a three-millisecond pulse do not end it");
-    PWM_Tick();
+    fake_tick += 1; PWM_Tick(); fake_tick += 1; PWM_Tick();
+    TEST_ASSERT(fake_tim_pwm_stops == 0, "two milliseconds of a three-millisecond pulse do not end it");
+    fake_tick += 1; PWM_Tick();
     TEST_ASSERT(fake_tim_pwm_stops == 1 && fake_tim_pwm_last_channel == TIM_CHANNEL_2, "the third does");
-    PWM_Tick();
+    fake_tick += 1; PWM_Tick();
     TEST_ASSERT(fake_tim_pwm_stops == 1, "and an idle channel is not stopped again");
+    // a pass of the loop that took far longer than a millisecond (the capture of the thermal camera): the pulse ends at its time, not after that many passes
+    PWM_Pulse(2, 50, 20);
+    fake_tick += 300; PWM_Tick();
+    TEST_ASSERT(fake_tim_pwm_stops == 2 && fake_tim_pwm_last_channel == TIM_CHANNEL_3, "a pulse of 20 ms ends at the first pass after its 20 ms, even if that pass came 300 ms later");
+    // a continuous request has no end of its own
+    PWM_Pulse(0, 50, 0);
+    fake_tick += 100000; PWM_Tick();
+    TEST_ASSERT(fake_tim_pwm_stops == 2, "a continuous pulse (0 ms) is never ended by the tick");
+    PWM_Stop(0);
+    fake_tim_pwm_stops = 1;
+    // the longest timed pulse, across the wrap of the 32-bit counter
+    fake_tick = 0xFFFFFF00u;
+    PWM_Pulse(3, 50, 255);
+    fake_tick = 0xFFFFFF00u + 254u; PWM_Tick();
+    TEST_ASSERT(fake_tim_pwm_stops == 1, "255 ms across the wrap: not yet at 254 ms");
+    fake_tick = 0xFFFFFF00u + 255u; PWM_Tick();
+    TEST_ASSERT(fake_tim_pwm_stops == 2 && fake_tim_pwm_last_channel == TIM_CHANNEL_4, "and ended at 255 ms, the counter having wrapped");
+    fake_tim_pwm_stops = 1;
+    fake_tick = 10000;
     PWM_StopAll();
     TEST_ASSERT(fake_tim_pwm_stops == 1 + 4, "StopAll stops the four channels");
 
