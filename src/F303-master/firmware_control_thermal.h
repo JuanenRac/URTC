@@ -13,4 +13,7 @@
 void Control_SolderingIron_PID(void);
 void Control_3D_Hotend_PID(void);
 
+// The thermal-runaway watch windows start afresh (after a latched error was lifted by command).
+void Control_ThermalGuardsReset(void);
+
 #endif // FIRMWARE_CONTROL_THERMAL_H

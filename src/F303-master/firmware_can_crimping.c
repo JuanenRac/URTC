@@ -24,6 +24,7 @@
 // =============================================================================
 #include "firmware_common.h"
 #include "firmware_can_crimping.h"
+#include "firmware_safety.h"
 #include "urtc_can_ids.h"
 
 void Handle_CAN_CrimpingActuator(void) {
@@ -46,6 +47,7 @@ void Handle_CAN_CrimpingActuator(void) {
         if (steps > 0) {
             total_steps_setpoint = steps;
             steps_remaining = steps;
+            Safety_NoteStepperMove(steps, 0u);
             step_pulse_high = 0;
             HAL_GPIO_WritePin(EXP_TMC_STEP_PORT, EXP_TMC_STEP_PIN, GPIO_PIN_RESET);
             HAL_GPIO_WritePin(EXP_TMC_EN_PORT, EXP_TMC_EN_PIN, GPIO_PIN_RESET); // Enable the expansion board's own driver

@@ -85,7 +85,7 @@ void Watchdog_Safety_Laser(void) {
         // interlock, not HIGH - see the POLARITY WARNING on the RX handler
         // above, which applies here too and still needs physical verification.
         HAL_GPIO_WritePin(TMC_ENN_PORT, LASER_SAFETY_PIN, GPIO_PIN_RESET); // Lock interlock (safe)
-        system_error_flag = 1;
+        RAISE_SYSTEM_ERROR(URTC_ERROR_REASON_COMMS_WATCHDOG);
     }
 }
 
@@ -102,7 +102,7 @@ void Watchdog_Safety_Drill(void) {
         drill_speed = 0;
         __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, 0);
         HAL_GPIO_WritePin(DRILL_BRAKE_PORT, DRILL_BRAKE_PIN, GPIO_PIN_RESET); // Brake (LOW, per this tool's polarity)
-        system_error_flag = 1;
+        RAISE_SYSTEM_ERROR(URTC_ERROR_REASON_COMMS_WATCHDOG);
     }
 }
 
@@ -117,7 +117,7 @@ void Watchdog_Safety_SolderIron(void) {
 
     if (target_temperature > 0 && (tick_age_ms(HAL_GetTick(), solder_iron_last_kick_tick) > 250)) {
         target_temperature = 0;
-        system_error_flag = 1;
+        RAISE_SYSTEM_ERROR(URTC_ERROR_REASON_COMMS_WATCHDOG);
     }
 }
 
@@ -126,7 +126,7 @@ void Watchdog_Safety_HotendHeater(void) {
 
     if (target_temperature > 0 && (tick_age_ms(HAL_GetTick(), hotend_heater_last_kick_tick) > 250)) {
         target_temperature = 0;
-        system_error_flag = 1;
+        RAISE_SYSTEM_ERROR(URTC_ERROR_REASON_COMMS_WATCHDOG);
     }
 }
 
@@ -145,7 +145,7 @@ void Watchdog_Safety_LayerFan(void) {
     if (layer_fan_duty > 0 && (tick_age_ms(HAL_GetTick(), layer_fan_last_kick_tick) > 1000)) {
         layer_fan_duty = 0;
         __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, 0);
-        system_error_flag = 1;
+        RAISE_SYSTEM_ERROR(URTC_ERROR_REASON_COMMS_WATCHDOG);
     }
 }
 
@@ -158,7 +158,7 @@ void Watchdog_Safety_UVCuring(void) {
     if (uv_curing_duty > 0 && (tick_age_ms(HAL_GetTick(), uv_curing_last_kick_tick) > 250)) {
         uv_curing_duty = 0;
         __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, 0);
-        system_error_flag = 1;
+        RAISE_SYSTEM_ERROR(URTC_ERROR_REASON_COMMS_WATCHDOG);
     }
 }
 
@@ -173,7 +173,7 @@ void Watchdog_Safety_HotAirBlower(void) {
     if (hotair_blower_duty > 0 && (tick_age_ms(HAL_GetTick(), hotair_blower_last_kick_tick) > 1000)) {
         hotair_blower_duty = 0;
         __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, 0);
-        system_error_flag = 1;
+        RAISE_SYSTEM_ERROR(URTC_ERROR_REASON_COMMS_WATCHDOG);
     }
 }
 
@@ -214,7 +214,7 @@ void Watchdog_Safety_HotendFan(void) {
             stall_start_tick = HAL_GetTick();
         } else if (tick_age_ms(HAL_GetTick(), stall_start_tick) > 3000) {
             // RPM has read exactly 0 for 3 continuous seconds while duty > 0
-            system_error_flag = 1;
+            RAISE_SYSTEM_ERROR(URTC_ERROR_REASON_FAN_STALL);
         }
     } else {
         stall_start_tick = HAL_GetTick();

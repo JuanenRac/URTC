@@ -91,8 +91,9 @@ Effect: answers with 0x111. Read-only, no side effects - answered even
 
 ID: 0x111 [URTC Tool Head -> Master, answers 0x110]
 Active tool + quick state response
-DLC: 6 bytes (firmware 0.3.2+; older firmware answers with the first 4 -
-     a host must treat missing bytes 4-5 as "not reported", not as 0)
+DLC: 8 bytes (firmware with the error reason; 6 bytes from firmware 0.3.2, older
+     firmware answers with the first 4 - a host must treat missing bytes 4-7
+     as "not reported", not as 0)
 Data:
   - txData[0]: Active tool (matches the ToolMode_t enum in
                firmware_common.h): 0=Soldering Iron, 1=Paste Dispenser,
@@ -123,6 +124,15 @@ Data:
   - txData[2]: can_bus_error_flag (0x01 = a CAN bus fault was seen)
   - txData[3]: boot_sequence_active (0x01 = still inside the ~5s boot
                splash window - movement commands are deferred until this clears)
+  (bytes 4 and 5, the thermal fault and the reset cause, are described in the
+  generated reference below)
+  - txData[6]: why the critical error is latched (0 = none): 1 unknown, 2 thermal,
+               3 sensor, 4 no valid tool, 5 communication watchdog of an
+               actuator, 6 hotend fan stalled, 7 stepper move cut by the
+               silence of the host, 8 electromagnet released by it
+  - txData[7]: outcome of the last clear-error command since power-up (0 = none,
+               1 lifted, 2 switch off, 3 no error, 4 not clearable, 5 hot or
+               unknown temperature, 6 an actuator is not at zero)
   - txData[4]: thermal_fault_code - WHY the heater was cut by the thermal
                runaway guard (thermal_guard.c), 0 if it never was:
                  0 = none
@@ -356,12 +366,17 @@ Switch the optional firmware features on or off (fw_features.c, firmware_feature
 DLC: 5 bytes
 Data:
   - rxData[0..3]: magic payload 0x46 0x45 0x41 0x54 (ASCII 'FEAT')
-  - rxData[4]:    bit mask of the features to have ON (any bit outside 0x0F:
+  - rxData[4]:    bit mask of the features to have ON (any bit outside 0x7F:
                   the frame is ignored)
                   0x01 = stepper ramps (trapezoid and S-curve, see 0x120)
                   0x02 = health frame (0x1B8)
                   0x04 = oscillator trim against the CAN bit time
                   0x08 = heater PID with relay autotune (0x1B9 / 0x1BA)
+                  0x10 = clear-error command (0x1B2)
+                  0x20 = communication watchdog of the steppers (0x120) and, with
+                         0x40, of the electromagnet (0x1B0)
+                  0x40 = the electromagnet lets go when the host falls silent
+                         (needs 0x20; without it the coil is held)
 Effect: stores the mask in its own F-RAM record (address 976, EEPROM.TXT
         section 8) and answers with 0x1AF. The setting acts after the NEXT
         power-up, never in the middle of a job. Every feature is OFF by
@@ -374,6 +389,20 @@ Effect: stores the mask in its own F-RAM record (address 976, EEPROM.TXT
         timer, the analogue channels of the health frame and the oscillator
         measurement need a bench (see CHANGELOG.md).
 
+ID: 0x1B2 [Master -> URTC Tool Head]
+Lift a latched critical error without a power cycle (feature 0x10 of 0x1AE, off by default)
+DLC: 4 bytes
+Data:
+  - rxData[0..3]: magic payload 0x43 0x4C 0x45 0x52 (ASCII 'CLER')
+Effect: answered with 0x111 (also during a critical error; any other payload or
+        length is ignored). With the feature off nothing changes and byte 7 of 0x111
+        says so. With it on the error is lifted only when the temperature of the
+        tool is known and below 50 C and every actuator is at zero (laser, drill,
+        heater set-points, fans, UV, hot-air blower, stepper moves, an energised
+        coil); an error for lack of a valid tool is never lifted. Lifting clears
+        the reason, the thermal fault and the thermal-runaway watch windows.
+        Without the feature a latched error still needs a power cycle.
+
 ID: 0x1AF [Master -> URTC Tool Head, or URTC Tool Head -> Master answering 0x1AE]
 Query/response: the optional firmware features
 DLC: any as a query (payload ignored) | 3 bytes as a response
@@ -381,7 +410,7 @@ Data:
   - txData[0]: stored in F-RAM (bit mask)
   - txData[1]: in force now (bit mask); differs from txData[0] until the
                next power-up
-  - txData[2]: supported by this firmware (0x0F)
+  - txData[2]: supported by this firmware (0x7F)
 
 ID: 0x1B8 [URTC Tool Head -> Master]
 Health frame of the board (only while feature 0x02 runs; once a second)
@@ -666,6 +695,11 @@ Data:
   The board plans the move (motion_profile.c) and ignores bytes 5 to 7
   whenever the feature is off. The step generator does not use the plan yet:
   loading the interval of each step into the timer needs a timing bench.
+  Communication watchdog (feature 0x20 of 0x1AE, off by default): a move is cut and
+  the critical error latched (reason 7) when the board hears no frame at all for
+  more than half of the time the move should take (steps over speed, 500 steps/s
+  when no speed is given) and never for less than 1 s. With the feature off there
+  is no watchdog, as before; any frame of the host, a query included, counts.
   Note: Uses lines PB3 (STEP), PB5 (DIR), and PB6 (TMC_ENN). The firmware
         enables power on receiving the frame (PB6=0) and cuts it once
         finished (PB6=1) to avoid static overheating.
@@ -911,11 +945,14 @@ Data:
                channel - an electromagnet has no use for a variable duty
                cycle the way this same physical pin's other use (the
                soldering iron's own bang-bang heater control) does.
-  Note: Deliberately no communication-loss watchdog, unlike every other
+  Note: By default there is no communication-loss watchdog, unlike every other
         actuator on this board - staying energized is this tool's own
         safer failure mode (a held part stays held), not the more
         dangerous one, so a lost link intentionally does NOT release it.
         Confirmed explicitly with the project owner, not an oversight.
+        Policy switch (both off by default, 0x1AE): with the features 0x20 and 0x40
+        on, the coil lets go after 5 s without any frame from the host and the
+        critical error is latched (reason 8); with 0x40 off the coil is held.
 
 ID: 0x1C0 [Master -> URTC Tool Head]
 Spot Welder Head timed pulse
@@ -1905,7 +1942,7 @@ accepted.
   0x1BC -> Ask for the crash record, only a firmware built with the crash capture answers (DLC:1+)
   0x1BD -> The crash record: six frames of eight bytes (DLC:8)
   --- Per-tool commands (see dedicated sections above) ---
-  0x120 -> Stepper motor control (Dispensers, Screwdriver, Grippers - DLC:5 - no watchdog)
+  0x120 -> Stepper motor control (Dispensers, Screwdriver, Grippers - DLC:5 - no watchdog unless feature 0x20 is on)
   0x130 -> T12 setpoint temperature (Soldering iron - DLC:2 - 250ms watchdog)
   0x131 -> Reset solder wire feeder position, magic payload 'RSP0' (Soldering iron - DLC:4)
   0x132 -> Query/response: solder wire feeder position (Soldering iron - DLC:any/4)
@@ -1923,7 +1960,7 @@ accepted.
   0x177 -> Layer fan actual RPM telemetry, uint16_t (3D printer - DLC:2)
   0x178 -> Hotend fan PWM power control, (3D printer - DLC:1 - no watchdog, on purpose)
   0x179 -> Hotend fan actual RPM telemetry, uint16_t, (3D printer - DLC:2)
-  0x1B0 -> Coil on/off (Electromagnet - DLC:1 - no watchdog, on purpose)
+  0x1B0 -> Coil on/off (Electromagnet - DLC:1 - no watchdog, on purpose; features 0x20 and 0x40 make it let go)
   0x1C0 -> Timed pulse + contact-sensor gate (Spot Welder - DLC:3)
   0x1D0 -> LED driver duty cycle (UV Curing - DLC:1 - 250ms watchdog)
   0x1E0 -> Heater setpoint + blower duty (Hot Air Rework - DLC:3 - 250ms watchdog on the heater, 1000ms on the blower)
