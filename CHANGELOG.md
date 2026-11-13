@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **Notes for the next board revision:** `PCB/CAMBIOS_PROXIMA_REVISION.md` lists two changes that need a new board (the stepper driver enable apart from the laser interlock, and pull-downs on the MOSFET gates).
+
 - **The screen of the inspection head names the light modes the right way round:** the mode of the command 0x150 is 0x01 for the strobe and 0x02 for the continuous light, as the documentation and the handler say, but the screen showed 0x01 as fixed and 0x02 as strobe (and the yellow strip said scanning for the continuous light). The host test of the render checks the three modes.
 
 - **The rpm of the drill and the two fans divides by the real time between two readings:** the figure assumed exactly 150 ms, but the block that calls it also renders the screen and talks I2C, so the real window was longer and the rpm read high. A window outside 50 to 1000 ms (the first reading, or one after another tool was active) uses the nominal 150 ms; the host suite covers the edges of the window and the largest pulse count.
