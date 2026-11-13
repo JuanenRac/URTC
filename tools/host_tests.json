@@ -36,6 +36,16 @@
    "sanitize": false
   },
   {
+   "name": "meta_ab",
+   "test": "tests/test_meta_ab.c",
+   "sources": [],
+   "includes": [
+    "tests",
+    "src/common"
+   ],
+   "std": "c11"
+  },
+  {
    "name": "thermal_guard",
    "test": "tests/test_thermal_guard.c",
    "sources": [
