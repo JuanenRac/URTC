@@ -27,6 +27,7 @@
 #include "firmware_common.h"
 #include "firmware_can_global.h"
 #include "firmware_features.h"
+#include "firmware_safety.h"
 #include "firmware_thermal_stats.h"
 
 void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan_m);
@@ -40,6 +41,9 @@ uint8_t rxData[8];
 volatile ToolMode_t active_tool = TOOL_SOLDERING_IRON;
 volatile uint8_t system_error_flag, can_bus_error_flag, boot_sequence_active;
 volatile uint8_t thermal_fault_code, last_reset_cause;
+volatile uint8_t system_error_reason;
+volatile uint8_t laser_power_setpoint, drill_speed, layer_fan_duty, uv_curing_duty, hotair_blower_duty;
+volatile uint32_t steps_remaining;
 volatile uint32_t can_led_tick;
 volatile uint16_t current_temperature, target_temperature;
 volatile uint8_t endstop_triggered;
@@ -146,6 +150,7 @@ int main(int argc, char **argv)
             print_tx();
             fake_tx_count = 0;
             Features_Service();
+            Safety_Service();
             print_tx();
         } else if (line[0] == 'V') {
             printf("V%02d%02d\r\n", FIRMWARE_VERSION_MAJOR, FIRMWARE_VERSION_MINOR);

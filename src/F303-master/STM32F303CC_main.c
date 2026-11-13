@@ -33,6 +33,7 @@
 #include "firmware_crash_dump.h"
 #include "firmware_multinode.h"
 #include "firmware_features.h"
+#include "firmware_safety.h"
 #include "urtc_can_ids.h"
 
 volatile ToolMode_t active_tool;
@@ -129,6 +130,7 @@ volatile uint8_t layer_fan_duty = 0;     // 0-255 setpoint received via CAN (0x1
 volatile uint32_t layer_fan_rpm_pulses = 0;          // FG edge accumulator between telemetry cycles
 volatile uint32_t layer_fan_actual_rpm = 0;          // Calculated RPM, ready for 0x177 telemetry
 volatile uint8_t system_error_flag = 0; 
+volatile uint8_t system_error_reason = 0; // why it was latched (firmware_common.h, RAISE_SYSTEM_ERROR)
 // Defers movement commands until the boot splash completes - TIM3 (step
 // generation) and CAN are both already live during the 5s splash, so a
 // 0x120/0x170 move command arriving in that window would otherwise start
@@ -539,6 +541,7 @@ int main(void) {
             Watchdog_Safety_HotAirBlower();
             Watchdog_Safety_SolderIron();
             Watchdog_Safety_HotendHeater();
+            Safety_Service();
             WeldPulse_Tick();
         }
 
