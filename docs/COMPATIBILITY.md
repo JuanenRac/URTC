@@ -2,7 +2,7 @@
 
 ## Compatibility
 
-Protocol version **1** (identifiers, layouts and magic payloads of `spec/can_protocol.json`).
+Protocol version **2** (identifiers, layouts and magic payloads of `spec/can_protocol.json`).
 
 | Project | Kind | Version | Shared code |
 |---|---|---|---|
