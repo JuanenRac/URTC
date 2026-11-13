@@ -271,6 +271,8 @@ static void test_incremental(int *failures)
     world();
     active_tool = TOOL_SOLDERING_IRON;
     current_temperature = 215; target_temperature = 220;
+    for (uint8_t p = 0; p < 8; p++) OLED_ClearPage(p);   // as the splash screen does before the first tool screen
+    fake_i2c_frame_count = 0;
     Render_ToolScreen();
     int first_pass = fake_i2c_frame_count;
     fake_i2c_frame_count = 0;
