@@ -30,6 +30,10 @@
 #include "test_runner.h"
 
 void WeldPulse_Tick(void);
+void TIM1_TRG_COM_TIM17_IRQHandler(void);
+
+// 1 in the suite built with -DURTC_WELD_PULSE_HW_TIMER=1 (the one-pulse timer that ends the pulse in its own interrupt), 0 in the default build
+#define WELD_HW_TIMER_BUILT URTC_WELD_PULSE_HW_TIMER
 
 // ---- recorders for the modules this suite does not link --------------------------------------------------------------------
 static uint8_t i2c_writes, i2c_reg, i2c_len, i2c_data[8];
@@ -561,7 +565,7 @@ static void weld_timing(int *failures)
 {
     TEST_ASSERT(urtc_weld_clamp_ms(100) == 100 && urtc_weld_clamp_ms(2000) == 2000 && urtc_weld_clamp_ms(2001) == 2000 && urtc_weld_clamp_ms(0xFFFF) == 2000,
                 "by default the pulse is clamped at the 2000 ms the firmware has always allowed");
-    TEST_ASSERT(URTC_WELD_PULSE_MAX_MS <= URTC_WELD_PULSE_HARD_MAX_MS && URTC_WELD_PULSE_MIN_MS == 0 && URTC_WELD_PULSE_HW_TIMER == 0, "the defaults keep the old timing and the hardware timer is off");
+    TEST_ASSERT(URTC_WELD_PULSE_MAX_MS <= URTC_WELD_PULSE_HARD_MAX_MS && URTC_WELD_PULSE_MIN_MS == 0 && URTC_WELD_PULSE_HW_TIMER == WELD_HW_TIMER_BUILT, "the defaults keep the old timing and the hardware timer is on only in the build that asks for it");
     uint32_t psc = 0, arr = 0;
     TEST_ASSERT(urtc_weld_timer_params(64000000u, 20, &psc, &arr) == 0 && psc == 6399u && arr == 199u, "20 ms at 64 MHz: a prescaler of 6400 (10 kHz) and 200 counts");
     TEST_ASSERT(urtc_weld_timer_params(64000000u, 5000, &psc, &arr) == 0 && arr == 49999u && arr <= 65535u, "the hard limit fits the 16-bit counter");
@@ -681,6 +685,94 @@ static void weld(int *failures)
     active_tool = TOOL_DRILL;
 }
 
+#if URTC_WELD_PULSE_HW_TIMER
+// ---- the one-pulse hardware timer (URTC_WELD_PULSE_HW_TIMER=1): TIM17 is armed with the clamped length when a pulse starts and its update interrupt ends it ------
+static void weld_hw_timer(int *failures)
+{
+    const uint8_t fire[3] = { 0x01, 0x00, 0x14 };      // 20 ms
+    const uint8_t huge[3] = { 0x01, 0xFF, 0xFF };
+    quiet();
+    SystemCoreClock = 64000000u;
+    weld_pulse_active = 0;
+    active_tool = TOOL_SPOT_WELDER;
+    fake_pin_set(GPIOB, TCRT_D0_DIG_PIN, GPIO_PIN_RESET);
+    RX(0x1C0, 3, fire);
+    Handle_CAN_WeldPulse();
+    TEST_ASSERT(weld_pulse_active == 1 && fake_tim17_clock_enables == 1, "a pulse starts and the clock of the timer is enabled");
+    TEST_ASSERT(TIM17->PSC == 6399u && TIM17->ARR == 199u, "the timer counts 100 microseconds per tick (64 MHz / 6400) for 200 ticks: 20 ms");
+    TEST_ASSERT(TIM17->CR1 == (TIM_CR1_OPM | TIM_CR1_CEN) && TIM17->DIER == TIM_DIER_UIE, "one-pulse mode, counting, with the update interrupt on");
+    TEST_ASSERT(fake_nvic[TIM1_TRG_COM_TIM17_IRQn].enabled && fake_nvic[TIM1_TRG_COM_TIM17_IRQn].preempt == 0, "its interrupt is enabled at the highest priority");
+    // a spurious call of the handler without the update flag changes nothing
+    TIM17->SR = 0;
+    TIM1_TRG_COM_TIM17_IRQHandler();
+    TEST_ASSERT(weld_pulse_active == 1 && pin_level(T12_PWM_PORT, T12_PWM_PIN) == GPIO_PIN_SET, "an interrupt without the update flag leaves the pulse on");
+    // the timer runs out: the output drops in the interrupt, before the main loop looks at it
+    TIM17->SR = TIM_SR_UIF;
+    TIM1_TRG_COM_TIM17_IRQHandler();
+    TEST_ASSERT(weld_pulse_active == 0 && pin_level(T12_PWM_PORT, T12_PWM_PIN) == GPIO_PIN_RESET && TIM17->SR == 0, "the update interrupt drops the output, ends the pulse and clears its flag");
+    int writes = fake_gpio_write_count;
+    WeldPulse_Tick();
+    TEST_ASSERT(fake_gpio_write_count == writes, "the main loop has nothing left to end");
+
+    // the clamp reaches the timer: a requested 65535 ms is armed as 2000 ms
+    quiet();
+    SystemCoreClock = 64000000u;
+    weld_pulse_active = 0;
+    RX(0x1C0, 3, huge);
+    Handle_CAN_WeldPulse();
+    TEST_ASSERT(weld_pulse_duration_ms == 2000 && TIM17->ARR == 19999u, "the longest pulse the timer is given is the clamped 2000 ms (20000 ticks)");
+
+    // the main loop stays as the second way to end the pulse
+    quiet();
+    SystemCoreClock = 64000000u;
+    weld_pulse_active = 0;
+    RX(0x1C0, 3, fire);
+    Handle_CAN_WeldPulse();
+    fake_tick = 1000 + 20;
+    WeldPulse_Tick();
+    TEST_ASSERT(weld_pulse_active == 0 && pin_level(T12_PWM_PORT, T12_PWM_PIN) == GPIO_PIN_RESET, "if the interrupt were late the main loop ends the pulse at its length");
+
+    // a clock that cannot make 10 kHz exactly: the timer is not touched and the main loop alone decides the end (the behaviour of the default build)
+    quiet();
+    SystemCoreClock = 64000001u;
+    weld_pulse_active = 0;
+    RX(0x1C0, 3, fire);
+    Handle_CAN_WeldPulse();
+    TEST_ASSERT(weld_pulse_active == 1 && TIM17->CR1 == 0 && TIM17->ARR == 0 && fake_tim17_clock_enables == 0, "with a clock that is no multiple of 10 kHz the timer is left alone");
+    fake_tick = 1000 + 20;
+    WeldPulse_Tick();
+    TEST_ASSERT(weld_pulse_active == 0 && pin_level(T12_PWM_PORT, T12_PWM_PIN) == GPIO_PIN_RESET, "and the main loop ends the pulse");
+
+    // the ultrasonic welder arms the timer the same way
+    quiet();
+    SystemCoreClock = 64000000u;
+    weld_pulse_active = 0;
+    active_tool = TOOL_ULTRASONIC_WELDER;
+    RX(0x200, 3, fire);
+    Handle_CAN_WeldPulse();
+    TEST_ASSERT(weld_pulse_active == 1 && TIM17->ARR == 199u && TIM17->CR1 == (TIM_CR1_OPM | TIM_CR1_CEN), "0x200 arms the timer with its own length");
+    TIM17->SR = TIM_SR_UIF;
+    TIM1_TRG_COM_TIM17_IRQHandler();
+    TEST_ASSERT(weld_pulse_active == 0, "and the same interrupt ends it");
+
+    // a new fire command during a pulse is dropped without re-arming the timer
+    quiet();
+    SystemCoreClock = 64000000u;
+    weld_pulse_active = 0;
+    active_tool = TOOL_SPOT_WELDER;
+    RX(0x1C0, 3, fire);
+    Handle_CAN_WeldPulse();
+    uint32_t arr_first = TIM17->ARR;
+    TIM17->ARR = 12345u;
+    RX(0x1C0, 3, huge);
+    Handle_CAN_WeldPulse();
+    TEST_ASSERT(arr_first == 199u && TIM17->ARR == 12345u, "a fire command during a pulse does not touch the running timer");
+    SystemCoreClock = 72000000u;
+    weld_pulse_active = 0;
+    active_tool = TOOL_DRILL;
+}
+#endif
+
 // ---- the stepper motion tools (0x120) ----------------------------------------------------------------------------------------
 static void motion(int *failures)
 {
@@ -760,6 +852,9 @@ int main(void)
     expansion(&failures);
     weld_timing(&failures);
     weld(&failures);
+#if URTC_WELD_PULSE_HW_TIMER
+    weld_hw_timer(&failures);
+#endif
     motion(&failures);
     if (failures == 0) {
         printf("  OK   all tool handler host tests passed\n");

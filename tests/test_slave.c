@@ -206,6 +206,9 @@ static void test_link(int *failures)
     int starts = fake_tim_pwm_starts;
     master_writes(short_pulse, 3);
     TEST_ASSERT(fake_tim_pwm_starts == starts, "a pulse command of the wrong length is ignored");
+#if URTC_SLAVE_WRITE_REASSEMBLY
+    fake_tick += SWA_STALE_MS_DEFAULT + 1;   // with the reassembly the half command waits for its rest; the master moves on, so it is forgotten before the next write
+#endif
 
     // the converter
     ads = fake_i2c_bus_add(ADS1115_I2C_ADDR, FAKE_I2C_WORD16);
@@ -226,6 +229,9 @@ static void test_link(int *failures)
     uint8_t short_magic[4] = {REG_ENTER_BOOTLOADER, 0xB0, 0x07, 0x1D};
     master_writes(short_magic, 4);
     TEST_ASSERT(fake_reset_count == resets, "a wrong or a short magic payload does not restart the slave");
+#if URTC_SLAVE_WRITE_REASSEMBLY
+    fake_tick += SWA_STALE_MS_DEFAULT + 1;   // the half command of the short magic is forgotten before the right one arrives
+#endif
     stops = fake_tim_pwm_stops;
     uint8_t magic[5] = {REG_ENTER_BOOTLOADER, 0xB0, 0x07, 0x1D, 0x5A};
     master_writes(magic, 5);
@@ -240,6 +246,64 @@ static void test_link(int *failures)
     HAL_I2C_ErrorCallback(&hi2c1);
     TEST_ASSERT(fake_i2c_listen_count == listens + 2, "after the end of a transfer or an error the link listens again");
 }
+
+#if URTC_SLAVE_WRITE_REASSEMBLY
+// ---- the link built with the reassembly of register writes (URTC_SLAVE_WRITE_REASSEMBLY=1) -------------------------------------------------------
+// A write that ends early (a STOP before the payload is complete) is held, completed by the next piece if it comes in time, and forgotten if it does not:
+// a half command is never executed and a late piece is never mixed with an unrelated write.
+static void test_link_reassembly(int *failures)
+{
+    world();
+    PWM_Init();
+    I2CLink_Init();
+    int starts = fake_tim_pwm_starts;
+    const uint8_t first[2] = {REG_PWM_PULSE, 1};
+    const uint8_t rest[2] = {25, 7};
+    master_writes(first, 2);
+    TEST_ASSERT(fake_tim_pwm_starts == starts, "the first piece of a pulse command starts nothing");
+    fake_tick += 1;
+    master_writes(rest, 2);
+    TEST_ASSERT(fake_tim_pwm_starts == starts + 1 && fake_tim_compare[1] == 250, "the rest, in time, completes the command and the pulse starts");
+
+    // a write cut after 1, 2 and 3 of its 4 bytes never runs, whatever comes much later
+    for (uint8_t cut = 1; cut <= 3; cut++) {
+        starts = fake_tim_pwm_starts;
+        const uint8_t whole[4] = {REG_PWM_PULSE, 0, 40, 9};
+        master_writes(whole, cut);
+        fake_tick += SWA_STALE_MS_DEFAULT + 5;
+        uint8_t late = whole[cut];
+        master_writes(&late, 1);
+        TEST_ASSERT(fake_tim_pwm_starts == starts, "a cut command is not completed by a byte that arrives after the time limit");
+        fake_tick += SWA_STALE_MS_DEFAULT + 5;
+    }
+
+    // after a forgotten half command the next whole write runs normally and is not mixed with it
+    ads = fake_i2c_bus_add(ADS1115_I2C_ADDR, FAKE_I2C_WORD16);
+    const uint8_t half[3] = {REG_PWM_PULSE, 1, 25};
+    master_writes(half, 3);
+    fake_tick += SWA_STALE_MS_DEFAULT + 5;
+    const uint8_t ads_cfg[3] = {REG_ADS_CONFIGURE, 0x04, 0x83};
+    starts = fake_tim_pwm_starts;
+    master_writes(ads_cfg, 3);
+    TEST_ASSERT(ads->words[1] == 0x0483 && fake_tim_pwm_starts == starts, "the next whole write runs and the old half command left nothing behind");
+
+    // the bootloader entry is never executed from an incomplete payload
+    int resets = fake_reset_count;
+    const uint8_t short_magic[4] = {REG_ENTER_BOOTLOADER, 0xB0, 0x07, 0x1D};
+    master_writes(short_magic, 4);
+    fake_tick += SWA_STALE_MS_DEFAULT + 5;
+    const uint8_t last = 0x5A;
+    master_writes(&last, 1);
+    TEST_ASSERT(fake_reset_count == resets, "the last byte of the magic, too late, does not restart the slave");
+    fake_tick += SWA_STALE_MS_DEFAULT + 5;
+    const uint8_t magic_a[3] = {REG_ENTER_BOOTLOADER, 0xB0, 0x07};
+    const uint8_t magic_b[2] = {0x1D, 0x5A};
+    master_writes(magic_a, 3);
+    fake_tick += 1;
+    master_writes(magic_b, 2);
+    TEST_ASSERT(fake_reset_count == resets + 1, "the same payload in two pieces in time restarts the slave");
+}
+#endif
 
 // ---- the sensors on the I2C2 of the slave ----------------------------------------------------------------------------------------------------
 static void test_converter(int *failures)
@@ -660,7 +724,14 @@ static void test_main(int *failures)
     TEST_ASSERT(sda_scl_pairs == 2, "the pins of both I2C buses are open-drain alternate function");
     int i2c2_pins = 0;
     for (int i = 0; i < fake_gpio_init_count; i++) if (fake_gpio_inits[i].port == URTC_SLAVE_I2C2_PORT && fake_gpio_inits[i].init.Pin == URTC_SLAVE_I2C2_PINS && fake_gpio_inits[i].init.Alternate == URTC_SLAVE_I2C2_AF) i2c2_pins++;
+#if URTC_SLAVE_I2C2_PRESET == 1
+    TEST_ASSERT(i2c2_pins == 1 && URTC_SLAVE_I2C2_PORT == GPIOA && URTC_SLAVE_I2C2_PINS == (GPIO_PIN_9 | GPIO_PIN_10), "with the preset the sensor bus is on PA9 (SCL) and PA10 (SDA), and the pins come from the configuration macros");
+    int old_pins = 0;
+    for (int i = 0; i < fake_gpio_init_count; i++) if (fake_gpio_inits[i].port == GPIOB && (fake_gpio_inits[i].init.Pin & (GPIO_PIN_10 | GPIO_PIN_11)) != 0 && fake_gpio_inits[i].init.Mode == GPIO_MODE_AF_OD) old_pins++;
+    TEST_ASSERT(old_pins == 0, "and nothing is configured on PB10 and PB11 any more");
+#else
     TEST_ASSERT(i2c2_pins == 1 && URTC_SLAVE_I2C2_PRESET == 0 && URTC_SLAVE_I2C2_PINS == (GPIO_PIN_10 | GPIO_PIN_11), "by default the sensor bus is on PB10 and PB11, and the pins come from the configuration macros");
+#endif
     TEST_ASSERT(fake_tim_pwm_stops > 4 && fake_tim_pwm_stops < 4 * 1500 - 4 * 900, "the outputs are stopped only after more than a second without a word from the master, then on every pass (a lost master leaves no output on)");
     I2C1_EV_IRQHandler();
     I2C1_ER_IRQHandler();
@@ -671,6 +742,9 @@ void run_slave_tests(int *failures)
 {
     test_pwm(failures);
     test_link(failures);
+#if URTC_SLAVE_WRITE_REASSEMBLY
+    test_link_reassembly(failures);
+#endif
     test_converter(failures);
     test_transport_codes(failures);
     test_variant_write_initialises_the_sensor(failures);
