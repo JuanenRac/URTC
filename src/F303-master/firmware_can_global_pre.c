@@ -18,9 +18,51 @@
 #include "firmware_thermal_stats.h"
 #include "urtc_version_wire.h"
 #include "urtc_boot_session.h"
+#include "firmware_safety.h"
 #include "urtc_can_ids.h"
 
+// The answer to 0x110, and to a clear-error command: the tool, the flags, the thermal fault, the reset cause, why the error is latched and what the
+// last clear-error command did.
+static void send_quick_state(void) {
+    if (HAL_CAN_GetTxMailboxesFreeLevel(&hcan) > 0) {
+        CAN_TxHeaderTypeDef txH;
+        uint8_t txD[8];
+        txD[0] = (uint8_t)active_tool; // 0-24 = a real tool head (ToolMode_t), 25 (TOOL_INVALID) = no tool assigned to this jumper setting
+        txD[1] = system_error_flag ? 0x01 : 0x00;
+        txD[2] = can_bus_error_flag ? 0x01 : 0x00;
+        txD[3] = boot_sequence_active ? 0x01 : 0x00;
+        // 5th byte (added with the thermal runaway guard): WHY a
+        // thermal tool latched its error - ThermalGuardFault_t, 0 =
+        // none. A host that only reads the first 4 bytes keeps
+        // working unchanged.
+        txD[4] = thermal_fault_code;
+        // 6th byte: last_reset_cause (RCC flags latched at boot) -
+        // bit0 set = the independent watchdog reset the board.
+        txD[5] = last_reset_cause;
+        // 7th and 8th bytes: why the critical error is latched (URTC_ERROR_REASON_*, 0 = none) and the outcome of the last clear-error command
+        // (URTC_CLEAR_ERROR_*, 0 = none since power-up). A reader of six bytes ignores them.
+        txD[6] = Safety_ErrorReason();
+        txD[7] = Safety_LastClearResult();
+        txH.StdId = URTC_CAN_ID_ACTIVE_TOOL_RESP;
+        txH.IDE = CAN_ID_STD;
+        txH.RTR = CAN_RTR_DATA;
+        txH.DLC = 8;
+        txH.TransmitGlobalTime = DISABLE;
+        uint32_t mb;
+        HAL_CAN_AddTxMessage(&hcan, &txH, txD, &mb);
+    }
+}
+
 void Handle_CAN_GlobalCommands_PreErrorGate(void) {
+
+        // Any frame of the host is a sign of life for the communication watchdog (works only while its switch runs).
+        Safety_NoteHostFrame();
+
+        // Clear-error command (0x1B2): answered with the quick state, also during a critical error; it lifts the error only while its switch
+        // runs, the tool is cool and every actuator is at zero (firmware_safety.c). Any payload but the magic one is ignored.
+        if (rxHeader.StdId == URTC_CAN_ID_CLEAR_ERROR && Safety_HandleClearError()) {
+            send_quick_state();
+        }
 
         // CAN bootloader entry (0x7F0) - checked first, before even the
         // system_error_flag gate below, since being able to trigger an
@@ -148,29 +190,7 @@ void Handle_CAN_GlobalCommands_PreErrorGate(void) {
         // below - this is exactly the kind of read-only diagnostic that's
         // most useful precisely when something's gone wrong.
         if (rxHeader.StdId == URTC_CAN_ID_QUERY_ACTIVE_TOOL) {
-            if (HAL_CAN_GetTxMailboxesFreeLevel(&hcan) > 0) {
-                CAN_TxHeaderTypeDef txH;
-                uint8_t txD[6];
-                txD[0] = (uint8_t)active_tool; // 0-24 = a real tool head (ToolMode_t), 25 (TOOL_INVALID) = no tool assigned to this jumper setting
-                txD[1] = system_error_flag ? 0x01 : 0x00;
-                txD[2] = can_bus_error_flag ? 0x01 : 0x00;
-                txD[3] = boot_sequence_active ? 0x01 : 0x00;
-                // 5th byte (added with the thermal runaway guard): WHY a
-                // thermal tool latched its error - ThermalGuardFault_t, 0 =
-                // none. A host that only reads the first 4 bytes keeps
-                // working unchanged.
-                txD[4] = thermal_fault_code;
-                // 6th byte: last_reset_cause (RCC flags latched at boot) -
-                // bit0 set = the independent watchdog reset the board.
-                txD[5] = last_reset_cause;
-                txH.StdId = URTC_CAN_ID_ACTIVE_TOOL_RESP;
-                txH.IDE = CAN_ID_STD;
-                txH.RTR = CAN_RTR_DATA;
-                txH.DLC = 6;
-                txH.TransmitGlobalTime = DISABLE;
-                uint32_t mb;
-                HAL_CAN_AddTxMessage(&hcan, &txH, txD, &mb);
-            }
+            send_quick_state();
         }
 
         // Recovered persisted-state query (0x190/0x191) - read-only, answers

@@ -55,6 +55,10 @@
 #define URTC_THERMAL_CHUNK_COUNT_MLX90640 0x30u  /* Chunks of a 32x24 frame (MLX90640 and MLX90642) */
 #define URTC_THERMAL_CHUNK_COUNT_MLX90641 0xCu  /* Chunks of a 16x12 frame (MLX90641) */
 #define URTC_BLACKBOX_CHUNK_COUNT 0x16u  /* Chunks of the fault recorder record read by 0x1A8 */
+#define URTC_CLEAR_ERROR_MAX_TEMP_C 0x32u  /* A latched error is lifted only below this temperature */
+#define URTC_STEPPER_SILENCE_MIN_MS 0x3E8u  /* Least silence of the host that cuts a stepper move (communication watchdog on) */
+#define URTC_STEPPER_SILENCE_PERCENT 0x32u  /* Silence that cuts a stepper move, as a percentage of the time the move should take (never below the least) */
+#define URTC_MAGNET_SILENCE_MS 0x1388u  /* Silence of the host after which the electromagnet lets go (communication watchdog and release policy on) */
 
 /* --- identifiers, and the length rule of every layout --- */
 #define URTC_CAN_ID_IMPACT_EVENT 0x095u  /* Impact register (touch probe, maximum priority) */
@@ -77,13 +81,15 @@
 #define URTC_DLC_QUERY_ACTIVE_TOOL_MAX 8u
 #define URTC_CAN_ID_ACTIVE_TOOL_RESP 0x111u  /* Active tool and quick state */
 #define URTC_DLC_ACTIVE_TOOL_RESP_MIN 4u
-#define URTC_DLC_ACTIVE_TOOL_RESP_MAX 6u
+#define URTC_DLC_ACTIVE_TOOL_RESP_MAX 8u
 #define URTC_ACTIVE_TOOL_RESP_TOOL_ID_OFFSET 0u
 #define URTC_ACTIVE_TOOL_RESP_SYSTEM_ERROR_OFFSET 1u
 #define URTC_ACTIVE_TOOL_RESP_CAN_ERROR_OFFSET 2u
 #define URTC_ACTIVE_TOOL_RESP_BOOTING_OFFSET 3u
 #define URTC_ACTIVE_TOOL_RESP_THERMAL_FAULT_OFFSET 4u
 #define URTC_ACTIVE_TOOL_RESP_RESET_CAUSE_OFFSET 5u
+#define URTC_ACTIVE_TOOL_RESP_ERROR_REASON_OFFSET 6u
+#define URTC_ACTIVE_TOOL_RESP_CLEAR_RESULT_OFFSET 7u
 #define URTC_CAN_ID_MOTION_CMD 0x120u  /* Plain stepper move (direction and step count) */
 #define URTC_DLC_MOTION_CMD_MIN 5u
 #define URTC_DLC_MOTION_CMD_MAX 8u
@@ -297,6 +303,10 @@
 #define URTC_DLC_ELECTROMAGNET_CMD_MIN 1u
 #define URTC_DLC_ELECTROMAGNET_CMD_MAX 1u
 #define URTC_ELECTROMAGNET_CMD_COIL_OFFSET 0u
+#define URTC_CAN_ID_CLEAR_ERROR 0x1B2u  /* Lift a latched critical error without a power cycle (feature CLEAR_ERROR, off by default) */
+#define URTC_DLC_CLEAR_ERROR_MIN 4u
+#define URTC_DLC_CLEAR_ERROR_MAX 4u
+#define URTC_CLEAR_ERROR_MAGIC_OFFSET 0u
 #define URTC_CAN_ID_HEALTH_PROFILE 0x1B8u  /* Periodic health frame of the board (only while the health feature runs) */
 #define URTC_DLC_HEALTH_PROFILE_MIN 8u
 #define URTC_DLC_HEALTH_PROFILE_MAX 8u
@@ -780,6 +790,9 @@
 #define URTC_FEATURE_HEALTH_PROFILE 0x02u
 #define URTC_FEATURE_HSI_AUTOTRIM 0x04u
 #define URTC_FEATURE_THERMAL_PID 0x08u
+#define URTC_FEATURE_CLEAR_ERROR 0x10u
+#define URTC_FEATURE_COMMS_WATCHDOG 0x20u
+#define URTC_FEATURE_MAGNET_RELEASE 0x40u
 
 /* Speed profile of a stepper move */
 #define URTC_MOTION_PROFILE_CONSTANT 0x00u
@@ -799,11 +812,32 @@
 #define URTC_PID_STATE_AUTOTUNE_DONE 0x03u
 #define URTC_PID_STATE_AUTOTUNE_FAILED 0x04u
 
+/* Why the board latched its critical error */
+#define URTC_ERROR_REASON_NONE 0x00u
+#define URTC_ERROR_REASON_UNKNOWN 0x01u
+#define URTC_ERROR_REASON_THERMAL 0x02u
+#define URTC_ERROR_REASON_SENSOR 0x03u
+#define URTC_ERROR_REASON_TOOL_ID 0x04u
+#define URTC_ERROR_REASON_COMMS_WATCHDOG 0x05u
+#define URTC_ERROR_REASON_FAN_STALL 0x06u
+#define URTC_ERROR_REASON_STEPPER_SILENCE 0x07u
+#define URTC_ERROR_REASON_MAGNET_RELEASE 0x08u
+
+/* Outcome of the last clear-error command */
+#define URTC_CLEAR_ERROR_NONE 0x00u
+#define URTC_CLEAR_ERROR_CLEARED 0x01u
+#define URTC_CLEAR_ERROR_REFUSED_SWITCH_OFF 0x02u
+#define URTC_CLEAR_ERROR_REFUSED_NO_ERROR 0x03u
+#define URTC_CLEAR_ERROR_REFUSED_NOT_CLEARABLE 0x04u
+#define URTC_CLEAR_ERROR_REFUSED_HOT 0x05u
+#define URTC_CLEAR_ERROR_REFUSED_ACTUATOR_ON 0x06u
+
 /* --- magic payloads --- */
 #define URTC_MAGIC_ENTER_BOOTLOADER_INIT { 0xB0, 0x07, 0x1D, 0x5A }  /* Reset the board (or the slave) into its bootloader (0x7F0) */
 #define URTC_MAGIC_AUTHORIZE_DOWNGRADE_INIT { 0xD0, 0x9E, 0x12, 0xAD }  /* Allow one older, validly signed image (0x7FD) */
 #define URTC_MAGIC_ERASE_FRAM_INIT { 0xE3, 0xA5, 0xE0, 0xFF }  /* Erase the recovered persisted state (0x192) */
 #define URTC_MAGIC_SOLDER_FEEDER_RESET_INIT { 0x52, 0x53, 0x50, 0x30 }  /* Reset the solder wire feeder position (ASCII RSP0) (0x131) */
+#define URTC_MAGIC_CLEAR_ERROR_INIT { 0x43, 0x4C, 0x45, 0x52 }  /* Lift a latched critical error (ASCII CLER) (0x1B2) */
 
 /* --- registers of the expansion slave over the I2C link bus --- */
 #define URTC_SLAVE_BOOT_REG_STATUS 0x00u
