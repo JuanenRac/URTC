@@ -514,4 +514,11 @@ uint8_t SavedState_Checksum(const SavedState_t *s);
 // - REG_MLX_CALIBRATED_CHUNK values are degrees C * 100 (centi-degrees).
 #define MLX_TEMP_SCALE 100
 
+#include "can_rx_queue.h"
+
+#if URTC_CAN_RX_QUEUE
+// Does in the main loop what the interrupt of the CAN receiver used to do with each frame (URTC_CAN_RX_QUEUE=1; see can_rx_queue.h).
+void CanDispatch_Drain(void);
+#endif
+
 #endif // FIRMWARE_COMMON_H

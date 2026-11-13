@@ -36,6 +36,9 @@
 #include "firmware_can_flyingprobe.h"
 #include "firmware_can_thermalinspection.h"
 #include "firmware_can_dispatch_routing.h"
+#include "can_rx_queue.h"
+
+#include <string.h>
 #include "firmware_multinode.h"
 #include "urtc_can_ids.h"
 
@@ -73,11 +76,10 @@ _Static_assert(TOOL_PASTE_JETTING == 23, "firmware_can_dispatch_routing.c's tool
 _Static_assert(TOOL_ULTRASONIC_WELDER == 24, "firmware_can_dispatch_routing.c's tool-ID literals are out of sync with ToolMode_t");
 _Static_assert(TOOL_INVALID == 25, "firmware_can_dispatch_routing.c's tool-ID literals are out of sync with ToolMode_t");
 
-void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan_m) {
-    if (HAL_CAN_GetRxMessage(hcan_m, CAN_RX_FIFO0, &rxHeader, rxData) == HAL_OK) {
-
-        can_led_tick = HAL_GetTick();
-
+// Everything that is done with a frame that has been received: rxHeader and rxData hold it. It runs in the interrupt of the receiver, or, with URTC_CAN_RX_QUEUE=1,
+// in the main loop (CanDispatch_Drain), where the handlers cannot interrupt a transaction of the main loop on the I2C buses or on the CAN transmitter.
+static void CanDispatch_ProcessFrame(void) {
+    {
         // Only a standard data frame is a command of this protocol. For an extended frame the HAL fills the extended identifier and leaves StdId as it was
         // (the identifier of the frame before), and a remote request carries whatever the mailbox held: either would be taken for a repeat of the previous
         // command, including one that actuates and one that feeds a watchdog. Anything else is ignored (the bus activity above still counts).
@@ -185,3 +187,37 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan_m) {
         }
     }
 }
+
+void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan_m) {
+    if (HAL_CAN_GetRxMessage(hcan_m, CAN_RX_FIFO0, &rxHeader, rxData) == HAL_OK) {
+        can_led_tick = HAL_GetTick(); // the bus activity is shown whatever is done with the frame
+#if URTC_CAN_RX_QUEUE
+        CanRxEntry_t entry;
+        entry.std_id = rxHeader.StdId;
+        entry.ide = rxHeader.IDE;
+        entry.rtr = rxHeader.RTR;
+        entry.dlc = rxHeader.DLC;
+        memcpy(entry.data, rxData, sizeof entry.data);
+        CanRxQueue_Push(&entry); // a full queue drops the frame and counts it
+#else
+        CanDispatch_ProcessFrame();
+#endif
+    }
+}
+
+#if URTC_CAN_RX_QUEUE
+// Called every pass of the main loop: takes the frames that the interrupt stored, oldest first, and does with each what the interrupt used to do. At most
+// CAN_RX_QUEUE_DEPTH frames per call, so that a flood on the bus cannot keep the loop (and the watchdog refresh in it) from running.
+void CanDispatch_Drain(void) {
+    CanRxEntry_t entry;
+    for (uint32_t taken = 0; taken < CAN_RX_QUEUE_DEPTH && CanRxQueue_Pop(&entry); taken++) {
+        memset(&rxHeader, 0, sizeof rxHeader);
+        rxHeader.StdId = entry.std_id;
+        rxHeader.IDE = entry.ide;
+        rxHeader.RTR = entry.rtr;
+        rxHeader.DLC = entry.dlc;
+        memcpy(rxData, entry.data, sizeof rxData);
+        CanDispatch_ProcessFrame();
+    }
+}
+#endif
