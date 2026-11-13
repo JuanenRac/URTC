@@ -1,10 +1,10 @@
 {
   "schema": 1,
   "source": "URTC-DEVTOOLS",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "files": {
     ".github/actions/urtc-baseline/action.yml": "424598f66bb19c9b8667ba3d2be6887d982eccf22262799e62105290f9d54709",
-    ".github/workflows/dashboard-dispatch.yml": "d0fcb644615c52528d9f4fb3f62752541be91e7b2ccee03c4e8bbadc8b8fd8bf",
+    ".github/workflows/dashboard-dispatch.yml": "15d1d1abbd41bf181cdff859c2d788fb6a83feac36b707a2be044ccf890e0069",
     "bump_manifest_version.py": "fbd3433f100e701457c2053495e2ba86771f9cb25f8d396eba2d173ef5462bda",
     "test.bat": "1a40c1de985d25ed71851da805e1f33396630c24c419f49404c83ca7ab5b5a50",
     "test.sh": "8fc4a9d28516d372adb3889c7cf85fd560cf33f89b2fb9cbc59a65f357f553c6",
@@ -16,8 +16,8 @@
     "tools/make_architecture.py": "9df7d6c00af0f1178c44eae8e849c31218bae196984ec718a7fdc63daa2e2fa9",
     "tools/make_structure.py": "27615e9b6374cbb6cc21b52d52bad4e9db1c9307319a8910b4b75c4ecb9fe5c8",
     "tools/pretty_run.py": "1698bfec531568afaf5319f0a220e9bf7c0087f39cbf5e6e88e7035bfc1327c5",
-    "tools/run_host_tests.py": "995715557fd7451ec1bbad004db9c205b455f5c49ac49844ca3e059009872066",
-    "tools/status_lights.py": "7e71dd24c828a07a3b842446dbab7921784df1e5538a463e88a1f33181550019",
+    "tools/run_host_tests.py": "4afc3d3da4e5d8a60794611d0d0c6f851ec5dc7e36d7d70b620b195ee0e07159",
+    "tools/status_lights.py": "792e013550498cd62c3af3c6680db779345fbf50e5d4f4bbf37c6ef55de00386",
     "tools/sync_manifests.py": "5ca8257fe91b5fad8c86d330ae5d907a36bb7a022d299067af922af9cf86fc03",
     "tools/universal_readme_check.py": "ddb5f9986119a8b16800cba627d8a13af8b39ff1e044adc992fd06defea301e5"
   }

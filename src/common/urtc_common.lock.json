@@ -16,7 +16,7 @@
     },
     "urtc_can_ids.h": {
       "from": "generated/urtc_can_ids.h",
-      "sha256": "37464f867e693eae838e7657952d66f05b4b94b7c96d4990e641f6d8a4406bfa"
+      "sha256": "fdcf81f99b4410f9c7dc0814a06b18180d443cb8f9bd3f9f15d6d85069a9023c"
     },
     "urtc_ed25519.c": {
       "from": "firmware_base/urtc_ed25519.c",
