@@ -58,6 +58,9 @@ void fake_hal_reset_recording(void)
     memset(&fake_rcc_clk, 0, sizeof fake_rcc_clk);
     memset(&fake_rcc_periph, 0, sizeof fake_rcc_periph);
     fake_rcc_calls = 0;
+    fake_rcc_osc_fail_next = 0;
+    memset(&fake_tim17, 0, sizeof fake_tim17);
+    fake_tim17_clock_enables = 0;
     fake_can_inits = fake_can_filters = fake_can_starts = 0;
     fake_can_notifications = 0;
     memset(fake_nvic, 0, sizeof fake_nvic);
@@ -340,7 +343,10 @@ RCC_ClkInitTypeDef fake_rcc_clk;
 RCC_PeriphCLKInitTypeDef fake_rcc_periph;
 uint32_t fake_rcc_flash_latency;
 int fake_rcc_calls;
-HAL_StatusTypeDef HAL_RCC_OscConfig(RCC_OscInitTypeDef *init) { fake_rcc_osc = *init; fake_rcc_calls++; return HAL_OK; }
+int fake_rcc_osc_fail_next;
+HAL_StatusTypeDef HAL_RCC_OscConfig(RCC_OscInitTypeDef *init) { fake_rcc_osc = *init; fake_rcc_calls++; if (fake_rcc_osc_fail_next > 0) { fake_rcc_osc_fail_next--; return HAL_ERROR; } return HAL_OK; }
+FakeTim17Regs fake_tim17;
+int fake_tim17_clock_enables;
 HAL_StatusTypeDef HAL_RCC_ClockConfig(RCC_ClkInitTypeDef *init, uint32_t latency) { fake_rcc_clk = *init; fake_rcc_flash_latency = latency; fake_rcc_calls++; return HAL_OK; }
 HAL_StatusTypeDef HAL_RCCEx_PeriphCLKConfig(RCC_PeriphCLKInitTypeDef *init) { fake_rcc_periph = *init; fake_rcc_calls++; return HAL_OK; }
 
