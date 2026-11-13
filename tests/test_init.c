@@ -168,6 +168,7 @@ static void test_timers(int *failures)
     fake_hal_reset_recording();
     memset(&htim3, 0, sizeof htim3);
     MX_TIM3_Full_Init();
+    TEST_ASSERT(htim3.Init.Prescaler == 63 && htim3.Init.Period == 999, "timer 3 ticks every millisecond exactly: a 1 MHz clock and a period of 999 (the counter counts 0 to 999 included)");
     TEST_ASSERT(fake_tim_base_inits == 1 && htim3.Instance == TIM3 && fake_tim_base_starts_it == 1, "timer 3 is initialised and started with its interrupt");
     double tick_hz = 64000000.0 / (fake_tim_init[2].Prescaler + 1.0) / (fake_tim_init[2].Period + 1.0);
     TEST_ASSERT(tick_hz > 990.0 && tick_hz < 1010.0 && fake_tim_init[2].CounterMode == TIM_COUNTERMODE_UP, "the step timer ticks at about 1 kHz (two edges per step, so 500 steps a second at most)");

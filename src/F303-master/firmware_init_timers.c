@@ -15,7 +15,7 @@ void MX_TIM3_Full_Init(void) {
     htim3.Instance = TIM3;
     htim3.Init.Prescaler = 63; // 64MHz/64 = 1MHz tick, same resolution as before
     htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-    htim3.Init.Period = 1000;  // Fine step resolution (0.1%)
+    htim3.Init.Period = 999;   // the counter counts 0..Period, so 999 is exactly 1000 ticks of 1 us = 1 ms (1000 gave 1.001 ms)
     htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
     HAL_TIM_Base_Init(&htim3);
 
