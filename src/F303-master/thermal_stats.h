@@ -54,6 +54,10 @@ uint8_t ThermalStats_IsValid(const ThermalStats_t *s);
 uint8_t ThermalStats_AccumulateHeater(ThermalStats_t *s, ThermalStatsClock_t *clk,
                                       uint32_t now_ms, uint8_t heater_on);
 
+// Whether the heater-on time grows now: the heater output pin is high AND the active tool is one that really heats with it. The pin is shared with other tools
+// (a magnet held for hours, the welders), and counting their time inflated the lifetime figure of the heater.
+uint8_t ThermalStats_HeaterOn(uint8_t tool_heats_with_pin, uint8_t pin_high);
+
 // Records one latched thermal fault (code != 0).
 void ThermalStats_RecordFault(ThermalStats_t *s, uint8_t fault_code);
 
