@@ -2166,7 +2166,7 @@ Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_do
 
 C. Field layouts and examples
 
-[[ BEGIN GENERATED layouts sha256=882ed801b9b32313567b466f6ebbd47d1daba3ab32d2349fea6b810bec6d1187 ]]
+[[ BEGIN GENERATED layouts sha256=f538b3ba4b1cf5ad5f622687101d3077f83671692771f38a1539eb4877023e0a ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 ### 0x095 IMPACT_EVENT - Impact register (touch probe, maximum priority)
@@ -3083,7 +3083,7 @@ Note: Same layout as 0x7F1; the slave HardwareID is not the main board one.
 
 host to board; handled by the application; tools: any; refused while a critical error is declared; the firmware accepts DLC 8.
 
-request, DLC 8: Four sequential frames, bytes 0-7, 8-15, 16-23 and 24-31 of the SHA-256 (no key) of the slave image, right after 0x211 and before the first 0x213. The slave compares it with the hash of what it received; WHO vouched for the image is decided by the master from the record of 0x21A.
+request, DLC 8: Four sequential frames, bytes 0-7, 8-15, 16-23 and 24-31 of the SHA-256 (no key) of the slave image, right after 0x211 and before the first 0x213. The slave compares it with the hash of what it received; WHO vouched for the image is decided by the master from the record of 0x21A. The frames carry no index: the position is implicit, a counter of the chunks of the group of four that every 0x211 sets to zero, every 0x212 raises by one and the fourth chunk returns to zero. When the end frame 0x214 arrives and the counter is not zero (1 to 3 chunks of a group), a frame was lost: the master does not forward the end frame, reports 0x215 VERIFY_FAIL and answers 0x219 with DIGEST_CHUNK_MISSING (7). A counter of 0 (a sender that does not send the digest) behaves as before.
 
 | Byte | Width | Type | Field | Values | Note |
 |---|---|---|---|---|---|
@@ -3217,6 +3217,7 @@ response, DLC 1
 Example CRC32: data 02 (reason=2)
 
 Note: Only meaningful right after 0x215 reports VERIFY_FAIL.
+Note: DIGEST_CHUNK_MISSING (7) is answered by the master bridge itself, not by the slave bootloader: a group of digest chunks (0x212) was left half way when 0x214 arrived. The legacy signature chunks (0x7F7) of the old bootloaders keep their order-only layout; the current bootloader reads the Ed25519 record instead.
 
 ### 0x21A SLAVE_RECORD_CHUNK - One chunk of the Ed25519 signature record of the slave image
 
@@ -3907,7 +3908,7 @@ Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_do
 
 E. Enumerations
 
-[[ BEGIN GENERATED enums sha256=3fa7d2e387d2bedfa70f4fc168cb8971efc07ad141c8a1d7b5dc7fb91e6daf5c ]]
+[[ BEGIN GENERATED enums sha256=18c4fc3d577b5a954895f2073a7b18c3588999e6c8717f65341c9914e5b36df5 ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 tool - Tool profile (prefix TOOL_, value)
@@ -3975,6 +3976,7 @@ slave_verify_fail_reason - Verify-fail reasons only the expansion slave bootload
 | Value | Name | Title |
 |---|---|---|
 | 6 | NOT_CONFIRMED | The master did not confirm the image in time, or its confirmation does not match this session and image |
+| 7 | DIGEST_CHUNK_MISSING | The master bridge found a group of digest chunks (0x212) left half way when the end (0x214) arrived; a frame was lost |
 
 responder - Answering side (prefix RESPONDER_, value)
 
