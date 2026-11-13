@@ -8,6 +8,7 @@
 #include "thermal_guard.h"
 #include "firmware_thermal_stats.h"
 #include "firmware_features.h"
+#include "t12_settle.h"
 
 // Last thermal-guard fault (ThermalGuardFault_t), 0 = none. Reported as the
 // 5th byte of the 0x111 state answer so a host knows WHY the board blocked
@@ -61,7 +62,7 @@ void Control_SolderingIron_PID(void) {
     // below turns it back on immediately if still needed; the tip's own
     // thermal mass is large relative to this brief window.
     HAL_GPIO_WritePin(T12_PWM_PORT, T12_PWM_PIN, GPIO_PIN_RESET);
-    for (volatile uint32_t settle = 0; settle < 640; settle++); // ~10us @ 64MHz
+    for (volatile uint32_t settle = 0; settle < urtc_t12_settle_loops(URTC_T12_SETTLE_US); settle++); // 10 us @ 64 MHz unless the build says otherwise (t12_settle.h)
 
     // AD8605 thermocouple ADC reading
     HAL_ADC_Start(&hadc);

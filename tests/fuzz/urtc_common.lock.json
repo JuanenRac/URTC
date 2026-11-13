@@ -1,10 +1,10 @@
 {
   "format": 1,
-  "urtc_common_version": "0.2.4",
+  "urtc_common_version": "0.2.6",
   "files": {
     "fuzz_corpus.txt": {
       "from": "conformance/fuzz_corpus.txt",
-      "sha256": "46f74a03db03d4957bfb9b7637055f4c3d3d3491872f2bbe1b7cf566aa0856d7"
+      "sha256": "e34a6f6b993fa6ce32ee48827f748b11a196eecab911b031e8b9386cc7597f86"
     }
   }
 }
