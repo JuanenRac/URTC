@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **The static analysis no longer reports the loops that are meant never to return:** the fault handlers, the stop after a failed start-up and the wait of the bootloader for the watchdog reset end in an endless loop on purpose, and the newer compilers report each one as `-Wanalyzer-infinite-loop`, which turned the analysis step red. That one report is switched off in the command of the analysis; every other warning of the analyzer still fails it.
+
 - **A lost digest chunk of the slave update is named:** the four chunks of 0x212 carry no index, so a lost frame used to end in a puzzling signature mismatch. The bridge now keeps the position of the chunk as an implicit count (zeroed by 0x211, checked when 0x214 arrives); if the end frame finds a group of chunks left half way, the end is neither verified nor forwarded to the slave, 0x215 answers VERIFY_FAIL and 0x219 answers the new reason DIGEST_CHUNK_MISSING (7) until the next start. No frame changes its length, a sender of the four chunks in order is unaffected and a sender without digest chunks behaves as before; the legacy chunks 0x7F7 keep their layout (the current bootloader reads the Ed25519 record). Tested on the host with a fake HAL for one to three chunks, four chunks, none, a new start and a second group left half way; not tried on a bus with real boards.
 
 - **Notes for the next board revision:** `PCB/CAMBIOS_PROXIMA_REVISION.md` lists two changes that need a new board (the stepper driver enable apart from the laser interlock, and pull-downs on the MOSFET gates).
