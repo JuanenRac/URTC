@@ -75,11 +75,31 @@ void run_thermal_stats_tests(int *failures)
     TEST_ASSERT(memcmp(out, want, 8) == 0, "0x1AB payload is fault_count BE16, seconds BE32, last code, persisted");
 }
 
+static void test_heater_on_needs_a_heating_tool(int *failures)
+{
+    TEST_ASSERT(ThermalStats_HeaterOn(1, 1) == 1, "a heating tool with the output high is heater time");
+    TEST_ASSERT(ThermalStats_HeaterOn(1, 0) == 0, "a heating tool with the output low is not");
+    TEST_ASSERT(ThermalStats_HeaterOn(0, 1) == 0, "the same pin high for a tool that does not heat with it (a held magnet, a welder) is not heater time");
+    TEST_ASSERT(ThermalStats_HeaterOn(0, 0) == 0, "nothing at all is not");
+    TEST_ASSERT(ThermalStats_HeaterOn(7, 255) == 1, "any non-zero value counts as true");
+    ThermalStats_t s;
+    ThermalStatsClock_t clk;
+    ThermalStats_Blank(&s);
+    memset(&clk, 0, sizeof clk);
+    ThermalStats_AccumulateHeater(&s, &clk, 1000, ThermalStats_HeaterOn(0, 1));
+    ThermalStats_AccumulateHeater(&s, &clk, 61000, ThermalStats_HeaterOn(0, 1));
+    TEST_ASSERT(s.heater_on_seconds == 0, "a minute of a pin held by a tool that does not heat adds no heater seconds");
+    ThermalStats_AccumulateHeater(&s, &clk, 62000, ThermalStats_HeaterOn(1, 1));
+    ThermalStats_AccumulateHeater(&s, &clk, 72000, ThermalStats_HeaterOn(1, 1));
+    TEST_ASSERT(s.heater_on_seconds == 10, "ten seconds of a heating tool add ten heater seconds");
+}
+
 int main(void)
 {
     int failures = 0;
     printf("URTC host logic tests - thermal_stats.c\n");
     run_thermal_stats_tests(&failures);
+    test_heater_on_needs_a_heating_tool(&failures);
     if (failures == 0) {
         printf("  OK   all thermal stats host tests passed\n");
         return 0;

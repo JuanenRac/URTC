@@ -71,6 +71,11 @@ uint8_t ThermalStats_AccumulateHeater(ThermalStats_t *s, ThermalStatsClock_t *cl
     return 1;
 }
 
+uint8_t ThermalStats_HeaterOn(uint8_t tool_heats_with_pin, uint8_t pin_high)
+{
+    return (uint8_t)((tool_heats_with_pin != 0u && pin_high != 0u) ? 1u : 0u);
+}
+
 void ThermalStats_RecordFault(ThermalStats_t *s, uint8_t fault_code)
 {
     if (fault_code == 0) {
