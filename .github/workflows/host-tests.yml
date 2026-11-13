@@ -14,6 +14,10 @@ on:
         description: "Run only this suite (empty: all)"
         required: false
         default: ""
+      coverage_floor:
+        description: "Also build the suites with gcov counters and fail under this percentage of executed lines (empty: no measurement)"
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -34,11 +38,16 @@ jobs:
       - name: Run the host suites
         env:
           ONLY: ${{ inputs.only }}
+          FLOOR: ${{ inputs.coverage_floor }}
         run: |
           sudo apt-get update
           sudo apt-get install --yes gcc cppcheck
+          EXTRA=""
+          if [ -n "$FLOOR" ]; then
+            EXTRA="--coverage-floor $FLOOR"
+          fi
           if [ -n "$ONLY" ]; then
-            python tools/run_host_tests.py --runner direct --no-analyze --only "$ONLY"
+            python tools/run_host_tests.py --runner direct --no-analyze $EXTRA --only "$ONLY"
           else
-            python tools/run_host_tests.py --runner direct --no-analyze
+            python tools/run_host_tests.py --runner direct --no-analyze $EXTRA
           fi
