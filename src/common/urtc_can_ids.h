@@ -11,7 +11,7 @@
 
 #include <stdint.h>
 
-#define URTC_PROTOCOL_VERSION 1
+#define URTC_PROTOCOL_VERSION 2
 
 /* --- constants --- */
 #define URTC_BITRATE 0xF4240u  /* Default bus bit rate of the tool heads */
@@ -321,7 +321,7 @@
 #define URTC_PID_STATE_RESP_RESPONSE_KD_X100_OFFSET 4u
 #define URTC_PID_STATE_RESP_RESPONSE_STATE_OFFSET 6u
 #define URTC_PID_STATE_RESP_RESPONSE_DUTY_PERCENT_OFFSET 7u
-#define URTC_CAN_ID_HEALTH_INFO 0x1BBu  /* Identity and life of the board: protocol byte, last reset cause, firmware version and uptime (sent with the health frame) */
+#define URTC_CAN_ID_HEALTH_INFO 0x1BBu  /* Identity and life of the board: protocol byte, last reset cause, firmware version, bus bit rate and uptime (sent with the health frame) */
 #define URTC_DLC_HEALTH_INFO_MIN 8u
 #define URTC_DLC_HEALTH_INFO_MAX 8u
 #define URTC_HEALTH_INFO_PROTOCOL_VERSION_OFFSET 0u
@@ -329,7 +329,8 @@
 #define URTC_HEALTH_INFO_FW_MINOR_OFFSET 2u
 #define URTC_HEALTH_INFO_FW_PATCH_OFFSET 3u
 #define URTC_HEALTH_INFO_FW_BUILD_OFFSET 4u
-#define URTC_HEALTH_INFO_UPTIME_S_OFFSET 5u
+#define URTC_HEALTH_INFO_BUS_RATE_CODE_OFFSET 5u
+#define URTC_HEALTH_INFO_UPTIME_S_OFFSET 6u
 #define URTC_CAN_ID_CRASH_DUMP_QUERY 0x1BCu  /* Request the fault capture of the last crash (stacked registers kept across the reset) */
 #define URTC_DLC_CRASH_DUMP_QUERY_MIN 1u
 #define URTC_DLC_CRASH_DUMP_QUERY_MAX 8u
@@ -713,6 +714,13 @@
 #define URTC_RESET_CAUSE_PIN 0x10u
 #define URTC_RESET_CAUSE_LOW_POWER 0x20u
 #define URTC_RESET_CAUSE_OPTION_BYTES 0x40u
+
+/* Bit rate of the CAN bus a head declares in its identity frame (0x1BB, protocol version 2 and later) */
+#define URTC_BUS_RATE_UNKNOWN 0x00u
+#define URTC_BUS_RATE_MBIT_1 0x01u
+#define URTC_BUS_RATE_KBIT_500 0x02u
+#define URTC_BUS_RATE_KBIT_250 0x03u
+#define URTC_BUS_RATE_KBIT_125 0x04u
 
 /* Expansion board type */
 #define URTC_EXPANSION_BOARD_NONE 0x00u

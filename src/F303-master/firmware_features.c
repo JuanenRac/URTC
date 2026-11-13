@@ -7,6 +7,7 @@
 #include "firmware_common.h"
 #include "firmware_fram.h"
 #include "firmware_features.h"
+#include "can_bit_timing.h"
 #include "health_profile.h"
 #include "hsi_trim.h"
 #include "pid_control.h"
@@ -183,7 +184,7 @@ void Features_Service(void) {
     send_frame(URTC_CAN_ID_HEALTH_PROFILE, out, 8);
     if (++health_info_count >= HEALTH_INFO_EVERY) {
         health_info_count = 0;
-        Health_EncodeInfo((uint8_t)URTC_PROTOCOL_VERSION, last_reset_cause, FIRMWARE_VERSION_MINOR, FIRMWARE_VERSION_PATCH, FIRMWARE_VERSION_BUILD, now, out);
+        Health_EncodeInfo((uint8_t)URTC_PROTOCOL_VERSION, last_reset_cause, FIRMWARE_VERSION_MINOR, FIRMWARE_VERSION_PATCH, FIRMWARE_VERSION_BUILD, Health_BusRateCode(URTC_CAN_BITRATE_BPS), now, out);
         send_frame(URTC_CAN_ID_HEALTH_INFO, out, 8);
     }
 }

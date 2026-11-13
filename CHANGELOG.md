@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **The identity frame declares the bit rate of the bus (protocol version 2):** the master firmware sends the code of the rate it was built for (1 Mbit/s, or 500 kbit/s with `URTC_CAN_LEGACY_500K`) in byte 5 of `0x1BB`, `URTC_PROTOCOL_VERSION` is 2, and the uptime of that frame is 16 bits that stop at 65535 s instead of 24 bits. A tool of the previous protocol version reads the frame with a wrong uptime and no rate; the new tools read both versions. `src/common/urtc_can_ids.h` is the generated header of the new specification, `docs/CANBUS.TXT` is regenerated, and the host test covers the layout, the stop of the uptime and every rate code. The code is built only in the CI; it has not been run on a board.
+
 ## [0.4.8] - The bus runs at 1 Mbit/s, the application images carry their own header and the expansion link gets a check byte
 
 - **The bus of the tool heads runs at 1 Mbit/s:** the master application and its bootloader calculate the bit timing (prescaler 2, 13 + 2 time quanta from the 32 MHz clock, sample point 87.5 percent, never below 75 percent, 0 ppm of rate error) from the rate, the sample point and the jump width of `spec/can_protocol.json` (one source), by default; `URTC_CAN_LEGACY_500K=1` builds the 500 kbit/s legacy option for early boards. **Compatibility note:** every board and adapter of one bus must run at the same speed, the trunk should stay under about 25 m at 1 Mbit/s (about 100 m at 500 kbit/s) with short stubs and a 120 ohm termination at each end, and boards built before this change must be rebuilt with the legacy option to stay on a 500 kbit/s bus. Host tests of the timing at both rates; nothing has run on a real bus.

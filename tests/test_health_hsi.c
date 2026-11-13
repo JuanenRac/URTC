@@ -37,13 +37,21 @@ static void test_health(int *failures)
     TEST_ASSERT(f[5] == 0, "above that: not available, never a wrapped value");
 
     uint8_t info[8];
-    Health_EncodeInfo(URTC_PROTOCOL_VERSION, 0x08, 4, 4, 0, 3600u * 1000u, info);
-    const uint8_t want_info[8] = { 0x01, 0x08, 0x04, 0x04, 0x00, 0x00, 0x0E, 0x10 };
-    TEST_ASSERT(memcmp(info, want_info, 8) == 0, "0x1BB layout: protocol, reset cause, version minor/patch/build, uptime seconds big-endian (same bytes as the spec example)");
-    Health_EncodeInfo(1, 0, 0, 0, 0, 999u, info);
-    TEST_ASSERT(info[5] == 0 && info[6] == 0 && info[7] == 0, "uptime below one second is 0");
-    Health_EncodeInfo(1, 0, 0, 0, 0, 0xFFFFFFFFu, info);
-    TEST_ASSERT(info[5] == 0x41 && info[6] == 0x89 && info[7] == 0x37, "uptime of the full 32-bit tick in seconds");
+    Health_EncodeInfo(URTC_PROTOCOL_VERSION, 0x08, 4, 4, 0, Health_BusRateCode(1000000u), 3600u * 1000u, info);
+    const uint8_t want_info[8] = { 0x02, 0x08, 0x04, 0x04, 0x00, 0x01, 0x0E, 0x10 };
+    TEST_ASSERT(memcmp(info, want_info, 8) == 0, "0x1BB layout: protocol 2, reset cause, version minor/patch/build, bus rate code, uptime seconds big-endian (same bytes as the spec example)");
+    TEST_ASSERT(URTC_PROTOCOL_VERSION == 2, "the identity frame declares protocol version 2");
+    Health_EncodeInfo(2, 0, 0, 0, 0, 0, 999u, info);
+    TEST_ASSERT(info[5] == 0 && info[6] == 0 && info[7] == 0, "uptime below one second is 0 and a rate that is not declared is code 0");
+    Health_EncodeInfo(2, 0, 0, 0, 0, 0, 0xFFFFFFFFu, info);
+    TEST_ASSERT(info[6] == 0xFF && info[7] == 0xFF, "uptime stops at 65535 seconds instead of wrapping");
+    Health_EncodeInfo(2, 0, 0, 0, 0, 0, 65535u * 1000u + 999u, info);
+    TEST_ASSERT(info[6] == 0xFF && info[7] == 0xFF, "the last second before the stop is 65535");
+    Health_EncodeInfo(2, 0, 0, 0, 0, 0, 65u * 1000u, info);
+    TEST_ASSERT(info[6] == 0x00 && info[7] == 65, "a short uptime keeps its seconds");
+    TEST_ASSERT(Health_BusRateCode(1000000u) == URTC_BUS_RATE_MBIT_1 && Health_BusRateCode(500000u) == URTC_BUS_RATE_KBIT_500, "the two rates the firmware can be built for have their codes");
+    TEST_ASSERT(Health_BusRateCode(250000u) == URTC_BUS_RATE_KBIT_250 && Health_BusRateCode(125000u) == URTC_BUS_RATE_KBIT_125, "the other two codes");
+    TEST_ASSERT(Health_BusRateCode(0u) == URTC_BUS_RATE_UNKNOWN && Health_BusRateCode(800000u) == URTC_BUS_RATE_UNKNOWN, "a rate with no code is declared as not declared");
 
     TEST_ASSERT(Health_CountBusOff(0) == 1 && Health_CountBusOff(254) == 255 && Health_CountBusOff(255) == 255, "bus-off count saturates at 255");
     TEST_ASSERT(Health_LoopMax(3, 2) == 3 && Health_LoopMax(3, 9) == 9 && Health_LoopMax(3, 100000) == 255, "loop maximum keeps the largest and saturates");
