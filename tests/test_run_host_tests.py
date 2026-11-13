@@ -58,6 +58,7 @@ class SuiteListTests(unittest.TestCase):
         for suite, source in runner.analysis_sources(list(runner.SUITES)):
             cmd = runner.analyze_command(suite, "gcc", source)
             self.assertIn("-fanalyzer", cmd)
+            self.assertIn("-Wno-analyzer-infinite-loop", cmd)  # the loops that never return on purpose are not reported; no other analyzer warning is turned off
             self.assertIn("-c", cmd)
             self.assertIn(f"-std={suite.std}", cmd)
             self.assertEqual(cmd[-1], str(ROOT / source))
