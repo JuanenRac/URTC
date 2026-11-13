@@ -289,19 +289,26 @@ static void test_the_led_colour_is_not_a_reason_to_write(int *failures)
     // The colour of the status LED changes by itself (blue for a second and a half after every frame): it must not write the F-RAM, and the colour already on the
     // chip stays when something else is saved.
     reset_world();
-    SavedState_t on_chip = sample_record();
-    put_record(&on_chip);
-    SavedState_Load();
+    active_tool = TOOL_SOLDERING_IRON; target_temperature = 300;
+    led_state_pixel.R = 1; led_state_pixel.G = 2; led_state_pixel.B = 3;
+    fake_tick = 100000;
+    SavedState_MaybeSave();
+    int writes = fake_fram_write_calls;
+    TEST_ASSERT(writes > 0 && stored().status_r == 0 && stored().status_g == 0 && stored().status_b == 0, "the first save keeps the colour the chip had (blank), not the one in memory");
     led_state_pixel.R = 0; led_state_pixel.G = 0; led_state_pixel.B = 255;
+    fake_tick = 200000;
     SavedState_MaybeSave();
-    TEST_ASSERT(fake_fram_write_calls == 0, "a change of the automatic colour alone writes nothing");
+    TEST_ASSERT(fake_fram_write_calls == writes, "a change of the automatic colour alone writes nothing");
     led_state_pixel.R = 0; led_state_pixel.G = 255; led_state_pixel.B = 0;
+    fake_tick = 300000;
     SavedState_MaybeSave();
-    TEST_ASSERT(fake_fram_write_calls == 0, "and neither does the change back");
+    TEST_ASSERT(fake_fram_write_calls == writes, "and neither does the change back");
     solder_spool_position = 777;
+    fake_tick = 400000;
     SavedState_MaybeSave();
     SavedState_t s = stored();
-    TEST_ASSERT(s.solder_spool_position == 777 && s.status_r == 1 && s.status_g == 2 && s.status_b == 3, "something else that changed is saved with the colour the chip already had");
+    TEST_ASSERT(fake_fram_write_calls > writes && s.solder_spool_position == 777 && s.status_r == 0 && s.status_g == 0 && s.status_b == 0,
+                "something else that changed is saved, still with the colour the chip already had");
 }
 
 static HardwareConfig_t stored_hw(void)
