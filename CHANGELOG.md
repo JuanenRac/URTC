@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.4.8] - The bus runs at 1 Mbit/s, the application images carry their own header and the expansion link gets a check byte
+
 - **The bus of the tool heads runs at 1 Mbit/s:** the master application and its bootloader calculate the bit timing (prescaler 2, 13 + 2 time quanta from the 32 MHz clock, sample point 87.5 percent, never below 75 percent, 0 ppm of rate error) from the rate, the sample point and the jump width of `spec/can_protocol.json` (one source), by default; `URTC_CAN_LEGACY_500K=1` builds the 500 kbit/s legacy option for early boards. **Compatibility note:** every board and adapter of one bus must run at the same speed, the trunk should stay under about 25 m at 1 Mbit/s (about 100 m at 500 kbit/s) with short stubs and a 120 ohm termination at each end, and boards built before this change must be rebuilt with the legacy option to stay on a 500 kbit/s bus. Host tests of the timing at both rates; nothing has run on a real bus.
 
 - **A sealed image goes through the twins of both bootloaders:** the image the seal step makes (the header inside it filled in) is signed with the throwaway development key and flashed through the compiled twin of the master bootloader, which installs it and reports the new version, and refuses it with the CRC-32 reason when one byte of the header inside changes; the model of the slave bootloader installs a sealed slave image through the confirmed exchange and refuses the one of the other board. `tools/make_boot_sig_cases.py` writes the sealed case. Run on the host only; nothing has been flashed to a board.
