@@ -4,6 +4,7 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **The CAN reference describes the weld pulse as the firmware has it:** the note of the spot welder (`0x1C0`) and of the ultrasonic welder (`0x200`) said that the duration is always clamped to 2000 ms and that a hardware timer was not implemented. It now names the build options that exist (`URTC_WELD_PULSE_MAX_MS`, `URTC_WELD_PULSE_MIN_MS`, the 5000 ms hard limit and the one-pulse timer `URTC_WELD_PULSE_HW_TIMER`, off by default), and a test fails if an option of `weld_pulse_timing.h` is missing from the reference.
 - **The official firmware can be compiled in GitHub Actions and only signed on the maintainer's machine:** the new workflow `.github/workflows/firmware-rc.yml` ("URTC firmware build (release candidate)", started by hand with the version, or called from another workflow) builds the four components with the official trust table, a build date taken from the commit and one pinned release of the Arm toolchain, holds no secret, builds twice on two runners and keeps the artifact (images, `SHA256SUMS`, build manifest, attestation) for seven days only when every file of the two builds is the same bytes. `tools/check_image_versions.py` checks the version inside each application image against its name and the manifest.
 
 ## [0.4.9] - Reduced interrupt work, optional transmit queue and metadata pages, clear-error command and bus speed declaration

@@ -36,6 +36,16 @@ class CanbusDocTests(unittest.TestCase):
             self.assertEqual(self.text.count(f"[[ BEGIN GENERATED {name} "), 1)
             self.assertEqual(self.text.count(f"[[ END GENERATED {name} ]]\n"), 1)
 
+    def test_the_weld_pulse_options_of_the_firmware_are_in_the_text(self):
+        # the pulse note of 0x1C0 and 0x200 used to say that a hardware timer was "not implemented" after the option existed: every build option of
+        # weld_pulse_timing.h is named in the reference, and the sentence that denied the timer is gone
+        header = (ROOT / "src" / "F303-master" / "weld_pulse_timing.h").read_text(encoding="utf-8")
+        options = set(re.findall(r"^#ifndef (URTC_WELD_PULSE_[A-Z_]+_(?:MS|TIMER))$", header, re.M))
+        self.assertGreaterEqual(len(options), 3)
+        for option in sorted(options):
+            self.assertIn(option, self.text, f"{option} is a build option of the weld pulse that CANBUS.TXT does not name")
+        self.assertNotIn("interrupt, not implemented", self.text)
+
 
 if __name__ == "__main__":
     unittest.main()
