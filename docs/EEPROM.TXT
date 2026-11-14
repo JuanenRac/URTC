@@ -464,7 +464,10 @@ Offset | Size | Field          | Type     | Notes
 4      | 1    | struct_version | uint8_t  | 1.
 5      | 1    | mask           | uint8_t  | Features that are on: 0x01 stepper
        |      |                |          | ramps, 0x02 health frame, 0x04
-       |      |                |          | oscillator trim, 0x08 heater PID.
+       |      |                |          | oscillator trim, 0x08 heater PID,
+       |      |                |          | 0x10 clear-error command, 0x20
+       |      |                |          | communication watchdog, 0x40
+       |      |                |          | electromagnet release.
 6      | 1    | reserved       | uint8_t  | 0.
 7      | 1    | checksum       | uint8_t  | CRC-8/SMBUS over bytes 0-6.
 
