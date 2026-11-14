@@ -201,11 +201,88 @@ void run_thermal_guard_tests(int *failures)
     }
 }
 
+// ---- a new setpoint restarts the watch only when it rises by more than retarget_min_rise_c --------------------------------------------------------------
+static const ThermalGuardLimits_t T12_RETARGET = {
+    .max_temp_c = 449, .watch_period_ms = 20000, .watch_min_rise_c = 10, .watch_band_c = 20,
+    .hold_period_ms = 45000, .hold_hysteresis_c = 40, .retarget_min_rise_c = 5,
+};
+
+static void test_retarget(int *failures)
+{
+    // a loose sensor and a host that moves the setpoint one degree every 5 s (a slider, an external PID): with the old rule the window never closed
+    {
+        Plant_t p = t12_plant(); p.sensor_loose = 1; Loop_t l = new_loop(0);
+        ThermalGuardFault_t f = THERMAL_GUARD_OK;
+        uint16_t target = 300;
+        for (int i = 0; i < 60 && f == THERMAL_GUARD_OK; i++) {
+            f = run_for(&l, &p, &T12, target++, 5, NULL);
+        }
+        TEST_ASSERT(f == THERMAL_GUARD_OK, "(the old rule) a setpoint moved a degree every 5 s keeps the guard from ever judging a loose sensor");
+    }
+    {
+        Plant_t p = t12_plant(); p.sensor_loose = 1; Loop_t l = new_loop(0);
+        ThermalGuardFault_t f = THERMAL_GUARD_OK;
+        uint16_t target = 300;
+        for (int i = 0; i < 60 && f == THERMAL_GUARD_OK; i++) {
+            f = run_for(&l, &p, &T12_RETARGET, target++, 5, NULL);
+        }
+        TEST_ASSERT(f == THERMAL_GUARD_HEATING_NO_RISE, "with the margin the same loose sensor is found while the setpoint creeps up");
+    }
+    // the guard state itself: what a change of the setpoint keeps and what it resets
+    {
+        ThermalGuard_t g;
+        ThermalGuard_Reset(&g);
+        ThermalGuard_Check(&g, &T12_RETARGET, 1000, 1, 100, 300);
+        TEST_ASSERT(g.watch_armed == 1 && g.last_target_c == 300, "a first setpoint arms the watch");
+        ThermalGuard_Check(&g, &T12_RETARGET, 1100, 1, 100, 305);
+        TEST_ASSERT(g.watch_armed == 1 && g.watch_start_ms == 1000 && g.last_target_c == 305, "a rise of exactly the margin keeps the window");
+        ThermalGuard_Check(&g, &T12_RETARGET, 1200, 1, 100, 311);
+        TEST_ASSERT(g.watch_start_ms == 1200 && g.last_target_c == 311, "a rise of more than the margin starts the watch over");
+        ThermalGuard_Check(&g, &T12_RETARGET, 1300, 1, 100, 200);
+        TEST_ASSERT(g.watch_armed == 1 && g.watch_start_ms == 1200 && g.last_target_c == 200, "a lower setpoint keeps the window, judged against the new setpoint");
+        ThermalGuard_Check(&g, &T12_RETARGET, 1400, 1, 100, 0);
+        TEST_ASSERT(g.watch_armed == 0 && g.last_target_c == 0, "the heater being commanded off always starts over");
+        // the old rule: any change restarts
+        ThermalGuard_Reset(&g);
+        ThermalGuard_Check(&g, &T12, 1000, 1, 100, 300);
+        ThermalGuard_Check(&g, &T12, 1100, 1, 100, 301);
+        TEST_ASSERT(g.watch_start_ms == 1100, "with a margin of zero a change of one degree starts the watch over, as it always did");
+    }
+    // a lower setpoint after the target was reached keeps the holding phase
+    {
+        ThermalGuard_t g;
+        ThermalGuard_Reset(&g);
+        ThermalGuard_Check(&g, &T12_RETARGET, 1000, 1, 300, 300);
+        TEST_ASSERT(g.reached_target == 1, "the target is reached");
+        ThermalGuard_Check(&g, &T12_RETARGET, 2000, 1, 300, 250);
+        TEST_ASSERT(g.reached_target == 1 && g.last_target_c == 250, "lowering the setpoint keeps the holding phase");
+        ThermalGuard_Check(&g, &T12_RETARGET, 3000, 1, 150, 320);
+        TEST_ASSERT(g.reached_target == 0, "a big rise after that starts a new heating phase");
+    }
+    // a big jump up still finds a loose sensor on the new setpoint
+    {
+        Plant_t p = t12_plant(); Loop_t l = new_loop(0);
+        run_for(&l, &p, &T12_RETARGET, 200, 120, NULL);
+        p.sensor_loose = 1;
+        ThermalGuardFault_t f = run_for(&l, &p, &T12_RETARGET, 350, 200, NULL);
+        TEST_ASSERT(f != THERMAL_GUARD_OK, "a big rise of the setpoint followed by a loose sensor is still found");
+    }
+    // healthy: a slider that creeps up and then down never trips a healthy heater
+    {
+        Plant_t p = t12_plant(); Loop_t l = new_loop(0);
+        ThermalGuardFault_t f = THERMAL_GUARD_OK;
+        for (uint16_t target = 200; target < 340 && f == THERMAL_GUARD_OK; target += 2) f = run_for(&l, &p, &T12_RETARGET, target, 6, NULL);
+        for (uint16_t target = 340; target > 250 && f == THERMAL_GUARD_OK; target -= 3) f = run_for(&l, &p, &T12_RETARGET, target, 6, NULL);
+        TEST_ASSERT(f == THERMAL_GUARD_OK, "a slider that creeps up and down never trips a healthy heater");
+    }
+}
+
 int main(void)
 {
     int failures = 0;
     printf("URTC host logic tests - thermal_guard.c\n");
     run_thermal_guard_tests(&failures);
+    test_retarget(&failures);
     if (failures == 0) {
         printf("  OK   all thermal guard host tests passed\n");
         return 0;

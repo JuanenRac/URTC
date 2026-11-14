@@ -38,6 +38,7 @@ typedef struct {
     uint16_t watch_band_c;        // heating phase = more than this below the target
     uint32_t hold_period_ms;      // holding phase: how long a sag is tolerated
     uint16_t hold_hysteresis_c;   // holding phase: how far below target counts as a sag
+    uint16_t retarget_min_rise_c; // a new setpoint starts the watch over only when it RISES by more than this (0 = any change does, the earlier behaviour)
 } ThermalGuardLimits_t;
 
 typedef struct {
