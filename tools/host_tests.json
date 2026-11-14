@@ -70,6 +70,16 @@
    "std": "c11"
   },
   {
+   "name": "can_recovery",
+   "test": "tests/test_can_recovery.c",
+   "sources": [],
+   "includes": [
+    "tests",
+    "src/common"
+   ],
+   "std": "c11"
+  },
+  {
    "name": "thermal_stats",
    "test": "tests/test_thermal_stats.c",
    "sources": [
