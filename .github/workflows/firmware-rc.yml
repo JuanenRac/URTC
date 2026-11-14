@@ -86,7 +86,8 @@ jobs:
       - name: Check out the exact commit that was planned
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ needs.plan.outputs.sha }}
+          # the planned commit is the one this run was started from (the plan job checks out github.sha): naming it from the run context keeps the checkout from depending on a job output
+          ref: ${{ github.sha }}
           persist-credentials: false
 
       - name: Set up Python
