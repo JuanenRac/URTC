@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented here.
 
-## [Unreleased]
+## [0.4.9] - Reduced interrupt work, optional transmit queue and metadata pages, clear-error command and bus speed declaration
 
 - **The expansion slave can read both sub-pages of the MLX90640, behind a build option that is off by default:** the camera measures half of its pixels per frame in a chess pattern and the slave took one frame per capture, so half of the image kept what an earlier capture had left or was zero (the master already had the option). Building the slave with `URTC_SLAVE_MLX90640_TWO_SUBPAGES=1` makes the capture take the frames that it needs, at most four, and calibrate each into the same image; a camera that keeps repeating one sub-page is an error. The state machine of the capture gets two optional joints (start and more), the host double of the bus can alternate the sub-page, and the slave suite runs again with the option on.
 - **Every frame the head sends can go through one transmit queue, behind a switch that is off by default:** the handlers put their frame straight into one of the three mailboxes, from the receive interrupt, from the touch interrupt or from the main loop, over each other, and the ones that send several frames in a row (the 32-byte answers, the images, the dumps) gave up the rest of the answer as soon as the third mailbox was busy. Building with `URTC_CAN_TX_QUEUE=1` redirects the send and the question about the free mailboxes of the application to a ring of 64 frames that is emptied into the mailboxes, oldest first, while one is free (right after each send and once per pass of the main loop); the room asked by the senders is the room of the ring, so a burst is no longer cut after the third frame, a full ring drops the new frame and counts it, and what waits is thrown away after a bus-off like the mailboxes. The impact event of the touch probe still goes straight to the mailboxes. The default is 0: nothing changes and neither the ring nor its glue is compiled. It has its own host suite (order, a full ring, bursts, bad calls, the discard, a seeded sweep against a model) and the suite of the feature frames runs again with the switch on.
@@ -53,6 +53,8 @@ All notable changes to this project are documented here.
 - **The manual host test workflow measures the coverage of the firmware logic with gcov and fails under 93 percent:** the 58 C suites execute 93.9 percent of the lines of the 83 firmware sources they compile (the floor is the measured value, never above it); an empty floor runs the suites without the measurement.
 
 - **The identity frame declares the bit rate of the bus (protocol version 2):** the master firmware sends the code of the rate it was built for (1 Mbit/s, or 500 kbit/s with `URTC_CAN_LEGACY_500K`) in byte 5 of `0x1BB`, `URTC_PROTOCOL_VERSION` is 2, and the uptime of that frame is 16 bits that stop at 65535 s instead of 24 bits. A tool of the previous protocol version reads the frame with a wrong uptime and no rate; the new tools read both versions. `src/common/urtc_can_ids.h` is the generated header of the new specification, `docs/CANBUS.TXT` is regenerated, and the host test covers the layout, the stop of the uptime and every rate code. The code is built only in the CI; it has not been run on a board.
+
+## [Unreleased]
 
 ## [0.4.8] - The bus runs at 1 Mbit/s, the application images carry their own header and the expansion link gets a check byte
 
