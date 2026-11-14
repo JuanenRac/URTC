@@ -368,6 +368,38 @@
    ]
   },
   {
+   "name": "can_dispatch_queue_on",
+   "test": "tests/test_can_dispatch.c",
+   "sources": [
+    "tests/host_hal/fake_hal.c",
+    "src/F303-master/firmware_can_dispatch.c",
+    "src/F303-master/firmware_can_dispatch_routing.c",
+    "src/F303-master/can_rx_queue.c"
+   ],
+   "includes": [
+    "tests",
+    "tests/host_hal",
+    "src/F303-master",
+    "src/common"
+   ],
+   "defines": [
+    "-DURTC_CAN_RX_QUEUE=1"
+   ]
+  },
+  {
+   "name": "can_rx_queue",
+   "test": "tests/test_can_rx_queue.c",
+   "sources": [
+    "src/F303-master/can_rx_queue.c"
+   ],
+   "includes": [
+    "tests",
+    "src/F303-master",
+    "src/common"
+   ],
+   "std": "c11"
+  },
+  {
    "name": "multinode",
    "test": "tests/test_multinode.c",
    "sources": [

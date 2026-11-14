@@ -494,6 +494,10 @@ int main(void) {
     while (1) {
         HAL_IWDG_Refresh(&hiwdg);
 
+#if URTC_CAN_RX_QUEUE
+        CanDispatch_Drain(); // the frames received since the last pass (the interrupt only stores them)
+#endif
+
         // CAN bus-off recovery - can_bus_error_flag is set by
         // HAL_CAN_ErrorCallback and consumed here to actually restart the
         // peripheral, not just report the condition via the 0x110 status
