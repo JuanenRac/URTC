@@ -70,6 +70,27 @@ class CheckImageVersions(unittest.TestCase):
         (self.folder / "URTC_MAIN_BOOTLOADER_v0.5.1.bin.manifest.json").write_text(json.dumps({"version": "0.5.0"}), encoding="utf-8")
         self.assertTrue(any("sidecar" in p or "manifest.json" in p for p in check_image_versions.check(self.folder)))
 
+    def project_file(self, **versions) -> Path:
+        declared = {"URTC_MAIN_FIRMWARE": "0.4.9", "URTC_MAIN_BOOTLOADER": "0.5.1", "URTC_SLAVE_FIRMWARE": "0.3.3", "URTC_SLAVE_BOOTLOADER": "0.3.5"}
+        declared.update(versions)
+        path = self.folder / "urtc.project.json"
+        path.write_text(json.dumps({"components": [{"name": n, "version": v} for n, v in declared.items()]}), encoding="utf-8")
+        return path
+
+    def test_every_component_must_be_what_the_project_file_states(self):
+        write_build(self.folder)
+        self.assertEqual(check_image_versions.check(self.folder, "0.4.9", self.project_file()), [])
+
+    def test_a_bootloader_that_is_not_the_declared_version_fails(self):
+        write_build(self.folder)
+        problems = check_image_versions.check(self.folder, None, self.project_file(URTC_MAIN_BOOTLOADER="0.5.2"))
+        self.assertTrue(any("main_bootloader is 0.5.1" in p and "0.5.2" in p for p in problems), problems)
+
+    def test_a_project_file_that_cannot_be_read_fails(self):
+        write_build(self.folder)
+        problems = check_image_versions.check(self.folder, None, self.folder / "missing.json")
+        self.assertTrue(any("cannot be read" in p for p in problems), problems)
+
 
 if __name__ == "__main__":
     unittest.main()

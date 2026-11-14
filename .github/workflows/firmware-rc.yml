@@ -134,7 +134,7 @@ jobs:
           VERSION: ${{ needs.plan.outputs.version }}
         run: |
           set -euo pipefail
-          python3 tools/check_image_versions.py build/firmware --main-version "$VERSION"
+          python3 tools/check_image_versions.py build/firmware --main-version "$VERSION" --project urtc.project.json
           # no path of the runner may be inside an image: a build made in another folder would differ
           for image in build/firmware/URTC_*.bin; do
             if grep -a -q -E "/home/runner|/tmp/|${RUNNER_TEMP}" "$image"; then

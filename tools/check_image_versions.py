@@ -6,13 +6,14 @@
 # =============================================================================
 """Checks that the version inside each firmware image is the version its name and the build manifest state.
 
-    python tools/check_image_versions.py DIR [--main-version X.Y.Z]
+    python tools/check_image_versions.py DIR [--main-version X.Y.Z] [--project urtc.project.json]
 
 DIR holds the four images of one build and its firmware_manifest.json. For each of the two application images the version is read from the header
 slot that the firmware emits at a fixed offset (tools/seal_image.py seals it); it must equal the version in the name of the file, the version of the
 manifest and the hardware of its board. The two bootloaders carry their version as code constants, not as a readable slot, so for them the name of the
 file and the manifest are compared with each other and with the sidecar; the version macros in the header files were already read by the build to
 name the files. With --main-version the main application must be exactly that version (the version of urtc.project.json).
+With --project every one of the four components must be the version that components[] of that file states, bootloaders included.
 Prints CHECK_IMAGE_VERSIONS=PASS and exits 0, or names each problem and exits 1.
 """
 from __future__ import annotations
@@ -30,6 +31,12 @@ from image_record import image_header  # noqa: E402
 EXPECTED = {"main_bootloader", "main_application", "slave_bootloader", "slave_application"}
 NAME_VERSION = re.compile(r"_v(\d+)\.(\d+)\.(\d+)(?:\.(\d+))?\.bin$")
 HARDWARE = {"main_application": 0x0303CC01, "slave_application": 0x0303CB01}
+PROJECT_NAMES = {
+    "main_application": "URTC_MAIN_FIRMWARE",
+    "main_bootloader": "URTC_MAIN_BOOTLOADER",
+    "slave_application": "URTC_SLAVE_FIRMWARE",
+    "slave_bootloader": "URTC_SLAVE_BOOTLOADER",
+}
 
 
 def padded(text: str) -> tuple[int, int, int, int]:
@@ -37,7 +44,7 @@ def padded(text: str) -> tuple[int, int, int, int]:
     return (*parts, *([0] * (4 - len(parts))))[:4]  # type: ignore[return-value]
 
 
-def check(folder: Path, main_version: str | None = None) -> list[str]:
+def check(folder: Path, main_version: str | None = None, project: Path | None = None) -> list[str]:
     problems: list[str] = []
     try:
         components = json.loads((folder / "firmware_manifest.json").read_text(encoding="utf-8"))["components"]
@@ -47,6 +54,15 @@ def check(folder: Path, main_version: str | None = None) -> list[str]:
         return ["the manifest holds " + ", ".join(sorted(components)) + " instead of the four components"]
     if main_version is not None and components["main_application"].get("version_string") != main_version:
         problems.append(f"main_application is {components['main_application'].get('version_string')}, expected {main_version}")
+    if project is not None:
+        try:
+            declared = {c["name"]: str(c["version"]) for c in json.loads(project.read_text(encoding="utf-8"))["components"]}
+        except (OSError, ValueError, KeyError) as error:
+            return [f"{project.name} cannot be read: {error}"]
+        for key, name in PROJECT_NAMES.items():
+            built = str(components[key].get("version_string"))
+            if name not in declared or padded(declared[name]) != padded(built):
+                problems.append(f"{key} is {built}, {project.name} states {declared.get(name)} for {name}")
     for key, component in sorted(components.items()):
         text = str(component.get("version_string"))
         filename = component["files"]["bin"]["filename"]
@@ -75,8 +91,9 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("folder", type=Path)
     parser.add_argument("--main-version")
+    parser.add_argument("--project", type=Path, help="urtc.project.json: all four components must match its components[]")
     args = parser.parse_args(argv)
-    problems = check(args.folder, args.main_version)
+    problems = check(args.folder, args.main_version, args.project)
     for problem in problems:
         print("CHECK_IMAGE_VERSIONS problem:", problem)
     print("CHECK_IMAGE_VERSIONS=" + ("FAIL" if problems else "PASS"))
