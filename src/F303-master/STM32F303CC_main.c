@@ -7,6 +7,7 @@
 // dozen .c/.h files by responsibility.
 // =============================================================================
 #include "firmware_common.h"
+#include "urtc_can_recovery.h"
 #include "urtc_flash_layout.h"
 #include "firmware_thermal_stats.h"
 #include "firmware_init_clocks.h"
@@ -33,6 +34,7 @@
 #include "firmware_crash_dump.h"
 #include "firmware_multinode.h"
 #include "firmware_features.h"
+#include "firmware_safety.h"
 #include "urtc_can_ids.h"
 
 volatile ToolMode_t active_tool;
@@ -129,6 +131,7 @@ volatile uint8_t layer_fan_duty = 0;     // 0-255 setpoint received via CAN (0x1
 volatile uint32_t layer_fan_rpm_pulses = 0;          // FG edge accumulator between telemetry cycles
 volatile uint32_t layer_fan_actual_rpm = 0;          // Calculated RPM, ready for 0x177 telemetry
 volatile uint8_t system_error_flag = 0; 
+volatile uint8_t system_error_reason = 0; // why it was latched (firmware_common.h, RAISE_SYSTEM_ERROR)
 // Defers movement commands until the boot splash completes - TIM3 (step
 // generation) and CAN are both already live during the 5s splash, so a
 // 0x120/0x170 move command arriving in that window would otherwise start
@@ -508,7 +511,11 @@ int main(void) {
             // instant the bus comes back, carrying whatever stale
             // telemetry/status payload they held from before the fault
             // instead of a fresh read of that same data.
-            HAL_CAN_AbortTxRequest(&hcan, CAN_TX_MAILBOX0 | CAN_TX_MAILBOX1 | CAN_TX_MAILBOX2);
+            // Only after a real bus-off (the controller recovers by itself: AutoBusOff): an error of any other kind is retried by the controller and aborting the
+            // mailboxes at each of them threw away answers that were still good. HAL_CAN_Start() on a started controller returns an error and does nothing.
+            if (urtc_can_recovery_abort_tx(hcan.Instance->ESR)) {
+                HAL_CAN_AbortTxRequest(&hcan, CAN_TX_MAILBOX0 | CAN_TX_MAILBOX1 | CAN_TX_MAILBOX2);
+            }
             HAL_CAN_Start(&hcan);
         }
 
@@ -540,6 +547,7 @@ int main(void) {
             Watchdog_Safety_HotAirBlower();
             Watchdog_Safety_SolderIron();
             Watchdog_Safety_HotendHeater();
+            Safety_Service();
             WeldPulse_Tick();
         }
 

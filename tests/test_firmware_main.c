@@ -148,10 +148,15 @@ static void test_every_tool(int *failures)
 }
 
 static void raise_bus_error(int refreshes) { if (refreshes == 80) can_bus_error_flag = 1; }
+static void raise_bus_off(int refreshes) { if (refreshes == 80) { fake_can_regs.ESR = 0x4u; can_bus_error_flag = 1; } }
 static void test_bus_error(int *failures)
 {
+    fake_can_regs.ESR = 0;
     boot(TOOL_SOLDERING_IRON, 200, raise_bus_error);
-    TEST_ASSERT(can_bus_error_flag == 0 && fake_can_abort_count >= 1 && fake_can_starts == 2, "a CAN bus error is cleared by aborting the pending requests and starting the controller again");
+    TEST_ASSERT(can_bus_error_flag == 0 && fake_can_abort_count == 0 && fake_can_starts == 2, "a CAN error that is not a bus-off leaves the pending requests and starts the controller again");
+    boot(TOOL_SOLDERING_IRON, 200, raise_bus_off);
+    TEST_ASSERT(can_bus_error_flag == 0 && fake_can_abort_count >= 1 && fake_can_starts == 2, "a CAN bus-off is cleared by aborting the pending requests and starting the controller again");
+    fake_can_regs.ESR = 0;
 }
 
 static void raise_latched_error(int refreshes) { if (refreshes == 80) system_error_flag = 1; }

@@ -91,8 +91,9 @@ Effect: answers with 0x111. Read-only, no side effects - answered even
 
 ID: 0x111 [URTC Tool Head -> Master, answers 0x110]
 Active tool + quick state response
-DLC: 6 bytes (firmware 0.3.2+; older firmware answers with the first 4 -
-     a host must treat missing bytes 4-5 as "not reported", not as 0)
+DLC: 8 bytes (firmware with the error reason; 6 bytes from firmware 0.3.2, older
+     firmware answers with the first 4 - a host must treat missing bytes 4-7
+     as "not reported", not as 0)
 Data:
   - txData[0]: Active tool (matches the ToolMode_t enum in
                firmware_common.h): 0=Soldering Iron, 1=Paste Dispenser,
@@ -123,6 +124,15 @@ Data:
   - txData[2]: can_bus_error_flag (0x01 = a CAN bus fault was seen)
   - txData[3]: boot_sequence_active (0x01 = still inside the ~5s boot
                splash window - movement commands are deferred until this clears)
+  (bytes 4 and 5, the thermal fault and the reset cause, are described in the
+  generated reference below)
+  - txData[6]: why the critical error is latched (0 = none): 1 unknown, 2 thermal,
+               3 sensor, 4 no valid tool, 5 communication watchdog of an
+               actuator, 6 hotend fan stalled, 7 stepper move cut by the
+               silence of the host, 8 electromagnet released by it
+  - txData[7]: outcome of the last clear-error command since power-up (0 = none,
+               1 lifted, 2 switch off, 3 no error, 4 not clearable, 5 hot or
+               unknown temperature, 6 an actuator is not at zero)
   - txData[4]: thermal_fault_code - WHY the heater was cut by the thermal
                runaway guard (thermal_guard.c), 0 if it never was:
                  0 = none
@@ -356,12 +366,17 @@ Switch the optional firmware features on or off (fw_features.c, firmware_feature
 DLC: 5 bytes
 Data:
   - rxData[0..3]: magic payload 0x46 0x45 0x41 0x54 (ASCII 'FEAT')
-  - rxData[4]:    bit mask of the features to have ON (any bit outside 0x0F:
+  - rxData[4]:    bit mask of the features to have ON (any bit outside 0x7F:
                   the frame is ignored)
                   0x01 = stepper ramps (trapezoid and S-curve, see 0x120)
                   0x02 = health frame (0x1B8)
                   0x04 = oscillator trim against the CAN bit time
                   0x08 = heater PID with relay autotune (0x1B9 / 0x1BA)
+                  0x10 = clear-error command (0x1B2)
+                  0x20 = communication watchdog of the steppers (0x120) and, with
+                         0x40, of the electromagnet (0x1B0)
+                  0x40 = the electromagnet lets go when the host falls silent
+                         (needs 0x20; without it the coil is held)
 Effect: stores the mask in its own F-RAM record (address 976, EEPROM.TXT
         section 8) and answers with 0x1AF. The setting acts after the NEXT
         power-up, never in the middle of a job. Every feature is OFF by
@@ -374,6 +389,20 @@ Effect: stores the mask in its own F-RAM record (address 976, EEPROM.TXT
         timer, the analogue channels of the health frame and the oscillator
         measurement need a bench (see CHANGELOG.md).
 
+ID: 0x1B2 [Master -> URTC Tool Head]
+Lift a latched critical error without a power cycle (feature 0x10 of 0x1AE, off by default)
+DLC: 4 bytes
+Data:
+  - rxData[0..3]: magic payload 0x43 0x4C 0x45 0x52 (ASCII 'CLER')
+Effect: answered with 0x111 (also during a critical error; any other payload or
+        length is ignored). With the feature off nothing changes and byte 7 of 0x111
+        says so. With it on the error is lifted only when the temperature of the
+        tool is known and below 50 C and every actuator is at zero (laser, drill,
+        heater set-points, fans, UV, hot-air blower, stepper moves, an energised
+        coil); an error for lack of a valid tool is never lifted. Lifting clears
+        the reason, the thermal fault and the thermal-runaway watch windows.
+        Without the feature a latched error still needs a power cycle.
+
 ID: 0x1AF [Master -> URTC Tool Head, or URTC Tool Head -> Master answering 0x1AE]
 Query/response: the optional firmware features
 DLC: any as a query (payload ignored) | 3 bytes as a response
@@ -381,7 +410,7 @@ Data:
   - txData[0]: stored in F-RAM (bit mask)
   - txData[1]: in force now (bit mask); differs from txData[0] until the
                next power-up
-  - txData[2]: supported by this firmware (0x0F)
+  - txData[2]: supported by this firmware (0x7F)
 
 ID: 0x1B8 [URTC Tool Head -> Master]
 Health frame of the board (only while feature 0x02 runs; once a second)
@@ -666,6 +695,11 @@ Data:
   The board plans the move (motion_profile.c) and ignores bytes 5 to 7
   whenever the feature is off. The step generator does not use the plan yet:
   loading the interval of each step into the timer needs a timing bench.
+  Communication watchdog (feature 0x20 of 0x1AE, off by default): a move is cut and
+  the critical error latched (reason 7) when the board hears no frame at all for
+  more than half of the time the move should take (steps over speed, 500 steps/s
+  when no speed is given) and never for less than 1 s. With the feature off there
+  is no watchdog, as before; any frame of the host, a query included, counts.
   Note: Uses lines PB3 (STEP), PB5 (DIR), and PB6 (TMC_ENN). The firmware
         enables power on receiving the frame (PB6=0) and cuts it once
         finished (PB6=1) to avoid static overheating.
@@ -911,11 +945,14 @@ Data:
                channel - an electromagnet has no use for a variable duty
                cycle the way this same physical pin's other use (the
                soldering iron's own bang-bang heater control) does.
-  Note: Deliberately no communication-loss watchdog, unlike every other
+  Note: By default there is no communication-loss watchdog, unlike every other
         actuator on this board - staying energized is this tool's own
         safer failure mode (a held part stays held), not the more
         dangerous one, so a lost link intentionally does NOT release it.
         Confirmed explicitly with the project owner, not an oversight.
+        Policy switch (both off by default, 0x1AE): with the features 0x20 and 0x40
+        on, the coil lets go after 5 s without any frame from the host and the
+        critical error is latched (reason 8); with 0x40 off the coil is held.
 
 ID: 0x1C0 [Master -> URTC Tool Head]
 Spot Welder Head timed pulse
@@ -1905,7 +1942,7 @@ accepted.
   0x1BC -> Ask for the crash record, only a firmware built with the crash capture answers (DLC:1+)
   0x1BD -> The crash record: six frames of eight bytes (DLC:8)
   --- Per-tool commands (see dedicated sections above) ---
-  0x120 -> Stepper motor control (Dispensers, Screwdriver, Grippers - DLC:5 - no watchdog)
+  0x120 -> Stepper motor control (Dispensers, Screwdriver, Grippers - DLC:5 - no watchdog unless feature 0x20 is on)
   0x130 -> T12 setpoint temperature (Soldering iron - DLC:2 - 250ms watchdog)
   0x131 -> Reset solder wire feeder position, magic payload 'RSP0' (Soldering iron - DLC:4)
   0x132 -> Query/response: solder wire feeder position (Soldering iron - DLC:any/4)
@@ -1923,7 +1960,7 @@ accepted.
   0x177 -> Layer fan actual RPM telemetry, uint16_t (3D printer - DLC:2)
   0x178 -> Hotend fan PWM power control, (3D printer - DLC:1 - no watchdog, on purpose)
   0x179 -> Hotend fan actual RPM telemetry, uint16_t, (3D printer - DLC:2)
-  0x1B0 -> Coil on/off (Electromagnet - DLC:1 - no watchdog, on purpose)
+  0x1B0 -> Coil on/off (Electromagnet - DLC:1 - no watchdog, on purpose; features 0x20 and 0x40 make it let go)
   0x1C0 -> Timed pulse + contact-sensor gate (Spot Welder - DLC:3)
   0x1D0 -> LED driver duty cycle (UV Curing - DLC:1 - 250ms watchdog)
   0x1E0 -> Heater setpoint + blower duty (Hot Air Rework - DLC:3 - 250ms watchdog on the heater, 1000ms on the blower)
@@ -2040,18 +2077,18 @@ GENERATED REFERENCE (from the specification in URTC-COMMON)
 
 A. Summary
 
-[[ BEGIN GENERATED summary sha256=70c558f877b994f4b436b3463bcdd3330b08a292811d3b77a725f63a5df51109 ]]
+[[ BEGIN GENERATED summary sha256=b960289988685b20c3f9889de915a4e753eb7261ab390e9dc993c0396c601e29 ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 URTC CAN protocol: protocol version 2, byte order big.
-106 identifiers, 25 tool profiles, 23 enumerations, 41 constants, 4 magic payloads, 27 registers of the expansion slave.
+107 identifiers, 25 tool profiles, 25 enumerations, 45 constants, 5 magic payloads, 27 registers of the expansion slave.
 
 Machine-readable specification of the CAN bus protocol of the URTC tool head: every identifier with its direction, length rule and payload layout, the magic payloads, the registers of the expansion slave, the version procedures and the SLCAN subset the host tools rely on. All multi-byte fields are big-endian.
 [[ END GENERATED summary ]]
 
 B. Index of identifiers
 
-[[ BEGIN GENERATED index sha256=cf89ac5b99caa5cd3ea386a5dfe28684e61756d8dc18f433dc23ff5e5cd90033 ]]
+[[ BEGIN GENERATED index sha256=02d839c24c2fe850166f492b32c718cce58f00c7cf00ddab48112c93a72ea3b9 ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 | ID | Name | Direction | DLC | Tools | Group | Title |
@@ -2059,7 +2096,7 @@ Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_do
 | 0x095 | IMPACT_EVENT | board to host | 1 | 11 | impact | Impact register (touch probe, maximum priority) |
 | 0x100 | GLOBAL_STATUS | host to board | 8 | any | global | Status LED, ring LED and OLED mode |
 | 0x110 | QUERY_ACTIVE_TOOL | host to board | any | any | global | Query the active tool and the quick state |
-| 0x111 | ACTIVE_TOOL_RESP | board to host | 4-6 | any | global | Active tool and quick state |
+| 0x111 | ACTIVE_TOOL_RESP | board to host | 4-8 | any | global | Active tool and quick state |
 | 0x120 | MOTION_CMD | host to board | 5-8 | 0,1,2,3,6,7,12,16 | motion | Plain stepper move (direction and step count) |
 | 0x130 | SOLDER_SETPOINT | host to board | 2 | 0 | soldering | T12 setpoint temperature |
 | 0x131 | SOLDER_FEEDER_RESET | host to board | 4 | 0 | soldering | Reset the solder wire feeder position |
@@ -2072,7 +2109,7 @@ Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_do
 | 0x155 | AOI_TELEMETRY | board to host | 1 | 8 | aoi | AOI endstop telemetry |
 | 0x160 | LASER_CMD | host to board | 2 | 9 | laser | Laser power and interlock |
 | 0x165 | LASER_TELEMETRY | board to host | 1 | 9 | laser | Laser endstop telemetry |
-| 0x170 | PRINTER_THERMAL_MOTION | host to board | 6 | 10 | printer | Nozzle setpoint and extruder motion |
+| 0x170 | PRINTER_THERMAL_MOTION | host to board | 6 2 | 10 | printer | Nozzle setpoint and extruder motion |
 | 0x173 | PRINTER_LAYERFAN_CMD | host to board | 1 | 10 | printer | Layer fan power |
 | 0x175 | PRINTER_HOTEND_TELEMETRY | board to host | 2 | 10 | printer | Hotend temperature telemetry |
 | 0x177 | PRINTER_LAYERFAN_RPM | board to host | 2 | 10 | printer | Layer fan RPM telemetry |
@@ -2102,6 +2139,7 @@ Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_do
 | 0x1AE | SET_FEATURES | host to board | 5 | any | configuration | Switch the optional firmware features on or off (persistent, acts after the next power-up) |
 | 0x1AF | FEATURES_RESP | both ways | any / 3 | any | configuration | The optional firmware features: stored mask, mask in force and supported mask |
 | 0x1B0 | ELECTROMAGNET_CMD | host to board | 1 | 13 | electromagnet | Electromagnet coil |
+| 0x1B2 | CLEAR_ERROR | host to board | 4 | any | global | Lift a latched critical error without a power cycle (feature CLEAR_ERROR, off by default) |
 | 0x1B8 | HEALTH_PROFILE | board to host | 8 | any | diagnostics | Periodic health frame of the board (only while the health feature runs) |
 | 0x1B9 | PID_CONFIG | host to board | 7 | any | configuration | Gains of the heater PID and start of its relay autotune |
 | 0x1BA | PID_STATE_RESP | both ways | any / 8 | any | configuration | The heater PID: gains in force, state and output |
@@ -2166,7 +2204,7 @@ Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_do
 
 C. Field layouts and examples
 
-[[ BEGIN GENERATED layouts sha256=882ed801b9b32313567b466f6ebbd47d1daba3ab32d2349fea6b810bec6d1187 ]]
+[[ BEGIN GENERATED layouts sha256=9301778c270cecfabe4bbb3352f3fa7cdf997b3017025390db698b94d47ad877 ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 ### 0x095 IMPACT_EVENT - Impact register (touch probe, maximum priority)
@@ -2223,7 +2261,7 @@ Note: Answered with 0x111, also during a critical error.
 
 board to host; handled by the application; tools: any; answered even while a critical error is declared.
 
-response, DLC 4-6
+response, DLC 4-8
 
 | Byte | Width | Type | Field | Values | Note |
 |---|---|---|---|---|---|
@@ -2233,11 +2271,14 @@ response, DLC 4-6
 | 3 | 1 | u8 | booting | 0..1 |  |
 | 4 | 1 | u8 | thermal_fault | enum thermal_fault, optional | Absent from firmware before the thermal guard: not reported, not zero. |
 | 5 | 1 | u8 | reset_cause | enum reset_cause, optional | Absent from firmware before the reset-cause byte: not reported, not zero. |
+| 6 | 1 | u8 | error_reason | enum error_reason, optional | Why the critical error is latched, 0 = none. Absent from firmware before the error reason: not reported, not zero. |
+| 7 | 1 | u8 | clear_result | enum clear_error_result, optional | Outcome of the last clear-error command (0x1B2) since power-up. Absent from firmware before the error reason. |
 
 Example idle soldering iron after a power-on reset: data 000000000008 (tool_id=0, system_error=0, can_error=0, booting=0, thermal_fault=0, reset_cause=8)
 
 Note: Byte 0 is the already-resolved tool, never the raw jumper reading (see 0x1A3).
 Note: A host must treat missing bytes as not reported.
+Note: Also the answer to the clear-error command 0x1B2, whose outcome is in the last byte.
 
 ### 0x120 MOTION_CMD - Plain stepper move (direction and step count)
 
@@ -2260,6 +2301,7 @@ Example forward 1000 steps, 800 steps/s, S-curve: data 01000003E8032002 (directi
 
 Note: The prose names tools 1, 2, 3, 6, 7 and the soldering iron's wire feeder; the firmware routing table also sends tools 12 and 16 here.
 Note: With eight bytes the frame also carries a cruise speed and a speed profile. A board whose MOTION_RAMPS feature is off ignores bytes 5 to 7, exactly as before.
+Note: While the COMMS_WATCHDOG feature of 0x1AE runs, a move is cut and the critical error latched (reason STEPPER_SILENCE) when the board hears no frame at all for longer than STEPPER_SILENCE_PERCENT of the time the move should take (steps over speed), and never for less than STEPPER_SILENCE_MIN_MS. With the feature off there is no watchdog, as before.
 
 ### 0x130 SOLDER_SETPOINT - T12 setpoint temperature
 
@@ -2420,7 +2462,7 @@ Example triggered: data 01 (endstop=1)
 
 ### 0x170 PRINTER_THERMAL_MOTION - Nozzle setpoint and extruder motion
 
-host to board; handled by the application; tools: 10; refused while a critical error is declared; timing: watchdog_ms 250; the firmware accepts DLC 6-8.
+host to board; handled by the application; tools: 10; refused while a critical error is declared; timing: watchdog_ms 250; the firmware accepts DLC 2-8.
 
 request, DLC 6
 
@@ -2434,7 +2476,18 @@ Example 200 C, extrude 16 steps: data 00C801000010 (nozzle_setpoint_c=200, extru
 
 Example heater off: data 000001000000 (nozzle_setpoint_c=0, extruder_direction=1, extruder_steps=0)
 
+request (heater_only), DLC 2: Only the heater: the setpoint is set and the watchdog is refreshed, and a move of the extruder that is under way is left alone. The long frame with 0 steps stops the extruder, so the keepalive of a heater that is on while the extruder moves uses this one.
+
+| Byte | Width | Type | Field | Values | Note |
+|---|---|---|---|---|---|
+| 0 | 2 | u16 | nozzle_setpoint_c | 0..300, C | The hosts offer 0 to 300 C; the firmware hard ceiling is 310 C. |
+
+Example keep a 200 C setpoint alive without touching the extruder: data 00C8 (nozzle_setpoint_c=200)
+
+Example heater off, extruder untouched: data 0000 (nozzle_setpoint_c=0)
+
 Note: The watchdog covers the nozzle setpoint only, not the extruder motion.
+Note: A frame of 2 bytes (heater only) leaves the extruder as it was; a frame of 6 bytes with 0 steps stops it (unchanged).
 Note: Only the extruder steps wait for the boot sequence; the nozzle setpoint is accepted during it.
 
 ### 0x173 PRINTER_LAYERFAN_CMD - Layer fan power
@@ -2826,7 +2879,7 @@ request, DLC 5
 | Byte | Width | Type | Field | Values | Note |
 |---|---|---|---|---|---|
 | 0 | 4 | bytes | magic | fixed 46454154 |  |
-| 4 | 1 | u8 | features | 0..15, enum firmware_feature | Bit mask: the features to have on; the others are off. |
+| 4 | 1 | u8 | features | 0..127, enum firmware_feature | Bit mask: the features to have on; the others are off. |
 
 Example all off: data 4645415400 (magic=46454154, features=0)
 
@@ -2849,9 +2902,9 @@ response, DLC 3
 
 | Byte | Width | Type | Field | Values | Note |
 |---|---|---|---|---|---|
-| 0 | 1 | u8 | stored | 0..15 | The mask the F-RAM record says. |
-| 1 | 1 | u8 | running | 0..15 | The mask in force now; it differs from stored until the next power-up. |
-| 2 | 1 | u8 | supported | 0..15 | The features this firmware has. |
+| 0 | 1 | u8 | stored | 0..127 | The mask the F-RAM record says. |
+| 1 | 1 | u8 | running | 0..127 | The mask in force now; it differs from stored until the next power-up. |
+| 2 | 1 | u8 | supported | 0..127 | The features this firmware has. |
 
 Example health on, stored but not yet running: data 02000F (stored=2, running=0, supported=15)
 
@@ -2867,7 +2920,23 @@ request, DLC 1
 
 Example energise: data 01 (coil=1)
 
-Note: Deliberately no watchdog: staying energised is the safer failure mode.
+Note: No watchdog by default: staying energised is the safer failure mode. With the COMMS_WATCHDOG and MAGNET_RELEASE features of 0x1AE both on, the coil lets go when the board hears no frame for MAGNET_SILENCE_MS and the critical error is latched (reason MAGNET_RELEASE); with MAGNET_RELEASE off the coil is held.
+
+### 0x1B2 CLEAR_ERROR - Lift a latched critical error without a power cycle (feature CLEAR_ERROR, off by default)
+
+host to board; handled by the application; tools: any; answered even while a critical error is declared; needs the magic payload clear_error; the firmware accepts DLC 4.
+
+request, DLC 4
+
+| Byte | Width | Type | Field | Values | Note |
+|---|---|---|---|---|---|
+| 0 | 4 | bytes | magic | fixed 434C4552 |  |
+
+Example clear: data 434C4552 (magic=434C4552)
+
+Note: Works only while the CLEAR_ERROR feature of 0x1AE runs; with it off the command changes nothing and 0x111 says so in its last byte.
+Note: The error is lifted only when the temperature of the tool is known and below CLEAR_ERROR_MAX_TEMP_C and every actuator is at zero (laser, drill, heater set-points, fans, UV, hot-air blower, stepper moves); otherwise it stays and the last byte of 0x111 says why. An error for lack of a valid tool is never lifted.
+Note: Always answered with 0x111, whose error_reason byte tells why the error was latched and whose last byte tells what this command did.
 
 ### 0x1B8 HEALTH_PROFILE - Periodic health frame of the board (only while the health feature runs)
 
@@ -3083,7 +3152,7 @@ Note: Same layout as 0x7F1; the slave HardwareID is not the main board one.
 
 host to board; handled by the application; tools: any; refused while a critical error is declared; the firmware accepts DLC 8.
 
-request, DLC 8: Four sequential frames, bytes 0-7, 8-15, 16-23 and 24-31 of the SHA-256 (no key) of the slave image, right after 0x211 and before the first 0x213. The slave compares it with the hash of what it received; WHO vouched for the image is decided by the master from the record of 0x21A.
+request, DLC 8: Four sequential frames, bytes 0-7, 8-15, 16-23 and 24-31 of the SHA-256 (no key) of the slave image, right after 0x211 and before the first 0x213. The slave compares it with the hash of what it received; WHO vouched for the image is decided by the master from the record of 0x21A. The frames carry no index: the position is implicit, a counter of the chunks of the group of four that every 0x211 sets to zero, every 0x212 raises by one and the fourth chunk returns to zero. When the end frame 0x214 arrives and the counter is not zero (1 to 3 chunks of a group), a frame was lost: the master does not forward the end frame, reports 0x215 VERIFY_FAIL and answers 0x219 with DIGEST_CHUNK_MISSING (7). A counter of 0 (a sender that does not send the digest) behaves as before.
 
 | Byte | Width | Type | Field | Values | Note |
 |---|---|---|---|---|---|
@@ -3217,6 +3286,7 @@ response, DLC 1
 Example CRC32: data 02 (reason=2)
 
 Note: Only meaningful right after 0x215 reports VERIFY_FAIL.
+Note: DIGEST_CHUNK_MISSING (7) is answered by the master bridge itself, not by the slave bootloader: a group of digest chunks (0x212) was left half way when 0x214 arrived. The legacy signature chunks (0x7F7) of the old bootloaders keep their order-only layout; the current bootloader reads the Ed25519 record instead.
 
 ### 0x21A SLAVE_RECORD_CHUNK - One chunk of the Ed25519 signature record of the slave image
 
@@ -3907,7 +3977,7 @@ Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_do
 
 E. Enumerations
 
-[[ BEGIN GENERATED enums sha256=3fa7d2e387d2bedfa70f4fc168cb8971efc07ad141c8a1d7b5dc7fb91e6daf5c ]]
+[[ BEGIN GENERATED enums sha256=75845e31ee4641619632e8b23322e2ba58dc5c831b2aa9bef080261a78c99e75 ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 tool - Tool profile (prefix TOOL_, value)
@@ -3975,6 +4045,7 @@ slave_verify_fail_reason - Verify-fail reasons only the expansion slave bootload
 | Value | Name | Title |
 |---|---|---|
 | 6 | NOT_CONFIRMED | The master did not confirm the image in time, or its confirmation does not match this session and image |
+| 7 | DIGEST_CHUNK_MISSING | The master bridge found a group of digest chunks (0x212) left half way when the end (0x214) arrived; a frame was lost |
 
 responder - Answering side (prefix RESPONDER_, value)
 
@@ -4101,6 +4172,9 @@ firmware_feature - Optional firmware features (each one is off until switched on
 | 0x02 | HEALTH_PROFILE | Periodic health frame of the board |
 | 0x04 | HSI_AUTOTRIM | Trim of the internal oscillator against the CAN bit time |
 | 0x08 | THERMAL_PID | PID with anti-windup and relay autotune for the heaters |
+| 0x10 | CLEAR_ERROR | The clear-error command (0x1B2) works: a latched error is lifted without a power cycle once the board is cool and every actuator is off |
+| 0x20 | COMMS_WATCHDOG | Communication watchdog of the stepper moves and of the electromagnet (silence of the host) |
+| 0x40 | MAGNET_RELEASE | With the communication watchdog: the electromagnet lets go when the host falls silent (without it, it holds) |
 
 motion_profile - Speed profile of a stepper move (prefix MOTION_PROFILE_, value)
 
@@ -4128,11 +4202,37 @@ pid_state - State of the heater PID (prefix PID_STATE_, value)
 | 2 | AUTOTUNING | Relay autotune in progress |
 | 3 | AUTOTUNE_DONE | Autotune finished and the gains were stored |
 | 4 | AUTOTUNE_FAILED | Autotune gave up; the previous gains are kept |
+
+error_reason - Why the board latched its critical error (prefix ERROR_REASON_, value)
+
+| Value | Name | Title |
+|---|---|---|
+| 0 | NONE | No error |
+| 1 | UNKNOWN | Raised by a path that does not record its reason |
+| 2 | THERMAL | Thermal guard or heater control (see thermal_fault) |
+| 3 | SENSOR | A reading of the board could not be trusted |
+| 4 | TOOL_ID | No valid tool for the jumper setting (never cleared by command) |
+| 5 | COMMS_WATCHDOG | An actuator was cut because its refresh stopped |
+| 6 | FAN_STALL | The hotend fan stalled |
+| 7 | STEPPER_SILENCE | A stepper move was cut because the host fell silent |
+| 8 | MAGNET_RELEASE | The electromagnet was released because the host fell silent |
+
+clear_error_result - Outcome of the last clear-error command (prefix CLEAR_ERROR_, value)
+
+| Value | Name | Title |
+|---|---|---|
+| 0 | NONE | No clear-error command since power-up |
+| 1 | CLEARED | The error was lifted |
+| 2 | REFUSED_SWITCH_OFF | The CLEAR_ERROR feature is off |
+| 3 | REFUSED_NO_ERROR | There was no error to clear |
+| 4 | REFUSED_NOT_CLEARABLE | The error cannot be lifted by command (no valid tool) |
+| 5 | REFUSED_HOT | The temperature is not below the limit, or it is unknown |
+| 6 | REFUSED_ACTUATOR_ON | An actuator is not at zero |
 [[ END GENERATED enums ]]
 
 F. Constants
 
-[[ BEGIN GENERATED constants sha256=8aadeff811aac35ddf5ba50645c0e5a243615165c305c6ed36449a5cfccb0fe7 ]]
+[[ BEGIN GENERATED constants sha256=9f26c8482ad1cd71e8dad96c05bc670088cc21ef0025c620b8b6179f602336d2 ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 | Name | Value | Unit | Group | Title |
@@ -4178,11 +4278,15 @@ Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_do
 | THERMAL_CHUNK_COUNT_MLX90640 | 48 |  | protocol | Chunks of a 32x24 frame (MLX90640 and MLX90642) |
 | THERMAL_CHUNK_COUNT_MLX90641 | 12 |  | protocol | Chunks of a 16x12 frame (MLX90641) |
 | BLACKBOX_CHUNK_COUNT | 22 |  | protocol | Chunks of the fault recorder record read by 0x1A8 |
+| CLEAR_ERROR_MAX_TEMP_C | 50 | C | protocol | A latched error is lifted only below this temperature |
+| STEPPER_SILENCE_MIN_MS | 1000 | ms | timing | Least silence of the host that cuts a stepper move (communication watchdog on) |
+| STEPPER_SILENCE_PERCENT | 50 | % | timing | Silence that cuts a stepper move, as a percentage of the time the move should take (never below the least) |
+| MAGNET_SILENCE_MS | 5000 | ms | timing | Silence of the host after which the electromagnet lets go (communication watchdog and release policy on) |
 [[ END GENERATED constants ]]
 
 G. Magic payloads
 
-[[ BEGIN GENERATED magic sha256=1b50cbb167760e27beb6acc7fd26de976956d324d6c17db6e414cd45bcb1d0e4 ]]
+[[ BEGIN GENERATED magic sha256=64e3515182f1d1886228dc5c8c3db41a8b301b8b15443c220bcbfd63d629df92 ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 | Name | ID | Data | Also on | Title |
@@ -4191,6 +4295,7 @@ Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_do
 | authorize_downgrade | 0x7FD | D09E12AD |  | Allow one older, validly signed image |
 | erase_fram | 0x192 | E3A5E0FF |  | Erase the recovered persisted state |
 | solder_feeder_reset | 0x131 | 52535030 |  | Reset the solder wire feeder position (ASCII RSP0) |
+| clear_error | 0x1B2 | 434C4552 |  | Lift a latched critical error (ASCII CLER) |
 [[ END GENERATED magic ]]
 
 H. Registers of the expansion slave

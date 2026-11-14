@@ -8,6 +8,7 @@
 #include "thermal_guard.h"
 #include "firmware_thermal_stats.h"
 #include "firmware_features.h"
+#include "t12_settle.h"
 
 // Last thermal-guard fault (ThermalGuardFault_t), 0 = none. Reported as the
 // 5th byte of the 0x111 state answer so a host knows WHY the board blocked
@@ -39,11 +40,16 @@ static ThermalGuard_t hotend_guard;
 static uint8_t ThermalGuard_Apply(ThermalGuardFault_t fault) {
     if (fault == THERMAL_GUARD_OK) return 0;
     thermal_fault_code = (uint8_t)fault;
-    system_error_flag = 1;
+    RAISE_SYSTEM_ERROR(URTC_ERROR_REASON_THERMAL);
     target_temperature = 0;
     HAL_GPIO_WritePin(T12_PWM_PORT, T12_PWM_PIN, GPIO_PIN_RESET);
     ThermalStats_NoteFault((uint8_t)fault); // after the heater is already off
     return 1;
+}
+
+void Control_ThermalGuardsReset(void) {
+    ThermalGuard_Reset(&t12_guard);
+    ThermalGuard_Reset(&hotend_guard);
 }
 
 void Control_SolderingIron_PID(void) {
@@ -61,7 +67,7 @@ void Control_SolderingIron_PID(void) {
     // below turns it back on immediately if still needed; the tip's own
     // thermal mass is large relative to this brief window.
     HAL_GPIO_WritePin(T12_PWM_PORT, T12_PWM_PIN, GPIO_PIN_RESET);
-    for (volatile uint32_t settle = 0; settle < 640; settle++); // ~10us @ 64MHz
+    for (volatile uint32_t settle = 0; settle < urtc_t12_settle_loops(URTC_T12_SETTLE_US); settle++); // 10 us @ 64 MHz unless the build says otherwise (t12_settle.h)
 
     // AD8605 thermocouple ADC reading
     HAL_ADC_Start(&hadc);
@@ -81,7 +87,7 @@ void Control_SolderingIron_PID(void) {
         if (adc_val > 15 && adc_val < 4090) { // see the hotend NTC section below for why 4090, not 4080
             current_temperature = (uint16_t)(((adc_val * 450) + 2047) / 4095); // Mapped to 450C max, rounded to nearest degree
         } else {
-            system_error_flag = 1;
+            RAISE_SYSTEM_ERROR(URTC_ERROR_REASON_SENSOR);
         }
     } else {
         // A conversion that can't complete even within this 2ms budget is
@@ -89,7 +95,7 @@ void Control_SolderingIron_PID(void) {
         // raising the fault here (rather than leaving current_temperature
         // frozen at its last value) keeps the heater from running off a
         // stale reading with no indication anything's wrong.
-        system_error_flag = 1;
+        RAISE_SYSTEM_ERROR(URTC_ERROR_REASON_SENSOR);
     }
     HAL_ADC_Stop(&hadc);
 
@@ -105,7 +111,7 @@ void Control_SolderingIron_PID(void) {
     // measured.
     if (target_temperature > 445) {
         target_temperature = 0;
-        system_error_flag = 1;
+        RAISE_SYSTEM_ERROR(URTC_ERROR_REASON_THERMAL);
     }
 
     if (system_error_flag) {
@@ -142,7 +148,7 @@ void Control_SolderingIron_PID(void) {
             t12_temp_at_off = current_temperature;
         } else if (HAL_GetTick() - t12_pwm_off_since > 3000 &&
                    current_temperature > t12_temp_at_off + 5) {
-            system_error_flag = 1;
+            RAISE_SYSTEM_ERROR(URTC_ERROR_REASON_THERMAL);
             HAL_GPIO_WritePin(T12_PWM_PORT, T12_PWM_PIN, GPIO_PIN_RESET);
             return;
         }
@@ -249,20 +255,20 @@ void Control_3D_Hotend_PID(void) {
             // has no way to distinguish "still heating toward target" from
             // "sensor is gone and I'm flying blind" - the heater would stay
             // on indefinitely if that frozen reading was below target.
-            system_error_flag = 1;
+            RAISE_SYSTEM_ERROR(URTC_ERROR_REASON_SENSOR);
         }
     } else {
         // Same reasoning as the soldering iron above: a timed-out poll
         // must raise the fault too, not leave current_temperature frozen
         // with the heater still running on stale data.
-        system_error_flag = 1;
+        RAISE_SYSTEM_ERROR(URTC_ERROR_REASON_SENSOR);
     }
     HAL_ADC_Stop(&hadc);
 
     // Independent safety ceiling for the extruder block
     if (target_temperature > 300) {
         target_temperature = 0;
-        system_error_flag = 1;
+        RAISE_SYSTEM_ERROR(URTC_ERROR_REASON_THERMAL);
     }
 
     if (system_error_flag) {
@@ -289,7 +295,7 @@ void Control_3D_Hotend_PID(void) {
             hotend_temp_at_off = current_temperature;
         } else if (HAL_GetTick() - hotend_pwm_off_since > 3000 &&
                    current_temperature > hotend_temp_at_off + 5) {
-            system_error_flag = 1;
+            RAISE_SYSTEM_ERROR(URTC_ERROR_REASON_THERMAL);
             HAL_GPIO_WritePin(T12_PWM_PORT, T12_PWM_PIN, GPIO_PIN_RESET);
             return;
         }

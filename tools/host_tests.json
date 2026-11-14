@@ -36,6 +36,16 @@
    "sanitize": false
   },
   {
+   "name": "meta_ab",
+   "test": "tests/test_meta_ab.c",
+   "sources": [],
+   "includes": [
+    "tests",
+    "src/common"
+   ],
+   "std": "c11"
+  },
+  {
    "name": "thermal_guard",
    "test": "tests/test_thermal_guard.c",
    "sources": [
@@ -52,6 +62,16 @@
   {
    "name": "version_wire",
    "test": "tests/test_version_wire.c",
+   "sources": [],
+   "includes": [
+    "tests",
+    "src/common"
+   ],
+   "std": "c11"
+  },
+  {
+   "name": "can_recovery",
+   "test": "tests/test_can_recovery.c",
    "sources": [],
    "includes": [
     "tests",
@@ -419,6 +439,41 @@
    ]
   },
   {
+   "name": "safety_policy",
+   "test": "tests/test_safety_policy.c",
+   "sources": [
+    "src/F303-master/fw_safety_policy.c"
+   ],
+   "includes": [
+    "tests",
+    "src/F303-master/",
+    "src/common"
+   ],
+   "std": "c11"
+  },
+  {
+   "name": "safety",
+   "test": "tests/test_safety.c",
+   "sources": [
+    "tests/host_hal/fake_hal.c",
+    "src/F303-master/firmware_safety.c",
+    "src/F303-master/fw_safety_policy.c",
+    "src/F303-master/fw_features.c",
+    "src/F303-master/firmware_features.c",
+    "src/F303-master/firmware_fram.c",
+    "src/F303-master/pid_control.c",
+    "src/F303-master/health_profile.c",
+    "src/F303-master/hsi_trim.c",
+    "src/F303-master/motion_profile.c"
+   ],
+   "includes": [
+    "tests",
+    "tests/host_hal",
+    "src/F303-master/",
+    "src/common"
+   ]
+  },
+  {
    "name": "can_tools",
    "test": "tests/test_can_tools.c",
    "sources": [
@@ -436,7 +491,9 @@
     "src/F303-master/firmware_can_crimping.c",
     "src/F303-master/firmware_can_weldpulse.c",
     "src/F303-master/firmware_can_flyingprobe.c",
-    "src/F303-master/firmware_can_motion.c"
+    "src/F303-master/firmware_can_motion.c",
+    "src/F303-master/firmware_safety.c",
+    "src/F303-master/fw_safety_policy.c"
    ],
    "includes": [
     "tests",
@@ -467,7 +524,9 @@
     "src/F303-master/firmware_can_crimping.c",
     "src/F303-master/firmware_can_weldpulse.c",
     "src/F303-master/firmware_can_flyingprobe.c",
-    "src/F303-master/firmware_can_motion.c"
+    "src/F303-master/firmware_can_motion.c",
+    "src/F303-master/firmware_safety.c",
+    "src/F303-master/fw_safety_policy.c"
    ],
    "includes": [
     "tests",
@@ -501,7 +560,9 @@
     "src/F303-master/firmware_can_crimping.c",
     "src/F303-master/firmware_can_weldpulse.c",
     "src/F303-master/firmware_can_flyingprobe.c",
-    "src/F303-master/firmware_can_motion.c"
+    "src/F303-master/firmware_can_motion.c",
+    "src/F303-master/firmware_safety.c",
+    "src/F303-master/fw_safety_policy.c"
    ],
    "includes": [
     "tests",
@@ -567,6 +628,73 @@
    ],
    "libs": [
     "-lm"
+   ]
+  },
+  {
+   "name": "t12_settle",
+   "test": "tests/test_t12_settle.c",
+   "sources": [
+    "tests/host_hal/fake_hal.c",
+    "tests/host_hal/fake_state.c",
+    "src/F303-master/firmware_control_thermal.c",
+    "src/F303-master/thermal_guard.c",
+    "src/F303-master/firmware_thermal_stats.c",
+    "src/F303-master/thermal_stats.c",
+    "src/F303-master/firmware_features.c",
+    "src/F303-master/fw_features.c",
+    "src/F303-master/firmware_fram.c",
+    "src/F303-master/pid_control.c",
+    "src/F303-master/health_profile.c",
+    "src/F303-master/hsi_trim.c",
+    "src/F303-master/motion_profile.c"
+   ],
+   "includes": [
+    "tests",
+    "tests/host_hal",
+    "src/F303-master",
+    "src/common"
+   ],
+   "extra": [
+    "-Wno-cpp",
+    "-Wno-int-to-pointer-cast"
+   ],
+   "libs": [
+    "-lm"
+   ]
+  },
+  {
+   "name": "t12_settle_long",
+   "test": "tests/test_t12_settle.c",
+   "sources": [
+    "tests/host_hal/fake_hal.c",
+    "tests/host_hal/fake_state.c",
+    "src/F303-master/firmware_control_thermal.c",
+    "src/F303-master/thermal_guard.c",
+    "src/F303-master/firmware_thermal_stats.c",
+    "src/F303-master/thermal_stats.c",
+    "src/F303-master/firmware_features.c",
+    "src/F303-master/fw_features.c",
+    "src/F303-master/firmware_fram.c",
+    "src/F303-master/pid_control.c",
+    "src/F303-master/health_profile.c",
+    "src/F303-master/hsi_trim.c",
+    "src/F303-master/motion_profile.c"
+   ],
+   "includes": [
+    "tests",
+    "tests/host_hal",
+    "src/F303-master",
+    "src/common"
+   ],
+   "extra": [
+    "-Wno-cpp",
+    "-Wno-int-to-pointer-cast"
+   ],
+   "libs": [
+    "-lm"
+   ],
+   "defines": [
+    "-DURTC_T12_SETTLE_US=2000u"
    ]
   },
   {

@@ -183,6 +183,16 @@ static void test_mlx90642_application(int *failures)
     TEST_ASSERT(w[MLX90642_APPLICATION_CONFIG_ADDRESS] == MLX90642_STEP_MEAS_MODE && device->config_writes == 2, "the head starts in single-measurement mode with temperature output");
     TEST_ASSERT(MLX90642_Direct_GetCaptureStatus() == MLX_CAPTURE_IDLE, "nothing is captured before it is asked for");
 
+    // The configuration word is in the EEPROM of the sensor, which wears out: a sensor that is already configured is not written again at the next start.
+    MLX90642_Direct_Init();
+    TEST_ASSERT(device->config_writes == 2, "a second start writes nothing when the sensor already has the wanted configuration");
+    w[MLX90642_APPLICATION_CONFIG_ADDRESS] = MLX90642_STEP_MEAS_MODE | MLX90642_NORMALIZED_DATA_OUTPUT;
+    MLX90642_Direct_Init();
+    TEST_ASSERT(device->config_writes == 3 && w[MLX90642_APPLICATION_CONFIG_ADDRESS] == MLX90642_STEP_MEAS_MODE, "only the output format differs: one write, and the mode is kept");
+    w[MLX90642_APPLICATION_CONFIG_ADDRESS] = MLX90642_CONT_MEAS_MODE | MLX90642_TEMPERATURE_OUTPUT;
+    MLX90642_Direct_Init();
+    TEST_ASSERT(device->config_writes == 4 && (w[MLX90642_APPLICATION_CONFIG_ADDRESS] & MLX90642_MEAS_MODE_MASK) == MLX90642_STEP_MEAS_MODE, "only the mode differs: one write");
+
     for (int i = 0; i < 768; i++) {
         w[MLX90642_IR_DATA_ADDRESS + 2 * i] = (uint16_t)(0x4000 + i);
         w[MLX90642_TO_DATA_ADDRESS + 2 * i] = (uint16_t)(int16_t)(i * 50 / 2 - 100);   // 0.01-degree style units as the sensor reports them (half of 0.02)
