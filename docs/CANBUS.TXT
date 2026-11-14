@@ -960,7 +960,8 @@ DLC: 3 bytes
 Data:
   - rxData[0]: 0x01 fires a pulse, any other value is ignored
   - rxData[1..2]: Pulse duration in milliseconds (uint16_t) [BIG-ENDIAN],
-        clamped to 2000ms maximum
+        clamped to 2000ms maximum by default (build option URTC_WELD_PULSE_MAX_MS,
+        never above the hard limit of 5000ms; URTC_WELD_PULSE_MIN_MS sets a minimum)
   Note: Refuses to fire unless the contact sensor (TCRT_D0_DIG_PIN, the
         same CONN_SEN digital input shared with the vacuum pickup's own
         comparator, active-low via the shared internal pull-up - see
@@ -971,11 +972,15 @@ Data:
         job. Ignored entirely while a pulse
         from this command OR 0x200 below is already in progress (shared
         pulse state, only one of these 2 tools is ever active at once).
-        Real timing resolution is ~20ms (this project's existing 20ms
+        By default the end of the pulse is decided in the main loop, so the
+        real timing resolution is ~20ms (this project's existing 20ms
         cyclic safety loop), not a true 1ms - see the firmware's own
-        firmware_can_weldpulse.c for the full reasoning; achieving
-        genuine 1ms precision would need a dedicated hardware timer
-        interrupt, not implemented.
+        firmware_can_weldpulse.c for the full reasoning. Build option
+        URTC_WELD_PULSE_HW_TIMER=1 (off by default) also ends the pulse from
+        a one-pulse hardware timer in its own interrupt, independent of the
+        main loop (a tick of 100 us; a clock that is not a whole multiple of
+        10 kHz is refused and the main loop ends the pulse as before). The
+        timer path is proven on the host only, not yet on a board.
 
 ID: 0x1D0 [Master -> URTC Tool Head]
 UV Curing Head power control
@@ -1024,7 +1029,8 @@ DLC: 3 bytes
 Data:
   - rxData[0]: 0x01 fires a pulse, any other value is ignored
   - rxData[1..2]: Pulse duration in milliseconds (uint16_t) [BIG-ENDIAN],
-        clamped to 2000ms maximum
+        clamped to 2000ms maximum by default (build option URTC_WELD_PULSE_MAX_MS,
+        never above the hard limit of 5000ms; URTC_WELD_PULSE_MIN_MS sets a minimum)
   Note: Same shared pulse mechanism as 0x1C0 above, minus the contact-
         sensor gate - this tool's own design brief doesn't call for one
         the way the Spot Welder's does.
