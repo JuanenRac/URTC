@@ -418,6 +418,57 @@ void run_can_slavebridge_tests(int *failures)
     rx(0x212, 4, chunks[0]);
     TEST_ASSERT(write_count == 0, "a chunk of the wrong length is not counted");
 
+    // ---- the implicit index of the digest chunks ------------------------------
+    // Zeroed by 0x211, checked by 0x214: an end that finds a group of chunks half way means a frame was lost.
+    for (int kept = 1; kept <= 3; kept++) {
+        clear();
+        rx(0x211, 8, eight);
+        for (int c = 0; c < kept; c++) rx(0x212, 8, chunks[c]);
+        write_count = 0;
+        rx(0x214, 8, eight);
+        TEST_ASSERT(write_count == 0, "an end after a lost digest chunk is neither verified nor forwarded to the slave");
+        reg_readable[0x00] = 1; reg_value[0x00][0] = 0x03;
+        reg_readable[0x07] = 1; reg_value[0x07][0] = 0x03;
+        fake_tx_count = 0;
+        rx(0x215, 0, 0);
+        TEST_ASSERT(tx(0x215) && tx(0x215)->dlc == 1 && tx(0x215)->data[0] == 0x05, "0x215 reports VERIFY_FAIL after a lost digest chunk, whatever the slave says");
+        rx(0x219, 0, 0);
+        TEST_ASSERT(tx(0x219) && tx(0x219)->dlc == 1 && tx(0x219)->data[0] == 0x07, "0x219 reports DIGEST_CHUNK_MISSING (7) after a lost digest chunk");
+    }
+    clear();
+    rx(0x211, 8, eight);
+    for (int c = 0; c < 4; c++) rx(0x212, 8, chunks[c]);
+    write_count = 0;
+    reg_readable[0x00] = 1; reg_value[0x00][0] = 0x03;
+    rx(0x214, 8, eight);
+    TEST_ASSERT(write_count >= 1 && writes[write_count - 1].reg == 0x04, "an end after the four digest chunks goes on to the slave as before");
+    rx(0x215, 0, 0);
+    TEST_ASSERT(tx(0x215) && tx(0x215)->data[0] == 0x03, "and 0x215 still answers what the slave says");
+    clear();
+    rx(0x211, 8, eight);
+    write_count = 0;
+    rx(0x214, 8, eight);
+    TEST_ASSERT(write_count >= 1 && writes[write_count - 1].reg == 0x04, "a sender without digest chunks (count 0) is not blamed: the end goes on as before");
+    clear();
+    rx(0x211, 8, eight);
+    rx(0x212, 8, chunks[0]);
+    rx(0x214, 8, eight);
+    rx(0x211, 8, eight);              // the next attempt forgets the lost chunk
+    for (int c = 0; c < 4; c++) rx(0x212, 8, chunks[c]);
+    reg_readable[0x00] = 1; reg_value[0x00][0] = 0x03;
+    fake_tx_count = 0;
+    rx(0x215, 0, 0);
+    TEST_ASSERT(tx(0x215) && tx(0x215)->data[0] == 0x03, "a new start clears the lost-chunk verdict");
+    clear();
+    rx(0x211, 8, eight);
+    for (int c = 0; c < 4; c++) rx(0x212, 8, chunks[c]);
+    rx(0x212, 8, chunks[0]);
+    rx(0x214, 8, eight);
+    fake_tx_count = 0;
+    rx(0x219, 0, 0);
+    TEST_ASSERT(tx(0x219) && tx(0x219)->data[0] == 0x07, "a second group left half way is also named");
+    rx(0x211, 8, eight);              // leave the bridge as the next tests expect it: no lost chunk pending
+
     // ---- status, progress, verify-fail reason --------------------------------
     clear();
     reg_readable[0x00] = 1; reg_value[0x00][0] = 0x03;

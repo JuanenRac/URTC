@@ -43,8 +43,13 @@ void ThermalStats_LoadFromFram(void) {
 }
 
 void ThermalStats_Service(uint8_t may_write) {
-    uint8_t heater_on = (HAL_GPIO_ReadPin(T12_PWM_PORT, T12_PWM_PIN) == GPIO_PIN_SET);
-    if (ThermalStats_AccumulateHeater(&stats, &stats_clock, HAL_GetTick(), heater_on)) {
+    uint8_t heater_on = ThermalStats_HeaterOn((uint8_t)(active_tool == TOOL_SOLDERING_IRON || active_tool == TOOL_HOTAIR_REWORK),
+                                              (uint8_t)(HAL_GPIO_ReadPin(T12_PWM_PORT, T12_PWM_PIN) == GPIO_PIN_SET));
+    // The CAN interrupt reads the record to answer 0x1AA: change it with the interrupts off so that the answer is never half of an old and half of a new value.
+    __disable_irq();
+    uint8_t changed = ThermalStats_AccumulateHeater(&stats, &stats_clock, HAL_GetTick(), heater_on);
+    __enable_irq();
+    if (changed) {
         stats_dirty = 1;
     }
     if (may_write && stats_dirty && (HAL_GetTick() - stats_last_save_ms) >= THERMAL_STATS_SAVE_INTERVAL_MS) {
@@ -53,7 +58,9 @@ void ThermalStats_Service(uint8_t may_write) {
 }
 
 void ThermalStats_NoteFault(uint8_t fault_code) {
+    __disable_irq();
     ThermalStats_RecordFault(&stats, fault_code);
+    __enable_irq();
     ThermalStats_Save(); // a fault is rare and worth keeping even if power is cut right after
 }
 

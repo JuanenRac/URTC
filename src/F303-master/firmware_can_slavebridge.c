@@ -85,6 +85,10 @@ static void ConfirmToSlave(void) {
     ExpansionI2C_SlaveWriteRegister(REG_BOOT_CONFIRM, tag, URTC_SLAVE_CONFIRM_TAG_SIZE);
 }
 static uint8_t digest_chunks_received = 0;
+// The four digest chunks carry no index: their place is implicit, the count of chunks of the group of four that has arrived (0 after the fourth). 0x211 zeroes it
+// and 0x214 checks it: a count that is not zero there means a chunk was lost on the bus. The flag then stays up until the next 0x211, so that the status and the
+// reason queries can say so instead of leaving a signature mismatch to be guessed.
+static uint8_t digest_chunk_lost = 0;
 
 static void SendCanResponse(uint32_t id, const uint8_t *data, uint8_t len) {
     if (HAL_CAN_GetTxMailboxesFreeLevel(&hcan) == 0) return;
@@ -118,6 +122,7 @@ void Handle_CAN_SlaveBridge(void) {
         // of digest_chunk_buf when a new sequence only sends fewer than 4
         // fresh chunks before something re-triggers completion.
         digest_chunks_received = 0;
+        digest_chunk_lost = 0;
         // The rollback floor of the slave is read BEFORE the START frame goes out: afterwards the slave is erasing its backup slot and does not answer. A slave
         // that does not answer (an older bootloader, no slave chip) leaves the floor unknown, and an unknown floor means nothing is ever vouched for.
         uint8_t floor_bytes[4];
@@ -162,6 +167,12 @@ void Handle_CAN_SlaveBridge(void) {
         uint8_t relayed = ExpansionI2C_SlaveWriteRegister(REG_BOOT_DATA, rxData, (uint8_t)rxHeader.DLC);
         SlaveAttest_Data(rxData, (uint8_t)rxHeader.DLC, relayed);
 
+    } else if (rxHeader.StdId == URTC_CAN_ID_SLAVE_END_UPDATE && rxHeader.DLC == 8 && digest_chunks_received != 0) {
+        // The end arrives with a group of digest chunks left half way: one of them never came. Nothing is verified, forwarded or confirmed (the slave stays as it is
+        // and times out on its own), and 0x215 / 0x219 answer VERIFY_FAIL / DIGEST_CHUNK_MISSING until the next start.
+        digest_chunk_lost = 1;
+        digest_chunks_received = 0;
+
     } else if (rxHeader.StdId == URTC_CAN_ID_SLAVE_END_UPDATE && rxHeader.DLC == 8) {
         // The signature record is checked BEFORE the END frame reaches the slave (the slave waits only ten seconds for the confirmation, and the check
         // takes a while on this chip); the verdict decides whether the slave is then told to install.
@@ -185,7 +196,10 @@ void Handle_CAN_SlaveBridge(void) {
         // convention as the main board's own 0x7F8), response is always
         // 1 byte.
         uint8_t status;
-        if (ExpansionI2C_SlaveReadRegister(REG_BOOT_STATUS, &status, 1)) {
+        if (digest_chunk_lost) {
+            status = URTC_STATUS_VERIFY_FAIL;
+            SendCanResponse(URTC_CAN_ID_SLAVE_STATUS, &status, 1);
+        } else if (ExpansionI2C_SlaveReadRegister(REG_BOOT_STATUS, &status, 1)) {
             SendCanResponse(URTC_CAN_ID_SLAVE_STATUS, &status, 1);
         }
         // A failed I2C transaction (slave not present/not responding,
@@ -233,7 +247,10 @@ void Handle_CAN_SlaveBridge(void) {
         // above reports STATUS_VERIFY_FAIL; same "any DLC request, 1 byte
         // response" convention as 0x215/0x216.
         uint8_t reason;
-        if (ExpansionI2C_SlaveReadRegister(REG_BOOT_VERIFY_FAIL_REASON, &reason, 1)) {
+        if (digest_chunk_lost) {
+            reason = URTC_SLAVE_VERIFY_FAIL_REASON_DIGEST_CHUNK_MISSING;
+            SendCanResponse(URTC_CAN_ID_SLAVE_VERIFY_FAIL_REASON, &reason, 1);
+        } else if (ExpansionI2C_SlaveReadRegister(REG_BOOT_VERIFY_FAIL_REASON, &reason, 1)) {
             SendCanResponse(URTC_CAN_ID_SLAVE_VERIFY_FAIL_REASON, &reason, 1);
         }
 

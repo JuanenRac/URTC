@@ -425,6 +425,11 @@ mechanism of both, and `docs/CANBUS.TXT` for the exact frame formats.
 
 ---
 
+## 6b. CAN error recovery and what an interrupt may do
+
+* **The bus recovers by itself.** The controller is built with `AutoBusOff`: after a bus-off it comes back once it has seen 128 occurrences of 11 recessive bits. `HAL_CAN_Start()` on a started controller returns an error and does nothing, so the call in the main loop is not the recovery. What the main loop does on an error callback is to throw away what was waiting in the transmit mailboxes, and since a message sent after the bus is back would carry data from before the fault, it does so only after a real bus-off (`ESR.BOFF`, decided in `src/common/urtc_can_recovery.h`). The number of bus-offs is already in the health frame `0x1B8` (`bus_off_count`).
+* **Nothing that runs in an interrupt may wait.** SysTick has the lowest priority the project gives it, so `HAL_GetTick()` does not advance while a higher-priority interrupt runs: a `HAL_Delay()` or a loop that spins until the tick has moved inside the receive, error or timer interrupt never ends, and the watchdog resets the head. `tests/test_isr_waits.py` scans the files that hold interrupt code and fails on a new wait; the one that is known (`firmware_can_slavebridge.c`, the poll of the expansion board during its update) runs in the interrupt only in the build without the receive queue (`URTC_CAN_RX_QUEUE=1` moves the dispatcher to the main loop, where it is harmless). The priority of SysTick is not changed.
+
 ## 7. Build system
 
 Toolchain, HAL/CMSIS sourcing, linker scripts, and the one real
