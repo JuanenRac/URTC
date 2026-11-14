@@ -24,7 +24,7 @@ class SuiteListTests(unittest.TestCase):
         linked = lambda name: name.endswith("_link_crc") or f"{name}_link_crc" in names   # noqa: E731
         # or to build the same test with an option that is off by default (the crystal, the hardware timer of the weld pulse, the other pins of the sensor bus,
         # the reassembly of the writes of the link), so that the code behind the option is run and not only compiled out
-        options = ("_crystal", "_weld_hw_timer", "_i2c2_preset", "_write_reassembly", "_long")
+        options = ("_crystal", "_weld_hw_timer", "_i2c2_preset", "_write_reassembly", "_long", "_return_on")
         optional = lambda name: name.endswith(options) or any(f"{name}{option}" in names for option in options)   # noqa: E731
         self.assertTrue(all(name.startswith("mlx_") or name.startswith("bootloader_boot") or name.startswith("bootloader_rotation") or linked(name) or optional(name) for name in again), again)
         self.assertTrue(all(name.endswith("_slave") or name.endswith("_serial") or name.startswith("bootloader_rotation") or linked(name) or optional(name) or f"{name}_slave" in names
