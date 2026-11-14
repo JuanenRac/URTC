@@ -112,6 +112,14 @@ ever need to know which sensor is actually behind them.
   fragments - see `slave_i2c_sensors.c`'s own top-of-file note for the
   full reasoning.
 
+  A capture takes ONE frame, as it always did: the pixels of the sub-page that
+  came are refreshed and the other half of the image keeps what an earlier
+  capture left (or zero). Building with `URTC_SLAVE_MLX90640_TWO_SUBPAGES=1`
+  makes the capture take as many frames as it needs (at most four) to have both
+  sub-pages calibrated into the same image; a camera that keeps repeating one
+  sub-page ends in an error instead of passing a half-refreshed image as
+  complete. It is off by default (`slave_mlx_capture.h`).
+
 - **MLX90641** (16×12, 192px) - same integration approach, a genuinely
   separate Melexis library (`melexis_mlx90641/MLX90641_API.h`/`.cpp`,
   also Apache-2.0), not a variant of the MLX90640's own one. **Written

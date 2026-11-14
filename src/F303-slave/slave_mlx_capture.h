@@ -19,7 +19,18 @@
 #ifndef SLAVE_MLX_CAPTURE_H
 #define SLAVE_MLX_CAPTURE_H
 
+#include <stddef.h>
 #include <stdint.h>
+
+// 1 = a capture of the MLX90640 takes the frames that are needed to have BOTH sub-pages of its chess pattern (the camera measures half of its pixels per frame) and calibrates each into
+// the same image, so no pixel is left from an earlier capture; at most MLX_CAPTURE_MAX_FRAMES frames, and a camera that keeps repeating one sub-page is an error. 0 (default) = one frame per
+// capture, as the firmware has always done. The joints that do it (start and more) are optional in MlxCaptureOps: a camera that does not give them takes one frame.
+#ifndef URTC_SLAVE_MLX90640_TWO_SUBPAGES
+#define URTC_SLAVE_MLX90640_TWO_SUBPAGES 0
+#endif
+#ifndef MLX_CAPTURE_MAX_FRAMES
+#define MLX_CAPTURE_MAX_FRAMES 4u
+#endif
 
 // How long the camera may take to have a frame ready, from the moment the measurement was started. The slowest refresh rate of the camera is 0.5 Hz (two
 // seconds per frame); a camera that is still silent after this much is reported as an error instead of waiting for ever.
@@ -40,6 +51,8 @@ typedef struct {
     int (*data_ready)(void);    // 1 = the frame is ready, 0 = not yet, negative = the camera did not answer
     int (*read_frame)(void);    // read the frame; negative = it could not be read or did not validate
     void (*calibrate)(void);    // calibrate the frame that was read
+    void (*start)(void);        // optional: a new capture begins (forget the frames of the one before); NULL = nothing to do
+    int (*more)(void);          // optional, asked after each calibration: 1 = take another frame, 0 = the image is complete, negative = it cannot be completed; NULL = one frame is enough
 } MlxCaptureOps;
 
 typedef enum { MLXCAP_IDLE = 0, MLXCAP_WAIT_READY, MLXCAP_READ, MLXCAP_CALIBRATE } MlxCaptureState;
@@ -65,6 +78,7 @@ static inline void mlx_capture_abort(MlxCapture *capture)
 static inline int mlx_capture_begin(MlxCapture *capture, const MlxCaptureOps *ops, uint32_t now_ms)
 {
     capture->state = MLXCAP_IDLE;
+    if (ops->start != NULL) ops->start();
     if (ops->trigger() < 0) return MLX_CAPTURE_STEP_ERROR;
     capture->state = MLXCAP_WAIT_READY;
     capture->started_ms = now_ms;
@@ -101,6 +115,23 @@ static inline int mlx_capture_step(MlxCapture *capture, const MlxCaptureOps *ops
         return MLX_CAPTURE_STEP_RUNNING;
     case MLXCAP_CALIBRATE:
         ops->calibrate();
+        if (ops->more != NULL) {
+            int more = ops->more();
+            if (more < 0) {
+                capture->state = MLXCAP_IDLE;
+                return MLX_CAPTURE_STEP_ERROR;
+            }
+            if (more > 0) {   // the other sub-page: measure again
+                if (ops->trigger() < 0) {
+                    capture->state = MLXCAP_IDLE;
+                    return MLX_CAPTURE_STEP_ERROR;
+                }
+                capture->state = MLXCAP_WAIT_READY;
+                capture->started_ms = now_ms;
+                capture->last_poll_ms = now_ms;
+                return MLX_CAPTURE_STEP_RUNNING;
+            }
+        }
         capture->state = MLXCAP_IDLE;
         return MLX_CAPTURE_STEP_DONE;
     case MLXCAP_IDLE:

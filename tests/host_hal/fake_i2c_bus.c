@@ -62,7 +62,12 @@ static void device_write(FakeI2cDevice *d, uint8_t byte)
         if (d->wcount == 0) d->mptr = (uint32_t)byte << 8;
         else if (d->wcount == 1) d->mptr |= byte;
         else if ((d->wcount & 1) == 0) d->wr_hi = byte;
-        else { if ((int32_t)(d->mptr & 0xFFFF) != d->read_only_addr) d->words16[d->mptr & 0xFFFF] = (uint16_t)((d->wr_hi << 8) | byte); d->mptr++; }
+        else {
+            if ((d->mptr & 0xFFFF) == 0x8000) {
+                d->status_writes++;
+                if (d->alternate_subpage) d->words16[0x8000] ^= 1u;
+            }
+            if ((int32_t)(d->mptr & 0xFFFF) != d->read_only_addr) d->words16[d->mptr & 0xFFFF] = (uint16_t)((d->wr_hi << 8) | byte); d->mptr++; }
         d->wcount++;
         return;
     }

@@ -26,7 +26,27 @@ static int d_ready(void)
 static int d_read(void) { read_calls++; return read_rc; }
 static void d_calibrate(void) { calibrate_calls++; }
 
-static const MlxCaptureOps OPS = { d_trigger, d_ready, d_read, d_calibrate };
+static const MlxCaptureOps OPS = { d_trigger, d_ready, d_read, d_calibrate, NULL, NULL };
+
+// The camera that needs more than one frame: the sub-pages it gives are a script, one per frame; more() says whether the other one is still missing.
+static int script[8], script_len, frames_seen_mask, start_calls, more_rc_override, more_calls;
+static void d_start(void) { start_calls++; frames_seen_mask = 0; }
+static int d_read_pages(void)
+{
+    read_calls++;
+    if (read_rc < 0) return read_rc;
+    int page = read_calls <= script_len ? script[read_calls - 1] : 0;
+    frames_seen_mask |= 1 << page;
+    return page;
+}
+static int d_more(void)
+{
+    more_calls++;
+    if (more_rc_override != 0) return more_rc_override;
+    if (frames_seen_mask == 3) return 0;
+    return read_calls < 4 ? 1 : -1;
+}
+static const MlxCaptureOps OPS_PAGES = { d_trigger, d_ready, d_read_pages, d_calibrate, d_start, d_more };
 
 static void reset(void)
 {
@@ -156,6 +176,46 @@ static void test_abort_and_restart(int *failures)
     TEST_ASSERT(mlx_capture_begin(&c, &OPS, 300) == MLX_CAPTURE_STEP_RUNNING && run(&c, 300, MLX_CAPTURE_POLL_MS, &steps) == MLX_CAPTURE_STEP_DONE, "and one after a finished one");
 }
 
+static void test_more_frames(int *failures)
+{
+    MlxCapture c = {0};
+    uint32_t now = 0;
+    int result;
+    // both sub-pages come in two frames: the camera is started twice, read twice, calibrated twice and the capture ends
+    reset(); start_calls = more_calls = more_rc_override = 0; script[0] = 0; script[1] = 1; script_len = 2;
+    mlx_capture_begin(&c, &OPS_PAGES, now);
+    TEST_ASSERT(start_calls == 1 && trigger_calls == 1, "a new capture says it starts, once");
+    for (int steps = 0, result0 = MLX_CAPTURE_STEP_RUNNING; result0 == MLX_CAPTURE_STEP_RUNNING && steps < 200; steps++) {
+        now += MLX_CAPTURE_POLL_MS;
+        result0 = mlx_capture_step(&c, &OPS_PAGES, now);
+        if (result0 != MLX_CAPTURE_STEP_RUNNING) { result = result0; TEST_ASSERT(result == MLX_CAPTURE_STEP_DONE, "it ends well"); }
+    }
+    TEST_ASSERT(trigger_calls == 2 && read_calls == 2 && calibrate_calls == 2 && more_calls == 2 && start_calls == 1 && !mlx_capture_active(&c), "two frames were measured, read and calibrated, and the capture is over");
+    // a camera that repeats one sub-page is an error after the limit, and nothing is left in flight
+    reset(); start_calls = more_calls = more_rc_override = 0; script[0] = 1; script[1] = 1; script[2] = 1; script[3] = 1; script_len = 4;
+    mlx_capture_begin(&c, &OPS_PAGES, now);
+    result = MLX_CAPTURE_STEP_RUNNING;
+    for (int steps = 0; result == MLX_CAPTURE_STEP_RUNNING && steps < 400; steps++) { now += MLX_CAPTURE_POLL_MS; result = mlx_capture_step(&c, &OPS_PAGES, now); }
+    TEST_ASSERT(result == MLX_CAPTURE_STEP_ERROR && read_calls == 4 && !mlx_capture_active(&c), "a camera that keeps repeating one sub-page ends in an error after four frames");
+    // the second measurement cannot be started: error at once
+    reset(); start_calls = more_calls = more_rc_override = 0; script[0] = 0; script_len = 1;
+    mlx_capture_begin(&c, &OPS_PAGES, now);
+    result = MLX_CAPTURE_STEP_RUNNING;
+    for (int steps = 0; result == MLX_CAPTURE_STEP_RUNNING && steps < 400; steps++) { now += MLX_CAPTURE_POLL_MS; if (read_calls == 1) trigger_rc = -2; result = mlx_capture_step(&c, &OPS_PAGES, now); }
+    TEST_ASSERT(result == MLX_CAPTURE_STEP_ERROR && trigger_calls == 2 && !mlx_capture_active(&c), "a camera that does not take the second start is an error");
+    // the timeout of the wait counts from the second start, not from the first
+    reset(); start_calls = more_calls = more_rc_override = 0; script[0] = 0; script[1] = 1; script_len = 2; ready_after = 0;
+    mlx_capture_begin(&c, &OPS_PAGES, 0);
+    now = 0; result = MLX_CAPTURE_STEP_RUNNING;
+    for (int steps = 0; result == MLX_CAPTURE_STEP_RUNNING && steps < 4000; steps++) { now += MLX_CAPTURE_READY_TIMEOUT_MS / 2u; result = mlx_capture_step(&c, &OPS_PAGES, now); }
+    TEST_ASSERT(result == MLX_CAPTURE_STEP_DONE && read_calls == 2, "each frame has its own wait: two frames of 1.5 s each do not exceed the 3 s limit of one");
+    // without the optional joints the machine behaves as before: one frame
+    reset();
+    mlx_capture_begin(&c, &OPS, 0);
+    int steps;
+    TEST_ASSERT(run(&c, 0, MLX_CAPTURE_POLL_MS, &steps) == MLX_CAPTURE_STEP_DONE && trigger_calls == 1 && read_calls == 1, "a camera without the optional joints takes one frame");
+}
+
 int main(void)
 {
     int failures = 0;
@@ -167,6 +227,7 @@ int main(void)
     test_clock_wrap(&failures);
     test_failures(&failures);
     test_abort_and_restart(&failures);
+    test_more_frames(&failures);
     if (failures == 0) {
         printf("  OK   all thermal camera capture state machine host tests passed\n");
         return 0;

@@ -1652,6 +1652,44 @@
    "defines": [
     "-DURTC_CAN_TX_QUEUE=1"
    ]
+  },
+  {
+   "name": "slave_two_subpages",
+   "test": "tests/test_slave.c",
+   "sources": [
+    "tests/host_hal/fake_hal.c",
+    "tests/host_hal/fake_i2c_bus.c",
+    "src/F303-slave/slave_main.c",
+    "src/F303-slave/slave_i2c_link.c",
+    "src/F303-slave/slave_pwm.c",
+    "src/F303-slave/slave_i2c_sensors.c",
+    "src/F303-slave/melexis_mlx90640/MLX90640_API.c",
+    "src/F303-slave/melexis_mlx90642/MLX90642.c"
+   ],
+   "includes": [
+    "tests",
+    "tests/host_hal",
+    "src/F303-slave",
+    "src/F303-slave/melexis_mlx90640",
+    "src/F303-slave/melexis_mlx90641",
+    "src/F303-slave/melexis_mlx90642",
+    "src/common",
+    "src/F303-master"
+   ],
+   "extra": [
+    "-Wno-cpp",
+    "-Wno-int-to-pointer-cast"
+   ],
+   "libs": [
+    "-lm"
+   ],
+   "unsanitize": [
+    "-fno-sanitize=shift-base"
+   ],
+   "defines": [
+    "-Dmain=slave_main_entry",
+    "-DURTC_SLAVE_MLX90640_TWO_SUBPAGES=1"
+   ]
   }
  ]
 }

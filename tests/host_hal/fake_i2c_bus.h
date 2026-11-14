@@ -34,6 +34,8 @@ typedef struct {
     uint16_t last_cmd;
     int32_t read_only_addr;       // FAKE_I2C_MLX: a write to this word address is ignored (-1: none)
     int clear_trigger_on_reset;   // FAKE_I2C_MLX: the general call (a write to address 0 through the hardware I2C) clears the trigger bit of the control register
+    int alternate_subpage;        // FAKE_I2C_MLX: each write of the status register (the host took a frame) flips the sub-page bit, as a sensor in its chess pattern does (0 = it never changes)
+    int status_writes;            // FAKE_I2C_MLX: writes of the status register since the device was added (one per frame taken)
 } FakeI2cDevice;
 
 typedef struct {
