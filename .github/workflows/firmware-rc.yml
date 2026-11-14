@@ -1,0 +1,237 @@
+# =============================================================================
+# URTC - Firmware build (release candidate)
+# Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
+# GPL-3.0-or-later - see LICENSE
+# =============================================================================
+# The official firmware is COMPILED here and only SIGNED on the maintainer's machine. This workflow holds no secret and no key: it builds the four components
+# (main application, main bootloader, slave application, slave bootloader) with build_firmware.sh in CI mode and the official trust table (URTC_RELEASE=1: the
+# public table of keys/image_trust.json, closed to every key but the image-signing keys; the private halves never leave the maintainer's machine), with a build
+# date taken from the commit (SOURCE_DATE_EPOCH) and one pinned release of the Arm GNU toolchain.
+#
+# It builds TWICE, on two separate runners, and publishes the artifact only when every image of the two builds is the same bytes: a build that is not
+# reproducible fails here instead of reaching the signing step. The artifact (firmware-rc-urtc-<version>) holds the images, SHA256SUMS and a build manifest, has
+# a build-provenance attestation and is kept for a few days only. Nothing is released from here: the maintainer downloads the artifact, checks it, signs it
+# (urtc_fetch_and_sign) and uploads the signed set as a draft (docs/FIRMWARE_DISTRIBUTION.md, "Compile in Actions, sign locally").
+#
+# Started by hand with the version to build, or called from another workflow. It never runs on a push or a pull request.
+
+name: URTC firmware build (release candidate)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version of the main application to build, as in urtc.project.json (for example 0.4.9); the run stops when it is another"
+        type: string
+        required: true
+  workflow_call:
+    inputs:
+      version:
+        description: "Version of the main application to build, as in urtc.project.json"
+        type: string
+        required: true
+    outputs:
+      artifact:
+        description: "Name of the artifact that holds the verified build"
+        value: ${{ jobs.collect.outputs.artifact }}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: firmware-rc-${{ inputs.version }}
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    name: Plan the build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      version: ${{ steps.plan.outputs.version }}
+      sha: ${{ steps.plan.outputs.sha }}
+      epoch: ${{ steps.plan.outputs.epoch }}
+    steps:
+      - name: Check out the commit this run was started from
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Check the version and take the build date from the commit
+        id: plan
+        shell: bash
+        env:
+          WANTED: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          [[ "$WANTED" =~ ^[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?$ ]] || { echo "::error::the version has characters that a version does not have"; exit 1; }
+          have="$(python3 -c "import json; print(json.load(open('urtc.project.json', encoding='utf-8'))['version'])")"
+          [ "$have" = "$WANTED" ] || { echo "::error::urtc.project.json says $have, not $WANTED: raise the version before the build"; exit 1; }
+          if compgen -G "signing_keys*.txt" >/dev/null; then echo "::error::a signing key file is in the repository"; exit 1; fi
+          echo "version=$have" >> "$GITHUB_OUTPUT"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "epoch=$(git log -1 --format=%ct)" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build the four components (copy ${{ matrix.copy }})
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        copy: [a, b]
+    steps:
+      - name: Check out the exact commit that was planned
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.plan.outputs.sha }}
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+
+      - name: Make sure the build has no private key to take
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "${URTC_SIGNING_KEY_FILE:-}" ] || [ -n "${URTC_RELEASE_KEY:-}" ]; then
+            echo "::error::a signing key is set in this job; this build holds no key"
+            exit 1
+          fi
+
+      - name: Install the Arm GNU toolchain 13.3.Rel1 (checked against its SHA-256) and cppcheck
+        shell: bash
+        run: |
+          set -euo pipefail
+          name=arm-gnu-toolchain-13.3.rel1-x86_64-arm-none-eabi.tar.xz
+          curl --fail --silent --show-error --location --output "$RUNNER_TEMP/$name" "https://developer.arm.com/-/media/Files/downloads/gnu/13.3.rel1/binrel/$name"
+          echo "95c011cee430e64dd6087c75c800f04b9c49832cc1000127a92a97f9c8d83af4  $RUNNER_TEMP/$name" | sha256sum --check -
+          tar -xJf "$RUNNER_TEMP/$name" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/arm-gnu-toolchain-13.3.rel1-x86_64-arm-none-eabi/bin" >> "$GITHUB_PATH"
+          sudo apt-get update
+          sudo apt-get install --yes cppcheck
+
+      - name: Compile with the official trust table
+        env:
+          URTC_CI: "1"
+          URTC_RELEASE: "1"
+          URTC_COVERAGE_FLOOR: "90"
+          SOURCE_DATE_EPOCH: ${{ needs.plan.outputs.epoch }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x build_firmware.sh
+          ./build_firmware.sh
+          arm-none-eabi-gcc --version | head -n 1 > build/toolchain.txt
+
+      - name: Check the images
+        shell: bash
+        env:
+          VERSION: ${{ needs.plan.outputs.version }}
+        run: |
+          set -euo pipefail
+          python3 tools/check_image_versions.py build/firmware --main-version "$VERSION"
+          # no path of the runner may be inside an image: a build made in another folder would differ
+          for image in build/firmware/URTC_*.bin; do
+            if grep -a -q -E "/home/runner|/tmp/|${RUNNER_TEMP}" "$image"; then
+              echo "::error::$(basename "$image") holds a path of this runner; a build made elsewhere would differ"
+              exit 1
+            fi
+          done
+          # the main bootloader holds exactly the official trust table, at the fixed offset
+          python3 tools/image_trust.py check build/firmware/URTC_MAIN_BOOTLOADER_v*.bin master release
+          kind="$(python3 -c "import json,glob; print(json.load(open(glob.glob('build/firmware/URTC_MAIN_FIRMWARE_v*.bin.manifest.json')[0], encoding='utf-8')).get('signing_key_kind'))")"
+          [ "$kind" = "release" ] || { echo "::error::the application manifest says signing_key_kind $kind, not release"; exit 1; }
+          python3 tools/bootloader_size.py --summary "$GITHUB_STEP_SUMMARY"
+          mkdir -p out
+          cp build/firmware/URTC_*.bin build/firmware/URTC_*.hex build/firmware/URTC_*.bin.sha256 build/firmware/URTC_*.bin.manifest.json build/firmware/firmware_manifest.json out/
+          cp build/toolchain.txt out/toolchain.txt.tmp
+
+      - name: Upload this copy
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rc-copy-${{ matrix.copy }}
+          path: out/*
+          if-no-files-found: error
+          retention-days: 1
+
+  collect:
+    name: Compare the two copies and keep the build
+    needs: [plan, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    outputs:
+      artifact: ${{ steps.name.outputs.artifact }}
+    env:
+      VERSION: ${{ needs.plan.outputs.version }}
+      SHA: ${{ needs.plan.outputs.sha }}
+    steps:
+      - name: Download both copies
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: rc-copy-*
+          path: copies
+
+      - name: Name the artifact
+        id: name
+        shell: bash
+        run: echo "artifact=firmware-rc-urtc-$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Compare every file of the two copies byte by byte
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd copies
+          diff -rq rc-copy-a rc-copy-b || { echo "::error::the two builds of the same commit are not the same bytes: the build is not reproducible"; exit 1; }
+          n="$(ls rc-copy-a | wc -l)"
+          echo "### Reproducibility: the two copies are identical ($n files)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Write SHA256SUMS and the build manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir files
+          cp copies/rc-copy-a/* files/
+          cd files
+          mv toolchain.txt.tmp /tmp/toolchain.txt
+          sha256sum URTC_* firmware_manifest.json > SHA256SUMS
+          python3 - <<'PY'
+          import json, os
+          files = []
+          for line in open("SHA256SUMS", encoding="utf-8"):
+              digest, name = line.strip().split("  ", 1)
+              files.append({"name": name, "sha256": digest, "bytes": os.path.getsize(name)})
+          json.dump({
+              "schema": "urtc-build/1", "repository": os.environ["GITHUB_REPOSITORY"], "project": "urtc", "version": os.environ["VERSION"],
+              "commit": os.environ["SHA"], "built_on": "github-actions", "run_id": os.environ["GITHUB_RUN_ID"],
+              "run_url": f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
+              "toolchain": open("/tmp/toolchain.txt", encoding="utf-8").read().strip(), "signing_key_kind": "release",
+              "reproducible": True, "builds_compared": 2, "signed": False, "files": files,
+          }, open("build-manifest.json", "w", encoding="utf-8"), indent=2)
+          PY
+          cat SHA256SUMS
+          { echo "### URTC firmware $VERSION (release trust table, not signed)"; sha256sum URTC_*.bin | sed 's/^/- /'; echo "- toolchain: \`$(cat /tmp/toolchain.txt)\`"; } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Attest the provenance of the files
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            files/URTC_*
+            files/firmware_manifest.json
+            files/SHA256SUMS
+
+      - name: Upload the build (kept for a few days)
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ steps.name.outputs.artifact }}
+          path: files/*
+          if-no-files-found: error
+          retention-days: 7

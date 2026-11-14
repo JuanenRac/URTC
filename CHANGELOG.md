@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented here.
 
+## [Unreleased]
+
+- **The official firmware can be compiled in GitHub Actions and only signed on the maintainer's machine:** the new workflow `.github/workflows/firmware-rc.yml` ("URTC firmware build (release candidate)", started by hand with the version, or called from another workflow) builds the four components with the official trust table, a build date taken from the commit and one pinned release of the Arm toolchain, holds no secret, builds twice on two runners and keeps the artifact (images, `SHA256SUMS`, build manifest, attestation) for seven days only when every file of the two builds is the same bytes. `tools/check_image_versions.py` checks the version inside each application image against its name and the manifest.
+
 ## [0.4.9] - Reduced interrupt work, optional transmit queue and metadata pages, clear-error command and bus speed declaration
 
 - **The expansion slave can read both sub-pages of the MLX90640, behind a build option that is off by default:** the camera measures half of its pixels per frame in a chess pattern and the slave took one frame per capture, so half of the image kept what an earlier capture had left or was zero (the master already had the option). Building the slave with `URTC_SLAVE_MLX90640_TWO_SUBPAGES=1` makes the capture take the frames that it needs, at most four, and calibrate each into the same image; a camera that keeps repeating one sub-page is an error. The state machine of the capture gets two optional joints (start and more), the host double of the bus can alternate the sub-page, and the slave suite runs again with the option on.
