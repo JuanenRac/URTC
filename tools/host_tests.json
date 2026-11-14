@@ -461,16 +461,6 @@
    "std": "c11"
   },
   {
-   "name": "percent",
-   "test": "tests/test_percent.c",
-   "sources": [],
-   "includes": [
-    "tests",
-    "src/common"
-   ],
-   "std": "c11"
-  },
-  {
    "name": "spool_position",
    "test": "tests/test_spool_position.c",
    "sources": [
