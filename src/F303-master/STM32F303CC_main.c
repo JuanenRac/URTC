@@ -7,6 +7,7 @@
 // dozen .c/.h files by responsibility.
 // =============================================================================
 #include "firmware_common.h"
+#include "urtc_can_recovery.h"
 #include "urtc_flash_layout.h"
 #include "firmware_thermal_stats.h"
 #include "firmware_init_clocks.h"
@@ -509,7 +510,11 @@ int main(void) {
             // instant the bus comes back, carrying whatever stale
             // telemetry/status payload they held from before the fault
             // instead of a fresh read of that same data.
-            HAL_CAN_AbortTxRequest(&hcan, CAN_TX_MAILBOX0 | CAN_TX_MAILBOX1 | CAN_TX_MAILBOX2);
+            // Only after a real bus-off (the controller recovers by itself: AutoBusOff): an error of any other kind is retried by the controller and aborting the
+            // mailboxes at each of them threw away answers that were still good. HAL_CAN_Start() on a started controller returns an error and does nothing.
+            if (urtc_can_recovery_abort_tx(hcan.Instance->ESR)) {
+                HAL_CAN_AbortTxRequest(&hcan, CAN_TX_MAILBOX0 | CAN_TX_MAILBOX1 | CAN_TX_MAILBOX2);
+            }
             HAL_CAN_Start(&hcan);
         }
 
