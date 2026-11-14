@@ -95,12 +95,31 @@ static void test_pwm(int *failures)
     PWM_StopAll();
     fake_tim_pwm_stops = 0;
     PWM_Pulse(1, 50, 3);
-    PWM_Tick(); PWM_Tick();
-    TEST_ASSERT(fake_tim_pwm_stops == 0, "two ticks of a three-millisecond pulse do not end it");
-    PWM_Tick();
+    fake_tick += 1; PWM_Tick(); fake_tick += 1; PWM_Tick();
+    TEST_ASSERT(fake_tim_pwm_stops == 0, "two milliseconds of a three-millisecond pulse do not end it");
+    fake_tick += 1; PWM_Tick();
     TEST_ASSERT(fake_tim_pwm_stops == 1 && fake_tim_pwm_last_channel == TIM_CHANNEL_2, "the third does");
-    PWM_Tick();
+    fake_tick += 1; PWM_Tick();
     TEST_ASSERT(fake_tim_pwm_stops == 1, "and an idle channel is not stopped again");
+    // a pass of the loop that took far longer than a millisecond (the capture of the thermal camera): the pulse ends at its time, not after that many passes
+    PWM_Pulse(2, 50, 20);
+    fake_tick += 300; PWM_Tick();
+    TEST_ASSERT(fake_tim_pwm_stops == 2 && fake_tim_pwm_last_channel == TIM_CHANNEL_3, "a pulse of 20 ms ends at the first pass after its 20 ms, even if that pass came 300 ms later");
+    // a continuous request has no end of its own
+    PWM_Pulse(0, 50, 0);
+    fake_tick += 100000; PWM_Tick();
+    TEST_ASSERT(fake_tim_pwm_stops == 2, "a continuous pulse (0 ms) is never ended by the tick");
+    PWM_Stop(0);
+    fake_tim_pwm_stops = 1;
+    // the longest timed pulse, across the wrap of the 32-bit counter
+    fake_tick = 0xFFFFFF00u;
+    PWM_Pulse(3, 50, 255);
+    fake_tick = 0xFFFFFF00u + 254u; PWM_Tick();
+    TEST_ASSERT(fake_tim_pwm_stops == 1, "255 ms across the wrap: not yet at 254 ms");
+    fake_tick = 0xFFFFFF00u + 255u; PWM_Tick();
+    TEST_ASSERT(fake_tim_pwm_stops == 2 && fake_tim_pwm_last_channel == TIM_CHANNEL_4, "and ended at 255 ms, the counter having wrapped");
+    fake_tim_pwm_stops = 1;
+    fake_tick = 10000;
     PWM_StopAll();
     TEST_ASSERT(fake_tim_pwm_stops == 1 + 4, "StopAll stops the four channels");
 
@@ -715,6 +734,7 @@ static void test_main(int *failures)
     TEST_ASSERT(fake_hal_inits == 1 && fake_scb.VTOR == 0x08005000UL, "the vector table is set to the application address, then the HAL started");
     TEST_ASSERT(fake_rcc_calls == 2 && fake_rcc_osc.PLL.PLLMUL == RCC_PLL_MUL16 && fake_rcc_clk.APB1CLKDivider == RCC_HCLK_DIV2, "the clocks: 64 MHz from the internal oscillator, a slower APB1");
     TEST_ASSERT(fake_iwdg_inits == 1 && fake_iwdg_prescaler == IWDG_PRESCALER_32 && fake_iwdg_reload == 999, "the watchdog is armed: 32 kHz / 32 for 1000 counts, a second");
+    TEST_ASSERT(fake_iwdg_window == IWDG_WINDOW_DISABLE && fake_iwdg_window_violations == 0, "the watchdog has no window (a global handle would give 0, and every refresh would then reset the chip)");
     TEST_ASSERT(fake_i2c_inits == 2 && fake_i2c_inits_without_clock == 0, "the clock of each I2C peripheral is enabled before its init (an init with the clock off is ignored by the chip)");
     TEST_ASSERT(fake_i2c_inits == 2 && hi2c1.Init.OwnAddress1 == (I2C_SLAVE_ADDRESS << 1) && hi2c2.Init.OwnAddress1 == 0, "I2C1 answers at address 0x42, I2C2 is a master");
     TEST_ASSERT(fake_nvic[I2C1_EV_IRQn].enabled && fake_nvic[I2C1_ER_IRQn].enabled && fake_nvic[I2C1_EV_IRQn].preempt == 1, "its two interrupts are enabled at priority 1");

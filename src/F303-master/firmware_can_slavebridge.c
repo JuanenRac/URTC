@@ -56,6 +56,9 @@
 #define REG_BOOT_RECORD_COUNTER 0x0C
 #define SLAVE_BOOT_STATUS_AWAIT_CONFIRM 0x08
 #define REG_APP_ENTER_BOOTLOADER 0x02
+// First byte of the answer to REG_BOOT_QUERY_VERSION: 1 when the slave bootloader answers (BuildVersionQueryResponse). The slave application has no such
+// register: it answers every unknown register with its one-byte idle status (0), and the nine bytes after it are not data of the slave.
+#define SLAVE_BOOT_VERSION_MARKER 0x01
 
 static uint8_t digest_chunk_buf[32];
 
@@ -219,7 +222,9 @@ void Handle_CAN_SlaveBridge(void) {
         // main board's own bootloader version query uses (0x7F9/0x7FA),
         // for the same reason.
         uint8_t version[10];
-        if (ExpansionI2C_SlaveReadRegister(REG_BOOT_QUERY_VERSION, version, 10)) {
+        // Only an answer that starts with the bootloader marker is a version: a slave that runs its application (or a chip that answers something else)
+        // gets no 0x217 / 0x218, the same silence as a slave that does not answer at all.
+        if (ExpansionI2C_SlaveReadRegister(REG_BOOT_QUERY_VERSION, version, 10) && version[0] == SLAVE_BOOT_VERSION_MARKER) {
             SendCanResponse(URTC_CAN_ID_SLAVE_VERSION_RESP_1, version, 8);
             // Optional PATCH extension: a slave bootloader that has it answers
             // REG_BOOT_QUERY_VERSION_EXT starting with a marker byte; an older

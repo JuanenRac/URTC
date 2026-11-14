@@ -17,6 +17,7 @@ struct fake_i2c_state {
     unsigned status_poll_count; // status-register reads since the last reset
     int fail_read_at;         // -1 = never; else every read after this count returns -MLX90640_I2C_NACK_ERROR
     int clear_trigger_on_reset; // 1 = the general reset clears the trigger bit of the control register, as a real sensor does once it has started a measurement
+    int alternate_subpage;    // 1 = the sub-page bit of the status register flips each time the host clears the data-ready bit, as a sensor in its chess pattern does (0 = it never changes)
     int status_ready_after;   // -1 = the data-ready bit is NEVER set (stuck bus);
                               //  N = it becomes set on and after the Nth status read
 };

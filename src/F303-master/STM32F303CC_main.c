@@ -389,6 +389,7 @@ int main(void) {
     hiwdg.Instance = IWDG;
     hiwdg.Init.Prescaler = IWDG_PRESCALER_32;
     hiwdg.Init.Reload = 999; // (999+1) * 32 / 40000 ~= 800ms @ ~40kHz LSI
+    hiwdg.Init.Window = IWDG_WINDOW_DISABLE; // the handle is global, so the window would be 0: on the chip the HAL writes it to the window register and a refresh above it resets - no window
     HAL_IWDG_Init(&hiwdg);
 
     // Graphics subsystem init via hardware I2C2 - initializes the I2C2
@@ -492,6 +493,10 @@ int main(void) {
 
     while (1) {
         HAL_IWDG_Refresh(&hiwdg);
+
+#if URTC_CAN_RX_QUEUE
+        CanDispatch_Drain(); // the frames received since the last pass (the interrupt only stores them)
+#endif
 
         // CAN bus-off recovery - can_bus_error_flag is set by
         // HAL_CAN_ErrorCallback and consumed here to actually restart the

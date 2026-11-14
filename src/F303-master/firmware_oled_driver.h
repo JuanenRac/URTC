@@ -16,6 +16,9 @@
 void OLED_WriteCmd(uint8_t cmd);
 void OLED_WriteData(uint8_t *buf, uint16_t len);
 void OLED_SetCursor(uint8_t page, uint8_t col);
+// Forget what the driver believes the display shows: the next write of every
+// page goes out in full (called by the init and after a failed transfer).
+void OLED_ForceFullRedraw(void);
 void MX_I2C2_Init_Early(void);
 void OLED_Init(void);
 
