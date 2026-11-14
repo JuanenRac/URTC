@@ -86,6 +86,7 @@ static void world(void)
     fake_tick = 50000;
     fake_tick_step = 0;
     model_reset();
+    OLED_ForceFullRedraw();
     mx_i2c2_init_calls = 0;
     active_tool = TOOL_SOLDERING_IRON;
     animation_frame = 0;
@@ -184,6 +185,102 @@ static void test_driver(int *failures)
     for (int i = 0; same && i < (int)sizeof expected; i++) if (fake_i2c_frames[i].len != 2 || fake_i2c_frames[i].data[1] != expected[i]) same = 0;
     TEST_ASSERT(same, "the start-up sequence is the documented one: off, clock, 64 rows, charge pump, page mode, flips, contrast, on");
     TEST_ASSERT(fake_tick >= 50050, "the display is given time to power up first");
+}
+
+static void test_incremental(int *failures)
+{
+    char out[32];
+    uint8_t blank[128] = {0};
+    uint8_t other[128];
+    memset(other, 0x3C, sizeof other);
+
+    // a page the driver has not seen written in full is always written; once it was, the same pixels are not sent again
+    world();
+    OLED_SetCursor(2, 0);
+    OLED_WriteData(blank, 128);
+    OLED_SetCursor(2, 0);
+    OLED_WriteData(blank, 128);
+    TEST_ASSERT(fake_i2c_frame_count == 3, "the second identical full-page write is skipped (the cursor still goes out, the 129-byte frame does not)");
+    OLED_SetCursor(2, 0);
+    OLED_WriteData(other, 128);
+    model_apply();
+    TEST_ASSERT(fake_i2c_frame_count == 5 && screen[2][0] == 0x3C && screen[2][127] == 0x3C, "a page whose pixels change is written again");
+
+    // only the lines that change are painted
+    world();
+    for (uint8_t p = 0; p < 8; p++) OLED_ClearPage(p);
+    OLED_PrintStr(2, 10, "TEMP 100");
+    OLED_PrintStr(3, 10, "STATUS READY");
+    int before = fake_i2c_frame_count;
+    OLED_PrintStr(2, 10, "TEMP 100");
+    OLED_PrintStr(3, 10, "STATUS READY");
+    int data_frames = 0;
+    for (int i = before; i < fake_i2c_frame_count; i++) if (fake_i2c_frames[i].data[0] == 0x40) data_frames++;
+    TEST_ASSERT(data_frames == 0, "a line that is painted again with the same text sends no pixels");
+    OLED_PrintStr(2, 10, "TEMP 101");
+    OLED_PrintStr(3, 10, "STATUS READY");
+    data_frames = 0;
+    for (int i = before; i < fake_i2c_frame_count; i++) if (fake_i2c_frames[i].data[0] == 0x40) data_frames++;
+    TEST_ASSERT(data_frames == 1, "and a line whose text changes is the only one sent");
+    model_apply();
+    text_at(2, 10, 8, out);
+    TEST_ASSERT(strcmp(out, "TEMP 101") == 0, "the display shows the new text");
+    text_at(3, 10, 12, out);
+    TEST_ASSERT(strcmp(out, "STATUS READY") == 0 && model_errors == 0, "and the line that was skipped is still there");
+
+    // a write that follows a skipped one lands where it belongs even if the caller did not set the cursor again
+    world();
+    OLED_ClearPage(1);
+    OLED_SetCursor(1, 0);
+    OLED_WriteData(blank, 16);
+    OLED_WriteData(other, 16);
+    model_apply();
+    TEST_ASSERT(screen[1][0] == 0 && screen[1][16] == 0x3C && screen[1][31] == 0x3C && screen[1][32] == 0 && model_errors == 0, "the position is sent again after a skipped write so the next pixels land after it");
+
+    // a failed transfer, a new start-up and an explicit order all make the next writes go out in full
+    world();
+    OLED_ClearPage(4);
+    fake_i2c_frame_count = 0;
+    fake_i2c_fail_transmits = 2;
+    OLED_PrintStr(4, 0, "A");
+    fake_i2c_frame_count = 0;
+    OLED_ClearPage(4);
+    int sent = fake_i2c_frame_count;
+    TEST_ASSERT(sent >= 2, "after a transfer that failed twice the page is written in full again");
+    world();
+    OLED_ClearPage(4);
+    fake_i2c_frame_count = 0;
+    OLED_ClearPage(4);
+    TEST_ASSERT(fake_i2c_frame_count == 1, "a clear of a page that is already clear sends only the cursor");
+    OLED_ForceFullRedraw();
+    fake_i2c_frame_count = 0;
+    OLED_ClearPage(4);
+    TEST_ASSERT(fake_i2c_frame_count == 2, "after the order to redraw everything the same clear is sent in full");
+
+    // a write that does not fit in the line is not modelled: it is always sent and the page is not trusted afterwards
+    world();
+    OLED_ClearPage(5);
+    OLED_SetCursor(5, 100);
+    OLED_WriteData(other, 60);
+    fake_i2c_frame_count = 0;
+    OLED_SetCursor(5, 100);
+    OLED_WriteData(other, 60);
+    TEST_ASSERT(fake_i2c_frame_count == 2, "a write past the end of the line is sent every time");
+
+    // the whole screen of a tool, drawn twice, costs far fewer frames the second time and shows the same thing
+    world();
+    active_tool = TOOL_SOLDERING_IRON;
+    current_temperature = 215; target_temperature = 220;
+    for (uint8_t p = 0; p < 8; p++) OLED_ClearPage(p);   // as the splash screen does before the first tool screen
+    fake_i2c_frame_count = 0;
+    Render_ToolScreen();
+    int first_pass = fake_i2c_frame_count;
+    fake_i2c_frame_count = 0;
+    Render_ToolScreen();
+    int second_pass = fake_i2c_frame_count;
+    model_apply();
+    TEST_ASSERT(first_pass > 0 && second_pass < first_pass, "the second pass of the same screen sends fewer frames than the first");
+    TEST_ASSERT(model_errors == 0, "and every frame of both passes is well formed");
 }
 
 static void test_numbers(int *failures)
@@ -553,6 +650,7 @@ void run_oled_render_tests(int *failures)
 {
     test_font(failures);
     test_driver(failures);
+    test_incremental(failures);
     test_numbers(failures);
     test_text_and_bars(failures);
     test_sparkline(failures);
