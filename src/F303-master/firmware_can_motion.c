@@ -13,6 +13,7 @@
 #include "firmware_common.h"
 #include "firmware_can_motion.h"
 #include "firmware_features.h"
+#include "spool_position.h"
 #include "firmware_safety.h"
 #include "urtc_can_ids.h"
 
@@ -63,7 +64,7 @@ void Handle_CAN_MotionTools(void) {
                         // read back over CAN via 0x132, reset via 0x131 -
                         // see CANBUS.TXT.
                         if (active_tool == TOOL_SOLDERING_IRON) {
-                            solder_spool_position += (new_dir == GPIO_PIN_SET) ? (int32_t)steps : -(int32_t)steps;
+                            solder_spool_position = SpoolPosition_Add(solder_spool_position, steps, new_dir == GPIO_PIN_SET); // saturates: a command of 2^32 - 1 steps cannot wrap the position
                         }
                         // Fresh move: force the step ISR to start with a
                         // rising edge. Left at 1 from the tail end of a

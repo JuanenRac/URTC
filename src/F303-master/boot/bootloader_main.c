@@ -160,6 +160,7 @@ int main(void) {
     hiwdg.Instance = IWDG;
     hiwdg.Init.Prescaler = IWDG_PRESCALER_32;
     hiwdg.Init.Reload = 999;
+    hiwdg.Init.Window = IWDG_WINDOW_DISABLE; // the handle is global, so the window would be 0: on the chip the HAL writes it to the window register and a refresh above it resets - no window
     HAL_IWDG_Init(&hiwdg);
     BlSelect_Init();
 
