@@ -98,7 +98,9 @@ The workflow `.github/workflows/release.yml` only **verifies and publishes** wha
    Ed25519 key of the releases (`~/.urtc-keys/urtc_release_ed25519.pem`).
 2. Raise the versions with `python bump.py` (compiling never does), write the CHANGELOG
    section of the new version, run `URTC_CI=1 py -3 tools/ci_validate.py` and push to `main`.
-3. `URTC_SIGNING_KEY_FILE=~/.urtc-keys/signing_keys.txt URTC_RELEASE=1 ./build_firmware.sh`
+3. Compile in Actions: "URTC firmware build (release candidate)" builds the four components twice with the official trust table and no key, and keeps the
+   artifact only when both builds are the same bytes. Download it, verify it and sign it here (`docs/FIRMWARE_DISTRIBUTION.md`, "Compile in Actions, sign
+   locally"); the folder with the signed set is the `firmware/` of the next step (or pass it with `--firmware-dir`).
 4. `python tools/publish_release_assets.py --sign --draft` signs every asset (`.sig`), checks the
    set and prints a `gh release create ... --draft` command. Run it: it uploads the signed files
    as an **unpublished draft** of the tag, which nobody else can see. Only one draft per tag.

@@ -114,7 +114,36 @@ node scripts/sync-firmware.mjs ../URTC/firmware --allow-unsigned
 
 Leave out `--allow-dev-key` once the images are signed with the production key.
 
-## Publishing a release
+## Compile in Actions, sign locally
+
+The official images are compiled by GitHub Actions and signed only on the maintainer's machine; the private keys never leave it.
+
+1. Raise the versions (`python bump.py`), write the CHANGELOG section, run `URTC_CI=1 py -3 tools/ci_validate.py` and merge to `main`.
+2. Actions, "URTC firmware build (release candidate)", Run workflow, branch `main`, the version of `urtc.project.json`. It holds no secret. It compiles
+   the four components (main application, main bootloader, expansion-slave application and bootloader) with `URTC_RELEASE=1` (the official trust table of
+   `keys/image_trust.json`), a build date taken from the commit (`SOURCE_DATE_EPOCH`) and one pinned release of the Arm GNU toolchain (checked by its SHA-256),
+   on two separate runners. It compares every file of the two builds and keeps the artifact `firmware-rc-urtc-<version>` for seven days only when they are the
+   same bytes. Inside it checks that the version inside each application image (the header slot) is the one of its name and the manifest
+   (`tools/check_image_versions.py`) and that the main bootloader holds exactly the official trust table.
+3. On the maintainer's machine the artifact of the last successful run is downloaded (`gh run download`) into an empty folder and verified before anything is
+   signed: `gh attestation verify` for every file, `sha256sum -c SHA256SUMS`, the build manifest (`reproducible: true`, `signing_key_kind: "release"`, the version
+   and the commit of the repository), and the trust table that the main bootloader holds. Then the maintainer's signing tool adds, with the keys of
+   `~/.urtc-keys` (never printed, never in a repository), the `<asset>.sig` of every file of the four components and the `<image>.imgsig` of each application
+   image, and runs `tools/verify_release_set.py` on the result before anything is uploaded.
+4. In that folder: `python tools/publish_release_assets.py --firmware-dir <folder> --sign --draft`, check that it ends with `RELEASE_ASSETS=PASS`, run the
+   `gh release create ... --draft` command it prints, then `python tools/verify_release_set.py <folder> --tag v<version>`.
+5. Actions, "URTC firmware release", Run workflow, branch `main`, the tag: it verifies the draft against the public keys and publishes it.
+
+What is reproducible: for one commit the images (`.bin`, `.hex`) and their `.sha256` sidecars are the same bytes in every run, on any runner of the same
+image, and across commits that do not change the sources. The manifests (`*.manifest.json`, `firmware_manifest.json`) carry the build date, which is the date
+of the commit, so they change with the commit and nothing else. Nothing else varies: no clock, no random value and no path of the runner is inside an
+image (the workflow fails when it finds one). What could change the images is another compiler: the toolchain release is pinned, so an image compiled
+locally with another one is not byte-equal to the one from Actions; the Actions build is the one that is signed. Linux and Windows builds of the same
+commit (`build_firmware.sh`, `build_firmware.bat`) are compared byte by byte by the manual workflow "Build scripts compared".
+
+## Publishing a release from a local build
+
+Kept for a build made on the maintainer's machine (for example with a different toolchain):
 
 0. For an official release steps 1 to 3 are done on the maintainer's machine, with `--draft` in step 2 so that the
    signed files are uploaded unpublished; the job `.github/workflows/release.yml` then only verifies them against the
