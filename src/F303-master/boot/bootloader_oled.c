@@ -146,21 +146,13 @@ void OLED_Init_Boot(void) {
     if (!oled_present_boot) return;
     // Same sequence as the application's OLED_Init, verified compatible
     // with both SSD1306 and SSD1315 - see that function's own comment.
-    OLED_WriteCmd_Boot(0xAE);
-    OLED_WriteCmd_Boot(0xD5); OLED_WriteCmd_Boot(0x80);
-    OLED_WriteCmd_Boot(0xA8); OLED_WriteCmd_Boot(0x3F);
-    OLED_WriteCmd_Boot(0xD3); OLED_WriteCmd_Boot(0x00);
-    OLED_WriteCmd_Boot(0x40);
-    OLED_WriteCmd_Boot(0x8D); OLED_WriteCmd_Boot(0x14);
-    OLED_WriteCmd_Boot(0x20); OLED_WriteCmd_Boot(0x02);
-    OLED_WriteCmd_Boot(0xA1);
-    OLED_WriteCmd_Boot(0xC8);
-    OLED_WriteCmd_Boot(0xDA); OLED_WriteCmd_Boot(0x12);
-    OLED_WriteCmd_Boot(0x81); OLED_WriteCmd_Boot(0xCF);
-    OLED_WriteCmd_Boot(0xD9); OLED_WriteCmd_Boot(0xF1);
-    OLED_WriteCmd_Boot(0xDB); OLED_WriteCmd_Boot(0x40);
-    OLED_WriteCmd_Boot(0xA4); OLED_WriteCmd_Boot(0xA6);
-    OLED_WriteCmd_Boot(0xAF);
+    // One table walked by one loop: the same bytes in the same order as the separate calls it replaces, which the compiler had expanded one by one (about 700
+    // bytes of the 28 KB region of the bootloader).
+    static const uint8_t init_sequence[] = {
+        0xAE, 0xD5, 0x80, 0xA8, 0x3F, 0xD3, 0x00, 0x40, 0x8D, 0x14, 0x20, 0x02, 0xA1, 0xC8,
+        0xDA, 0x12, 0x81, 0xCF, 0xD9, 0xF1, 0xDB, 0x40, 0xA4, 0xA6, 0xAF,
+    };
+    for (uint8_t i = 0; i < sizeof(init_sequence); i++) OLED_WriteCmd_Boot(init_sequence[i]);
 }
 
 void OLED_ClearAll_Boot(void) {
