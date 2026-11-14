@@ -169,6 +169,7 @@ static void test_main(int *failures)
     TEST_ASSERT(left == 2 && fake_iwdg_refreshes == 300, "the main loop refreshes the watchdog on every pass (the test leaves it after 300)");
     TEST_ASSERT(fake_hal_inits == 1 && fake_rcc_osc.PLL.PLLMUL == RCC_PLL_MUL16 && fake_rcc_clk.APB1CLKDivider == RCC_HCLK_DIV2, "the HAL is started and the clocks are the ones of the application");
     TEST_ASSERT(fake_iwdg_inits == 1 && fake_iwdg_prescaler == IWDG_PRESCALER_32 && fake_iwdg_reload == 999, "the watchdog is armed for one second");
+    TEST_ASSERT(fake_iwdg_window == IWDG_WINDOW_DISABLE && fake_iwdg_window_violations == 0, "the watchdog has no window (a global handle would give 0, and every refresh would then reset the chip)");
     TEST_ASSERT(fake_i2c_inits == 1 && fake_i2c_inits_without_clock == 0, "the clock of I2C1 is enabled before its init (an init with the clock off is ignored by the chip)");
     TEST_ASSERT(fake_i2c_inits == 1 && hi2c1.Init.OwnAddress1 == (I2C_SLAVE_ADDRESS << 1) && fake_i2c_init.NoStretchMode == I2C_NOSTRETCH_DISABLE, "I2C1 answers at 0x42 and may stretch the clock");
     TEST_ASSERT(fake_nvic[I2C1_EV_IRQn].enabled && fake_nvic[I2C1_ER_IRQn].enabled && fake_nvic[I2C1_ER_IRQn].preempt == 1, "its two interrupts are enabled at priority 1");

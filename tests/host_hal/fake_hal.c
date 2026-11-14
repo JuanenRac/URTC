@@ -51,6 +51,8 @@ void fake_hal_reset_recording(void)
     fake_i2c_slave_rx_len = fake_i2c_slave_tx_len = 0;
     fake_tim_pwm_stops = 0;
     fake_iwdg_exit_after = 0;
+    fake_iwdg_window = IWDG_WINDOW_DISABLE;
+    fake_iwdg_window_violations = 0;
     fake_iwdg_hook = 0;
     fake_gpio_toggle_count = fake_rcc_flag_clears = 0;
     fake_hal_inits = fake_i2c_ev_irq_count = fake_i2c_er_irq_count = fake_iwdg_inits = 0;
@@ -105,6 +107,7 @@ void (*fake_iwdg_hook)(int refreshes);
 HAL_StatusTypeDef HAL_IWDG_Refresh(IWDG_HandleTypeDef *h)
 {
     (void)h;
+    if (fake_iwdg_window < fake_iwdg_reload) fake_iwdg_window_violations++;   // the counter starts at the reload and counts down: a refresh above the window resets the chip
     fake_iwdg_refreshes++;
     if (fake_iwdg_hook) fake_iwdg_hook(fake_iwdg_refreshes);
     if (fake_iwdg_exit_after && fake_iwdg_refreshes >= fake_iwdg_exit_after && fake_reset_jmp_armed) longjmp(fake_reset_jmp, 2);
@@ -454,9 +457,10 @@ HAL_StatusTypeDef HAL_I2C_Slave_Seq_Transmit_IT(I2C_HandleTypeDef *h, uint8_t *d
 HAL_StatusTypeDef HAL_TIM_PWM_Stop(TIM_HandleTypeDef *h, uint32_t channel) { (void)h; fake_tim_pwm_stops++; fake_tim_pwm_last_channel = channel; return HAL_OK; }
 
 int fake_hal_inits, fake_i2c_ev_irq_count, fake_i2c_er_irq_count, fake_iwdg_inits;
-uint32_t fake_iwdg_prescaler, fake_iwdg_reload;
+uint32_t fake_iwdg_prescaler, fake_iwdg_reload, fake_iwdg_window = IWDG_WINDOW_DISABLE;   // before any init the window register has its reset value: open
+int fake_iwdg_window_violations;
 HAL_StatusTypeDef HAL_Init(void) { fake_hal_inits++; return HAL_OK; }
-HAL_StatusTypeDef HAL_IWDG_Init(IWDG_HandleTypeDef *h) { fake_iwdg_prescaler = h->Init.Prescaler; fake_iwdg_reload = h->Init.Reload; fake_iwdg_inits++; return HAL_OK; }
+HAL_StatusTypeDef HAL_IWDG_Init(IWDG_HandleTypeDef *h) { fake_iwdg_prescaler = h->Init.Prescaler; fake_iwdg_reload = h->Init.Reload; fake_iwdg_window = h->Init.Window; fake_iwdg_inits++; return HAL_OK; }
 void HAL_I2C_EV_IRQHandler(I2C_HandleTypeDef *h) { (void)h; fake_i2c_ev_irq_count++; }
 void HAL_I2C_ER_IRQHandler(I2C_HandleTypeDef *h) { (void)h; fake_i2c_er_irq_count++; }
 
