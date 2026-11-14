@@ -9,6 +9,7 @@
 #include "bootloader_flash.h"
 #include "bootloader_oled.h"
 #include "urtc_bl_serial.h"
+#include "urtc_percent.h"
 
 // URTC_BL_META_AB=1 keeps the metadata (and the programmed serial) in two alternating pages instead of the append-only log of one page (src/common/urtc_meta_ab.h).
 // The official build (URTC_RELEASE=1 of build_firmware.sh) turns it on; the bench build leaves it off unless URTC_BL_META_AB=1 is set. It uses the page
@@ -161,7 +162,7 @@ uint8_t Flash_CopyRegion(uint32_t dest_addr, uint32_t src_addr, uint32_t total_l
         // for however long the full copy takes (several seconds for a
         // large image), even though this is the phase most worth showing
         // progress for.
-        uint8_t pct = (uint8_t)(((uint64_t)(p + 1) * 100) / num_pages);
+        uint8_t pct = urtc_percent_of(p + 1, num_pages);
         OLED_DrawProgressBar_Boot(pct);
         CAN_SendHeartbeat(STATUS_COPYING, pct);
     }

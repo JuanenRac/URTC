@@ -17,6 +17,7 @@
 #include "urtc_bl_serial.h"
 #include "urtc_key_rotation.h"
 #include "urtc_key_rotation_cmd.h"
+#include "urtc_percent.h"
 
 static uint8_t CAN_WaitForFreeMailbox(void) {
     // 50 attempts x 1ms = 50ms max - a small fraction of the ~800ms IWDG
@@ -550,7 +551,7 @@ static uint8_t FlushPageBuffer(void) {
         // explicitly here too costs nothing and keeps that safety visible
         // locally rather than relying on a precondition from elsewhere.
         uint8_t pct = (update_total_size > 0) ?
-            (uint8_t)(((uint64_t)update_bytes_received * 100) / update_total_size) : 0;
+            urtc_percent_of(update_bytes_received, update_total_size) : 0;
         OLED_DrawProgressBar_Boot(pct);
     }
     return ok;
@@ -773,7 +774,7 @@ void HandleReadbackStart(void) {
         offset += page_len;
 
         if (!WaitForReadbackPageAck(p)) return;
-        OLED_DrawProgressBar_Boot((uint8_t)(((uint64_t)(p + 1) * 100) / num_pages));
+        OLED_DrawProgressBar_Boot(urtc_percent_of(p + 1, num_pages));
     }
 }
 

@@ -20,6 +20,7 @@
 #endif
 #include "urtc_boot_session.h"
 #include "urtc_boot_return.h"
+#include "urtc_percent.h"
 
 #ifndef URTC_CAN_BOOT_SJW_TQ
 #define URTC_CAN_BOOT_SJW_TQ 1u
@@ -286,7 +287,7 @@ int main(void) {
             uint8_t pct = 0xFF;
             uint8_t hb_status = STATUS_LISTENING;
             if (update_in_progress && !update_failed && update_total_size > 0) {
-                pct = (uint8_t)(((uint64_t)update_bytes_received * 100) / update_total_size);
+                pct = urtc_percent_of(update_bytes_received, update_total_size);
                 hb_status = STATUS_RECEIVING;
             }
             CAN_SendHeartbeat(hb_status, pct);
