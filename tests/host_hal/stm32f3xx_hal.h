@@ -125,6 +125,7 @@ uint32_t HAL_GetTick(void);
 #define __ISB() ((void)0)
 #define __disable_irq() ((void)0)
 #define __enable_irq() ((void)0)
+#define __get_PRIMASK() 0u
 #define __set_MSP(v) ((void)(v))
 #define SCB_ICSR_PENDSTCLR_Msk 1u
 
