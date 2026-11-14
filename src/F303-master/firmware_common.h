@@ -525,4 +525,19 @@ uint8_t SavedState_Checksum(const SavedState_t *s);
 void CanDispatch_Drain(void);
 #endif
 
+#include "can_tx_queue.h"
+
+#if URTC_CAN_TX_QUEUE
+// Every frame the application sends goes through the transmit queue (URTC_CAN_TX_QUEUE=1; see can_tx_queue.h and firmware_can_tx.c). The two HAL names are redirected here so that
+// the handlers do not change: asking for the free mailboxes asks for the room in the queue, and sending puts the frame in the queue. firmware_can_tx.c undoes it to reach the HAL.
+HAL_StatusTypeDef CanTx_Submit(CAN_TxHeaderTypeDef *hdr, uint8_t *data, uint32_t *mailbox);
+uint32_t CanTx_FreeLevel(void);
+void CanTx_Service(void);       // main loop: sends what did not fit in the mailboxes before
+uint32_t CanTx_Discard(void);   // after a bus-off: drops what waits in the queue
+uint32_t CanTx_Dropped(void);
+uint32_t CanTx_Failed(void);
+#define HAL_CAN_AddTxMessage(h, hdr, data, mb) CanTx_Submit((hdr), (data), (mb))
+#define HAL_CAN_GetTxMailboxesFreeLevel(h) CanTx_FreeLevel()
+#endif
+
 #endif // FIRMWARE_COMMON_H

@@ -498,6 +498,10 @@ int main(void) {
         CanDispatch_Drain(); // the frames received since the last pass (the interrupt only stores them)
 #endif
 
+#if URTC_CAN_TX_QUEUE
+        CanTx_Service(); // the frames that did not fit in the mailboxes when they were sent
+#endif
+
         // CAN bus-off recovery - can_bus_error_flag is set by
         // HAL_CAN_ErrorCallback and consumed here to actually restart the
         // peripheral, not just report the condition via the 0x110 status
@@ -519,6 +523,9 @@ int main(void) {
             // mailboxes at each of them threw away answers that were still good. HAL_CAN_Start() on a started controller returns an error and does nothing.
             if (urtc_can_recovery_abort_tx(hcan.Instance->ESR)) {
                 HAL_CAN_AbortTxRequest(&hcan, CAN_TX_MAILBOX0 | CAN_TX_MAILBOX1 | CAN_TX_MAILBOX2);
+#if URTC_CAN_TX_QUEUE
+                CanTx_Discard(); // the frames waiting in the queue are as stale as the ones in the mailboxes
+#endif
             }
             HAL_CAN_Start(&hcan);
         }

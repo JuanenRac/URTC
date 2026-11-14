@@ -7,6 +7,13 @@
 #include "firmware_interrupts_gpio.h"
 #include "urtc_can_ids.h"
 
+#if URTC_CAN_TX_QUEUE
+// The impact event is the one frame that must never wait behind other frames: it goes straight to the mailboxes (the transmit queue works with interrupts masked, so this
+// interrupt can only run between two of its steps), not through the queue.
+#undef HAL_CAN_AddTxMessage
+#undef HAL_CAN_GetTxMailboxesFreeLevel
+#endif
+
 // =============================================================================
 // 10. ASSOCIATED INTERRUPTS AND VECTOR HANDLERS (ISR)
 // =============================================================================

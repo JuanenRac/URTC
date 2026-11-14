@@ -1609,6 +1609,49 @@
     "-Wno-cpp",
     "-Wno-int-to-pointer-cast"
    ]
+  },
+  {
+   "name": "can_tx_queue",
+   "test": "tests/test_can_tx_queue.c",
+   "sources": [
+    "tests/host_hal/fake_hal.c",
+    "src/F303-master/can_tx_queue.c",
+    "src/F303-master/firmware_can_tx.c"
+   ],
+   "includes": [
+    "tests",
+    "tests/host_hal",
+    "src/F303-master",
+    "src/common"
+   ],
+   "defines": [
+    "-DURTC_CAN_TX_QUEUE=1"
+   ]
+  },
+  {
+   "name": "features_tx_queue_on",
+   "test": "tests/test_features.c",
+   "sources": [
+    "tests/host_hal/fake_hal.c",
+    "src/F303-master/fw_features.c",
+    "src/F303-master/firmware_features.c",
+    "src/F303-master/firmware_fram.c",
+    "src/F303-master/pid_control.c",
+    "src/F303-master/health_profile.c",
+    "src/F303-master/hsi_trim.c",
+    "src/F303-master/motion_profile.c",
+    "src/F303-master/can_tx_queue.c",
+    "src/F303-master/firmware_can_tx.c"
+   ],
+   "includes": [
+    "tests",
+    "tests/host_hal",
+    "src/F303-master",
+    "src/common"
+   ],
+   "defines": [
+    "-DURTC_CAN_TX_QUEUE=1"
+   ]
   }
  ]
 }
