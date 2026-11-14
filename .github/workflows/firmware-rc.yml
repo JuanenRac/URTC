@@ -144,6 +144,8 @@ jobs:
           done
           # the main bootloader holds exactly the official trust table, at the fixed offset
           python3 tools/image_trust.py check build/firmware/URTC_MAIN_BOOTLOADER_v*.bin master release
+          # the official main bootloader keeps its metadata in the two alternating pages (URTC_BL_META_AB=1, which URTC_RELEASE=1 turns on): the image carries the marker
+          grep -a -q "URTC-META-AB-V1" build/firmware/URTC_MAIN_BOOTLOADER_v*.bin || { echo "::error::the main bootloader was built without the two metadata pages (URTC_BL_META_AB)"; exit 1; }
           kind="$(python3 -c "import json,glob; print(json.load(open(glob.glob('build/firmware/URTC_MAIN_FIRMWARE_v*.bin.manifest.json')[0], encoding='utf-8')).get('signing_key_kind'))")"
           [ "$kind" = "release" ] || { echo "::error::the application manifest says signing_key_kind $kind, not release"; exit 1; }
           python3 tools/bootloader_size.py --summary "$GITHUB_STEP_SUMMARY"

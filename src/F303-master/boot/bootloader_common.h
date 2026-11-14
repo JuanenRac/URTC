@@ -58,7 +58,7 @@ extern I2C_HandleTypeDef hi2c2;
 // of the partitioned bootloader source changes.
 #define BOOTLOADER_VERSION_MAJOR 0
 #define BOOTLOADER_VERSION_MINOR 5
-#define BOOTLOADER_VERSION_PATCH 1
+#define BOOTLOADER_VERSION_PATCH 2
 
 // -----------------------------------------------------------------------
 // Image authentication: the bootloader holds no secret. An application is

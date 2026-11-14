@@ -111,8 +111,9 @@ the log of the build in Actions prints the size of every bootloader
 ("URTC_MAIN_BOOTLOADER_v...bin/.hex/.elf built (N bytes text)", from
 arm-none-eabi-size), so the difference between the size before and after this
 change is the cost of the verifier, the table and the metadata log. The code
-region of the main bootloader is 30 KB (0x08000000-0x080077FF; the 2 KB page
-at 0x08007800 holds the metadata) and the slave's is 18 KB
+region of the main bootloader is 30 KB (0x08000000-0x080077FF: 28 KB of code,
+the 2 KB page at 0x08007000 is the second metadata page and the one at
+0x08007800 the first) and the slave's is 18 KB
 (0x08000000-0x080047FF; its metadata page is at 0x08004800).
 
 For the slave there are three routes, in this order:
@@ -167,9 +168,24 @@ Metadata. One 2 KB page holds an append-only log of 72-byte records
 record with the highest generation is the state, and a record cut by a power
 loss fails its CRC and is ignored, so the previous state stays in force. The
 page is erased only when its 28 records are used, and a cut right then loses
-the log: the board starts as a first boot with the floor compiled in. There is
-no room for a second page (the layout is exactly 256 KB), so an A/B pair of
-pages is not possible on this chip without taking a page from the application.
+the log: the board starts as a first boot with the floor compiled in. That is
+the layout of the bench build. The official build (URTC_RELEASE=1 of
+build_firmware.sh; URTC_BL_META_AB=0 or 1 overrides it) keeps the state and the
+programmed serial in two alternating pages instead (src/common/urtc_meta_ab.h):
+the page of the newest record is never touched while the next one is written, so
+a cut at any step leaves a valid state and the recycling of the log, with its
+known risk, no longer exists. The second page is 0x08007000, the last page of
+the 30 KB region of the bootloader: the code of the main bootloader stops at
+28 KB (the linker script), and the size check of the build measures it against
+that. A board installed with the log of one page moves over by itself
+(src/common/urtc_meta_migrate.h): while no record of the two pages exists the
+old log and its two serial slots are read, the first record goes to 0x08007000
+and the old page is erased only by the write after it, so the serial, the
+programmed counter of the serial command and the rollback counter survive the
+move, also when the power goes at any step of it. A bootloader of the one-page
+layout flashed over a board that runs the two pages reads the page 0x08007800
+as a blank log (a first boot with the floor compiled in, serial of the unique
+ID), so going back is not supported without programming the serial again.
 
 Revocation and rotation. A new bootloader flashed over SWD carries the new
 table: it can raise the compiled floor of the counter and mark a key revoked

@@ -82,7 +82,7 @@ Every file of the repository with a line on what it does: the annotated tree tha
 │   │       ├── bootloader_main.c  Entry point for the bootloader
 │   │       ├── bootloader_*.c/.h  9 more files (shared types/constants, crypto,
 │   │       │                      flash/metadata, OLED, CAN protocol)
-│   │       ├── STM32F303CCTx_BOOTLOADER.ld  Linker script for the bootloader (30K region at 0x08000000)
+│   │       ├── STM32F303CCTx_BOOTLOADER.ld  Linker script for the bootloader (28K of code at 0x08000000)
 │   │       └── README.md          Same technical-reference role as the application's, for the bootloader
 │   ├── common/                   Headers shared by the application, the bootloader and the slave: the boot session mark, the slave registers, the version wire format and the flash layout (urtc_flash_layout.h), plus the host-tested copies of the Ed25519 verifier, the signed-image decision and the addressing by serial number (urtc_ed25519.c, urtc_auth.h, urtc_bl_select.h; no bootloader calls them yet)
 │   └── F303-slave/               Companion chip (STM32F303CBT6) on the 2 ADVANCED expansion
@@ -158,7 +158,7 @@ Every file of the repository with a line on what it does: the annotated tree tha
 │   ├── seal_image.py            The step after the link: fills in the length and the CRC-32 of the header an application image carries inside it
 │   ├── verify_release_set.py    Checks a folder of signed release assets (digests, signatures against the registered public key) before the workflow publishes them
 │   ├── run_host_tests.py        Executor of the host test suites (ctest where cmake is installed, shared with the other firmware repositories), with the sanitizers, the analysis and a coverage floor
-│   ├── host_tests.json          The 61 suites: sources, include folders and flags
+│   ├── host_tests.json          The 62 suites: sources, include folders and flags
 │   ├── c_quality.py / c_quality.json  Checks the compiler of the board does not make: `-Wconversion` with the host compiler, cppcheck and the length of comment blocks (what is excluded and why, and the limits, are in the JSON)
 │   ├── gen_build_scripts.py / build_plan.json  Writes the pinned vendor sources, the compiler and linker flags and the HAL modules into build_firmware.sh and build_firmware.bat from one file (`--check` in CI)
 │   ├── bootloader_twin.py / changelog_section.py / fuzz_virtual_board.py The twin of the bootloader (build and drive); the text of one CHANGELOG section for a release; a fuzz run of the virtual board

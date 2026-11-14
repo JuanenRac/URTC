@@ -11,7 +11,8 @@
 // a wrong CRC and is ignored. The page with the newest record is never touched while the new one is written, so at every instant at least one valid
 // record exists: a power loss costs the write in progress, never the state that was there.
 //
-// This is the layout behind URTC_BL_META_AB (off by default: it needs a second page, URTC_MASTER_METADATA_B_ADDR).
+// This is the layout behind URTC_BL_META_AB (on in the official build, off in the bench build; it needs a second page, URTC_MASTER_METADATA_B_ADDR). A board that
+// still holds the state in the append-only log of one page moves to this layout without losing it: see urtc_meta_migrate.h.
 #ifndef URTC_META_AB_H
 #define URTC_META_AB_H
 
@@ -92,13 +93,14 @@ static inline uint8_t urtc_meta_ab_read(const UrtcMetaAbOps *ops, uint32_t paylo
 
 // Writes the payload as a new record in the page that does not hold the newest one. 1 when the new record reads back valid; 0 on a flash failure (the
 // previous record is still in force). A payload equal to the newest one is not written again.
-static inline uint8_t urtc_meta_ab_write(const UrtcMetaAbOps *ops, uint32_t payload_len, const uint8_t *payload)
+static inline uint8_t urtc_meta_ab_write_first(const UrtcMetaAbOps *ops, uint32_t payload_len, const uint8_t *payload, uint8_t first_page)
 {
     if (payload_len == 0 || payload_len > URTC_META_AB_MAX_PAYLOAD) return 0;
     uint32_t generation = 0;
     const int newest = urtc_meta_ab_newest(ops, payload_len, &generation);
     if (newest >= 0 && memcmp(ops->page_ptr(ops->ctx, (uint8_t)newest) + URTC_META_AB_HEADER, payload, payload_len) == 0) return 1;
-    const uint8_t target = (newest == 0) ? 1u : 0u;
+    // with no valid record yet the caller chooses the page (urtc_meta_migrate.h keeps the single-page log in page 0 untouched until page 1 holds a record)
+    const uint8_t target = (newest < 0) ? (uint8_t)(first_page ? 1u : 0u) : (newest == 0 ? 1u : 0u);
     uint32_t next = generation + 1u;
     if (next == 0 || next == URTC_META_AB_BLANK) next = 1; // the generation wraps over the two values that mean no record
 
@@ -114,6 +116,11 @@ static inline uint8_t urtc_meta_ab_write(const UrtcMetaAbOps *ops, uint32_t payl
     if (!ops->program(ops->ctx, target, 0u, magic, 4u)) return 0;               // the magic goes last
     uint32_t check;
     return urtc_meta_ab_page_valid(ops->page_ptr(ops->ctx, target), payload_len, &check) && check == next;
+}
+
+static inline uint8_t urtc_meta_ab_write(const UrtcMetaAbOps *ops, uint32_t payload_len, const uint8_t *payload)
+{
+    return urtc_meta_ab_write_first(ops, payload_len, payload, 0u);
 }
 
 #endif // URTC_META_AB_H

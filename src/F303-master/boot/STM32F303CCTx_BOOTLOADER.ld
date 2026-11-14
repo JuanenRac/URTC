@@ -1,15 +1,16 @@
 /* Linker script for URTC bootloader - STM32F303CCT6
- * Flash region: 0x08000000, 30KB of code. The last 2KB of the 32KB slot in
+ * Flash region: 0x08000000, 28KB of code. The last 4KB of the 32KB slot in
  * front of MAIN_APP_ADDR=0x08008000 / BACKUP_APP_ADDR=0x08024000 (see
- * bootloader_common.h) hold the boot metadata at METADATA_ADDR=0x08007800,
- * so the code must stop before it.
+ * bootloader_common.h) hold the boot metadata: the page at METADATA_ADDR=0x08007800
+ * and the second page of the alternating pair (URTC_BL_META_AB) at
+ * URTC_MASTER_METADATA_B_ADDR=0x08007000, so the code must stop before them.
  * RAM: 40KB main SRAM at 0x20000000 (the STM32F303CC's other 8KB, CCM
  * RAM, lives at the unrelated 0x10000000 alias and isn't used here).
  */
 
 MEMORY
 {
-  FLASH (rx)      : ORIGIN = 0x08000000, LENGTH = 30K
+  FLASH (rx)      : ORIGIN = 0x08000000, LENGTH = 28K
   RAM (xrw)       : ORIGIN = 0x20000000, LENGTH = 40K
 }
 
@@ -55,6 +56,7 @@ SECTIONS
     . = ALIGN(4);
     *(.rodata)
     *(.rodata*)
+    KEEP(*(.urtc_layout)) /* the marker of the two-page metadata (URTC_BL_META_AB): the release build looks for it in the image */
     . = ALIGN(4);
   } >FLASH
 
