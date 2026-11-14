@@ -18,6 +18,14 @@
 
 #define MLX90640_I2C_ADDR 0x33 // fixed factory address, not configurable - same constant as the expansion slave chip's own copy (slave_common.h)
 
+// 1 = a capture reads BOTH sub-pages of the chess pattern (the sensor measures half of the pixels per frame) and calculates each into the same image, so no pixel
+// is left from an earlier capture or at zero; the watchdog is refreshed between the frames because two frames take longer than its period. 0 (default) = one frame
+// per capture, as the firmware has always done: only the pixels of the sub-page that came are updated.
+#ifndef URTC_MLX90640_TWO_SUBPAGES
+#define URTC_MLX90640_TWO_SUBPAGES 0
+#endif
+#define MLX90640_MAX_FRAMES_PER_CAPTURE 4   // frames read at most to see both sub-pages (a sensor that repeats one sub-page is an error, not a loop)
+
 static uint8_t mlx90640_capture_status = MLX_CAPTURE_IDLE;
 static paramsMLX90640 mlx90640_params;
 static uint16_t mlx90640_frame_data[834]; // 768 pixels + 64 aux words + frameData[832]/[833] control/subpage metadata, same buffer size already verified for the expansion slave chip's own copy of this same library
@@ -37,6 +45,25 @@ void MLX90640_Direct_Init(void) {
 
 void MLX90640_Direct_TriggerCapture(void) {
     mlx90640_capture_status = MLX_CAPTURE_BUSY;
+#if URTC_MLX90640_TWO_SUBPAGES
+    uint8_t seen = 0;   // bit n = sub-page n has been calculated into the image
+    for (int attempt = 0; attempt < MLX90640_MAX_FRAMES_PER_CAPTURE && seen != 3; attempt++) {
+        if (attempt > 0) HAL_IWDG_Refresh(&hiwdg);   // the first frame comes with the whole period in front of it (the caller refreshes), the next ones need their own
+        if (MLX90640_TriggerMeasurement(MLX90640_I2C_ADDR) < 0) {
+            mlx90640_capture_status = MLX_CAPTURE_ERROR;
+            return;
+        }
+        int subpage = MLX90640_GetFrameData(MLX90640_I2C_ADDR, mlx90640_frame_data);
+        if (subpage < 0) {
+            mlx90640_capture_status = MLX_CAPTURE_ERROR;
+            return;
+        }
+        float ta = MLX90640_GetTa(mlx90640_frame_data, &mlx90640_params);
+        MLX90640_CalculateTo(mlx90640_frame_data, &mlx90640_params, 0.95f, ta - 8.0f, mlx90640_calibrated_frame);
+        seen |= (uint8_t)(1u << (subpage & 1));
+    }
+    mlx90640_capture_status = (seen == 3) ? MLX_CAPTURE_READY : MLX_CAPTURE_ERROR;
+#else
 
     if (MLX90640_TriggerMeasurement(MLX90640_I2C_ADDR) < 0) {
         mlx90640_capture_status = MLX_CAPTURE_ERROR;
@@ -56,6 +83,7 @@ void MLX90640_Direct_TriggerCapture(void) {
     MLX90640_CalculateTo(mlx90640_frame_data, &mlx90640_params, emissivity, tr, mlx90640_calibrated_frame);
 
     mlx90640_capture_status = MLX_CAPTURE_READY;
+#endif
 }
 
 uint8_t MLX90640_Direct_GetCaptureStatus(void) {

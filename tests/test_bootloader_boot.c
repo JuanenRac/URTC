@@ -204,6 +204,7 @@ static void test_main_loop(int *failures)
     TEST_ASSERT(left == 2 && fake_iwdg_refreshes == 2500, "the bootloader refreshes its watchdog on every pass of both loops");
     TEST_ASSERT(fake_hal_inits == 1 && fake_rcc_calls == 2 && fake_rcc_osc.PLL.PLLMUL == RCC_PLL_MUL16 && fake_rcc_clk.APB1CLKDivider == RCC_HCLK_DIV2, "the HAL is started and the clocks are the ones of the application");
     TEST_ASSERT(fake_iwdg_inits == 1 && fake_iwdg_prescaler == IWDG_PRESCALER_32 && fake_iwdg_reload == 999, "the watchdog is armed for one second");
+    TEST_ASSERT(fake_iwdg_window == IWDG_WINDOW_DISABLE && fake_iwdg_window_violations == 0, "the watchdog has no window (a global handle would give 0, and every refresh would then reset the chip)");
     double quanta = 1.0 + CAN_BS1_TQ_OF(fake_can_init.TimeSeg1) + CAN_BS2_TQ_OF(fake_can_init.TimeSeg2);
     TEST_ASSERT(32000000.0 / fake_can_init.Prescaler / quanta == (double)URTC_CAN_BITRATE_BPS && fake_can_init.SyncJumpWidth == CAN_SJW_1TQ && fake_can_init.AutoBusOff == ENABLE && fake_can_init.AutoRetransmission == ENABLE, "CAN runs at the rate of the specification of the bus (1 Mbit/s unless built as legacy) and recovers from bus-off by itself");
     TEST_ASSERT((1000.0 * (1.0 + CAN_BS1_TQ_OF(fake_can_init.TimeSeg1)) / quanta) >= (double)URTC_CAN_SAMPLE_POINT_MIN_PERMILLE, "the sample point of the bootloader is not below the floor of the specification");

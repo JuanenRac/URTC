@@ -79,9 +79,21 @@ void Handle_CAN_PasteJetting(void) { note("jet"); }
 void Handle_CAN_FlyingProbe(void) { note("probe"); }
 void Handle_CAN_ThermalInspection(void) { note("thermal"); }
 
+// The interrupt hands the frame to the dispatcher; with URTC_CAN_RX_QUEUE=1 it only stores it and the main loop does the rest, which is what this stands for.
+static void receive_and_dispatch(void)
+{
+    HAL_CAN_RxFifo0MsgPendingCallback(&hcan);
+#if URTC_CAN_RX_QUEUE
+    CanDispatch_Drain();
+#endif
+}
+
 static void deliver(uint32_t id, ToolMode_t tool, int error)
 {
     fake_hal_reset_recording();
+#if URTC_CAN_RX_QUEUE
+    CanRxQueue_Reset();
+#endif
     trace_len = 0;
     trace[0] = 0;
     make_error_in_post = make_error_in_bridge = 0;
@@ -91,7 +103,7 @@ static void deliver(uint32_t id, ToolMode_t tool, int error)
     fake_rx_queue_count = 1;
     active_tool = tool;
     system_error_flag = (uint8_t)error;
-    HAL_CAN_RxFifo0MsgPendingCallback(&hcan);
+    receive_and_dispatch();
 }
 
 typedef struct { ToolMode_t tool; const char *expect; } Route;
@@ -147,14 +159,14 @@ void run_can_dispatch_tests(int *failures)
     fake_rx_queue_count = 1;
     active_tool = TOOL_LASER_ENGRAVER;
     system_error_flag = 0;
-    HAL_CAN_RxFifo0MsgPendingCallback(&hcan);
+    receive_and_dispatch();
     TEST_ASSERT(trace[0] == 0, "an extended frame reaches no handler, even with the StdId of a command left over");
     memset(&fake_rx_queue[0], 0, sizeof fake_rx_queue[0]);
     fake_rx_queue[0].hdr.StdId = 0x160;
     fake_rx_queue[0].hdr.RTR = CAN_RTR_REMOTE;
     fake_rx_queue[0].hdr.DLC = 2;
     fake_rx_queue_count = 1;
-    HAL_CAN_RxFifo0MsgPendingCallback(&hcan);
+    receive_and_dispatch();
     TEST_ASSERT(trace[0] == 0, "a remote request reaches no handler");
 
     // The diagnostics that must work during a fault run first; an unassigned jumper value reaches no tool.
@@ -184,13 +196,13 @@ void run_can_dispatch_tests(int *failures)
     fake_rx_queue_count = 1;
     active_tool = TOOL_DRILL;
     system_error_flag = 0;
-    HAL_CAN_RxFifo0MsgPendingCallback(&hcan);
+    receive_and_dispatch();
     TEST_ASSERT(strcmp(trace, "pre post bridge ") == 0 && system_error_flag == 1, "an error raised by the post-gate handler stops the tool handler for that frame");
     trace_len = 0; trace[0] = 0;
     make_error_in_post = 0; make_error_in_bridge = 1;
     fake_rx_queue_count = 1;
     system_error_flag = 0;
-    HAL_CAN_RxFifo0MsgPendingCallback(&hcan);
+    receive_and_dispatch();
     TEST_ASSERT(strcmp(trace, "pre post bridge ") == 0 && system_error_flag == 1, "an error raised by the slave bridge stops the tool handler for that frame");
 
     // The frame must have been read; a failed read does nothing.
@@ -199,12 +211,12 @@ void run_can_dispatch_tests(int *failures)
     fake_rx_queue_count = 0;
     can_led_tick = 0;
     fake_tick = 777;
-    HAL_CAN_RxFifo0MsgPendingCallback(&hcan);
+    receive_and_dispatch();
     TEST_ASSERT(trace_len == 0 && can_led_tick == 0, "when the frame cannot be read nothing is called and the activity LED tick is untouched");
     deliver(0x120, TOOL_DRILL, 0);
     fake_tick = 777;
     fake_rx_queue_count = 1;
-    HAL_CAN_RxFifo0MsgPendingCallback(&hcan);
+    receive_and_dispatch();
     TEST_ASSERT(can_led_tick == 777, "a received frame stamps the activity LED tick with the current time");
 
     // A frame the multinode filter consumes reaches no handler; the activity LED still stamps it.
@@ -214,6 +226,54 @@ void run_can_dispatch_tests(int *failures)
     multinode_consumes = 0;
     deliver(0x120, TOOL_SOLDERING_IRON, 0);
     TEST_ASSERT(strcmp(trace, "pre post bridge solder motion ") == 0, "with the filter passing, the single-head trace is unchanged");
+
+#if URTC_CAN_RX_QUEUE
+    // With the queue the interrupt only stores the frame: nothing is dispatched until the main loop drains it, and the activity LED is stamped at once.
+    fake_hal_reset_recording();
+    trace_len = 0;
+    trace[0] = 0;
+    CanRxQueue_Reset();
+    memset(&fake_rx_queue[0], 0, sizeof fake_rx_queue[0]);
+    fake_rx_queue[0].hdr.StdId = 0x120;
+    fake_rx_queue[0].hdr.DLC = 1;
+    fake_rx_queue_count = 1;
+    active_tool = TOOL_SOLDERING_IRON;
+    system_error_flag = 0;
+    can_led_tick = 0;
+    fake_tick = 4242;
+    HAL_CAN_RxFifo0MsgPendingCallback(&hcan);
+    TEST_ASSERT(trace_len == 0 && CanRxQueue_Count() == 1 && can_led_tick == 4242, "the interrupt stores the frame, dispatches nothing and stamps the activity LED");
+    CanDispatch_Drain();
+    TEST_ASSERT(strcmp(trace, "pre post bridge solder motion ") == 0 && CanRxQueue_Count() == 0, "the main loop dispatches it exactly as the interrupt would have");
+    CanDispatch_Drain();
+    TEST_ASSERT(strcmp(trace, "pre post bridge solder motion ") == 0, "and draining an empty queue does nothing");
+    // frames come out in the order they arrived, each with its own identifier and data
+    CanRxQueue_Reset();
+    trace_len = 0;
+    trace[0] = 0;
+    for (int i = 0; i < 3; i++) {
+        memset(&fake_rx_queue[0], 0, sizeof fake_rx_queue[0]);
+        fake_rx_queue[0].hdr.StdId = (i == 1) ? 0x1FFu : 0x120u;
+        fake_rx_queue[0].hdr.DLC = 1;
+        fake_rx_queue_count = 1;
+        HAL_CAN_RxFifo0MsgPendingCallback(&hcan);
+    }
+    TEST_ASSERT(CanRxQueue_Count() == 3, "three frames wait in the queue");
+    CanDispatch_Drain();
+    TEST_ASSERT(CanRxQueue_Count() == 0 && trace_len > 0, "and one pass of the main loop takes them all");
+    // a frame that is not a standard data frame is stored and then ignored by the dispatcher, as it is in the interrupt
+    CanRxQueue_Reset();
+    trace_len = 0;
+    trace[0] = 0;
+    memset(&fake_rx_queue[0], 0, sizeof fake_rx_queue[0]);
+    fake_rx_queue[0].hdr.StdId = 0x120;
+    fake_rx_queue[0].hdr.IDE = CAN_ID_EXT;
+    fake_rx_queue[0].hdr.DLC = 1;
+    fake_rx_queue_count = 1;
+    HAL_CAN_RxFifo0MsgPendingCallback(&hcan);
+    CanDispatch_Drain();
+    TEST_ASSERT(trace_len == 0, "an extended frame that went through the queue reaches no handler");
+#endif
 }
 
 int main(void)

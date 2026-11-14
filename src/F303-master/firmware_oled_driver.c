@@ -31,6 +31,31 @@ void OLED_WriteCmd(uint8_t cmd) {
     I2C2_TransmitWithRecovery(OLED_I2C_ADDR, frame, 2);
 }
 
+// Incremental redraw. The screen is repainted from the top of the main loop
+// every few hundred milliseconds, but most of what is painted has not
+// changed since the last pass, and every write costs a 129-byte transaction
+// (about 12 ms at the 100 kHz of this bus). The driver therefore keeps a copy
+// of what each page of the display shows and sends a write only when its
+// pixels differ from the copy. The copy of a page is trusted only after a
+// write that covered the whole page (a clear, or a full-width line), or after
+// OLED_ForceFullRedraw; a page that has not been written in full yet, or a
+// bus that failed, makes the next writes go out unconditionally. The
+// controller keeps its own write position, so a skipped write moves only the
+// driver's position; the position is sent again before the next real write.
+// Nothing here changes the speed of the bus or the bytes of a write that is
+// sent.
+#define OLED_PAGES 8
+#define OLED_COLUMNS 128
+static uint8_t shadow[OLED_PAGES][OLED_COLUMNS];
+static uint8_t shadow_page_known;                // bit n: the copy of page n matches the display
+static uint8_t cursor_page, cursor_col;          // where the next data byte goes, as the driver sees it
+static uint8_t hw_page = 0xFF, hw_col;           // where the display itself is (0xFF page: unknown)
+
+void OLED_ForceFullRedraw(void) {
+    shadow_page_known = 0;
+    hw_page = 0xFF;
+}
+
 void OLED_WriteData(uint8_t *buf, uint16_t len) {
     if (!oled_present) return;
     if (len == 0) return; // a control-byte-only transaction with no data
@@ -44,20 +69,51 @@ void OLED_WriteData(uint8_t *buf, uint16_t len) {
                               // is verified within this bound, but this
                               // costs nothing and protects against a future
                               // caller passing an oversized len.
+    uint8_t modelled = (cursor_page < OLED_PAGES && (uint16_t)cursor_col + len <= OLED_COLUMNS);
+    if (modelled && (shadow_page_known & (1u << cursor_page)) &&
+        memcmp(&shadow[cursor_page][cursor_col], buf, len) == 0) {
+        cursor_col = (uint8_t)(cursor_col + len); // nothing to change on the display
+        return;
+    }
+    if (hw_page != 0xFF && (hw_page != cursor_page || hw_col != cursor_col)) {
+        OLED_SetCursor(cursor_page, cursor_col);
+    }
     uint8_t frame[129];
     frame[0] = 0x40;
     memcpy(&frame[1], buf, len);
-    I2C2_TransmitWithRecovery(OLED_I2C_ADDR, frame, len + 1);
+    if (!I2C2_TransmitWithRecovery(OLED_I2C_ADDR, frame, len + 1)) {
+        OLED_ForceFullRedraw(); // the display may hold anything now
+        return;
+    }
+    if (modelled) {
+        memcpy(&shadow[cursor_page][cursor_col], buf, len);
+        if (cursor_col == 0 && len == OLED_COLUMNS) shadow_page_known |= (uint8_t)(1u << cursor_page);
+        cursor_col = (uint8_t)(cursor_col + len);
+        hw_page = cursor_page;
+        hw_col = cursor_col;
+    } else {
+        // a write that runs past the end of the line wraps in the controller
+        // in a way the copy does not model: forget the copy of this page
+        if (cursor_page < OLED_PAGES) shadow_page_known &= (uint8_t)~(1u << cursor_page);
+        hw_page = 0xFF;
+    }
 }
 
 void OLED_SetCursor(uint8_t page, uint8_t col) {
     if (!oled_present) return;
+    cursor_page = page;
+    cursor_col = col;
     // Combined into one transaction rather than 3 separate OLED_WriteCmd
     // calls - the SSD1306 protocol allows any number of command bytes to
     // follow a single 0x00 control byte, so there's no need to repeat the
     // START/address/control/STOP overhead for each of the 3 commands here.
     uint8_t frame[4] = {0x00, (uint8_t)(0xB0 + page), (uint8_t)(0x00 + (col & 0x0F)), (uint8_t)(0x10 + ((col >> 4) & 0x0F))};
-    I2C2_TransmitWithRecovery(OLED_I2C_ADDR, frame, 4);
+    if (I2C2_TransmitWithRecovery(OLED_I2C_ADDR, frame, 4)) {
+        hw_page = page;
+        hw_col = col;
+    } else {
+        OLED_ForceFullRedraw();
+    }
 }
 
 // Split out from OLED_Init() below - just the I2C2 peripheral+pin setup,
@@ -99,6 +155,7 @@ void OLED_Init(void) {
     // OLED_WriteCmd/WriteData call for the rest of the session).
     oled_present = (HAL_I2C_IsDeviceReady(&hi2c2, OLED_I2C_ADDR, 2, 5) == HAL_OK) ? 1 : 0;
     if (!oled_present) return;
+    OLED_ForceFullRedraw(); // the display RAM holds anything after power-up
     // Verified compatible with both SSD1306 and SSD1315 (a newer, drop-in
     // replacement controller that many "SSD1306" modules actually ship
     // with today without the silkscreen/listing changing) - Solomon
