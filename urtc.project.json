@@ -41,7 +41,7 @@
     {
       "name": "URTC_MAIN_BOOTLOADER",
       "kind": "bootloader",
-      "version": "0.5.1",
+      "version": "0.5.2",
       "target": "stm32f303cc",
       "source": {
         "file": "src/F303-master/boot/bootloader_common.h",

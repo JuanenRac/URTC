@@ -11,12 +11,15 @@
 #include "urtc_bl_serial.h"
 
 // URTC_BL_META_AB=1 keeps the metadata (and the programmed serial) in two alternating pages instead of the append-only log of one page (src/common/urtc_meta_ab.h).
-// Off by default: it needs a second 2 KB page, URTC_MASTER_METADATA_B_ADDR, that the layout of the bootloader does not give today.
+// The official build (URTC_RELEASE=1 of build_firmware.sh) turns it on; the bench build leaves it off unless URTC_BL_META_AB=1 is set. It uses the page
+// URTC_MASTER_METADATA_B_ADDR (src/common/urtc_flash_layout.h), the last 2 KB page of the 30 KB region, which the linker script keeps free of code. A board that
+// holds its state in the log of one page moves over without losing the serial or the rollback counter (src/common/urtc_meta_migrate.h).
 #ifndef URTC_BL_META_AB
 #define URTC_BL_META_AB 0
 #endif
 #if URTC_BL_META_AB
 #include "urtc_meta_ab.h"
+#include "urtc_meta_migrate.h"
 #ifndef URTC_MASTER_METADATA_B_ADDR
 #error "URTC_BL_META_AB=1 needs URTC_MASTER_METADATA_B_ADDR: the address of a free 2 KB page (check that the bootloader image ends before it)"
 #endif
@@ -168,6 +171,7 @@ uint8_t Flash_CopyRegion(uint32_t dest_addr, uint32_t src_addr, uint32_t total_l
 // ---- metadata: an append-only log (see FirmwareMetadata_t in bootloader_common.h) ------------------------------------------------------------
 _Static_assert(sizeof(MetaRecord_t) == META_RECORD_SIZE, "a metadata record is 72 bytes");
 
+#if !URTC_BL_META_AB // the helpers of the log of one page; the two-page layout does not use them (it reads the old log through urtc_meta_migrate.h)
 static const MetaRecord_t *meta_slot(uint32_t index) {
     return (const MetaRecord_t*)(METADATA_ADDR + index * META_RECORD_SIZE);
 }
@@ -200,7 +204,6 @@ static int32_t meta_find_newest(void) {
     return best;
 }
 
-#if !URTC_BL_META_AB
 uint8_t Metadata_Read(FirmwareMetadata_t *out) {
     int32_t newest = meta_find_newest();
     if (newest < 0) {
@@ -217,9 +220,11 @@ uint8_t Metadata_Read(FirmwareMetadata_t *out) {
 #define SERIAL_SLOT_B (SERIAL_SLOT_A + URTC_SERIAL_SLOT_BYTES)
 _Static_assert(META_RECORD_SLOTS * META_RECORD_SIZE + URTC_SERIAL_SLOT_COUNT * URTC_SERIAL_SLOT_BYTES <= 2048u, "the two serial slots fit after the log");
 
+#if !URTC_BL_META_AB
 static void serial_slot_words(uint32_t address, uint32_t words[4]) {
     memcpy(words, (const void*)(uintptr_t)address, URTC_SERIAL_SLOT_BYTES);
 }
+#endif
 
 static uint8_t metadata_page_erase_at(uint32_t address) {
     FLASH_EraseInitTypeDef eraseInit;
@@ -234,6 +239,7 @@ static uint8_t metadata_page_erase_at(uint32_t address) {
     return (res == HAL_OK && pageError == 0xFFFFFFFF) ? 1u : 0u;
 }
 
+#if !URTC_BL_META_AB
 static uint8_t metadata_page_erase(void) {
     return metadata_page_erase_at(METADATA_ADDR);
 }
@@ -245,6 +251,7 @@ static uint8_t serial_slot_program(uint32_t address, uint32_t serial, uint32_t c
     if (!Flash_WriteVerified(address + 4u, (const uint8_t*)&words[1], 12u)) return 0;
     return Flash_WriteVerified(address, (const uint8_t*)&words[0], 4u);
 }
+#endif
 
 #if !URTC_BL_META_AB
 uint8_t Serial_ReadNewest(uint32_t *serial, uint32_t *counter) {
@@ -319,6 +326,12 @@ typedef struct {
 } MetaAbState_t;
 _Static_assert(sizeof(MetaAbState_t) % 2u == 0u, "the record is programmed by half-words");
 _Static_assert(sizeof(MetaAbState_t) <= URTC_META_AB_MAX_PAYLOAD, "the state fits the record");
+_Static_assert(sizeof(MetaAbState_t) == URTC_META_STATE_BYTES && sizeof(FirmwareMetadata_t) == URTC_META_LEGACY_META_BYTES, "the state is laid out as the migration reads and writes it");
+_Static_assert(URTC_MASTER_METADATA_B_ADDR + FLASH_PAGE_SIZE <= URTC_MASTER_METADATA_ADDR, "the second page is in front of the first and the two do not overlap");
+
+// A marker that the linker keeps (the linker script has KEEP for the section): the build of the release candidate looks for it in the image, so a bootloader
+// built without the two pages cannot reach a release by mistake.
+__attribute__((used, section(".urtc_layout"))) const char urtc_bl_meta_layout[16] = "URTC-META-AB-V1";
 
 static const uint8_t *meta_ab_page_ptr(void *ctx, uint8_t page) {
     (void)ctx;
@@ -337,11 +350,14 @@ static uint8_t meta_ab_program(void *ctx, uint8_t page, uint32_t offset, const u
 
 static const UrtcMetaAbOps meta_ab_ops = { meta_ab_page_ptr, meta_ab_erase, meta_ab_program, 0 };
 
+// The newest A/B record; with none, the state of the single-page layout still in page 0 (a board that was installed before this layout); with none either, blank.
 static void meta_ab_load(MetaAbState_t *state) {
-    if (!urtc_meta_ab_read(&meta_ab_ops, sizeof(*state), (uint8_t*)state)) {
-        memset(state, 0, sizeof(*state));
-        memset(state->serial_words, 0xFF, sizeof(state->serial_words)); // no serial yet: the blank slot
-    }
+    (void)urtc_meta_ab_load_state(&meta_ab_ops, (uint8_t*)state, 0);
+}
+
+// The first A/B record of a board that holds the single-page layout goes to page 1, so the old log stays readable until the new record is complete.
+static uint8_t meta_ab_store(const MetaAbState_t *state) {
+    return urtc_meta_ab_store_state(&meta_ab_ops, (const uint8_t*)state);
 }
 
 uint8_t Metadata_Read(FirmwareMetadata_t *out) {
@@ -359,7 +375,7 @@ uint8_t Metadata_EraseAndWrite(const FirmwareMetadata_t *meta) {
     MetaAbState_t state;
     meta_ab_load(&state);
     state.meta = *meta;
-    return urtc_meta_ab_write(&meta_ab_ops, sizeof(state), (const uint8_t*)&state);
+    return meta_ab_store(&state);
 }
 
 uint8_t Serial_ReadNewest(uint32_t *serial, uint32_t *counter) {
@@ -373,6 +389,6 @@ uint8_t Serial_Store(uint32_t serial, uint32_t counter) {
     MetaAbState_t state;
     meta_ab_load(&state);
     urtc_serial_slot_pack(serial, counter, state.serial_words);
-    return urtc_meta_ab_write(&meta_ab_ops, sizeof(state), (const uint8_t*)&state);
+    return meta_ab_store(&state);
 }
 #endif

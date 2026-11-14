@@ -307,6 +307,17 @@ if errorlevel 1 (
 )
 set "MASTER_KEY_FLAGS="
 for /f "usebackq delims=" %%k in (`python "%ROOT%\firmware_signing.py" cflags master`) do set "MASTER_KEY_FLAGS=%%k"
+REM The metadata of the main bootloader: two alternating pages (URTC_BL_META_AB=1, src\common\urtc_meta_ab.h) in the official build (URTC_RELEASE=1), the
+REM append-only log of one page in the bench build. URTC_BL_META_AB=0 or 1 in the environment overrides either choice. A board installed with the log of
+REM one page moves to the two pages by itself and keeps its serial and its rollback counter (src\common\urtc_meta_migrate.h).
+set "META_AB=0"
+if "%URTC_RELEASE%"=="1" set "META_AB=1"
+if defined URTC_BL_META_AB set "META_AB=%URTC_BL_META_AB%"
+if not "%META_AB%"=="0" if not "%META_AB%"=="1" (
+    echo URTC_BL_META_AB must be 0 or 1 ^(got '%META_AB%'^)
+    exit /b 1
+)
+set "MASTER_KEY_FLAGS=%MASTER_KEY_FLAGS% -DURTC_BL_META_AB=%META_AB%"
 
 REM -----------------------------------------------------------------------
 if "%TARGET%"=="all" set "DO_MASTER=1" & set "DO_SLAVE=1"

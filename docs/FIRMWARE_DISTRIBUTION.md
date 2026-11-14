@@ -124,7 +124,8 @@ The official images are compiled by GitHub Actions and signed only on the mainta
    `keys/image_trust.json`), a build date taken from the commit (`SOURCE_DATE_EPOCH`) and one pinned release of the Arm GNU toolchain (checked by its SHA-256),
    on two separate runners. It compares every file of the two builds and keeps the artifact `firmware-rc-urtc-<version>` for seven days only when they are the
    same bytes. Inside it checks that the version inside each application image (the header slot) is the one of its name and the manifest
-   (`tools/check_image_versions.py`) and that the main bootloader holds exactly the official trust table.
+   (`tools/check_image_versions.py`) and that the main bootloader holds exactly the official trust table and keeps its metadata in the two alternating
+   pages (`URTC_BL_META_AB=1`, which `URTC_RELEASE=1` turns on; `src/common/urtc_meta_ab.h`).
 3. On the maintainer's machine the artifact of the last successful run is downloaded (`gh run download`) into an empty folder and verified before anything is
    signed: `gh attestation verify` for every file, `sha256sum -c SHA256SUMS`, the build manifest (`reproducible: true`, `signing_key_kind: "release"`, the version
    and the commit of the repository), and the trust table that the main bootloader holds. Then the maintainer's signing tool adds, with the keys of

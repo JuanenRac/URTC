@@ -70,7 +70,9 @@ class BootloaderRegionTests(unittest.TestCase):
         self.assertEqual(declared, kilobytes * 1024)
         header = (ROOT / "src" / "common" / "urtc_flash_layout.h").read_text(encoding="utf-8")   # the layout is written once; the bootloader header takes it from there
         metadata = int(re.search(r"#define URTC_MASTER_METADATA_ADDR\s+0x([0-9A-Fa-f]+)UL", header).group(1), 16)
-        self.assertEqual(metadata - 0x08000000, declared)
+        second = int(re.search(r"#define URTC_MASTER_METADATA_B_ADDR\s+0x([0-9A-Fa-f]+)UL", header).group(1), 16)
+        self.assertEqual(second - 0x08000000, declared, "the code of the bootloader stops at the second metadata page")
+        self.assertEqual(metadata - second, 0x800, "the two metadata pages are side by side")
 
 
 if __name__ == "__main__":

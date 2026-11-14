@@ -27,8 +27,9 @@ by an incoming update.
 ## 2. Flash layout
 
 ```
-0x08000000 ─┬─ Bootloader                30 KB   (this)
-0x08007800 ─┼─ Metadata                   2 KB   (version, size, CRC32, SHA-256, rollback floor - an append-only log of records)
+0x08000000 ─┬─ Bootloader                28 KB   (this)
+0x08007000 ─┼─ Metadata, second page      2 KB   (the alternating pair of the official build, URTC_BL_META_AB; free in the bench build)
+0x08007800 ─┼─ Metadata                   2 KB   (version, size, CRC32, SHA-256, rollback floor - an append-only log of records, or the first page of the pair)
 0x08008000 ─┼─ Main application slot    112 KB   (the application firmware, what actually runs)
 0x08024000 ─┴─ Backup/staging slot      112 KB   (OTA updates land here first, verified, then copied to main)
 0x08040000    (end of flash, 256 KB total)

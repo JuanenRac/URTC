@@ -333,6 +333,17 @@ else
     echo ""; echo "$PASS passed, $WARN warnings, $FAIL failed"; exit 1
 fi
 MASTER_KEY_FLAGS="$(python3 "$ROOT/firmware_signing.py" cflags master)" || exit 1
+# The metadata of the main bootloader: two alternating pages (URTC_BL_META_AB=1, src/common/urtc_meta_ab.h) in the official build (URTC_RELEASE=1), the
+# append-only log of one page in the bench build. URTC_BL_META_AB=0 or 1 in the environment overrides either choice. A board installed with the log of one
+# page moves to the two pages by itself and keeps its serial and its rollback counter (src/common/urtc_meta_migrate.h).
+META_AB=0
+[ "${URTC_RELEASE:-}" = "1" ] && META_AB=1
+META_AB="${URTC_BL_META_AB:-$META_AB}"
+case "$META_AB" in
+    0|1) ;;
+    *) echo "URTC_BL_META_AB must be 0 or 1 (got '$META_AB')"; exit 1 ;;
+esac
+MASTER_KEY_FLAGS="$MASTER_KEY_FLAGS -DURTC_BL_META_AB=$META_AB"
 
 # The firmware directory is a single coherent build set, never a history of
 # mixed component versions. Preserve non-generated material, but remove every

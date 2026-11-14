@@ -52,7 +52,8 @@ class FlashLayoutTests(unittest.TestCase):
         self.assertEqual(origin_and_length("F303-slave/boot/STM32F303CBTx_SLAVEBOOT.ld"), (0x08000000, v["URTC_SLAVE_BOOTLOADER_SIZE"]))
         origin, length = origin_and_length("F303-master/boot/STM32F303CCTx_BOOTLOADER.ld")
         self.assertEqual(origin, 0x08000000)
-        self.assertEqual(origin + length, v["URTC_MASTER_METADATA_ADDR"] + 0x0, "the bootloader of the master ends at the metadata page")
+        self.assertEqual(origin + length, v["URTC_MASTER_METADATA_B_ADDR"], "the code of the bootloader of the master ends at the second metadata page")
+        self.assertEqual(v["URTC_MASTER_METADATA_B_ADDR"] + 0x800, v["URTC_MASTER_METADATA_ADDR"], "the two metadata pages are side by side, the second one first")
 
     def test_the_c_files_take_the_numbers_from_the_header(self) -> None:
         for name in ("F303-master/boot/bootloader_common.h", "F303-slave/boot/slaveboot_common.h"):

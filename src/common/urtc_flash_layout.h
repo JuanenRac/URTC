@@ -11,6 +11,9 @@
 
 // Master board (STM32F303CC, 256 KB): bootloader, metadata page, application slot and the backup slot an update is received into.
 #define URTC_MASTER_METADATA_ADDR    0x08007800UL
+// The second page of the metadata (URTC_BL_META_AB): the last 2 KB page of the 30 KB region of the bootloader. The linker script of the bootloader stops its code
+// at this address (28 KB) so the page is always free; the page is unused when the bootloader is built without URTC_BL_META_AB.
+#define URTC_MASTER_METADATA_B_ADDR  0x08007000UL
 #define URTC_MASTER_MAIN_APP_ADDR    0x08008000UL
 #define URTC_MASTER_BACKUP_APP_ADDR  0x08024000UL
 #define URTC_MASTER_APP_MAX_SIZE     (112UL * 1024UL)
