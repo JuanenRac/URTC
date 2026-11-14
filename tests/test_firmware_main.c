@@ -114,6 +114,7 @@ static void test_power_up(int *failures)
     TEST_ASSERT(fake_scb.VTOR == 0x08008000UL && fake_hal_inits == 1, "the vector table points at the application, and the HAL is started");
     TEST_ASSERT(fake_rcc_calls == 3 && fake_rcc_osc.PLL.PLLMUL == RCC_PLL_MUL16, "the clocks are configured");
     TEST_ASSERT(fake_iwdg_inits == 1 && fake_iwdg_prescaler == IWDG_PRESCALER_32 && fake_iwdg_reload == 999, "the watchdog is armed for one second");
+    TEST_ASSERT(fake_iwdg_window == IWDG_WINDOW_DISABLE && fake_iwdg_window_violations == 0, "the watchdog has no window (a global handle would give 0, and every refresh would then reset the chip)");
     TEST_ASSERT(fake_can_inits == 1 && fake_can_starts == 1 && fake_adc_inits == 1 && fake_adc_channel.Channel == ADC_CHANNEL_1, "the CAN controller is started and the ADC reads the thermocouple channel");
     TEST_ASSERT(fake_tim_base_inits == 1 && fake_tim_base_starts_it == 1 && fake_spi_inits == 1 && fake_dma_inits == 1, "the step timer, the SPI and the DMA of the status LED are set up");
     TEST_ASSERT(fake_i2c_probes == 1 && i2c_frames > 100, "the display is probed, the splash screen and the tool screen are drawn");
@@ -147,10 +148,15 @@ static void test_every_tool(int *failures)
 }
 
 static void raise_bus_error(int refreshes) { if (refreshes == 80) can_bus_error_flag = 1; }
+static void raise_bus_off(int refreshes) { if (refreshes == 80) { fake_can_regs.ESR = 0x4u; can_bus_error_flag = 1; } }
 static void test_bus_error(int *failures)
 {
+    fake_can_regs.ESR = 0;
     boot(TOOL_SOLDERING_IRON, 200, raise_bus_error);
-    TEST_ASSERT(can_bus_error_flag == 0 && fake_can_abort_count >= 1 && fake_can_starts == 2, "a CAN bus error is cleared by aborting the pending requests and starting the controller again");
+    TEST_ASSERT(can_bus_error_flag == 0 && fake_can_abort_count == 0 && fake_can_starts == 2, "a CAN error that is not a bus-off leaves the pending requests and starts the controller again");
+    boot(TOOL_SOLDERING_IRON, 200, raise_bus_off);
+    TEST_ASSERT(can_bus_error_flag == 0 && fake_can_abort_count >= 1 && fake_can_starts == 2, "a CAN bus-off is cleared by aborting the pending requests and starting the controller again");
+    fake_can_regs.ESR = 0;
 }
 
 static void raise_latched_error(int refreshes) { if (refreshes == 80) system_error_flag = 1; }

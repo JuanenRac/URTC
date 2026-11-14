@@ -7,6 +7,7 @@
 #define FIRMWARE_COMMON_H
 
 #include "stm32f3xx_hal.h"
+#include "urtc_can_ids.h"
 #include <stddef.h>
 #include <string.h>
 #include <math.h>
@@ -426,6 +427,9 @@ extern volatile uint8_t layer_fan_duty;
 extern volatile uint32_t layer_fan_rpm_pulses;
 extern volatile uint32_t layer_fan_actual_rpm;
 extern volatile uint8_t system_error_flag;
+extern volatile uint8_t system_error_reason; // URTC_ERROR_REASON_* of the latched error, 0 while none (STM32F303CC_main.c); set with RAISE_SYSTEM_ERROR
+// Latch the critical error and keep WHY (the first reason wins until the error is lifted); reported in byte 6 of 0x111.
+#define RAISE_SYSTEM_ERROR(reason) do { if (!system_error_flag) { system_error_reason = (uint8_t)(reason); } system_error_flag = 1; } while (0)
 extern volatile uint8_t thermal_fault_code; // ThermalGuardFault_t of the latched thermal fault, 0 = none (firmware_control_thermal.c)
 extern volatile uint8_t last_reset_cause;   // RCC reset-cause bits latched at boot (STM32F303CC_main.c), reported in 0x111 byte 5
 extern volatile uint8_t boot_sequence_active;
@@ -513,5 +517,12 @@ uint8_t SavedState_Checksum(const SavedState_t *s);
 // Same scaling convention as the slave chip's own copy (slave_common.h)
 // - REG_MLX_CALIBRATED_CHUNK values are degrees C * 100 (centi-degrees).
 #define MLX_TEMP_SCALE 100
+
+#include "can_rx_queue.h"
+
+#if URTC_CAN_RX_QUEUE
+// Does in the main loop what the interrupt of the CAN receiver used to do with each frame (URTC_CAN_RX_QUEUE=1; see can_rx_queue.h).
+void CanDispatch_Drain(void);
+#endif
 
 #endif // FIRMWARE_COMMON_H

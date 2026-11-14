@@ -24,7 +24,7 @@ void Control_SensorTelemetry(void) {
         // sensor_analog_reading frozen at its last value with no
         // indication anything's wrong would let a vacuum-pickup/Flying
         // Probe reading go stale silently.
-        system_error_flag = 1;
+        RAISE_SYSTEM_ERROR(URTC_ERROR_REASON_SENSOR);
     }
     HAL_ADC_Stop(&hadc);
     

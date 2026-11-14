@@ -13,6 +13,8 @@
 #include "firmware_common.h"
 #include "firmware_can_motion.h"
 #include "firmware_features.h"
+#include "spool_position.h"
+#include "firmware_safety.h"
 #include "urtc_can_ids.h"
 
 void Handle_CAN_MotionTools(void) {
@@ -45,6 +47,8 @@ void Handle_CAN_MotionTools(void) {
                         total_steps_setpoint = steps;
                         Features_NoteMove(steps); // plans the ramp when the MOTION_RAMPS switch is on and the frame has eight bytes; the step generator does not use the plan yet
                         steps_remaining = steps;
+                        // The cruise speed of the eight-byte form is read only while the ramps run; otherwise the default speed is the one that moves.
+                        Safety_NoteStepperMove(steps, (Features_Active(FEAT_MOTION_RAMPS) && rxHeader.DLC >= 8) ? (uint32_t)(((uint32_t)rxData[5] << 8) | rxData[6]) : 0u);
                         // Open-loop position tracking for the solder-wire
                         // feeder only (doc #16) - this motor has no
                         // encoder, so this is an estimate that assumes
@@ -60,7 +64,7 @@ void Handle_CAN_MotionTools(void) {
                         // read back over CAN via 0x132, reset via 0x131 -
                         // see CANBUS.TXT.
                         if (active_tool == TOOL_SOLDERING_IRON) {
-                            solder_spool_position += (new_dir == GPIO_PIN_SET) ? (int32_t)steps : -(int32_t)steps;
+                            solder_spool_position = SpoolPosition_Add(solder_spool_position, steps, new_dir == GPIO_PIN_SET); // saturates: a command of 2^32 - 1 steps cannot wrap the position
                         }
                         // Fresh move: force the step ISR to start with a
                         // rising edge. Left at 1 from the tail end of a
