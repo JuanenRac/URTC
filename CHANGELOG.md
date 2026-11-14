@@ -4,6 +4,7 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **The MLX90642 thermal camera is configured only when its configuration differs:** the head and the expansion board rewrote the configuration word in the EEPROM of the sensor (a limited number of writes, and 30 ms of waiting) at every start even when it was already right. They now read the mode and the output format first and write only what differs; the host suite covers a sensor that is already configured, one that differs in only one field and one that does not answer.
 - **The length check of the clear-error command is written like the others:** the identifier and the length are tested together in the form that the comparison of the specification with the firmware reads. Same behaviour.
 
 - **The magic payload of the clear-error command is compared byte by byte, like the others:** the comparison of the specification with the firmware reads the four bytes in the source, and the command compared them through a table. Same behaviour, now readable by that check.
