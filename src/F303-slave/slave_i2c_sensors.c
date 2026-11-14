@@ -355,10 +355,20 @@ static uint16_t mlx90642_rawpix[MLX90642_TOTAL_NUMBER_OF_PIXELS];
 static int16_t mlx90642_pixval[MLX90642_TOTAL_NUMBER_OF_PIXELS + 1];
 
 static void MLX90642_DoInit(void) {
-    if (MLX90642_SetMeasMode(MLX90642_SLAVE_I2C_ADDR, MLX90642_STEP_MEAS_MODE) < 0) {
+    // The configuration word is in the EEPROM of the sensor, which wears out: it is written only when it differs from what is wanted, not at every start.
+    int mode = MLX90642_GetMeasMode(MLX90642_SLAVE_I2C_ADDR);
+    if (mode < 0) {
+        // Sensor not present/not responding - the capture status stays MLX_CAPTURE_IDLE; a real capture attempt against a silent bus reports
+        // MLX_CAPTURE_ERROR on its own, same as the other 2 sensors' own DumpEE-failure handling.
         return;
     }
-    MLX90642_SetOutputFormat(MLX90642_SLAVE_I2C_ADDR, MLX90642_TEMPERATURE_OUTPUT);
+    if (mode != MLX90642_STEP_MEAS_MODE && MLX90642_SetMeasMode(MLX90642_SLAVE_I2C_ADDR, MLX90642_STEP_MEAS_MODE) < 0) {
+        return;
+    }
+    int format = MLX90642_GetOutputFormat(MLX90642_SLAVE_I2C_ADDR);
+    if (format >= 0 && format != MLX90642_TEMPERATURE_OUTPUT) {
+        MLX90642_SetOutputFormat(MLX90642_SLAVE_I2C_ADDR, MLX90642_TEMPERATURE_OUTPUT);
+    }
 }
 
 static void MLX90642_DoTriggerCapture(void) {

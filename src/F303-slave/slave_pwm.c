@@ -18,12 +18,15 @@
 // volatile: written from PWM_Pulse/PWM_Stop (called from the I2C1 slave RX
 // interrupt via slave_i2c_link.c's own register dispatch), read/decremented
 // from PWM_Tick in the main loop.
-static volatile uint8_t pulse_remaining_ms[PWM_CHANNEL_COUNT] = {0};
+static volatile uint8_t pulse_duration_ms[PWM_CHANNEL_COUNT] = {0}; // 0 = a continuous pulse (no end of its own)
+// The pulse is timed against the clock and not by counting the passes of the main loop: a pass is not always one millisecond (the capture of the thermal
+// camera can hold the loop for hundreds), and a pulse counted in passes lasted that many times longer than it was asked to.
+static volatile uint32_t pulse_start_tick[PWM_CHANNEL_COUNT] = {0};
 // Tracks whether a channel is mid-pulse (including an indefinite
-// duration_ms=0 continuous pulse, which pulse_remaining_ms alone can't
+// duration_ms=0 continuous pulse, which pulse_duration_ms alone can't
 // distinguish from "never started" - both read 0) - PWM_Configure uses this
 // to avoid retuning the single shared ARR out from under a channel that's
-// already running. Same volatile reasoning as pulse_remaining_ms above.
+// already running. Same volatile reasoning as pulse_duration_ms above.
 static volatile uint8_t channel_active[PWM_CHANNEL_COUNT] = {0};
 
 void PWM_Init(void) {
@@ -111,14 +114,15 @@ void PWM_Pulse(uint8_t channel, uint8_t duty_percent, uint8_t duration_ms) {
     uint32_t ccr = ((uint32_t)duty_percent * (arr + 1)) / 100;
     __HAL_TIM_SET_COMPARE(&htim1, ChannelToHalChannel(channel), ccr);
     HAL_TIM_PWM_Start(&htim1, ChannelToHalChannel(channel));
-    pulse_remaining_ms[channel] = duration_ms; // 0 stays 0 - PWM_Tick only ever counts down a nonzero value, so a continuous request (duration_ms=0) is correctly never auto-stopped
+    pulse_start_tick[channel] = HAL_GetTick();
+    pulse_duration_ms[channel] = duration_ms; // 0 is a continuous request: PWM_Tick never ends it
     channel_active[channel] = 1;
 }
 
 void PWM_Stop(uint8_t channel) {
     if (channel >= PWM_CHANNEL_COUNT) return;
     HAL_TIM_PWM_Stop(&htim1, ChannelToHalChannel(channel));
-    pulse_remaining_ms[channel] = 0;
+    pulse_duration_ms[channel] = 0;
     channel_active[channel] = 0;
 }
 
@@ -129,16 +133,12 @@ void PWM_StopAll(void) {
 }
 
 void PWM_Tick(void) {
-    // Called once per main loop iteration, which slave_main.c paces at
-    // 1ms via HAL_Delay - each call here represents 1ms elapsed, so
-    // decrementing by 1 per call is a millisecond countdown without a
-    // dedicated hardware timer interrupt for it.
+    // Called once per main loop iteration. A timed pulse (duration_ms > 0) ends when that many milliseconds of the clock have gone by since it started,
+    // however long the passes of the loop took; the comparison is on the difference so that it survives the wrap of the 32-bit counter.
+    uint32_t now = HAL_GetTick();
     for (uint8_t ch = 0; ch < PWM_CHANNEL_COUNT; ch++) {
-        if (pulse_remaining_ms[ch] > 0) {
-            pulse_remaining_ms[ch]--;
-            if (pulse_remaining_ms[ch] == 0) {
-                PWM_Stop(ch);
-            }
+        if (pulse_duration_ms[ch] > 0 && (uint32_t)(now - pulse_start_tick[ch]) >= pulse_duration_ms[ch]) {
+            PWM_Stop(ch);
         }
     }
 }

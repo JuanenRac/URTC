@@ -56,7 +56,8 @@ typedef struct { void *Instance; DMA_InitTypeDef Init; } DMA_HandleTypeDef;
 typedef struct { void *Instance; SPI_InitTypeDef Init; DMA_HandleTypeDef *hdmatx; } SPI_HandleTypeDef;
 typedef struct { void *Instance; I2C_InitTypeDef Init; uint32_t XferCount; } I2C_HandleTypeDef;
 typedef struct { void *Instance; ADC_InitTypeDef Init; } ADC_HandleTypeDef;
-typedef struct { void *Instance; struct { uint32_t Prescaler, Reload; } Init; } IWDG_HandleTypeDef;
+typedef struct { void *Instance; struct { uint32_t Prescaler, Reload, Window; } Init; } IWDG_HandleTypeDef;
+#define IWDG_WINDOW_DISABLE 0x00000FFFu   // the value of the window register that turns the window off (any refresh is allowed); the HAL writes Init.Window to it as given
 
 #define TIM_CHANNEL_1 0u
 #define CAN_ID_STD    0u
@@ -500,7 +501,8 @@ HAL_StatusTypeDef HAL_IWDG_Init(IWDG_HandleTypeDef *h);
 void HAL_I2C_EV_IRQHandler(I2C_HandleTypeDef *h);
 void HAL_I2C_ER_IRQHandler(I2C_HandleTypeDef *h);
 extern int fake_i2c_ev_irq_count, fake_i2c_er_irq_count, fake_iwdg_inits;
-extern uint32_t fake_iwdg_prescaler, fake_iwdg_reload;
+extern uint32_t fake_iwdg_prescaler, fake_iwdg_reload, fake_iwdg_window;
+extern int fake_iwdg_window_violations;   // refreshes made while the window set at the init was narrower than the reload: on the chip the counter is above the window and the refresh resets
 
 // ---- the start-up of the application (STM32F303CC_main.c, compiled with main renamed) ---------------------------------------------------------------
 // The reset cause flags the application reads and clears, the diagnostic LED it toggles, the ADC channel numbers and the hook that lets a test act on the

@@ -10,3 +10,6 @@
 *.bin binary
 *.elf binary
 *.hex -text
+
+# Parallel branches each add entries to the unreleased list: keep both sides.
+CHANGELOG.md merge=union

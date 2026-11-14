@@ -70,6 +70,16 @@
    "std": "c11"
   },
   {
+   "name": "boot_return",
+   "test": "tests/test_boot_return.c",
+   "sources": [],
+   "includes": [
+    "tests",
+    "src/common"
+   ],
+   "std": "c11"
+  },
+  {
    "name": "can_recovery",
    "test": "tests/test_can_recovery.c",
    "sources": [],
@@ -421,6 +431,19 @@
    "std": "c11"
   },
   {
+   "name": "spool_position",
+   "test": "tests/test_spool_position.c",
+   "sources": [
+    "src/F303-master/spool_position.c"
+   ],
+   "includes": [
+    "tests",
+    "src/F303-master",
+    "src/common"
+   ],
+   "std": "c11"
+  },
+  {
    "name": "pid_control",
    "test": "tests/test_pid_control.c",
    "sources": [
@@ -524,6 +547,7 @@
     "src/F303-master/firmware_can_weldpulse.c",
     "src/F303-master/firmware_can_flyingprobe.c",
     "src/F303-master/firmware_can_motion.c",
+    "src/F303-master/spool_position.c",
     "src/F303-master/firmware_safety.c",
     "src/F303-master/fw_safety_policy.c"
    ],
@@ -558,7 +582,8 @@
     "src/F303-master/firmware_can_flyingprobe.c",
     "src/F303-master/firmware_can_motion.c",
     "src/F303-master/firmware_safety.c",
-    "src/F303-master/fw_safety_policy.c"
+    "src/F303-master/fw_safety_policy.c",
+    "src/F303-master/spool_position.c"
    ],
    "includes": [
     "tests",
@@ -593,6 +618,7 @@
     "src/F303-master/firmware_can_weldpulse.c",
     "src/F303-master/firmware_can_flyingprobe.c",
     "src/F303-master/firmware_can_motion.c",
+    "src/F303-master/spool_position.c",
     "src/F303-master/firmware_safety.c",
     "src/F303-master/fw_safety_policy.c"
    ],
@@ -1254,6 +1280,37 @@
     "-Dmain=bootloader_main_entry",
     "-DURTC_HOST_TEST",
     "-DURTC_TRUST_DEV"
+   ]
+  },
+  {
+   "name": "bootloader_boot_return_on",
+   "test": "tests/test_bootloader_boot.c",
+   "sources": [
+    "tests/host_hal/fake_hal.c",
+    "src/F303-master/boot/bootloader_main.c",
+    "src/F303-master/boot/bootloader_oled.c",
+    "src/F303-master/boot/bootloader_protocol.c",
+    "src/F303-master/boot/bootloader_flash.c",
+    "src/F303-master/boot/bootloader_crypto.c",
+    "src/F303-master/boot/bootloader_trust.c",
+    "src/F303-master/boot/bootloader_ed25519.c"
+   ],
+   "includes": [
+    "tests",
+    "tests/host_hal",
+    "src/F303-master/boot",
+    "src/common",
+    "tests/vectors"
+   ],
+   "extra": [
+    "-Wno-cpp",
+    "-Wno-int-to-pointer-cast"
+   ],
+   "defines": [
+    "-Dmain=bootloader_main_entry",
+    "-DURTC_HOST_TEST",
+    "-DURTC_TRUST_DEV",
+    "-DURTC_BL_RETURN_TO_APP_S=3600"
    ]
   },
   {
