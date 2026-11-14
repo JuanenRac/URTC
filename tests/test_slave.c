@@ -16,6 +16,7 @@
 #include "slave_common.h"
 #include "slave_i2c_link.h"
 #include "slave_i2c_sensors.h"
+#include "slave_mlx_capture.h"
 #include "slave_pwm.h"
 #include "slave_write_assembler.h"
 #include "MLX90640_I2C_Driver.h"
@@ -416,12 +417,15 @@ static void test_camera_640(int *failures)
     mlx->words16[0x800D] = 0x1901;
     mlx->words16[0x8000] = 0x0008;
     mlx->read_only_addr = 0x8000;                                // the status register keeps its data-ready bit when it is written
+    mlx->alternate_subpage = 1;                                  // the camera measures one sub-page of its chess pattern per frame, the other one next
     Sensors_Init();
     TEST_ASSERT(MLX_GetCaptureStatus() == MLX_CAPTURE_IDLE, "nothing is captured before it is asked for");
+    int frames_before = mlx->status_writes;
     MLX_TriggerCapture();
     TEST_ASSERT(MLX_GetCaptureStatus() == MLX_CAPTURE_BUSY, "a trigger from the master only marks the capture busy (it is slow, and the master is waiting on an interrupt)");
     settle_capture();
     TEST_ASSERT(MLX_GetCaptureStatus() == MLX_CAPTURE_READY, "the main loop does the capture: ready");
+    TEST_ASSERT(mlx->status_writes - frames_before == (URTC_SLAVE_MLX90640_TWO_SUBPAGES ? 2 : 1), "a capture takes one frame, or the two that hold both sub-pages when the option is on");
     settle_capture();
     TEST_ASSERT(MLX_GetCaptureStatus() == MLX_CAPTURE_READY, "and a second service call with nothing requested leaves it alone");
     MLX_GetRawChunk(0, chunk);
@@ -446,6 +450,40 @@ static void test_camera_640(int *failures)
     MLX_TriggerCapture();
     settle_capture();
     TEST_ASSERT(MLX_GetCaptureStatus() == MLX_CAPTURE_ERROR, "with no sensor it is an error too");
+}
+
+// A camera that gives the same sub-page again and again: with the option off the capture takes its one frame as it always did; with it on the capture is an error
+// after the fourth frame instead of a half-refreshed image passed as complete.
+static void test_camera_640_repeating_one_subpage(int *failures)
+{
+    static uint16_t ee[MLX90640_EEPROM_DUMP_NUM];
+    static uint16_t frame[834];
+    world();
+    mlx_sensor_variant = MLX_VARIANT_90640;
+    mlx = fake_i2c_bus_add(0x33, FAKE_I2C_MLX);
+    mlx->clear_trigger_on_reset = 1;
+    synthetic_eeprom(ee);
+    synthetic_frame(frame, 0x0100);
+    for (int i = 0; i < MLX90640_EEPROM_DUMP_NUM; i++) mlx->words16[0x2400 + i] = ee[i];
+    for (int i = 0; i < 768; i++) mlx->words16[0x0400 + i] = (uint16_t)(0x0100 + i % 50);
+    for (int i = 0; i < 64; i++) mlx->words16[0x0700 + i] = frame[768 + i];
+    mlx->words16[0x800D] = 0x1901;
+    mlx->words16[0x8000] = 0x0008;
+    mlx->read_only_addr = 0x8000;
+    mlx->alternate_subpage = 0;
+    Sensors_Init();
+    int frames_before = mlx->status_writes;
+    MLX_TriggerCapture();
+    settle_capture();
+#if URTC_SLAVE_MLX90640_TWO_SUBPAGES
+    TEST_ASSERT(MLX_GetCaptureStatus() == MLX_CAPTURE_ERROR && mlx->status_writes - frames_before == (int)MLX_CAPTURE_MAX_FRAMES, "a camera that repeats one sub-page is an error after the limit of frames");
+    mlx->alternate_subpage = 1;
+    MLX_TriggerCapture();
+    settle_capture();
+    TEST_ASSERT(MLX_GetCaptureStatus() == MLX_CAPTURE_READY, "and the next capture, with a camera that alternates, is complete: nothing was left over from the failed one");
+#else
+    TEST_ASSERT(MLX_GetCaptureStatus() == MLX_CAPTURE_READY && mlx->status_writes - frames_before == 1, "with the option off one frame is a capture, whatever sub-page it is");
+#endif
 }
 
 static void test_camera_641(int *failures)
@@ -769,6 +807,7 @@ void run_slave_tests(int *failures)
     test_transport_codes(failures);
     test_variant_write_initialises_the_sensor(failures);
     test_camera_640(failures);
+    test_camera_640_repeating_one_subpage(failures);
     test_camera_641(failures);
     test_camera_642(failures);
     test_write_assembler(failures);

@@ -164,9 +164,34 @@ static int MLX90640_CaptureDataReady(void) {
     return MLX90640_GET_DATA_READY(status) ? 1 : 0;
 }
 
+#if URTC_SLAVE_MLX90640_TWO_SUBPAGES
+static uint8_t mlx90640_subpages_seen;   // bit n = sub-page n has been calibrated into the image of this capture
+static uint8_t mlx90640_frames_taken;
+
+static void MLX90640_CaptureStart(void) {
+    mlx90640_subpages_seen = 0;
+    mlx90640_frames_taken = 0;
+}
+
+static int MLX90640_CaptureReadFrame(void) {
+    int subpage = MLX90640_GetFrameData(MLX90640_I2C_ADDR, mlx90640_frame_data);   // the camera has already said the frame is ready: no waiting inside the library
+    if (subpage >= 0) {
+        mlx90640_subpages_seen |= (uint8_t)(1u << (subpage & 1));
+        mlx90640_frames_taken++;
+    }
+    return subpage;
+}
+
+// After each calibration: 1 = the other sub-page is still missing, 0 = both are in the image, -1 = the camera keeps repeating the same one.
+static int MLX90640_CaptureMore(void) {
+    if (mlx90640_subpages_seen == 3u) return 0;
+    return (mlx90640_frames_taken < MLX_CAPTURE_MAX_FRAMES) ? 1 : -1;
+}
+#else
 static int MLX90640_CaptureReadFrame(void) {
     return MLX90640_GetFrameData(MLX90640_I2C_ADDR, mlx90640_frame_data);   // the camera has already said the frame is ready: no waiting inside the library
 }
+#endif
 
 static void MLX90640_CaptureCalibrate(void) {
     float ta = MLX90640_GetTa(mlx90640_frame_data, &mlx90640_params);
@@ -468,8 +493,12 @@ static volatile uint8_t mlx_init_requested = 0;
 // The capture in flight (main loop only) and the camera it belongs to; the joints of each camera are the functions above.
 static MlxCapture mlx_capture;
 static uint8_t mlx_capture_variant = MLX_VARIANT_NONE;
-static const MlxCaptureOps mlx90640_capture_ops = { MLX90640_CaptureTrigger, MLX90640_CaptureDataReady, MLX90640_CaptureReadFrame, MLX90640_CaptureCalibrate };
-static const MlxCaptureOps mlx90641_capture_ops = { MLX90641_CaptureTrigger, MLX90641_CaptureDataReady, MLX90641_CaptureReadFrame, MLX90641_CaptureCalibrate };
+#if URTC_SLAVE_MLX90640_TWO_SUBPAGES
+static const MlxCaptureOps mlx90640_capture_ops = { MLX90640_CaptureTrigger, MLX90640_CaptureDataReady, MLX90640_CaptureReadFrame, MLX90640_CaptureCalibrate, MLX90640_CaptureStart, MLX90640_CaptureMore };
+#else
+static const MlxCaptureOps mlx90640_capture_ops = { MLX90640_CaptureTrigger, MLX90640_CaptureDataReady, MLX90640_CaptureReadFrame, MLX90640_CaptureCalibrate, NULL, NULL };
+#endif
+static const MlxCaptureOps mlx90641_capture_ops = { MLX90641_CaptureTrigger, MLX90641_CaptureDataReady, MLX90641_CaptureReadFrame, MLX90641_CaptureCalibrate, NULL, NULL };
 
 void MLX_RequestInit(void) {
     mlx_init_requested = 1;
