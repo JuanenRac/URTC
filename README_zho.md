@@ -400,7 +400,7 @@ URTC 的闪存被拆分为两个独立部分，因此板卡可以通过它已经
 
 ## 🧪 测试
 
-围绕硬件的固件逻辑在电脑上测试：`python tools/run_host_tests.py` 用主机编译器、模拟 HAL 以及 AddressSanitizer 和 UBSan（带 `-fanalyzer`）构建并运行 62 个 C 测试套件（`tests/test_*.c`），涵盖引导程序、热保护、调度器、13 种工具的真实 CAN 处理程序、加热器控制回路和黑匣子等。CI 还会编译并链接四个二进制文件，并在固件源码已执行行的覆盖率低于下限时失败。这一切都没有在板卡上运行过：目前没有焊装完成的板卡，主机测试也无法证明时序、驱动或功率级能正常工作。`python tools/c_quality.py` 增加了三项板卡编译器不会做的检查：用电脑的编译器对测试套件构建的每个源文件加 `-Wconversion`、cppcheck，以及注释块长度上限（原样引入的传感器驱动不在其内，每项理由写在 `tools/c_quality.json` 中）。
+围绕硬件的固件逻辑在电脑上测试：`python tools/run_host_tests.py` 用主机编译器、模拟 HAL 以及 AddressSanitizer 和 UBSan（带 `-fanalyzer`）构建并运行 63 个 C 测试套件（`tests/test_*.c`），涵盖引导程序、热保护、调度器、13 种工具的真实 CAN 处理程序、加热器控制回路和黑匣子等。CI 还会编译并链接四个二进制文件，并在固件源码已执行行的覆盖率低于下限时失败。这一切都没有在板卡上运行过：目前没有焊装完成的板卡，主机测试也无法证明时序、驱动或功率级能正常工作。`python tools/c_quality.py` 增加了三项板卡编译器不会做的检查：用电脑的编译器对测试套件构建的每个源文件加 `-Wconversion`、cppcheck，以及注释块长度上限（原样引入的传感器驱动不在其内，每项理由写在 `tools/c_quality.json` 中）。
 
 ## 🏗️ 构建与发布
 
@@ -441,7 +441,7 @@ URTC/
 ├── ani/                                               OLED 的动画
 ├── keys/                                              只有公钥，绝无私钥
 ├── docs/                                              CAN 协议、引脚、签名、威胁模型、数据手册
-├── tests/                                             62 个 C 主机测试套件
+├── tests/                                             63 个 C 主机测试套件
 ├── tools/                                             主机测试运行器、发布工具、共用检查
 ├── images/                                            横幅和本 README 的图片
 ├── .github/                                           CI 工作流以及 Issue 和 Pull Request 模板
