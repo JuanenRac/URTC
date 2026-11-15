@@ -408,7 +408,7 @@ Quali versioni dei programmi URTC funzionano insieme, e quale versione del proto
 
 ## 🧪 Test
 
-La logica del firmware attorno all'hardware è testata su un computer: `python tools/run_host_tests.py` compila ed esegue 62 suite di test in C (`tests/test_*.c`) con il compilatore del computer, una HAL finta e i sanitizer AddressSanitizer e UBSan con `-fanalyzer`: i bootloader, la protezione termica, il dispatcher, i veri gestori CAN dei 13 utensili, gli anelli di controllo dei riscaldatori e la scatola nera, tra gli altri. La CI compila e collega anche i quattro binari e fallisce sotto una soglia di copertura delle righe eseguite dei sorgenti del firmware. Niente di tutto questo è girato su una scheda: non esiste nessuna scheda montata, e i test sul computer non possono dimostrare che tempi, driver o stadi di potenza funzionino. `python tools/c_quality.py` aggiunge tre controlli che il compilatore della scheda non fa: il compilatore del computer con `-Wconversion` su ogni sorgente che le suite costruiscono, cppcheck e un limite alla lunghezza dei blocchi di commento (i driver dei sensori importati così come sono restano esclusi, ciascuno con il suo motivo in `tools/c_quality.json`).
+La logica del firmware attorno all'hardware è testata su un computer: `python tools/run_host_tests.py` compila ed esegue 63 suite di test in C (`tests/test_*.c`) con il compilatore del computer, una HAL finta e i sanitizer AddressSanitizer e UBSan con `-fanalyzer`: i bootloader, la protezione termica, il dispatcher, i veri gestori CAN dei 13 utensili, gli anelli di controllo dei riscaldatori e la scatola nera, tra gli altri. La CI compila e collega anche i quattro binari e fallisce sotto una soglia di copertura delle righe eseguite dei sorgenti del firmware. Niente di tutto questo è girato su una scheda: non esiste nessuna scheda montata, e i test sul computer non possono dimostrare che tempi, driver o stadi di potenza funzionino. `python tools/c_quality.py` aggiunge tre controlli che il compilatore della scheda non fa: il compilatore del computer con `-Wconversion` su ogni sorgente che le suite costruiscono, cppcheck e un limite alla lunghezza dei blocchi di commento (i driver dei sensori importati così come sono restano esclusi, ciascuno con il suo motivo in `tools/c_quality.json`).
 
 ## 🏗️ Compilazione e rilascio
 
@@ -453,7 +453,7 @@ URTC/
 ├── ani/                                               le animazioni dell'OLED
 ├── keys/                                              solo chiavi pubbliche, mai una privata
 ├── docs/                                              protocollo CAN, piedinature, firma, modello delle minacce, datasheet
-├── tests/                                             62 suite di test host in C
+├── tests/                                             63 suite di test host in C
 ├── tools/                                             esecutore dei test host, strumenti di release, controlli condivisi
 ├── images/                                            banner e immagini di questo README
 ├── .github/                                           workflow di CI e modelli per issue e pull request
