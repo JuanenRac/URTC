@@ -16,7 +16,7 @@
 #define FWSAFE_DEFAULT_SPEED_SPS   500u     // what a move without a speed does: one step every two milliseconds
 
 // The outcome (URTC_CLEAR_ERROR_*) of a clear-error command that carried its magic payload. The order of the checks is part of the contract: the switch,
-// whether there is an error, whether this kind can be lifted at all, the temperature, the actuators.
+// whether there is an error, whether this kind can be lifted at all (a missing tool and a stop of the stack end only another way), the temperature, the actuators.
 uint8_t FwSafe_ClearDecision(uint8_t feature_on, uint8_t error_latched, uint8_t reason, uint16_t temperature_c, uint8_t actuators_off);
 
 // How long the host may stay silent while a move of `steps` runs at `speed_sps` steps/s (0 = the default speed): a share of the time the move should take,

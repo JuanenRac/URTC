@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "urtc_common_version": "0.2.6",
+  "urtc_common_version": "0.2.7",
   "files": {
     "bl_serial_vectors.h": {
       "from": "generated/bl_serial_vectors.h",
@@ -17,6 +17,10 @@
     "ed25519_vectors.h": {
       "from": "generated/ed25519_vectors.h",
       "sha256": "59450f928dc5b0d6d337b446c541b529193e535d86861a34ce7d5eadeb1c4892"
+    },
+    "estop_follow_vectors.h": {
+      "from": "generated/estop_follow_vectors.h",
+      "sha256": "25c436594030a9f4077eec90dd92b11ace14b30fe24c333ff40080b1188baec3"
     },
     "image_header_embedded_vectors.h": {
       "from": "generated/image_header_embedded_vectors.h",
@@ -40,7 +44,7 @@
     },
     "safety_policy_vectors.h": {
       "from": "generated/safety_policy_vectors.h",
-      "sha256": "e58b66b683103b643479231b21c7b2cf38917e1a0361e8645e1853c715f7c74b"
+      "sha256": "eba6941779613f10c0ed329e4cbd5a93f1c28191e8c68140f5b7b01375143e91"
     },
     "signed_image_vectors.h": {
       "from": "generated/signed_image_vectors.h",

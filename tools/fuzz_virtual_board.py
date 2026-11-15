@@ -54,7 +54,7 @@ INCLUDES = ["tests", "tests/host_hal", MASTER, "src/common"]
 MAGIC = bytes.fromhex("B0071D5A")
 FRAME_LINE = re.compile(r"^t([0-7][0-9A-F]{2})([0-8])((?:[0-9A-F]{2}){0,8})$")
 # (tool profile, optional features mask): a tool of each family, features off and all on
-RUNS = ((0, 0), (0, 0x0F), (1, 0), (10, 0x0F), (19, 0x0F), (22, 0), (5, 0x0F), (0, 0x7F), (13, 0x70), (10, 0x7F))
+RUNS = ((0, 0), (0, 0x0F), (1, 0), (10, 0x0F), (19, 0x0F), (22, 0), (5, 0x0F), (0, 0x7F), (13, 0x70), (10, 0x7F), (0, 0x80), (10, 0xFF))
 
 
 def load_corpus() -> tuple[list[tuple[int, bytes, str]], set[int]]:

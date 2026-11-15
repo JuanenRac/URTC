@@ -29,6 +29,16 @@ uint8_t Safety_ErrorReason(void);
 uint8_t Safety_LastClearResult(void);
 
 // Main loop, every 20 ms: the silence of the host against the move that runs and the coil that is energised. No-op while the switch is off.
+// It also runs the silence of the master of the emergency stop (ESTOP_FOLLOW).
 void Safety_Service(void);
+
+// ESTOP_FOLLOW (fw_estop_follow.h), a third switch that is OFF unless a valid record in F-RAM says otherwise. With it on the head follows the emergency
+// stop frame of the stack: it powers up latched (critical error with the reason ESTOP, outputs in the safe state) and stays so until a release arrives.
+// Once at boot, after Features_Init.
+void Safety_EstopInit(void);
+
+// A frame whose identifier is URTC_ESTOP_CAN_ID is in rxHeader/rxData: 1 when the head took it (the switch is on), 0 when it is to be ignored. It acts
+// before the multi-head filter and before the error gate, because a stop must reach every head and must never be refused.
+uint8_t Safety_HandleEstopFrame(void);
 
 #endif // FIRMWARE_SAFETY_H

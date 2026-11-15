@@ -36,6 +36,7 @@
 #include "firmware_can_flyingprobe.h"
 #include "firmware_can_thermalinspection.h"
 #include "firmware_can_dispatch_routing.h"
+#include "firmware_safety.h"
 #include "can_rx_queue.h"
 
 #include <string.h>
@@ -84,6 +85,12 @@ static void CanDispatch_ProcessFrame(void) {
         // (the identifier of the frame before), and a remote request carries whatever the mailbox held: either would be taken for a repeat of the previous
         // command, including one that actuates and one that feeds a watchdog. Anything else is ignored (the bus activity above still counts).
         if (rxHeader.IDE != CAN_ID_STD || rxHeader.RTR != CAN_RTR_DATA) {
+            return;
+        }
+
+        // The emergency stop frame of the stack (off unless the ESTOP_FOLLOW switch is on): taken before the multi-head filter, so every head obeys, and
+        // before the error gate, because a stop is never refused. With the switch off the frame goes on as before.
+        if (rxHeader.StdId == URTC_ESTOP_CAN_ID && Safety_HandleEstopFrame()) {
             return;
         }
 

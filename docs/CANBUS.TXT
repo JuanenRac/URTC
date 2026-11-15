@@ -40,6 +40,45 @@ Data:
         absolute priority straight from the EXTI3 interrupt callback (PB3
         pin) to avoid probe damage during high-speed scanning.
 
+ID: 0x001 [Master / stack -> URTC Tool Head] (feature 0x80 of 0x1AE; OFF by default)
+Emergency stop frame of the stack, which a head with the switch on obeys
+DLC: 8 bytes, standard data frame
+Data:
+  - rxData[0]: kind: 0x01 TRIP, 0x02 RELEASE, 0x03 ALIVE (heartbeat of the master)
+  - rxData[1]: detail: the reason of a TRIP; 0x00 in a RELEASE; in an ALIVE 0x00
+               not tripped, 0x01 tripped
+  - rxData[2]: source: 0x00 kinematic brain, 0x01..0x08 slot board, 0x10 CM5 bridge
+  - rxData[3]: epoch: counts the stops of the stack
+  - rxData[4..5]: sequence, 16 bits, little endian, +1 on every frame of a sender
+  - rxData[6..7]: the complement (XOR 0xFF) of the kind and of the detail
+Effect: the frame is defined by the stack that carries it (it is the lowest
+        identifier, so it wins the arbitration against every other frame); the head
+        only follows it. It is taken before the filter of several heads, so every
+        head obeys, and before the error gate, because a stop is never refused.
+        With the switch OFF (the default) the frame changes nothing and the head
+        behaves as in earlier releases. With it ON:
+        - The head powers up latched, like every node of the stack: critical error
+          with the reason ESTOP, every output in the safe state (heaters, laser,
+          drill, steppers, as the SAFE_STOP of several heads), every command blocked
+          except 0x100. Without a master on the bus that sends the heartbeat and a
+          release, the head stays blocked on purpose: switch it on only on a stack
+          that has the master.
+        - A TRIP, a malformed frame (wrong length, wrong complement, unknown kind,
+          reason or source, a RELEASE or ALIVE that does not come from the master),
+          an ALIVE that says tripped and a bus-off latch it at once: safe state and
+          critical error with the reason ESTOP (9).
+        - A RELEASE moves a latched head to ready only when the master was heard
+          within 100 ms (ESTOP_ALIVE_TIMEOUT_MS), the epoch is the one of the stop it
+          knows, the sequence is newer than the last one it saw (modular order) and,
+          after a bus-off, a new heartbeat was heard. It then lifts the critical error
+          only if that error came from the stop; any other error stays. It never
+          switches an actuator on.
+        - A ready head that hears no new heartbeat for 100 ms latches again with
+          the reason ESTOP_SILENCE (10). A repeated or frozen heartbeat does not count.
+        The clear-error command 0x1B2 never lifts these errors. The reason is in byte
+        6 of 0x111. This is not a certified safety function and never replaces a
+        hardware emergency stop. Simulator evidence only: nothing has run on a board.
+
 -----------------------------------------------------------------------------
 2. GLOBAL COMMANDS (Valid for any active tool)
 -----------------------------------------------------------------------------
@@ -367,8 +406,8 @@ Switch the optional firmware features on or off (fw_features.c, firmware_feature
 DLC: 5 bytes
 Data:
   - rxData[0..3]: magic payload 0x46 0x45 0x41 0x54 (ASCII 'FEAT')
-  - rxData[4]:    bit mask of the features to have ON (any bit outside 0x7F:
-                  the frame is ignored)
+  - rxData[4]:    bit mask of the features to have ON (all eight bits are
+                  switches of this firmware)
                   0x01 = stepper ramps (trapezoid and S-curve, see 0x120)
                   0x02 = health frame (0x1B8)
                   0x04 = oscillator trim against the CAN bit time
@@ -378,6 +417,8 @@ Data:
                          0x40, of the electromagnet (0x1B0)
                   0x40 = the electromagnet lets go when the host falls silent
                          (needs 0x20; without it the coil is held)
+                  0x80 = the head follows the emergency stop frame of the
+                         stack (identifier 0x001, section 1)
 Effect: stores the mask in its own F-RAM record (address 976, EEPROM.TXT
         section 8) and answers with 0x1AF. The setting acts after the NEXT
         power-up, never in the middle of a job. Every feature is OFF by
@@ -400,7 +441,9 @@ Effect: answered with 0x111 (also during a critical error; any other payload or
         says so. With it on the error is lifted only when the temperature of the
         tool is known and below 50 C and every actuator is at zero (laser, drill,
         heater set-points, fans, UV, hot-air blower, stepper moves, an energised
-        coil); an error for lack of a valid tool is never lifted. Lifting clears
+        coil); an error for lack of a valid tool is never lifted, and neither is
+        one that came from the emergency stop frame 0x001 (feature 0x80): that
+        one ends with a release on 0x001. Lifting clears
         the reason, the thermal fault and the thermal-runaway watch windows.
         Without the feature a latched error still needs a power cycle.
 
@@ -411,7 +454,7 @@ Data:
   - txData[0]: stored in F-RAM (bit mask)
   - txData[1]: in force now (bit mask); differs from txData[0] until the
                next power-up
-  - txData[2]: supported by this firmware (0x7F)
+  - txData[2]: supported by this firmware (0xFF)
 
 ID: 0x1B8 [URTC Tool Head -> Master]
 Health frame of the board (only while feature 0x02 runs; once a second)
@@ -2084,11 +2127,11 @@ GENERATED REFERENCE (from the specification in URTC-COMMON)
 
 A. Summary
 
-[[ BEGIN GENERATED summary sha256=b960289988685b20c3f9889de915a4e753eb7261ab390e9dc993c0396c601e29 ]]
+[[ BEGIN GENERATED summary sha256=04e6e47d8102470d9f683c4da1b935cb4b3005e748b9faf0a2741f30dc6a415e ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 URTC CAN protocol: protocol version 2, byte order big.
-107 identifiers, 25 tool profiles, 25 enumerations, 45 constants, 5 magic payloads, 27 registers of the expansion slave.
+107 identifiers, 25 tool profiles, 25 enumerations, 47 constants, 5 magic payloads, 27 registers of the expansion slave.
 
 Machine-readable specification of the CAN bus protocol of the URTC tool head: every identifier with its direction, length rule and payload layout, the magic payloads, the registers of the expansion slave, the version procedures and the SLCAN subset the host tools rely on. All multi-byte fields are big-endian.
 [[ END GENERATED summary ]]
@@ -2211,7 +2254,7 @@ Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_do
 
 C. Field layouts and examples
 
-[[ BEGIN GENERATED layouts sha256=9301778c270cecfabe4bbb3352f3fa7cdf997b3017025390db698b94d47ad877 ]]
+[[ BEGIN GENERATED layouts sha256=fba3a458eea9b0aa6804862c2710b443fd413de5dfeaaf2c909f6b9620e0f1d3 ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 ### 0x095 IMPACT_EVENT - Impact register (touch probe, maximum priority)
@@ -2886,7 +2929,7 @@ request, DLC 5
 | Byte | Width | Type | Field | Values | Note |
 |---|---|---|---|---|---|
 | 0 | 4 | bytes | magic | fixed 46454154 |  |
-| 4 | 1 | u8 | features | 0..127, enum firmware_feature | Bit mask: the features to have on; the others are off. |
+| 4 | 1 | u8 | features | 0..255, enum firmware_feature | Bit mask: the features to have on; the others are off. |
 
 Example all off: data 4645415400 (magic=46454154, features=0)
 
@@ -2909,9 +2952,9 @@ response, DLC 3
 
 | Byte | Width | Type | Field | Values | Note |
 |---|---|---|---|---|---|
-| 0 | 1 | u8 | stored | 0..127 | The mask the F-RAM record says. |
-| 1 | 1 | u8 | running | 0..127 | The mask in force now; it differs from stored until the next power-up. |
-| 2 | 1 | u8 | supported | 0..127 | The features this firmware has. |
+| 0 | 1 | u8 | stored | 0..255 | The mask the F-RAM record says. |
+| 1 | 1 | u8 | running | 0..255 | The mask in force now; it differs from stored until the next power-up. |
+| 2 | 1 | u8 | supported | 0..255 | The features this firmware has. |
 
 Example health on, stored but not yet running: data 02000F (stored=2, running=0, supported=15)
 
@@ -2942,7 +2985,7 @@ request, DLC 4
 Example clear: data 434C4552 (magic=434C4552)
 
 Note: Works only while the CLEAR_ERROR feature of 0x1AE runs; with it off the command changes nothing and 0x111 says so in its last byte.
-Note: The error is lifted only when the temperature of the tool is known and below CLEAR_ERROR_MAX_TEMP_C and every actuator is at zero (laser, drill, heater set-points, fans, UV, hot-air blower, stepper moves); otherwise it stays and the last byte of 0x111 says why. An error for lack of a valid tool is never lifted.
+Note: The error is lifted only when the temperature of the tool is known and below CLEAR_ERROR_MAX_TEMP_C and every actuator is at zero (laser, drill, heater set-points, fans, UV, hot-air blower, stepper moves); otherwise it stays and the last byte of 0x111 says why. An error for lack of a valid tool is never lifted, and neither is one that came from the emergency stop frame 0x001 (ESTOP_FOLLOW feature): that one ends with a release on 0x001.
 Note: Always answered with 0x111, whose error_reason byte tells why the error was latched and whose last byte tells what this command did.
 
 ### 0x1B8 HEALTH_PROFILE - Periodic health frame of the board (only while the health feature runs)
@@ -3984,7 +4027,7 @@ Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_do
 
 E. Enumerations
 
-[[ BEGIN GENERATED enums sha256=75845e31ee4641619632e8b23322e2ba58dc5c831b2aa9bef080261a78c99e75 ]]
+[[ BEGIN GENERATED enums sha256=5135171acf2df52250b98095642ca1b637db054d7d244aa390e3458a4c6a22cf ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 tool - Tool profile (prefix TOOL_, value)
@@ -4182,6 +4225,7 @@ firmware_feature - Optional firmware features (each one is off until switched on
 | 0x10 | CLEAR_ERROR | The clear-error command (0x1B2) works: a latched error is lifted without a power cycle once the board is cool and every actuator is off |
 | 0x20 | COMMS_WATCHDOG | Communication watchdog of the stepper moves and of the electromagnet (silence of the host) |
 | 0x40 | MAGNET_RELEASE | With the communication watchdog: the electromagnet lets go when the host falls silent (without it, it holds) |
+| 0x80 | ESTOP_FOLLOW | The head follows the emergency stop frame 0x001 of the stack: it goes to its safe state on a stop, on a malformed frame and when the master falls silent |
 
 motion_profile - Speed profile of a stepper move (prefix MOTION_PROFILE_, value)
 
@@ -4223,6 +4267,8 @@ error_reason - Why the board latched its critical error (prefix ERROR_REASON_, v
 | 6 | FAN_STALL | The hotend fan stalled |
 | 7 | STEPPER_SILENCE | A stepper move was cut because the host fell silent |
 | 8 | MAGNET_RELEASE | The electromagnet was released because the host fell silent |
+| 9 | ESTOP | The emergency stop frame 0x001 (or a malformed frame on it) put the head in its safe state |
+| 10 | ESTOP_SILENCE | The master of the emergency stop fell silent while the head was ready |
 
 clear_error_result - Outcome of the last clear-error command (prefix CLEAR_ERROR_, value)
 
@@ -4239,7 +4285,7 @@ clear_error_result - Outcome of the last clear-error command (prefix CLEAR_ERROR
 
 F. Constants
 
-[[ BEGIN GENERATED constants sha256=9f26c8482ad1cd71e8dad96c05bc670088cc21ef0025c620b8b6179f602336d2 ]]
+[[ BEGIN GENERATED constants sha256=b64477564802eab3324366626fb7273942c0c6174fb34a06cf1c443cff72d9f7 ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 | Name | Value | Unit | Group | Title |
@@ -4289,6 +4335,8 @@ Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_do
 | STEPPER_SILENCE_MIN_MS | 1000 | ms | timing | Least silence of the host that cuts a stepper move (communication watchdog on) |
 | STEPPER_SILENCE_PERCENT | 50 | % | timing | Silence that cuts a stepper move, as a percentage of the time the move should take (never below the least) |
 | MAGNET_SILENCE_MS | 5000 | ms | timing | Silence of the host after which the electromagnet lets go (communication watchdog and release policy on) |
+| ESTOP_CAN_ID | 1 |  | protocol | Identifier of the emergency stop frame of the stack, which a head with the ESTOP_FOLLOW feature obeys (standard frame, eight bytes) |
+| ESTOP_ALIVE_TIMEOUT_MS | 100 | ms | timing | Silence of the master of the emergency stop after which a head that is ready goes back to its safe state (ESTOP_FOLLOW feature on) |
 [[ END GENERATED constants ]]
 
 G. Magic payloads

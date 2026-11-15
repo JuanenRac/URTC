@@ -30,6 +30,10 @@ static const safety_clear_case_t SAFETY_CLEAR_CASES[] = {
     {1, 1, 4, 300u, 0, 4},
     {1, 1, 2, 65535u, 0, 5},
     {0, 0, 4, 65535u, 0, 2},
+    {1, 1, 9, 20u, 1, 4},
+    {1, 1, 10, 20u, 1, 4},
+    {1, 1, 9, 300u, 0, 4},
+    {0, 1, 9, 20u, 1, 2},
 };
 
 static const safety_limit_case_t SAFETY_LIMIT_CASES[] = {

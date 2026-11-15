@@ -89,7 +89,9 @@ static void test_record(int *failures)
     c.mask = 0x0B;
     TEST_ASSERT(!Feat_ConfigIsValid(&c) && Feat_ConfigMask(&c) == 0, "a record changed after sealing is not trusted");
     c.mask = 0x9A; Feat_ConfigSeal(&c);
-    TEST_ASSERT(Feat_ConfigMask(&c) == 0, "a bit this firmware does not have makes the whole record untrusted");
+    TEST_ASSERT(Feat_ConfigMask(&c) == 0x9A, "all eight bits are switches of this firmware: a sealed record with the eighth bit is trusted");
+    c.mask = 0xFF; Feat_ConfigSeal(&c);
+    TEST_ASSERT(Feat_ConfigMask(&c) == 0xFF && FEAT_SUPPORTED == 0xFF, "a record with every switch on is trusted");
     memset(&c, 0xFF, sizeof c);
     TEST_ASSERT(!Feat_ConfigIsValid(&c) && Feat_ConfigMask(&c) == 0, "erased F-RAM (0xFF) is every feature off");
     TEST_ASSERT(sizeof(FeatConfig_t) == 8, "the record is 8 bytes");
@@ -105,8 +107,8 @@ static void test_record(int *failures)
         bad[i] ^= 0xFF;
         TEST_ASSERT(!Feat_ParseCommand(5, bad, &mask), "any corrupted magic byte is ignored");
     }
-    const uint8_t over[5] = { 0x46, 0x45, 0x41, 0x54, 0x80 };
-    TEST_ASSERT(!Feat_ParseCommand(5, over, &mask), "an unsupported bit is ignored");
+    const uint8_t every[5] = { 0x46, 0x45, 0x41, 0x54, 0xFF };
+    TEST_ASSERT(Feat_ParseCommand(5, every, &mask) && mask == 0xFF, "the eighth bit (following the emergency stop) is a supported switch: all eight are accepted");
 }
 
 static void test_switches(int *failures)
@@ -114,13 +116,13 @@ static void test_switches(int *failures)
     reset_world();
     Features_Init();
     TEST_ASSERT(Features_Running() == 0, "a blank F-RAM: every feature off");
-    for (uint8_t b = 1; b <= FEAT_SUPPORTED; b <<= 1) TEST_ASSERT(!Features_Active(b), "off by default");
+    for (uint8_t b = 1; b != 0; b <<= 1) TEST_ASSERT(!Features_Active(b), "off by default");
 
     // query
     send(0x1AF, NULL, 0);
     Features_HandleCommand();
     const FakeTxFrame *r = find_tx(0x1AF);
-    TEST_ASSERT(r && r->dlc == 3 && r->data[0] == 0 && r->data[1] == 0 && r->data[2] == FEAT_SUPPORTED, "0x1AF: stored 0, running 0, supported 0x7F");
+    TEST_ASSERT(r && r->dlc == 3 && r->data[0] == 0 && r->data[1] == 0 && r->data[2] == FEAT_SUPPORTED, "0x1AF: stored 0, running 0, supported 0xFF");
 
     // change: writes the record, reports it, does not act yet
     const uint8_t on[5] = { 0x46, 0x45, 0x41, 0x54, 0x0A };

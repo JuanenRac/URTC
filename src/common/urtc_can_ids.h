@@ -59,6 +59,8 @@
 #define URTC_STEPPER_SILENCE_MIN_MS 0x3E8u  /* Least silence of the host that cuts a stepper move (communication watchdog on) */
 #define URTC_STEPPER_SILENCE_PERCENT 0x32u  /* Silence that cuts a stepper move, as a percentage of the time the move should take (never below the least) */
 #define URTC_MAGNET_SILENCE_MS 0x1388u  /* Silence of the host after which the electromagnet lets go (communication watchdog and release policy on) */
+#define URTC_ESTOP_CAN_ID 0x1u  /* Identifier of the emergency stop frame of the stack, which a head with the ESTOP_FOLLOW feature obeys (standard frame, eight bytes) */
+#define URTC_ESTOP_ALIVE_TIMEOUT_MS 0x64u  /* Silence of the master of the emergency stop after which a head that is ready goes back to its safe state (ESTOP_FOLLOW feature on) */
 
 /* --- identifiers, and the length rule of every layout --- */
 #define URTC_CAN_ID_IMPACT_EVENT 0x095u  /* Impact register (touch probe, maximum priority) */
@@ -793,6 +795,7 @@
 #define URTC_FEATURE_CLEAR_ERROR 0x10u
 #define URTC_FEATURE_COMMS_WATCHDOG 0x20u
 #define URTC_FEATURE_MAGNET_RELEASE 0x40u
+#define URTC_FEATURE_ESTOP_FOLLOW 0x80u
 
 /* Speed profile of a stepper move */
 #define URTC_MOTION_PROFILE_CONSTANT 0x00u
@@ -822,6 +825,8 @@
 #define URTC_ERROR_REASON_FAN_STALL 0x06u
 #define URTC_ERROR_REASON_STEPPER_SILENCE 0x07u
 #define URTC_ERROR_REASON_MAGNET_RELEASE 0x08u
+#define URTC_ERROR_REASON_ESTOP 0x09u
+#define URTC_ERROR_REASON_ESTOP_SILENCE 0x0Au
 
 /* Outcome of the last clear-error command */
 #define URTC_CLEAR_ERROR_NONE 0x00u

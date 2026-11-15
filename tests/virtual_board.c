@@ -125,6 +125,7 @@ int main(int argc, char **argv)
         memcpy(&fake_fram[FEAT_CONFIG_FRAM_ADDR], &c, sizeof c);
     }
     Features_Init();
+    Safety_EstopInit();
 
     char line[128];
     while (fgets(line, sizeof line, stdin)) {

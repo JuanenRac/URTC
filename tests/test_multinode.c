@@ -64,6 +64,7 @@ static void note(const char *name)
         trace[trace_len] = 0;
     }
 }
+uint8_t Safety_HandleEstopFrame(void) { return 0; }   // the stop logic is tested in tests/test_estop_follow.c
 void Handle_CAN_GlobalCommands_PreErrorGate(void) { note("pre"); }
 void Handle_CAN_GlobalCommands_PostErrorGate(void) { note("post"); }
 void Handle_CAN_SlaveBridge(void) { note("bridge"); }
