@@ -258,6 +258,9 @@ int main(void) {
     // unless a valid F-RAM record says otherwise.
     Features_Init();
 
+    // Following the emergency stop frame of the stack: with its switch on the head powers up latched, like every node of the stack.
+    Safety_EstopInit();
+
     MX_GPIO_Post_Init();
     MX_CAN_Init();
     MX_TIM3_Full_Init();

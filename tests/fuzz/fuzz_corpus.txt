@@ -271,10 +271,8 @@
 1AE 4645415400 valid example
 1AE 464541540A valid example
 1AE 0000000000 valid features=0
-1AE 000000003F valid features=63
 1AE 000000007F valid features=127
-1AE 0000000080 invalid features=128 outside the range
-1AE 00000000FF invalid features=255 outside the range
+1AE 00000000FF valid features=255
 1AE - invalid length 0
 1AE AC invalid length 1
 1AE 8C70 invalid length 2

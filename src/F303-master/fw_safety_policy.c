@@ -10,7 +10,7 @@ uint8_t FwSafe_ClearDecision(uint8_t feature_on, uint8_t error_latched, uint8_t 
 {
     if (!feature_on) return URTC_CLEAR_ERROR_REFUSED_SWITCH_OFF;
     if (!error_latched) return URTC_CLEAR_ERROR_REFUSED_NO_ERROR;
-    if (reason == URTC_ERROR_REASON_TOOL_ID) return URTC_CLEAR_ERROR_REFUSED_NOT_CLEARABLE;
+    if (reason == URTC_ERROR_REASON_TOOL_ID || reason == URTC_ERROR_REASON_ESTOP || reason == URTC_ERROR_REASON_ESTOP_SILENCE) return URTC_CLEAR_ERROR_REFUSED_NOT_CLEARABLE;
     if (temperature_c == FWSAFE_TEMPERATURE_UNKNOWN || temperature_c >= URTC_CLEAR_ERROR_MAX_TEMP_C) return URTC_CLEAR_ERROR_REFUSED_HOT;
     if (!actuators_off) return URTC_CLEAR_ERROR_REFUSED_ACTUATOR_ON;
     return URTC_CLEAR_ERROR_CLEARED;

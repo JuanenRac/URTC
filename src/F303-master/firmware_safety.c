@@ -8,10 +8,14 @@
 #include "firmware_features.h"
 #include "firmware_control_thermal.h"
 #include "fw_safety_policy.h"
+#include "fw_estop_follow.h"
+#include "firmware_multinode.h"
 #include "urtc_can_ids.h"
 
 // The real one is in firmware_control_thermal.c; a suite that does not link the thermal loops keeps this empty one.
 __attribute__((weak)) void Control_ThermalGuardsReset(void) {}
+// The real one is in firmware_multinode_platform.c (the outputs that a stop puts in the safe state); a suite that does not link it keeps this empty one.
+__attribute__((weak)) void MultiNode_PlatformSafeState(void) {}
 
 static volatile uint32_t host_last_frame_tick;   // the last frame of the host, written by the receive interrupt
 static uint32_t move_silence_limit_ms = URTC_STEPPER_SILENCE_MIN_MS;
@@ -83,8 +87,62 @@ uint8_t Safety_LastClearResult(void)
     return last_clear_result;
 }
 
+// ---- following the emergency stop frame of the stack (ESTOP_FOLLOW) -------------------------------------------------------------------------
+static EstopFollow_t estop;
+static uint8_t estop_bus_off_seen;
+
+static uint8_t estop_reason_is_ours(uint8_t reason)
+{
+    return (uint8_t)(reason == URTC_ERROR_REASON_ESTOP || reason == URTC_ERROR_REASON_ESTOP_SILENCE);
+}
+
+// What the logic decided: a stop puts the outputs in the safe state (the same one a SAFE_STOP of several heads uses) and latches the critical error, which
+// blocks every command until the release; a release lifts the error only when it came from a stop, as the clear-error command would, and never another one.
+static void estop_apply(EstopFollowEffect_t effect)
+{
+    if (effect.stop_reason) {
+        MultiNode_PlatformSafeState();
+        RAISE_SYSTEM_ERROR(effect.stop_reason);
+    } else if (effect.released && system_error_flag && estop_reason_is_ours(system_error_reason)) {
+        system_error_reason = URTC_ERROR_REASON_NONE;
+        thermal_fault_code = 0;
+        Control_ThermalGuardsReset();   // the watch windows start afresh, as after a power-up
+        system_error_flag = 0;
+    }
+}
+
+void Safety_EstopInit(void)
+{
+    estop_bus_off_seen = 0;
+    EstopFollow_Reset(&estop);
+    if (!Features_Active(FEAT_ESTOP_FOLLOW)) return;
+    estop_apply((EstopFollowEffect_t){URTC_ERROR_REASON_ESTOP, 0u});   // like every node of the stack, the head powers up latched
+}
+
+uint8_t Safety_HandleEstopFrame(void)
+{
+    if (!Features_Active(FEAT_ESTOP_FOLLOW)) return 0;
+    estop_apply(EstopFollow_OnFrame(&estop, HAL_GetTick(), rxData, (uint8_t)rxHeader.DLC));
+    return 1;
+}
+
+static void estop_service(void)
+{
+    if (!Features_Active(FEAT_ESTOP_FOLLOW)) return;
+    if (hcan.Instance != NULL) {
+        uint8_t bus_off = (uint8_t)((hcan.Instance->ESR >> 2) & 1u);   // BOFF
+        if (bus_off && !estop_bus_off_seen) estop_apply(EstopFollow_OnBusOff(&estop));
+        estop_bus_off_seen = bus_off;
+    }
+    __disable_irq();   // the receive interrupt feeds the same state; the decision is taken between two of its frames
+    EstopFollowEffect_t effect = EstopFollow_Tick(&estop, HAL_GetTick());
+    __enable_irq();
+    estop_apply(effect);
+}
+
 void Safety_Service(void)
 {
+    estop_service();
     if (!Features_Active(FEAT_COMMS_WATCHDOG) || system_error_flag) return;
     uint32_t silence = silence_ms(HAL_GetTick(), host_last_frame_tick);
     if (FwSafe_StepperMustStop(1, steps_remaining > 0, silence, move_silence_limit_ms)) {

@@ -61,6 +61,11 @@ static int make_error_in_post, make_error_in_bridge;
 static uint8_t multinode_consumes;
 uint8_t MultiNode_FilterRx(void) { return multinode_consumes; }
 
+// The emergency stop frame of the stack (firmware_safety.c) is replaced by a stub: it takes the frame only when the test says the switch is on.
+static uint8_t estop_takes_frame;
+static int estop_calls;
+uint8_t Safety_HandleEstopFrame(void) { estop_calls++; note("estop"); return estop_takes_frame; }
+
 void Handle_CAN_GlobalCommands_PreErrorGate(void) { note("pre"); }
 void Handle_CAN_GlobalCommands_PostErrorGate(void) { note("post"); if (make_error_in_post) system_error_flag = 1; }
 void Handle_CAN_SlaveBridge(void) { note("bridge"); if (make_error_in_bridge) system_error_flag = 1; }
@@ -226,6 +231,26 @@ void run_can_dispatch_tests(int *failures)
     multinode_consumes = 0;
     deliver(0x120, TOOL_SOLDERING_IRON, 0);
     TEST_ASSERT(strcmp(trace, "pre post bridge solder motion ") == 0, "with the filter passing, the single-head trace is unchanged");
+
+    // The emergency stop frame (0x001): with the switch off (the stub does not take it) it goes on exactly as any other identifier; with it on it is taken
+    // before the multi-head filter and before the error gate, and nothing below sees it.
+    estop_takes_frame = 0;
+    estop_calls = 0;
+    deliver(0x001, TOOL_SOLDERING_IRON, 0);
+    TEST_ASSERT(strcmp(trace, "estop pre post bridge solder motion ") == 0 && estop_calls == 1, "with the switch off the frame on 0x001 goes on to every handler, as before");
+    estop_takes_frame = 1;
+    deliver(0x001, TOOL_SOLDERING_IRON, 0);
+    TEST_ASSERT(strcmp(trace, "estop ") == 0, "with the switch on the stop frame is taken first and no other handler sees it");
+    multinode_consumes = 1;
+    deliver(0x001, TOOL_DRILL, 0);
+    TEST_ASSERT(strcmp(trace, "estop ") == 0, "it is taken even when the multi-head filter would consume it: every head obeys");
+    multinode_consumes = 0;
+    deliver(0x001, TOOL_DRILL, 1);
+    TEST_ASSERT(strcmp(trace, "estop ") == 0, "and during a critical error: a stop is never refused");
+    estop_calls = 0;
+    deliver(0x120, TOOL_DRILL, 0);
+    TEST_ASSERT(estop_calls == 0 && strcmp(trace, "pre post bridge drill ") == 0, "any other identifier does not ask the stop logic");
+    estop_takes_frame = 0;
 
 #if URTC_CAN_RX_QUEUE
     // With the queue the interrupt only stores the frame: nothing is dispatched until the main loop drains it, and the activity LED is stamped at once.

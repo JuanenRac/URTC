@@ -3,7 +3,7 @@
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
 // GPL-3.0-or-later - see LICENSE
 // =============================================================================
-// Four optional functions (stepper ramps, health frame, oscillator trim, heater PID) are each
+// Optional functions (stepper ramps, health frame, oscillator trim, heater PID, clear-error command, communication watchdog, following the emergency stop frame) are each
 // behind a switch that is OFF unless a valid record in F-RAM says otherwise. This file is the
 // part without hardware: the record, its checksum and the check of the 0x1AE command. The
 // glue that reads and writes the F-RAM and answers on the bus is firmware_features.c.
@@ -19,7 +19,8 @@
 #define FEAT_CLEAR_ERROR    0x10u  // the clear-error command 0x1B2 works
 #define FEAT_COMMS_WATCHDOG 0x20u  // silence of the host cuts a stepper move and, with the next switch, lets the electromagnet go
 #define FEAT_MAGNET_RELEASE 0x40u  // with the communication watchdog: the electromagnet lets go; without it, it holds
-#define FEAT_SUPPORTED      0x7Fu
+#define FEAT_ESTOP_FOLLOW   0x80u  // the head follows the emergency stop frame of the stack (see fw_estop_follow.h)
+#define FEAT_SUPPORTED      0xFFu
 
 // States reported in the 0x1BA answer (the enumeration pid_state of the protocol specification).
 #define PID_STATE_OFF_VALUE        0u

@@ -299,12 +299,12 @@ static void test_electromagnet_policy(int *failures)
 
 static void test_the_supported_mask(int *failures)
 {
-    TEST_ASSERT(FEAT_SUPPORTED == 0x7F && FEAT_CLEAR_ERROR == URTC_FEATURE_CLEAR_ERROR && FEAT_COMMS_WATCHDOG == URTC_FEATURE_COMMS_WATCHDOG &&
-                FEAT_MAGNET_RELEASE == URTC_FEATURE_MAGNET_RELEASE, "the firmware switches are the ones of the specification");
+    TEST_ASSERT(FEAT_SUPPORTED == 0xFF && FEAT_CLEAR_ERROR == URTC_FEATURE_CLEAR_ERROR && FEAT_COMMS_WATCHDOG == URTC_FEATURE_COMMS_WATCHDOG &&
+                FEAT_MAGNET_RELEASE == URTC_FEATURE_MAGNET_RELEASE && FEAT_ESTOP_FOLLOW == URTC_FEATURE_ESTOP_FOLLOW, "the firmware switches are the ones of the specification");
     boot_with(0);
-    for (uint8_t b = 1; b != 0 && b <= FEAT_SUPPORTED; b <<= 1) TEST_ASSERT(!Features_Active(b), "every switch is off on a blank record");
-    boot_with(0x80);
-    TEST_ASSERT(Features_Running() == 0, "a record with a bit this firmware does not have is not trusted: all off");
+    for (uint8_t b = 1; b != 0; b <<= 1) TEST_ASSERT(!Features_Active(b), "every switch is off on a blank record");
+    boot_with(0xFF);
+    TEST_ASSERT(Features_Running() == 0xFF, "a record with all eight switches on is trusted");
 }
 
 int main(void)
