@@ -103,6 +103,7 @@ static void rx(uint32_t id, uint32_t dlc, const uint8_t *data)
     rxHeader.StdId = id;
     rxHeader.DLC = dlc;
     Handle_CAN_SlaveBridge();
+    SlaveBridge_Service();   // the main loop's turn: an end frame is only noted by the interrupt
 }
 
 static const FakeTxFrame *tx(uint32_t id)
@@ -639,6 +640,42 @@ void run_can_slavebridge_tests(int *failures)
     uint8_t rd_other[8] = { 0x13, 10 };
     rx(0x221, 2, rd_other);
     TEST_ASSERT(!tx(0x222), "only the version register has a companion");
+
+    // ---- the end of an update is only NOTED by the receive interrupt; the check and the confirmation wait for the main loop ----
+    {
+        uint8_t end_frame[8] = { 1, 2, 3, 4, 5, 6, 7, 8 };
+        uint8_t data_frame[8] = { 9, 9, 9, 9, 9, 9, 9, 9 };
+        clear();
+        uint32_t tick_before = fake_tick;
+        memcpy(rxData, end_frame, 8);
+        rxHeader.StdId = 0x214;
+        rxHeader.DLC = 8;
+        Handle_CAN_SlaveBridge();   // what the interrupt runs
+        TEST_ASSERT(write_count == 0 && read_count == 0 && fake_tick == tick_before, "0x214 in the interrupt touches no bus and waits for nothing");
+        memcpy(rxData, data_frame, 8);
+        rxHeader.StdId = 0x213;
+        rxHeader.DLC = 8;
+        Handle_CAN_SlaveBridge();
+        TEST_ASSERT(write_count == 0, "a data frame that arrives while an end waits is dropped");
+        SlaveBridge_Service();   // the main loop
+        TEST_ASSERT(write_count >= 1 && writes[write_count - 1].reg == 0x04 && memcmp(writes[write_count - 1].data, end_frame, 8) == 0, "the main loop forwards the end frame that was noted");
+        int after_first = write_count;
+        SlaveBridge_Service();
+        TEST_ASSERT(write_count == after_first, "an end frame is handled once");
+
+        clear();
+        memcpy(rxData, end_frame, 8);
+        rxHeader.StdId = 0x214;
+        rxHeader.DLC = 8;
+        Handle_CAN_SlaveBridge();
+        memcpy(rxData, end_frame, 8);
+        rxHeader.StdId = 0x211;
+        rxHeader.DLC = 8;
+        Handle_CAN_SlaveBridge();   // a new start cancels the end that has not been checked
+        int writes_after_start = write_count;
+        SlaveBridge_Service();
+        TEST_ASSERT(write_count == writes_after_start, "a new start cancels an end that waits");
+    }
 
     // ---- other identifiers -----------------------------------------------------
     clear();

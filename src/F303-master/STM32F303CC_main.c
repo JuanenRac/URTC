@@ -29,6 +29,7 @@
 #include "firmware_telemetry_watchdog.h"
 #include "firmware_can_weldpulse.h"
 #include "firmware_can_thermalinspection.h"
+#include "firmware_can_slavebridge.h"
 #include "firmware_persistence.h"
 #include "firmware_blackbox.h"
 #include "firmware_crash_dump.h"
@@ -544,6 +545,9 @@ int main(void) {
 
         // A thermal capture requested over CAN (0x250) runs here, not in the receive interrupt that took the command
         ThermalInspection_Service();
+
+        // The end of an update of the expansion slave (signature check, confirmation) runs here, not in the receive interrupt that noted it
+        SlaveBridge_Service();
 
         // Health frame and oscillator trim (do nothing while their switches are off)
         Features_Service();
