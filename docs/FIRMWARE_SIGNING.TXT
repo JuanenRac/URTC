@@ -9,10 +9,12 @@ MAIN BOARD (src/F303-master/boot/): the bootloader holds NO secret. It installs
 an application only when an Ed25519 record verifies under one of the PUBLIC
 keys of its trust table (section 6). The record is made on the maintainer's
 machine after the build, so the image is built without any key, and the build
-in Actions is the one that can be shipped. The official (release) table is
-EMPTY until the maintainer creates the image-signing key and adds its public
-half to keys/image_trust.json: until then an official main bootloader trusts
-nobody and installs nothing (it fails closed). Bench builds carry the
+in Actions is the one that can be shipped. The official (release) table holds
+the public half of the image-signing key (current) and the reserved next key
+(keys/image_trust.json); their private halves stay outside every repository,
+and the official releases carry an Ed25519 record made with the current one.
+A table with no key would close the bootloader (it trusts nobody and installs
+nothing). Bench builds carry the
 development table, whose key is public (signing_key_kind "dev").
 
 EXPANSION SLAVE (src/F303-slave/boot/): the verifier does not fit its 18 KB
@@ -31,6 +33,9 @@ run on a real board.
 
 1. WHAT THE BOOTLOADERS CHECK
 -------------------------------------------------------------------------------
+NOTE: sections 1 to 4 describe the EARLIER shared-key scheme (HMAC-SHA256),
+kept for the record and for boards built with it. The main bootloader does not
+use it any more (it holds no secret): what it checks today is in section 6.
 Before a CAN-OTA update is copied into the application slot, the main board
 bootloader (src/F303-master/boot/) verifies the CRC32 of the image (catches
 transfer corruption) and the Ed25519 record of section 6. The expansion slave
