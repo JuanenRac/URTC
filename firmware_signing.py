@@ -123,7 +123,9 @@ def application_signing(board, bin_path, env=None):
             if flavour == "release":
                 return {"algorithm": "none", "key_kind": flavour}
             raise
-        return {"algorithm": "HMAC-SHA256", "key_kind": kind, "key_id": key_id(key), "hmac_sha256": hmac_file("master", bin_path, env)}
+        # key_kind names the trust table the bootloader of this build holds, never the kind of key that happened to be found: a key file with URTC_RELEASE unset still builds
+        # the development table, and the manifest must not call that image a release one
+        return {"algorithm": "HMAC-SHA256", "key_kind": "release" if (flavour == "release" and kind == "release") else "dev", "key_id": key_id(key), "hmac_sha256": hmac_file("master", bin_path, env)}
     return {"algorithm": "none", "key_kind": flavour}
 
 
