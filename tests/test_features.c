@@ -94,7 +94,8 @@ static void test_record(int *failures)
     TEST_ASSERT(Feat_ConfigMask(&c) == 0xFF && FEAT_SUPPORTED == 0xFF, "a record with every switch on is trusted");
     memset(&c, 0xFF, sizeof c);
     TEST_ASSERT(!Feat_ConfigIsValid(&c) && Feat_ConfigMask(&c) == 0, "erased F-RAM (0xFF) is every feature off");
-    TEST_ASSERT(sizeof(FeatConfig_t) == 8, "the record is 8 bytes");
+    TEST_ASSERT(sizeof(FeatConfig_t) == 16 && sizeof(FeatConfigV1_t) == 8, "the record is 16 bytes (8 in the first format)");
+    TEST_ASSERT(FEAT_CONFIG_RAW_SIZE == 16 && FEAT_CONFIG_FRAM_ADDR + FEAT_CONFIG_RAW_SIZE <= 992, "the record ends before the heater PID gains at address 992");
 
     uint8_t mask = 99;
     const uint8_t good[5] = { 0x46, 0x45, 0x41, 0x54, 0x0A };
@@ -109,6 +110,139 @@ static void test_record(int *failures)
     }
     const uint8_t every[5] = { 0x46, 0x45, 0x41, 0x54, 0xFF };
     TEST_ASSERT(Feat_ParseCommand(5, every, &mask) && mask == 0xFF, "the eighth bit (following the emergency stop) is a supported switch: all eight are accepted");
+}
+
+static void put_v1(uint8_t mask, int sound)
+{
+    FeatConfigV1_t o;
+    memset(&o, 0, sizeof o);
+    o.magic = FEAT_CONFIG_MAGIC;
+    o.struct_version = 1;
+    o.mask = mask;
+    uint8_t crc = 0;
+    const uint8_t *p = (const uint8_t *)&o;
+    for (unsigned i = 0; i < sizeof(o) - 1; i++) {
+        crc ^= p[i];
+        for (int b = 0; b < 8; b++) crc = (crc & 0x80) ? (uint8_t)((crc << 1) ^ 0x07) : (uint8_t)(crc << 1);
+    }
+    o.checksum = sound ? crc : (uint8_t)(crc ^ 0x55);
+    memset(&fake_fram[FEAT_CONFIG_FRAM_ADDR], 0xFF, FEAT_CONFIG_RAW_SIZE);   // the second half of the 16 bytes was never written by the old firmware
+    memcpy(&fake_fram[FEAT_CONFIG_FRAM_ADDR], &o, sizeof o);
+}
+
+static void test_second_byte_and_formats(int *failures)
+{
+    FeatConfig_t c;
+    uint8_t raw[FEAT_CONFIG_RAW_SIZE];
+
+    // the record of the first format is still read: a board configured before the second byte keeps its switches
+    reset_world();
+    put_v1(0x2A, 1);
+    memcpy(raw, &fake_fram[FEAT_CONFIG_FRAM_ADDR], sizeof raw);
+    TEST_ASSERT(Feat_ConfigDecode(raw, &c) && Feat_ConfigMask(&c) == 0x2A && Feat_ConfigMaskExt(&c) == 0 && c.struct_version == FEAT_CONFIG_VERSION, "a sound record of version 1 is read; the second byte is zero");
+    int writes_before = fake_fram_write_calls;
+    Features_Init();
+    TEST_ASSERT(Features_Running() == 0x2A && Features_RunningExt() == 0, "a board configured in the first format keeps its switches after the update and the new ones are off");
+    TEST_ASSERT(fake_fram_write_calls == writes_before, "reading a record of version 1 writes nothing at power-up");
+
+    // a damaged record of version 1 is every feature off
+    put_v1(0x2A, 0);
+    memcpy(raw, &fake_fram[FEAT_CONFIG_FRAM_ADDR], sizeof raw);
+    TEST_ASSERT(!Feat_ConfigDecode(raw, &c) && Feat_ConfigMask(&c) == 0 && Feat_ConfigMaskExt(&c) == 0, "a version 1 record with a bad checksum switches nothing on");
+
+    // a record of version 2 with both bytes
+    Feat_ConfigBlank(&c);
+    c.mask = 0x20; c.mask_ext = FEAT_EXT_WATCHDOG_HOST_ONLY; Feat_ConfigSeal(&c);
+    memcpy(raw, &c, sizeof raw);
+    FeatConfig_t d;
+    TEST_ASSERT(Feat_ConfigDecode(raw, &d) && Feat_ConfigMask(&d) == 0x20 && Feat_ConfigMaskExt(&d) == FEAT_EXT_WATCHDOG_HOST_ONLY, "a sound record of version 2 gives both bytes");
+
+    // anything else: every feature off, both bytes
+    raw[4] = 3;
+    TEST_ASSERT(!Feat_ConfigDecode(raw, &d) && Feat_ConfigMask(&d) == 0 && Feat_ConfigMaskExt(&d) == 0, "a version this firmware does not know is every feature off");
+    memcpy(raw, &c, sizeof raw);
+    raw[15] ^= 0x01;
+    TEST_ASSERT(!Feat_ConfigDecode(raw, &d) && Feat_ConfigMaskExt(&d) == 0, "a record of version 2 with a bad checksum is every feature off");
+    memcpy(raw, &c, sizeof raw);
+    raw[7] = 0x80;
+    TEST_ASSERT(!Feat_ConfigDecode(raw, &d), "a change in the reserved bytes breaks the checksum");
+    Feat_ConfigBlank(&c);
+    c.mask_ext = 0x02; Feat_ConfigSeal(&c);
+    memcpy(raw, &c, sizeof raw);
+    TEST_ASSERT(!Feat_ConfigDecode(raw, &d) && Feat_ConfigMask(&d) == 0, "a bit of the second byte that this firmware does not have: the record is not trusted");
+    memset(raw, 0xFF, sizeof raw);
+    TEST_ASSERT(!Feat_ConfigDecode(raw, &d) && Feat_ConfigMask(&d) == 0, "erased F-RAM is every feature off");
+    memset(raw, 0x00, sizeof raw);
+    TEST_ASSERT(!Feat_ConfigDecode(raw, &d), "zeroed F-RAM is every feature off");
+
+    // the commands
+    uint8_t mask, ext, extended;
+    const uint8_t five[5] = { 0x46, 0x45, 0x41, 0x54, 0x20 };
+    const uint8_t six[6] = { 0x46, 0x45, 0x41, 0x54, 0x20, 0x01 };
+    TEST_ASSERT(Feat_ParseCommandEx(5, five, &mask, &ext, &extended) && mask == 0x20 && ext == 0 && !extended, "the five-byte form sets the second byte to zero");
+    TEST_ASSERT(Feat_ParseCommandEx(6, six, &mask, &ext, &extended) && mask == 0x20 && ext == 1 && extended, "the six-byte form carries both bytes");
+    const uint8_t bad_ext[6] = { 0x46, 0x45, 0x41, 0x54, 0x20, 0x02 };
+    TEST_ASSERT(!Feat_ParseCommandEx(6, bad_ext, &mask, &ext, &extended), "a bit of the second byte that this firmware does not have is ignored");
+    TEST_ASSERT(!Feat_ParseCommandEx(4, six, &mask, &ext, &extended) && !Feat_ParseCommandEx(7, six, &mask, &ext, &extended), "a short or a long 0x1AE is ignored");
+    const uint8_t bad_magic[6] = { 0x46, 0x45, 0x41, 0x55, 0x20, 0x01 };
+    TEST_ASSERT(!Feat_ParseCommandEx(6, bad_magic, &mask, &ext, &extended), "a six-byte command with a wrong magic is ignored");
+    const uint8_t two = 2, zero = 0;
+    TEST_ASSERT(Feat_QueryWantsExtended(1, &two) && !Feat_QueryWantsExtended(1, &zero) && !Feat_QueryWantsExtended(0, NULL) && !Feat_QueryWantsExtended(2, six), "only the one-byte query 02 asks for the six-byte answer");
+    uint8_t out6[6];
+    Feat_EncodeResponseExt(0x20, 0x00, 0x01, 0x00, out6);
+    TEST_ASSERT(out6[0] == 0x20 && out6[1] == 0 && out6[2] == FEAT_SUPPORTED && out6[3] == 1 && out6[4] == 0 && out6[5] == FEAT_EXT_SUPPORTED, "the six-byte answer");
+
+    // through the glue: each host is answered in its own form
+    reset_world();
+    Features_Init();
+    send(0x1AE, five, 5);
+    Features_HandleCommand();
+    const FakeTxFrame *r = find_tx(0x1AF);
+    TEST_ASSERT(r && r->dlc == 3 && r->data[0] == 0x20, "a five-byte 0x1AE is answered with three bytes");
+    send(0x1AE, six, 6);
+    Features_HandleCommand();
+    r = find_tx(0x1AF);
+    TEST_ASSERT(r && r->dlc == 6 && r->data[0] == 0x20 && r->data[1] == 0 && r->data[3] == 1 && r->data[4] == 0 && r->data[5] == 1, "a six-byte 0x1AE is answered with six: stored now, running only after power-up");
+    Features_Init();
+    TEST_ASSERT(Features_Running() == 0x20 && Features_RunningExt() == 1 && Features_ActiveExt(FEAT_EXT_WATCHDOG_HOST_ONLY), "after the next power-up both bytes are in force");
+    memcpy(raw, &fake_fram[FEAT_CONFIG_FRAM_ADDR], sizeof raw);
+    TEST_ASSERT(raw[4] == FEAT_CONFIG_VERSION && raw[6] == 1, "the record is written in the current format");
+    send(0x1AF, &two, 1);
+    Features_HandleCommand();
+    r = find_tx(0x1AF);
+    TEST_ASSERT(r && r->dlc == 6 && r->data[0] == 0x20 && r->data[1] == 0x20 && r->data[3] == 1 && r->data[4] == 1, "the query 02 gets the six-byte answer with both masks in force");
+    send(0x1AF, NULL, 0);
+    Features_HandleCommand();
+    r = find_tx(0x1AF);
+    TEST_ASSERT(r && r->dlc == 3, "an empty query is answered with three bytes as before");
+    const uint8_t other = 7;
+    send(0x1AF, &other, 1);
+    Features_HandleCommand();
+    r = find_tx(0x1AF);
+    TEST_ASSERT(r && r->dlc == 3, "a one-byte query that is not 02 is answered with three bytes");
+    send(0x1AE, five, 5);
+    Features_HandleCommand();
+    Features_Init();
+    TEST_ASSERT(Features_Running() == 0x20 && Features_RunningExt() == 0, "the five-byte form puts every switch of the second byte off");
+
+    // a version 1 record is replaced by a version 2 one the first time the host writes
+    reset_world();
+    put_v1(0x0A, 1);
+    Features_Init();
+    send(0x1AE, six, 6);
+    Features_HandleCommand();
+    memcpy(raw, &fake_fram[FEAT_CONFIG_FRAM_ADDR], sizeof raw);
+    TEST_ASSERT(raw[4] == FEAT_CONFIG_VERSION && Feat_ConfigDecode(raw, &c) && Feat_ConfigMask(&c) == 0x20 && Feat_ConfigMaskExt(&c) == 1, "the first write replaces the old record by one of the current format");
+
+    // a chip that refuses the write: the answer says what the chip really holds
+    reset_world();
+    Features_Init();
+    fake_fram_fail_writes = 1;
+    send(0x1AE, six, 6);
+    Features_HandleCommand();
+    r = find_tx(0x1AF);
+    TEST_ASSERT(r && r->dlc == 6 && r->data[0] == 0 && r->data[3] == 0, "a write that fails reports what the chip really holds");
+    fake_fram_fail_writes = 0;
 }
 
 static void test_switches(int *failures)
@@ -387,6 +521,7 @@ int main(void)
     printf("URTC host logic tests - optional features\n");
     test_record(&failures);
     test_switches(&failures);
+    test_second_byte_and_formats(&failures);
     test_health(&failures);
     test_hsi(&failures);
     test_motion(&failures);

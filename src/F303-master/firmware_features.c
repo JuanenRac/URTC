@@ -26,14 +26,14 @@
 
 static FeatConfig_t persisted;     // what is in F-RAM now (blank when the chip is absent, blank or damaged)
 static uint8_t running_mask;       // read once at boot
+static uint8_t running_mask_ext;   // the second byte of the map, read at the same time
 
 // ---- the switches ------------------------------------------------------------------------------------
 static void read_persisted(void) {
-    FeatConfig_t loaded;
-    if (FRAM_ReadBytes(FEAT_CONFIG_FRAM_ADDR, (uint8_t *)&loaded, sizeof(loaded)) && Feat_ConfigIsValid(&loaded)) {
-        persisted = loaded;
-    } else {
-        Feat_ConfigBlank(&persisted); // erased, never written, damaged or no chip: every feature off
+    uint8_t raw[FEAT_CONFIG_RAW_SIZE];
+    // A record of version 1 (8 bytes) or 2 (16 bytes); anything else, an erased or damaged chip or no chip at all leaves every feature off.
+    if (!FRAM_ReadBytes(FEAT_CONFIG_FRAM_ADDR, raw, sizeof(raw)) || !Feat_ConfigDecode(raw, &persisted)) {
+        Feat_ConfigBlank(&persisted);
     }
 }
 
@@ -118,6 +118,7 @@ __attribute__((weak)) void Features_PlatformHsiWriteTrim(uint8_t trim) { (void)t
 void Features_Init(void) {
     read_persisted();
     running_mask = Feat_ConfigMask(&persisted);
+    running_mask_ext = Feat_ConfigMaskExt(&persisted);
     pid_state = PID_STATE_OFF_VALUE;
     if (running_mask & FEAT_THERMAL_PID) { pid_load(); pid_state = PID_STATE_RUNNING_VALUE; }
     HsiTrim_Init(&hsi, HSI_TRIM_DEFAULT);
@@ -127,19 +128,32 @@ void Features_Init(void) {
 
 uint8_t Features_Running(void) { return running_mask; }
 uint8_t Features_Active(uint8_t feature_bit) { return (uint8_t)((running_mask & feature_bit) != 0); }
+uint8_t Features_RunningExt(void) { return running_mask_ext; }
+uint8_t Features_ActiveExt(uint8_t feature_bit) { return (uint8_t)((running_mask_ext & feature_bit) != 0); }
 
 void Features_HandleCommand(void) {
+    uint8_t extended;   // whether the host speaks the form with the second mask byte: it is answered in the same form
     if (rxHeader.StdId == URTC_CAN_ID_SET_FEATURES) {
-        uint8_t mask;
-        if (!(rxHeader.StdId == URTC_CAN_ID_SET_FEATURES && rxHeader.DLC == 5 && Feat_ParseCommand((uint8_t)rxHeader.DLC, rxData, &mask))) return; // anything else is ignored, like every magic-protected command
+        uint8_t mask, mask_ext;
+        if (!Feat_ParseCommandEx((uint8_t)rxHeader.DLC, rxData, &mask, &mask_ext, &extended)) return; // anything else is ignored, like every magic-protected command
         FeatConfig_t next;
         Feat_ConfigBlank(&next);
         next.mask = mask;
+        next.mask_ext = mask_ext;   // zero for the five-byte form: the switches of the second byte go off
         Feat_ConfigSeal(&next);
+        // Always written in the current format (16 bytes); a record of the first format is replaced here and never at power-up.
         if (FRAM_WriteBytes(FEAT_CONFIG_FRAM_ADDR, (const uint8_t *)&next, sizeof(next))) {
             read_persisted(); // report what the chip really holds, not what was asked
         }
-    } else if (rxHeader.StdId != URTC_CAN_ID_FEATURES_RESP) {
+    } else if (rxHeader.StdId == URTC_CAN_ID_FEATURES_RESP) {
+        extended = Feat_QueryWantsExtended((uint8_t)rxHeader.DLC, rxData);
+    } else {
+        return;
+    }
+    if (extended) {
+        uint8_t out6[6];
+        Feat_EncodeResponseExt(Feat_ConfigMask(&persisted), running_mask, Feat_ConfigMaskExt(&persisted), running_mask_ext, out6);
+        send_frame(URTC_CAN_ID_FEATURES_RESP, out6, 6);
         return;
     }
     uint8_t out[3];

@@ -248,6 +248,67 @@ static void test_stepper_watchdog(int *failures)
     TEST_ASSERT(steps_remaining == 0 && system_error_flag == 1, "a fast move has a short limit");
 }
 
+static void boot_with_ext(uint8_t mask, uint8_t mask_ext)
+{
+    boot_with(mask);
+    FeatConfig_t c;
+    Feat_ConfigBlank(&c);
+    c.mask = mask;
+    c.mask_ext = mask_ext;
+    Feat_ConfigSeal(&c);
+    memcpy(&fake_fram[FEAT_CONFIG_FRAM_ADDR], &c, sizeof c);
+    Features_Init();
+    rxHeader.StdId = 0x120;
+    Safety_NoteHostFrame();
+}
+
+static void test_host_only_watchdog(int *failures)
+{
+    // switch off (the default): any frame keeps the move alive, as in earlier releases
+    boot_with_ext(FEAT_COMMS_WATCHDOG, 0);
+    steps_remaining = 4000;
+    Safety_NoteStepperMove(4000, 0);
+    for (int i = 0; i < 20; i++) {
+        fake_tick += 3000;
+        rxHeader.StdId = 0x095;
+        Safety_NoteHostFrame();
+        Safety_Service();
+    }
+    TEST_ASSERT(steps_remaining == 4000 && system_error_flag == 0, "switch off: frames of any identifier keep the move alive");
+
+    // switch on: a frame that is not of the host side feeds nothing, so the move is cut at the limit
+    boot_with_ext(FEAT_COMMS_WATCHDOG, FEAT_EXT_WATCHDOG_HOST_ONLY);
+    steps_remaining = 4000;
+    Safety_NoteStepperMove(4000, 0);
+    for (int i = 0; i < 4; i++) {
+        fake_tick += 1100;
+        rxHeader.StdId = 0x095;
+        Safety_NoteHostFrame();
+        Safety_Service();
+    }
+    TEST_ASSERT(steps_remaining == 0 && system_error_flag == 1 && Safety_ErrorReason() == URTC_ERROR_REASON_STEPPER_SILENCE, "switch on: reports of heads do not keep the move alive");
+
+    // switch on: a frame of the host side does
+    boot_with_ext(FEAT_COMMS_WATCHDOG, FEAT_EXT_WATCHDOG_HOST_ONLY);
+    steps_remaining = 4000;
+    Safety_NoteStepperMove(4000, 0);
+    for (int i = 0; i < 20; i++) {
+        fake_tick += 3000;
+        rxHeader.StdId = 0x1AF;
+        Safety_NoteHostFrame();
+        Safety_Service();
+    }
+    TEST_ASSERT(steps_remaining == 4000 && system_error_flag == 0, "switch on: frames of the host side keep the move alive");
+
+    // the host-only switch without the watchdog itself changes nothing
+    boot_with_ext(0, FEAT_EXT_WATCHDOG_HOST_ONLY);
+    steps_remaining = 4000;
+    Safety_NoteStepperMove(4000, 0);
+    fake_tick += 100000;
+    Safety_Service();
+    TEST_ASSERT(system_error_flag == 0 && steps_remaining == 4000, "the host-only switch does nothing while the watchdog is off");
+}
+
 static void test_electromagnet_policy(int *failures)
 {
     // default: hold, whatever the silence, whatever the switches of the watchdog
@@ -316,6 +377,7 @@ int main(void)
     test_clear_with_the_switch_on(&failures);
     test_clear_every_actuator_and_the_special_cases(&failures);
     test_stepper_watchdog(&failures);
+    test_host_only_watchdog(&failures);
     test_electromagnet_policy(&failures);
     test_the_supported_mask(&failures);
     if (failures == 0) {

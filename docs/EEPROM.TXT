@@ -414,11 +414,11 @@ Address | Size  | What                                  | Defined in
         |       | (section 8)                           | SavedState_t does not
         |       |                                       | change)
 968     | 8     | free                                  |
-976     | 8     | optional firmware features: switches  | fw_features.h,
-        |       | of the ramps, the health frame, the   | firmware_features.c
-        |       | oscillator trim and the heater PID    | (own CRC-8 record,
-        |       | (default all OFF; section 9)          | section 9)
-984     | 8     | free                                  |
+976     | 16    | optional firmware features: the       | fw_features.h,
+        |       | switches (two mask bytes; default all | firmware_features.c
+        |       | OFF; section 9). Version 1 of the     | (own CRC-8 record,
+        |       | record used only the first 8 bytes    | section 9)
+        |       | and is still read                     |
 992     | 12    | heater PID gains (section 9)          | firmware_features.c
 1004    | 7188  | free                                  |
 8191    |       | last byte of the chip                 |
@@ -455,13 +455,13 @@ once at boot, so a change acts after the next power-up. See CANBUS.TXT (the
 appendix) for what the extension does.
 
 -----------------------------------------------------------------------------
-9. Optional firmware features (address 976, 8 bytes) and heater PID gains (address 992, 12 bytes)
+9. Optional firmware features (address 976, 16 bytes) and heater PID gains (address 992, 12 bytes)
 -----------------------------------------------------------------------------
-Feature record (address 976):
+Feature record (address 976, version 2, 16 bytes, the one that is written):
 Offset | Size | Field          | Type     | Notes
 -------|------|----------------|----------|---------------------------------
 0      | 4    | magic          | uint32_t | 0x46454154 ('FEAT').
-4      | 1    | struct_version | uint8_t  | 1.
+4      | 1    | struct_version | uint8_t  | 2.
 5      | 1    | mask           | uint8_t  | Features that are on: 0x01 stepper
        |      |                |          | ramps, 0x02 health frame, 0x04
        |      |                |          | oscillator trim, 0x08 heater PID,
@@ -470,8 +470,25 @@ Offset | Size | Field          | Type     | Notes
        |      |                |          | electromagnet release, 0x80
        |      |                |          | following the emergency stop
        |      |                |          | frame.
-6      | 1    | reserved       | uint8_t  | 0.
-7      | 1    | checksum       | uint8_t  | CRC-8/SMBUS over bytes 0-6.
+6      | 1    | mask_ext       | uint8_t  | Switches of the second byte that
+       |      |                |          | are on: 0x01 communication
+       |      |                |          | watchdog counts only frames of
+       |      |                |          | the host side.
+7      | 8    | reserved       | uint8_t  | 0 (room for a third byte
+       |      |                |          | without a new version).
+15     | 1    | checksum       | uint8_t  | CRC-8/SMBUS over bytes 0-14.
+
+Version 1 (written by earlier releases): the same first five bytes with
+struct_version 1, then reserved (byte 6, 0) and the checksum at byte 7 over
+bytes 0-6; bytes 8 to 15 were never written. It is still read, as a record
+whose second mask byte is zero, so a head that was configured before the
+second byte existed keeps every switch it had and the new ones are off. The
+record is not rewritten at power-up; the first 0x1AE after the update writes
+version 2, always in full (16 bytes). Reading is by version: a version 2
+record read by an earlier release is not recognised (every feature off, the
+safe side), and a version this firmware does not know, a bit of either mask
+byte that this firmware does not have, or a checksum that does not match
+makes the whole record untrusted.
 
 DEFAULT ALL OFF, like the multinode switch: a blank, erased, damaged or
 missing record, or one whose checksum does not match, reads as every

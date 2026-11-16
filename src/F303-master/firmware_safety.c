@@ -30,6 +30,8 @@ static uint32_t silence_ms(uint32_t now, uint32_t kick)
 
 void Safety_NoteHostFrame(void)
 {
+    // With WATCHDOG_HOST_ONLY on, only a frame of the host side is a sign of life (the identifier is the one the receive interrupt just stored).
+    if (!FwSafe_WatchdogFeeds(Features_ActiveExt(FEAT_EXT_WATCHDOG_HOST_ONLY), (uint16_t)rxHeader.StdId)) return;
     host_last_frame_tick = HAL_GetTick();
 }
 
