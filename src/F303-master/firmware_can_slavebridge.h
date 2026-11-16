@@ -10,5 +10,8 @@
 void Handle_CAN_SlaveBridge(void);
 // Main loop: checks the signature record and confirms to the slave once the end frame of an update has been noted by the receive interrupt (see the .c).
 void SlaveBridge_Service(void);
+// The probe that says whether every actuator of the board is at zero (1) or one is active (0). While a tool is active the end of a slave update is refused
+// (0x215 answers VERIFY_FAIL, 0x219 the reason ACTUATOR_ACTIVE): the check of the record would hold the safety ticks of the main loop for most of a second.
+void SlaveBridge_SetActuatorProbe(uint8_t (*probe)(void));
 
 #endif // FIRMWARE_CAN_SLAVEBRIDGE_H

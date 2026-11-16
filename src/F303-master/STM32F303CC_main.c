@@ -261,6 +261,7 @@ int main(void) {
 
     // Following the emergency stop frame of the stack: with its switch on the head powers up latched, like every node of the stack.
     Safety_EstopInit();
+    SlaveBridge_SetActuatorProbe(Safety_ActuatorsOff);
 
     MX_GPIO_Post_Init();
     MX_CAN_Init();
