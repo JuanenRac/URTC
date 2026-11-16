@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "urtc_common_version": "0.2.7",
+  "urtc_common_version": "0.2.8",
   "files": {
     "bl_serial_vectors.h": {
       "from": "generated/bl_serial_vectors.h",

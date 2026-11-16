@@ -24,6 +24,9 @@ void Safety_NoteStepperMove(uint32_t steps, uint32_t speed_sps);
 // decision says so.
 uint8_t Safety_HandleClearError(void);
 
+// 1 when every actuator is at zero (the hotend fan only cools, so it may run); the end of an update of the expansion board is refused otherwise.
+uint8_t Safety_ActuatorsOff(void);
+
 // Bytes 6 and 7 of the quick state 0x111: why the error is latched (0 when none), and what the last clear-error command did (0 when none since power-up).
 uint8_t Safety_ErrorReason(void);
 uint8_t Safety_LastClearResult(void);

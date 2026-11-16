@@ -106,6 +106,9 @@ static void rx(uint32_t id, uint32_t dlc, const uint8_t *data)
     SlaveBridge_Service();   // the main loop's turn: an end frame is only noted by the interrupt
 }
 
+static uint8_t probe_busy(void) { return 0; }
+static uint8_t probe_idle(void) { return 1; }
+
 static const FakeTxFrame *tx(uint32_t id)
 {
     for (int i = 0; i < fake_tx_count; i++) if (fake_tx[i].id == id) return &fake_tx[i];
@@ -675,6 +678,38 @@ void run_can_slavebridge_tests(int *failures)
         int writes_after_start = write_count;
         SlaveBridge_Service();
         TEST_ASSERT(write_count == writes_after_start, "a new start cancels an end that waits");
+    }
+
+    // ---- the end of an update is refused while a tool is active ----
+    {
+        uint8_t end_frame[8] = { 1, 2, 3, 4, 5, 6, 7, 8 };
+        uint8_t start_frame[8] = { 0, 0, 5, 220, 0, 0, 0, 0 };
+        uint8_t query[1] = { 0 };
+        clear();
+        SlaveBridge_SetActuatorProbe(probe_busy);
+        rx(0x214, 8, end_frame);
+        TEST_ASSERT(write_count == 0 && read_count == 0, "an end frame while a tool is active reaches the slave in no way (no check, no forward, no confirmation)");
+        rx(0x215, 0, query);
+        TEST_ASSERT(tx(0x215) && tx(0x215)->data[0] == 0x05, "0x215 answers VERIFY_FAIL after the refusal");
+        rx(0x219, 0, query);
+        TEST_ASSERT(tx(0x219) && tx(0x219)->data[0] == 0x08, "0x219 answers ACTUATOR_ACTIVE after the refusal");
+        SlaveBridge_Service();
+        TEST_ASSERT(write_count == 0, "a refused end is not retried by the main loop");
+
+        clear();
+        SlaveBridge_SetActuatorProbe(probe_idle);
+        rx(0x211, 8, start_frame);   // a new start forgets the refusal
+        clear();
+        rx(0x215, 0, query);
+        TEST_ASSERT(!(tx(0x215) && tx(0x215)->data[0] == 0x05), "a new start forgets the refusal of the status");
+        clear();
+        rx(0x214, 8, end_frame);
+        TEST_ASSERT(write_count >= 1 && writes[write_count - 1].reg == 0x04, "with every actuator at zero the end frame is forwarded as before");
+
+        clear();
+        SlaveBridge_SetActuatorProbe(0);
+        rx(0x214, 8, end_frame);
+        TEST_ASSERT(write_count >= 1 && writes[write_count - 1].reg == 0x04, "without a probe nothing is refused");
     }
 
     // ---- other identifiers -----------------------------------------------------

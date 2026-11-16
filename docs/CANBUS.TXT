@@ -2254,7 +2254,7 @@ Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_do
 
 C. Field layouts and examples
 
-[[ BEGIN GENERATED layouts sha256=fba3a458eea9b0aa6804862c2710b443fd413de5dfeaaf2c909f6b9620e0f1d3 ]]
+[[ BEGIN GENERATED layouts sha256=4b797cd31f65b46a7da57b715766df9d6ee07714d914ffd67c66b99147a7a03a ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 ### 0x095 IMPACT_EVENT - Impact register (touch probe, maximum priority)
@@ -3337,6 +3337,7 @@ Example CRC32: data 02 (reason=2)
 
 Note: Only meaningful right after 0x215 reports VERIFY_FAIL.
 Note: DIGEST_CHUNK_MISSING (7) is answered by the master bridge itself, not by the slave bootloader: a group of digest chunks (0x212) was left half way when 0x214 arrived. The legacy signature chunks (0x7F7) of the old bootloaders keep their order-only layout; the current bootloader reads the Ed25519 record instead.
+Note: ACTUATOR_ACTIVE (8) is answered by the master bridge itself: the end of the update (0x214) arrived while a heater, the laser, the drill, a fan, the blower, a stepper move or the electromagnet was active. Nothing is verified, forwarded or confirmed and the slave stays as it is; 0x215 answers VERIFY_FAIL and 0x219 answers this reason until the next start (0x211). Stop the tool and send the update again.
 
 ### 0x21A SLAVE_RECORD_CHUNK - One chunk of the Ed25519 signature record of the slave image
 
@@ -4027,7 +4028,7 @@ Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_do
 
 E. Enumerations
 
-[[ BEGIN GENERATED enums sha256=5135171acf2df52250b98095642ca1b637db054d7d244aa390e3458a4c6a22cf ]]
+[[ BEGIN GENERATED enums sha256=30ad14faf59911329b757c6262ba79734184b099496ce3c330176812b4436737 ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 tool - Tool profile (prefix TOOL_, value)
@@ -4096,6 +4097,7 @@ slave_verify_fail_reason - Verify-fail reasons only the expansion slave bootload
 |---|---|---|
 | 6 | NOT_CONFIRMED | The master did not confirm the image in time, or its confirmation does not match this session and image |
 | 7 | DIGEST_CHUNK_MISSING | The master bridge found a group of digest chunks (0x212) left half way when the end (0x214) arrived; a frame was lost |
+| 8 | ACTUATOR_ACTIVE | The master bridge refused the end of the update (0x214) because an actuator of the board was active; the image was not installed |
 
 responder - Answering side (prefix RESPONDER_, value)
 

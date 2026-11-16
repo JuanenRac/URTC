@@ -45,7 +45,7 @@ static uint8_t magnet_energised(void)
 }
 
 // Every actuator at zero. The hotend fan only cools, so it may run.
-static uint8_t actuators_off(void)
+uint8_t Safety_ActuatorsOff(void)
 {
     return (uint8_t)(laser_power_setpoint == 0 && drill_speed == 0 && target_temperature == 0 && layer_fan_duty == 0 && uv_curing_duty == 0 &&
                      hotair_blower_duty == 0 && steps_remaining == 0 && !magnet_energised());
@@ -66,7 +66,7 @@ uint8_t Safety_HandleClearError(void)
     if (!(rxHeader.StdId == URTC_CAN_ID_CLEAR_ERROR && rxHeader.DLC == 4 &&
           rxData[0] == 0x43 && rxData[1] == 0x4C && rxData[2] == 0x45 && rxData[3] == 0x52)) return 0;
     uint8_t reason = system_error_reason ? system_error_reason : (uint8_t)URTC_ERROR_REASON_UNKNOWN;
-    last_clear_result = FwSafe_ClearDecision(Features_Active(FEAT_CLEAR_ERROR), system_error_flag, reason, tool_temperature_c(), actuators_off());
+    last_clear_result = FwSafe_ClearDecision(Features_Active(FEAT_CLEAR_ERROR), system_error_flag, reason, tool_temperature_c(), Safety_ActuatorsOff());
     if (last_clear_result == URTC_CLEAR_ERROR_CLEARED) {
         system_error_reason = URTC_ERROR_REASON_NONE;
         thermal_fault_code = 0;

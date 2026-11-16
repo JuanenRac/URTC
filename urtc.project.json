@@ -3,7 +3,7 @@
   "ecosystem": "URTC",
   "name": "URTC",
   "version": "0.5.0",
-  "min_common": "0.2.6",
+  "min_common": "0.2.8",
   "role": "firmware",
   "stack": "firmware-c",
   "technologies": [
