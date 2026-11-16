@@ -85,6 +85,7 @@ static uint32_t noted_steps;
 static int noted;
 void Features_NoteMove(uint32_t steps) { noted++; noted_steps = steps; }
 uint8_t Features_Active(uint8_t feature_bit) { (void)feature_bit; return 0; }   // every switch off: the 0x120 handler reads only the plain frame
+uint8_t Features_ActiveExt(uint8_t feature_bit) { (void)feature_bit; return 0; }   // the same for the second byte: every switch off
 
 // ---- helpers ----------------------------------------------------------------------------------------------------------------
 static void quiet(void)
