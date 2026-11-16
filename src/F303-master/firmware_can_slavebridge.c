@@ -94,6 +94,16 @@ static uint8_t digest_chunk_lost = 0;
 static volatile uint8_t slave_end_pending = 0;
 static uint8_t slave_end_data[8];
 
+// The check of the signature record takes most of a second in the main loop, where the safety ticks of the board (the thermal and the pulse loops, the 250 ms
+// watchdogs) stand still. So the end of an update is refused while a tool is active: the probe answers 1 when every actuator is at zero. Without a probe (a host test
+// that does not set one) nothing is refused. The flag stays up until the next start (0x211), so that the status and the reason queries can say why.
+static uint8_t (*actuators_off_probe)(void) = 0;
+static uint8_t end_refused_busy = 0;
+
+void SlaveBridge_SetActuatorProbe(uint8_t (*probe)(void)) {
+    actuators_off_probe = probe;
+}
+
 static void SendCanResponse(uint32_t id, const uint8_t *data, uint8_t len) {
     if (HAL_CAN_GetTxMailboxesFreeLevel(&hcan) == 0) return;
     CAN_TxHeaderTypeDef txH;
@@ -129,6 +139,7 @@ void Handle_CAN_SlaveBridge(void) {
         // fresh chunks before something re-triggers completion.
         digest_chunks_received = 0;
         digest_chunk_lost = 0;
+        end_refused_busy = 0;
         slave_end_pending = 0;   // a new start cancels an end that has not been checked yet
         // The rollback floor of the slave is read BEFORE the START frame goes out: afterwards the slave is erasing its backup slot and does not answer. A slave
         // that does not answer (an older bootloader, no slave chip) leaves the floor unknown, and an unknown floor means nothing is ever vouched for.
@@ -194,7 +205,7 @@ void Handle_CAN_SlaveBridge(void) {
         // convention as the main board's own 0x7F8), response is always
         // 1 byte.
         uint8_t status;
-        if (digest_chunk_lost) {
+        if (digest_chunk_lost || end_refused_busy) {
             status = URTC_STATUS_VERIFY_FAIL;
             SendCanResponse(URTC_CAN_ID_SLAVE_STATUS, &status, 1);
         } else if (ExpansionI2C_SlaveReadRegister(REG_BOOT_STATUS, &status, 1)) {
@@ -247,6 +258,9 @@ void Handle_CAN_SlaveBridge(void) {
         uint8_t reason;
         if (digest_chunk_lost) {
             reason = URTC_SLAVE_VERIFY_FAIL_REASON_DIGEST_CHUNK_MISSING;
+            SendCanResponse(URTC_CAN_ID_SLAVE_VERIFY_FAIL_REASON, &reason, 1);
+        } else if (end_refused_busy) {
+            reason = URTC_SLAVE_VERIFY_FAIL_REASON_ACTUATOR_ACTIVE;
             SendCanResponse(URTC_CAN_ID_SLAVE_VERIFY_FAIL_REASON, &reason, 1);
         } else if (ExpansionI2C_SlaveReadRegister(REG_BOOT_VERIFY_FAIL_REASON, &reason, 1)) {
             SendCanResponse(URTC_CAN_ID_SLAVE_VERIFY_FAIL_REASON, &reason, 1);
@@ -302,6 +316,12 @@ void Handle_CAN_SlaveBridge(void) {
 // seconds for the confirmation, and the check takes a while on this chip); the verdict decides whether the slave is then told to install.
 void SlaveBridge_Service(void) {
     if (!slave_end_pending) return;
+    if (actuators_off_probe && !actuators_off_probe()) {
+        // A tool is active: nothing is verified, forwarded or confirmed (the slave stays as it is and times out on its own); 0x215 / 0x219 say why until the next start.
+        end_refused_busy = 1;
+        slave_end_pending = 0;
+        return;
+    }
     uint8_t data[8];
     memcpy(data, (const void *)slave_end_data, 8);
     uint32_t end_crc = ((uint32_t)data[0] << 24) | ((uint32_t)data[1] << 16) | ((uint32_t)data[2] << 8) | data[3];
