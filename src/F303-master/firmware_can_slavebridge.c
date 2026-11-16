@@ -90,6 +90,10 @@ static uint8_t digest_chunks_received = 0;
 // reason queries can say so instead of leaving a signature mismatch to be guessed.
 static uint8_t digest_chunk_lost = 0;
 
+// The end frame of an update waits here, written by the receive interrupt and taken by SlaveBridge_Service in the main loop.
+static volatile uint8_t slave_end_pending = 0;
+static uint8_t slave_end_data[8];
+
 static void SendCanResponse(uint32_t id, const uint8_t *data, uint8_t len) {
     if (HAL_CAN_GetTxMailboxesFreeLevel(&hcan) == 0) return;
     CAN_TxHeaderTypeDef txH;
@@ -103,6 +107,8 @@ static void SendCanResponse(uint32_t id, const uint8_t *data, uint8_t len) {
 }
 
 void Handle_CAN_SlaveBridge(void) {
+    // While an end frame waits for the main loop, the frames that feed the check (data, record and digest chunks) are dropped: the check must read what was there at the end.
+    if (slave_end_pending && (rxHeader.StdId == URTC_CAN_ID_SLAVE_DATA || rxHeader.StdId == URTC_CAN_ID_SLAVE_RECORD_CHUNK || rxHeader.StdId == URTC_CAN_ID_SLAVE_DIGEST_CHUNK)) return;
     // ---- OTA relay (Flasher -> this board -> slave's own bootloader) ----
     if (rxHeader.StdId == URTC_CAN_ID_SLAVE_ENTER_BOOTLOADER && rxHeader.DLC == 4) {
         // Enter slave bootloader - relayed to the SLAVE'S OWN application-
@@ -123,6 +129,7 @@ void Handle_CAN_SlaveBridge(void) {
         // fresh chunks before something re-triggers completion.
         digest_chunks_received = 0;
         digest_chunk_lost = 0;
+        slave_end_pending = 0;   // a new start cancels an end that has not been checked yet
         // The rollback floor of the slave is read BEFORE the START frame goes out: afterwards the slave is erasing its backup slot and does not answer. A slave
         // that does not answer (an older bootloader, no slave chip) leaves the floor unknown, and an unknown floor means nothing is ever vouched for.
         uint8_t floor_bytes[4];
@@ -174,21 +181,12 @@ void Handle_CAN_SlaveBridge(void) {
         digest_chunks_received = 0;
 
     } else if (rxHeader.StdId == URTC_CAN_ID_SLAVE_END_UPDATE && rxHeader.DLC == 8) {
-        // The signature record is checked BEFORE the END frame reaches the slave (the slave waits only ten seconds for the confirmation, and the check
-        // takes a while on this chip); the verdict decides whether the slave is then told to install.
-        uint32_t end_crc = ((uint32_t)rxData[0] << 24) | ((uint32_t)rxData[1] << 16) | ((uint32_t)rxData[2] << 8) | rxData[3];
-        uint16_t end_major = (uint16_t)(((uint16_t)rxData[4] << 8) | rxData[5]);
-        uint16_t end_minor = (uint16_t)(((uint16_t)rxData[6] << 8) | rxData[7]);
-        uint8_t vouched = SlaveAttest_Verify(end_crc, end_major, end_minor);
-        if (vouched) {
-            // The signed counter of the record, before the END frame: the slave binds its check to it. A counter that could not be delivered means no vouching.
-            uint32_t counter = SlaveAttest_Counter();
-            uint8_t counter_bytes[4] = { (uint8_t)(counter >> 24), (uint8_t)(counter >> 16), (uint8_t)(counter >> 8), (uint8_t)counter };
-            if (!ExpansionI2C_SlaveWriteRegister(REG_BOOT_RECORD_COUNTER, counter_bytes, 4)) vouched = 0;
-        }
-        ExpansionI2C_SlaveWriteRegister(REG_BOOT_END_UPDATE, rxData, 8);
-        if (vouched) {
-            ConfirmToSlave();
+        // The end of the update is only NOTED here. Checking the signature record (a whole Ed25519 verification, longer than the period of the watchdog) and confirming to the
+        // slave (a wait on its status) must not run inside the receive interrupt: SysTick cannot preempt it, so a wait would never end, and every watchdog and safety tick of
+        // the main loop would stand still for the whole check. SlaveBridge_Service does the work in the main loop. A second end frame while one waits is dropped.
+        if (!slave_end_pending) {
+            memcpy((void *)slave_end_data, rxData, 8);
+            slave_end_pending = 1;
         }
 
     } else if (rxHeader.StdId == URTC_CAN_ID_SLAVE_STATUS) {
@@ -298,4 +296,27 @@ void Handle_CAN_SlaveBridge(void) {
             }
         }
     }
+}
+
+// Main loop: the part of the end of a slave update that waits or takes long. The signature record is checked BEFORE the END frame reaches the slave (the slave waits only ten
+// seconds for the confirmation, and the check takes a while on this chip); the verdict decides whether the slave is then told to install.
+void SlaveBridge_Service(void) {
+    if (!slave_end_pending) return;
+    uint8_t data[8];
+    memcpy(data, (const void *)slave_end_data, 8);
+    uint32_t end_crc = ((uint32_t)data[0] << 24) | ((uint32_t)data[1] << 16) | ((uint32_t)data[2] << 8) | data[3];
+    uint16_t end_major = (uint16_t)(((uint16_t)data[4] << 8) | data[5]);
+    uint16_t end_minor = (uint16_t)(((uint16_t)data[6] << 8) | data[7]);
+    uint8_t vouched = SlaveAttest_Verify(end_crc, end_major, end_minor);
+    if (vouched) {
+        // The signed counter of the record, before the END frame: the slave binds its check to it. A counter that could not be delivered means no vouching.
+        uint32_t counter = SlaveAttest_Counter();
+        uint8_t counter_bytes[4] = { (uint8_t)(counter >> 24), (uint8_t)(counter >> 16), (uint8_t)(counter >> 8), (uint8_t)counter };
+        if (!ExpansionI2C_SlaveWriteRegister(REG_BOOT_RECORD_COUNTER, counter_bytes, 4)) vouched = 0;
+    }
+    ExpansionI2C_SlaveWriteRegister(REG_BOOT_END_UPDATE, data, 8);
+    if (vouched) {
+        ConfirmToSlave();
+    }
+    slave_end_pending = 0;   // after the work: a start that cancelled it meanwhile has already cleared it
 }

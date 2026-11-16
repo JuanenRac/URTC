@@ -19,8 +19,8 @@ ISR_FILES = sorted(set(MASTER.glob("firmware_can_*.c")) | set(MASTER.glob("firmw
 
 WAIT = re.compile(r"HAL_Delay\s*\(|while\s*\(\s*\(?\s*HAL_GetTick\s*\(\s*\)\s*-")
 
-# file -> number of waits that are known. firmware_can_slavebridge.c: the update of the expansion board polls its status with HAL_Delay(10) between reads; it runs in the interrupt only
-# in the build without the receive queue (URTC_CAN_RX_QUEUE=1 moves the whole dispatcher to the main loop, where the wait is harmless). A new wait anywhere else is a fault.
+# file -> number of waits that are known. firmware_can_slavebridge.c: the confirmation of the update of the expansion board polls its status with HAL_Delay(10) between reads; it runs only
+# from SlaveBridge_Service, in the main loop (the interrupt just notes the end frame; test_the_slave_bridge_interrupt_part_does_not_verify_or_wait checks that). A new wait anywhere else is a fault.
 KNOWN = {"firmware_can_slavebridge.c": 1}
 
 
@@ -52,3 +52,14 @@ def test_the_pattern_finds_the_waits_it_is_meant_to_find_and_skips_comments():
     assert not WAIT.search("if (HAL_GetTick() - last >= 1000) {")
     assert waits_in.__doc__ is None
     assert code_without_comments("a(); // HAL_Delay(1);\n/* HAL_Delay(2); */ b();").replace(" ", "").replace("\n", "") == "a();b();"
+
+
+def test_the_slave_bridge_interrupt_part_does_not_verify_or_wait():
+    text = code_without_comments((MASTER / "firmware_can_slavebridge.c").read_text(encoding="utf-8", errors="replace"))
+    start = text.index("void Handle_CAN_SlaveBridge(")
+    end = text.index("void SlaveBridge_Service(")
+    assert start < end
+    in_interrupt = text[start:end]
+    for forbidden in ("SlaveAttest_Verify(", "ConfirmToSlave(", "HAL_Delay("):
+        assert forbidden not in in_interrupt, f"{forbidden} runs inside the receive interrupt"
+    assert "ConfirmToSlave(" in text[end:] and "SlaveAttest_Verify(" in text[end:]

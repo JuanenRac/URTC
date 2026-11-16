@@ -8,5 +8,7 @@
 #define FIRMWARE_CAN_SLAVEBRIDGE_H
 
 void Handle_CAN_SlaveBridge(void);
+// Main loop: checks the signature record and confirms to the slave once the end frame of an update has been noted by the receive interrupt (see the .c).
+void SlaveBridge_Service(void);
 
 #endif // FIRMWARE_CAN_SLAVEBRIDGE_H
