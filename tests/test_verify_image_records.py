@@ -158,5 +158,65 @@ class RecordsTests(unittest.TestCase):
         self.assertTrue(json.loads((ROOT / "keys" / "image_trust.json").read_text(encoding="utf-8"))["flavours"]["release"]["keys"])
 
 
+class CounterLedgerTests(unittest.TestCase):
+    """The rollback counter of a release against the public ledger of the counters of the earlier ones."""
+
+    LEDGER = {"counters": [{"image": "MAIN", "version": "1.2.2", "counter": 4}, {"image": "SLAVE", "version": "0.3.3", "counter": 9}]}
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.dir = Path(self.tmp.name)
+        self.payload = bytes(range(256)) * 8
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def put(self, counter, kind="MAIN", version="1.2.3"):
+        name = f"URTC_{kind}_FIRMWARE_v{version}.bin"
+        hardware = MAIN_HW if kind == "MAIN" else SLAVE_HW
+        numbers = tuple(int(part) for part in version.split("."))
+        text = sg.sign_image(SEED, vir.header28(hardware, numbers + (0,) * (4 - len(numbers)), self.payload), self.payload, counter)
+        (self.dir / (name + ".imgsig")).write_bytes((text.strip() + "\n").encode("ascii"))
+
+    def test_a_counter_above_the_earlier_ones_passes(self):
+        self.put(5)
+        self.assertEqual(vir.check_counters(self.dir, self.LEDGER), [])
+
+    def test_a_counter_that_does_not_rise_is_refused(self):
+        for counter in (4, 3, 0):
+            self.put(counter)
+            problems = vir.check_counters(self.dir, self.LEDGER)
+            self.assertTrue(any("not above 4" in p for p in problems), (counter, problems))
+
+    def test_the_kinds_are_counted_apart(self):
+        self.put(5, "SLAVE", "0.3.4")
+        self.assertTrue(any("not above 9" in p for p in vir.check_counters(self.dir, self.LEDGER)))
+        self.put(10, "SLAVE", "0.3.4")
+        self.assertEqual(vir.check_counters(self.dir, self.LEDGER), [])
+
+    def test_a_version_that_is_in_the_ledger_must_repeat_its_counter(self):
+        self.put(4, version="1.2.2")
+        self.assertEqual(vir.check_counters(self.dir, self.LEDGER), [])
+        self.put(7, version="1.2.2")
+        self.assertTrue(any("ledger holds for MAIN 1.2.2" in p for p in vir.check_counters(self.dir, self.LEDGER)))
+
+    def test_a_missing_ledger_is_a_problem_and_an_empty_one_is_not(self):
+        self.put(1)
+        self.assertTrue(vir.check_counters(self.dir, None))
+        self.assertEqual(vir.check_counters(self.dir, {"counters": []}), [])
+
+    def test_the_ledger_of_the_repository_is_well_formed_and_consistent(self):
+        ledger = json.loads((ROOT / "keys" / "counter_ledger.json").read_text(encoding="utf-8"))
+        seen = set()
+        for item in ledger["counters"]:
+            self.assertIn(item["image"], ("MAIN", "SLAVE"))
+            self.assertIsInstance(item["counter"], int)
+            self.assertNotIn((item["image"], item["version"]), seen)
+            seen.add((item["image"], item["version"]))
+        for kind in ("MAIN", "SLAVE"):
+            ordered = [item["counter"] for item in sorted((i for i in ledger["counters"] if i["image"] == kind), key=lambda i: tuple(int(p) for p in i["version"].split(".")))]
+            self.assertEqual(ordered, sorted(ordered), f"the counters of the {kind} images rise with the version")
+
+
 if __name__ == "__main__":
     unittest.main()

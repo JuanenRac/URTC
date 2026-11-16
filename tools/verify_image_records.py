@@ -92,6 +92,38 @@ def check_folder(folder: Path, flavour: str = "release", doc: dict | None = None
     return problems
 
 
+def check_counters(folder: Path, ledger: dict | None) -> list[str]:
+    """The rollback counter of every record of the folder against the public ledger of released counters (keys/counter_ledger.json): a version that is in the ledger
+    repeats its counter; a new version carries a counter above every counter of its kind that the ledger holds, or the bootloaders that took the earlier release would
+    refuse it, or a lower counter would pass for a newer image. A missing ledger is a problem of its own: the check is not optional for an official release."""
+    if ledger is None:
+        return ["keys/counter_ledger.json is missing: the counters of the earlier releases cannot be compared"]
+    entries = [(str(item["image"]), str(item["version"]), int(item["counter"])) for item in ledger.get("counters", [])]
+    problems: list[str] = []
+    for record in sorted(folder.glob("*.imgsig")):
+        found = NAME.match(record.name)
+        if not found:
+            continue
+        kind = found.group(1)
+        version = ".".join(found.group(i) for i in (2, 3, 4)) + (f".{found.group(5)}" if found.group(5) else "")
+        try:
+            raw = bytes.fromhex(record.read_text(encoding="ascii", errors="replace").strip())
+        except ValueError:
+            continue    # check_folder says the record is not valid
+        if len(raw) != 76:
+            continue
+        counter = int.from_bytes(raw[8:12], "big")
+        same = [c for i, v, c in entries if i == kind and v == version]
+        if same:
+            if counter != same[0]:
+                problems.append(f"{record.name}: the counter {counter} is not the {same[0]} the ledger holds for {kind} {version}")
+            continue
+        top = max((c for i, _, c in entries if i == kind), default=None)
+        if top is not None and counter <= top:
+            problems.append(f"{record.name}: the counter {counter} is not above {top}, the highest released for {kind} images (keys/counter_ledger.json)")
+    return problems
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("folder")

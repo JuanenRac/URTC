@@ -1,0 +1,9 @@
+{
+  "format": 1,
+  "about": "The public ledger of the rollback counters of the application images that were released: for each image kind, the version and the counter its signature record carried. A new release must carry a counter above every counter of its kind that is written here (tools/verify_release_set.py); a version that is already here must repeat its counter. Public values only. Add the line of a release when it is published.",
+  "counters": [
+    {"image": "MAIN", "version": "0.4.9", "counter": 2},
+    {"image": "MAIN", "version": "0.5.0", "counter": 3},
+    {"image": "SLAVE", "version": "0.3.3", "counter": 3}
+  ]
+}
