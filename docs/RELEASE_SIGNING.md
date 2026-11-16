@@ -138,21 +138,24 @@ they keep no file that names another release to use in its place.
 
 ## Transition from the development key
 
-Until now the images carry an HMAC made with the public development key, so
-nothing proves who published them. The plan, in order:
+The images used to carry an HMAC made with the public development key, so
+nothing proved who published them. The main bootloader no longer uses it. The
+steps, in order:
 
 1. **Until the first official release.** Releases that are signed with the development key are published as
    pre-releases ("bench"). The tools verify a `.sig` when it is there; a download without signatures is
    refused unless you say `--allow-unsigned`. The flasher and the web studio keep no copy of the images:
    they take them from the release; a bench pre-release is reached only by its tag.
-2. **First official release.** Built with the production HMAC key and signed
-   with `--sign`. From then on the flasher and the web studio treat an asset
-   without a valid `.sig` as an error (`REQUIRE_RELEASE_SIGNATURE = True`), and
-   the pre-releases of the old scheme are reached only on request.
-3. **Later (needs a board).** Ed25519 verification inside the bootloader, so
-   the board itself no longer depends on a shared secret. That step is
-   tracked with the bootloader work; it needs a free-flash measurement of the
-   F303 and a bench.
+2. **Official releases.** Built with the official trust table and no key, then
+   signed with `--sign`: every asset has a `.sig`, and every application image
+   has an Ed25519 record (`.imgsig`) made with the image-signing key. The
+   flasher and the web studio treat an asset without a valid `.sig` as an
+   error (`REQUIRE_RELEASE_SIGNATURE = True`), and the pre-releases of the old
+   scheme are reached only on request.
+3. **In the bootloader.** The main bootloader verifies the Ed25519 record
+   against its table of public keys and holds no secret; the master checks the
+   record of the expansion slave image (`docs/FIRMWARE_SIGNING.TXT`). This has
+   not run on a real board yet.
 
 ## Losing or replacing the key
 
