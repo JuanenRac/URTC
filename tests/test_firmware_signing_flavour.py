@@ -66,5 +66,20 @@ class NoSlaveKeyTests(unittest.TestCase):
         self.assertEqual(len(block["hmac_sha256"]), 64)
 
 
+class KeyKindTests(unittest.TestCase):
+    def test_a_key_file_without_the_release_flag_still_says_dev(self):
+        import tempfile  # noqa: PLC0415
+        with tempfile.TemporaryDirectory() as tmp:
+            keys = Path(tmp) / "keys.txt"
+            keys.write_text("master=" + "ab" * 32 + chr(10), encoding="utf-8")
+            path = Path(tmp) / "image.bin"
+            path.write_bytes(b"abc")
+            env = {"URTC_SIGNING_KEY_FILE": str(keys)}
+            self.assertEqual(firmware_signing.trust_flavour(env), "dev")
+            self.assertEqual(firmware_signing.application_signing("master", str(path), env)["key_kind"], "dev")
+            env["URTC_RELEASE"] = "1"
+            self.assertEqual(firmware_signing.application_signing("master", str(path), env)["key_kind"], "release")
+
+
 if __name__ == "__main__":
     unittest.main()
