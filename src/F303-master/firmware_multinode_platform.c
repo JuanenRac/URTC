@@ -18,8 +18,13 @@ void MultiNode_PlatformSafeState(void) {
     __disable_irq();
     steps_remaining = 0;
     __enable_irq();
+    // The setpoints that drive the TIM1 output go to zero together with it, so the RAM does not say "on" while the PWM is off.
+    drill_speed = 0;
+    layer_fan_duty = 0;
+    uv_curing_duty = 0;
+    hotair_blower_duty = 0;
     __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, 0);
-    __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, 0);
+    // TIM2 (the hotend heatsink fan) is left running on purpose, as the error path of the timer interrupt does: it keeps taking away the heat that is left.
     HAL_GPIO_WritePin(TMC_ENN_PORT, TMC_ENN_PIN, GPIO_PIN_SET);              // stepper tools: HIGH disables
     HAL_GPIO_WritePin(DRILL_BRAKE_PORT, DRILL_BRAKE_PIN, GPIO_PIN_RESET);    // drill: LOW brakes
     HAL_GPIO_WritePin(T12_PWM_PORT, T12_PWM_PIN, GPIO_PIN_RESET);            // heater off
