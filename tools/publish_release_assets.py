@@ -203,7 +203,14 @@ def build_plan(root: Path, fw_dir: Path, with_elf: bool, repo: str | None, allow
     elif (fw_dir / "firmware_manifest.json").is_file():
         files = collect_with_index(fw_dir, with_elf, problems, dev_keys, missing_records)
     else:
-        files = collect_single(fw_dir, version, with_elf, problems)
+        # A folder without the index cannot say which key built the images or which components belong together: an official release always has its index. A loose
+        # set of images is a bench publication, allowed only with --allow-dev-key (then a pre-release, with the same image signature records required of it).
+        if not allow_dev_key:
+            problems.append(f"firmware_manifest.json is missing in {fw_dir}: an official release needs the index of the build "
+                            "(use --allow-dev-key to publish loose images as a bench pre-release)")
+        files = collect_single(fw_dir, version, with_elf, problems, missing_records)
+        if allow_dev_key:
+            dev_keys.append("no firmware_manifest.json: the images are loose")
     prerelease = bool(dev_keys)
     if prerelease and not allow_dev_key:
         for item in dev_keys:

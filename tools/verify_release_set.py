@@ -18,6 +18,9 @@ the one pinned in tools/release_sign.py), and it checks, for the files of DIR:
   * every asset has its .sig and each one verifies against the public key of the registry;
   * every image signature record (.imgsig) verifies, with no key, against the release trust table of keys/image_trust.json for the image next to
     it, and the bootloader of the set holds exactly that table (tools/verify_image_records.py);
+  * the rollback counter of every record is above those of the earlier releases of its kind, or is the one the public ledger holds for that version
+    (keys/counter_ledger.json);
+  * an official set has its firmware_manifest.json (the index of the build);
   * no file is in DIR that the set does not account for.
 
 Prints VERIFY_RELEASE_SET=PASS and exits 0 only when all of that holds; otherwise nothing may be
@@ -81,6 +84,9 @@ def verify_set(folder: Path, tag: str, with_elf: bool = False, root: Path = ROOT
         trust_file = root / "keys" / "image_trust.json"
         doc = json.loads(trust_file.read_text(encoding="utf-8")) if trust_file.is_file() else None
         problems.extend(verify_image_records.check_folder(folder, "release", doc))
+        ledger_file = root / "keys" / "counter_ledger.json"
+        ledger = json.loads(ledger_file.read_text(encoding="utf-8")) if ledger_file.is_file() else None
+        problems.extend(verify_image_records.check_counters(folder, ledger))
     return problems, names
 
 

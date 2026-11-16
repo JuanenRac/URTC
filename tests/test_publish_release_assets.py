@@ -123,7 +123,7 @@ class PublishPlanTests(unittest.TestCase):
         image.write_bytes(b"app")
         (self.fw / "URTC_MAIN_FIRMWARE_v1.2.3.hex").write_text(":00000001FF\n")
         (self.fw / (image.name + ".imgsig")).write_bytes(b"cd" * 76 + b"\n")
-        plan = pra.build_plan(self.root, self.fw, False, "o/r", sign=True)
+        plan = pra.build_plan(self.root, self.fw, False, "o/r", allow_dev_key=True, sign=True)
         self.assertEqual(plan["problems"], [])
         self.assertIn("URTC_MAIN_FIRMWARE_v1.2.3.bin.imgsig", [Path(p).name for p in plan["files"]])
 
@@ -199,13 +199,26 @@ class PublishPlanTests(unittest.TestCase):
     def test_single_image_layout_writes_missing_sidecar_and_checks_version(self):
         (self.fw / "URTC_SMART_RACK_FIRMWARE_v1.2.3.bin").write_bytes(b"x")
         (self.fw / "URTC_SMART_RACK_FIRMWARE_v1.2.3.hex").write_text(":00000001FF\n")
-        plan = pra.build_plan(self.root, self.fw, False, "o/r", sign=True)
+        plan = pra.build_plan(self.root, self.fw, False, "o/r", allow_dev_key=True, sign=True)
         self.assertEqual(plan["problems"], [])
+        self.assertTrue(plan["prerelease"])
         self.assertTrue((self.fw / "URTC_SMART_RACK_FIRMWARE_v1.2.3.bin.sha256").is_file())
         self.assertEqual(len(plan["files"]), 6)  # bin, hex, sidecar and the three signatures
         (self.root / "urtc.project.json").write_text(json.dumps({"name": "URTC", "version": "9.9.9"}))
-        plan = pra.build_plan(self.root, self.fw, False, "o/r")
+        plan = pra.build_plan(self.root, self.fw, False, "o/r", allow_dev_key=True)
         self.assertTrue(plan["problems"])
+
+    def test_an_official_release_without_the_index_of_the_build_is_refused(self):
+        image = self.fw / "URTC_MAIN_FIRMWARE_v1.2.3.bin"
+        image.write_bytes(b"app")
+        (self.fw / "URTC_MAIN_FIRMWARE_v1.2.3.hex").write_text(":00000001FF\n")
+        (self.fw / (image.name + ".imgsig")).write_bytes(b"cd" * 76 + b"\n")
+        official = pra.build_plan(self.root, self.fw, False, "o/r", sign=True)
+        self.assertTrue(any("firmware_manifest.json is missing" in p for p in official["problems"]))
+        self.assertFalse(official["prerelease"])
+        bench = pra.build_plan(self.root, self.fw, False, "o/r", allow_dev_key=True, sign=True)
+        self.assertEqual(bench["problems"], [])
+        self.assertTrue(bench["prerelease"])
 
     def test_an_official_release_needs_every_signature_and_a_prerelease_does_not(self):
         comp = {"main_application": make_component(self.fw, "URTC_MAIN_FIRMWARE", "1.2.3", b"app", True)}
