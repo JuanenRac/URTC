@@ -3,7 +3,7 @@
 // Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
 // GPL-3.0-or-later - see LICENSE
 // =============================================================================
-// Four questions the board answers with a few integers, kept apart from the hardware so the host tests can replay the shared vectors of URTC-COMMON
+// Five questions the board answers with a few integers, kept apart from the hardware so the host tests can replay the shared vectors of URTC-COMMON
 // (urtc_common.safety_policy): may a latched critical error be lifted, how long may the host stay silent while a stepper move runs, must that move be
 // cut, and does the electromagnet let go. The glue that reads the state of the board and drives the pins is firmware_safety.c. Every function that
 // says "feature on" is given the state of a switch that is OFF unless a valid record in F-RAM says otherwise (fw_features.h).
@@ -28,5 +28,14 @@ uint8_t FwSafe_StepperMustStop(uint8_t feature_on, uint8_t moving, uint32_t sile
 
 // 1 when the electromagnet lets go: both switches on, the coil energised and a silence longer than URTC_MAGNET_SILENCE_MS.
 uint8_t FwSafe_MagnetMustRelease(uint8_t watchdog_on, uint8_t release_on, uint8_t energised, uint32_t silence_ms);
+
+// 1 when a frame with this identifier is one of the host side: a command or a query of the host, a frame both sides use, or the emergency stop frame
+// 0x001 of the stack. The answers and reports of a head, and every identifier that is not in the table, are not. (An answer that another head of the
+// same bus gives with an identifier of the second kind cannot be told from a frame of the host by the identifier alone.)
+uint8_t FwSafe_IsHostFrameId(uint16_t id);
+
+// 1 when a frame counts as a sign of life for the communication watchdog: any frame while the switch WATCHDOG_HOST_ONLY is off (the behaviour of
+// earlier releases), only a frame of the host side while it is on.
+uint8_t FwSafe_WatchdogFeeds(uint8_t host_only_on, uint16_t id);
 
 #endif // FW_SAFETY_POLICY_H

@@ -44,7 +44,7 @@
     },
     "safety_policy_vectors.h": {
       "from": "generated/safety_policy_vectors.h",
-      "sha256": "eba6941779613f10c0ed329e4cbd5a93f1c28191e8c68140f5b7b01375143e91"
+      "sha256": "9f149902a43a5842170aaf0f494fa8321a7f296a1e5f688617ba731452fafd09"
     },
     "signed_image_vectors.h": {
       "from": "generated/signed_image_vectors.h",

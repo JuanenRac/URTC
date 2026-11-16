@@ -6,6 +6,24 @@
 #include "fw_safety_policy.h"
 #include "urtc_can_ids.h"
 
+static const uint16_t host_frame_ids[] = URTC_HOST_FRAME_IDS;   // sorted, generated from the specification
+
+uint8_t FwSafe_IsHostFrameId(uint16_t id)
+{
+    unsigned lo = 0, hi = sizeof(host_frame_ids) / sizeof(host_frame_ids[0]);
+    while (lo < hi) {
+        unsigned mid = (lo + hi) / 2;
+        if (host_frame_ids[mid] == id) return 1;
+        if (host_frame_ids[mid] < id) lo = mid + 1; else hi = mid;
+    }
+    return 0;
+}
+
+uint8_t FwSafe_WatchdogFeeds(uint8_t host_only_on, uint16_t id)
+{
+    return (uint8_t)(!host_only_on || FwSafe_IsHostFrameId(id));
+}
+
 uint8_t FwSafe_ClearDecision(uint8_t feature_on, uint8_t error_latched, uint8_t reason, uint16_t temperature_c, uint8_t actuators_off)
 {
     if (!feature_on) return URTC_CLEAR_ERROR_REFUSED_SWITCH_OFF;

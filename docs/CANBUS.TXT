@@ -403,7 +403,8 @@ Data:
 
 ID: 0x1AE [Master -> URTC Tool Head]
 Switch the optional firmware features on or off (fw_features.c, firmware_features.c)
-DLC: 5 bytes
+DLC: 5 bytes, or 6 bytes with the second mask byte (the first byte has all its
+     eight bits taken)
 Data:
   - rxData[0..3]: magic payload 0x46 0x45 0x41 0x54 (ASCII 'FEAT')
   - rxData[4]:    bit mask of the features to have ON (all eight bits are
@@ -419,8 +420,30 @@ Data:
                          (needs 0x20; without it the coil is held)
                   0x80 = the head follows the emergency stop frame of the
                          stack (identifier 0x001, section 1)
+  - rxData[5]:    (DLC 6 only) bit mask of the switches of the second byte
+                  that are to be ON
+                  0x01 = with the communication watchdog (0x20): only a frame
+                         of the host side counts as a sign of life. Those are
+                         the identifiers of the commands and queries of the
+                         host, the ones both sides use (a query and its
+                         answer share the identifier) and the emergency stop
+                         frame 0x001; the reports and answers of a head
+                         (board to host) and identifiers that are not in the
+                         table do not feed the watchdog. The list is
+                         URTC_HOST_FRAME_IDS in urtc_can_ids.h. Limit: with
+                         several heads on the bus, the answer of another head
+                         on an identifier that both sides use cannot be told
+                         from a frame of the host. Off by default: every
+                         frame feeds the watchdog, as before.
+                  A bit that this firmware does not have, in either byte, makes
+                  the command be ignored. The five-byte form is the same as the
+                  six-byte form with the second byte at zero: it switches every
+                  switch of the second byte OFF.
 Effect: stores the mask in its own F-RAM record (address 976, EEPROM.TXT
-        section 8) and answers with 0x1AF. The setting acts after the NEXT
+        section 9, version 2: 16 bytes with both mask bytes; a record of
+        version 1 written by an earlier release is still read) and answers
+        with 0x1AF, in the form of the request (three bytes after the
+        five-byte command, six bytes after the six-byte one). The setting acts after the NEXT
         power-up, never in the middle of a job. Every feature is OFF by
         default: a board that was never written, with an erased or damaged
         record, behaves exactly as in earlier releases. Blocked during a
@@ -449,12 +472,17 @@ Effect: answered with 0x111 (also during a critical error; any other payload or
 
 ID: 0x1AF [Master -> URTC Tool Head, or URTC Tool Head -> Master answering 0x1AE]
 Query/response: the optional firmware features
-DLC: any as a query (payload ignored) | 3 bytes as a response
+DLC: any as a query | 3 bytes as a response, 6 bytes as the extended response
+Query: a single byte 0x02 asks for the six-byte response; every other query
+       (empty or with another payload) is answered with the three bytes.
 Data:
   - txData[0]: stored in F-RAM (bit mask)
   - txData[1]: in force now (bit mask); differs from txData[0] until the
                next power-up
   - txData[2]: supported by this firmware (0xFF)
+  - txData[3]: (six bytes only) stored, second mask byte
+  - txData[4]: (six bytes only) in force now, second mask byte
+  - txData[5]: (six bytes only) supported, second mask byte (0x01)
 
 ID: 0x1B8 [URTC Tool Head -> Master]
 Health frame of the board (only while feature 0x02 runs; once a second)
@@ -2127,18 +2155,18 @@ GENERATED REFERENCE (from the specification in URTC-COMMON)
 
 A. Summary
 
-[[ BEGIN GENERATED summary sha256=04e6e47d8102470d9f683c4da1b935cb4b3005e748b9faf0a2741f30dc6a415e ]]
+[[ BEGIN GENERATED summary sha256=a0fb09481f44b105b6a0bac48150d9dbfdc5318a73ac4b31a1a621190fb12056 ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 URTC CAN protocol: protocol version 2, byte order big.
-107 identifiers, 25 tool profiles, 25 enumerations, 47 constants, 5 magic payloads, 27 registers of the expansion slave.
+107 identifiers, 25 tool profiles, 26 enumerations, 47 constants, 5 magic payloads, 27 registers of the expansion slave.
 
 Machine-readable specification of the CAN bus protocol of the URTC tool head: every identifier with its direction, length rule and payload layout, the magic payloads, the registers of the expansion slave, the version procedures and the SLCAN subset the host tools rely on. All multi-byte fields are big-endian.
 [[ END GENERATED summary ]]
 
 B. Index of identifiers
 
-[[ BEGIN GENERATED index sha256=02d839c24c2fe850166f492b32c718cce58f00c7cf00ddab48112c93a72ea3b9 ]]
+[[ BEGIN GENERATED index sha256=d5328becfe48a0a414a8f060810deda60ff29086495007faffb51a8f82e7be46 ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 | ID | Name | Direction | DLC | Tools | Group | Title |
@@ -2186,8 +2214,8 @@ Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_do
 | 0x1AB | THERMAL_STATS_RESP | board to host | 8 | any | diagnostics | Lifetime thermal counters |
 | 0x1AC | SET_MULTINODE | host to board | 6 | any | configuration | Switch the multinode extension on or off (persistent, acts after the next power-up) |
 | 0x1AD | MULTINODE_CONFIG_RESP | both ways | any / 4 | any | configuration | The multinode switch: stored value, value in force, instance and node address |
-| 0x1AE | SET_FEATURES | host to board | 5 | any | configuration | Switch the optional firmware features on or off (persistent, acts after the next power-up) |
-| 0x1AF | FEATURES_RESP | both ways | any / 3 | any | configuration | The optional firmware features: stored mask, mask in force and supported mask |
+| 0x1AE | SET_FEATURES | host to board | 5 6 | any | configuration | Switch the optional firmware features on or off (persistent, acts after the next power-up) |
+| 0x1AF | FEATURES_RESP | both ways | any 1 / 3 / 6 | any | configuration | The optional firmware features: stored mask, mask in force and supported mask |
 | 0x1B0 | ELECTROMAGNET_CMD | host to board | 1 | 13 | electromagnet | Electromagnet coil |
 | 0x1B2 | CLEAR_ERROR | host to board | 4 | any | global | Lift a latched critical error without a power cycle (feature CLEAR_ERROR, off by default) |
 | 0x1B8 | HEALTH_PROFILE | board to host | 8 | any | diagnostics | Periodic health frame of the board (only while the health feature runs) |
@@ -2254,7 +2282,7 @@ Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_do
 
 C. Field layouts and examples
 
-[[ BEGIN GENERATED layouts sha256=4b797cd31f65b46a7da57b715766df9d6ee07714d914ffd67c66b99147a7a03a ]]
+[[ BEGIN GENERATED layouts sha256=c86002d9a2e197e33e70fb7b224293ee8c040436d7131ed2ba07311b238c8c7c ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 ### 0x095 IMPACT_EVENT - Impact register (touch probe, maximum priority)
@@ -2922,7 +2950,7 @@ Example stored on, not yet running, address 5: data 01000005 (stored=1, running=
 
 ### 0x1AE SET_FEATURES - Switch the optional firmware features on or off (persistent, acts after the next power-up)
 
-host to board; handled by the application; tools: any; refused while a critical error is declared; the firmware accepts DLC 5.
+host to board; handled by the application; tools: any; refused while a critical error is declared; the firmware accepts DLC 5-6.
 
 request, DLC 5
 
@@ -2935,8 +2963,19 @@ Example all off: data 4645415400 (magic=46454154, features=0)
 
 Example health frame and PID on: data 464541540A (magic=46454154, features=10)
 
+request (extended), DLC 6
+
+| Byte | Width | Type | Field | Values | Note |
+|---|---|---|---|---|---|
+| 0 | 4 | bytes | magic | fixed 46454154 |  |
+| 4 | 1 | u8 | features | 0..255, enum firmware_feature | Bit mask of the first byte: the features to have on; the others are off. |
+| 5 | 1 | u8 | features_ext | 0..255, enum firmware_feature_ext | Bit mask of the second byte: the features to have on; the others are off. |
+
+Example watchdog on, only the host feeds it: data 464541542001 (magic=46454154, features=32, features_ext=1)
+
 Note: Every feature is off on a board that was never written, with an erased or damaged record, or when a bit outside the supported mask is set. Any other payload or length is ignored.
 Note: Answered with 0x1AF, which reports the stored mask, the mask in force and the mask this firmware supports.
+Note: The five-byte form sets the second byte of the map to zero (every feature of it off) and is answered with the three-byte form of 0x1AF; the six-byte form is answered with the six-byte form. A host that only knows the five-byte form keeps working.
 
 ### 0x1AF FEATURES_RESP - The optional firmware features: stored mask, mask in force and supported mask
 
@@ -2948,6 +2987,14 @@ request, DLC any: The payload is ignored.
 
 Example empty query: data (empty)
 
+request (extended), DLC 1
+
+| Byte | Width | Type | Field | Values | Note |
+|---|---|---|---|---|---|
+| 0 | 1 | bytes | format | fixed 02 | Asks for the six-byte answer. |
+
+Example extended query: data 02 (format=02)
+
 response, DLC 3
 
 | Byte | Width | Type | Field | Values | Note |
@@ -2957,6 +3004,21 @@ response, DLC 3
 | 2 | 1 | u8 | supported | 0..255 | The features this firmware has. |
 
 Example health on, stored but not yet running: data 02000F (stored=2, running=0, supported=15)
+
+response (extended), DLC 6
+
+| Byte | Width | Type | Field | Values | Note |
+|---|---|---|---|---|---|
+| 0 | 1 | u8 | stored | 0..255 | The first byte of the mask the F-RAM record says. |
+| 1 | 1 | u8 | running | 0..255 | The first byte of the mask in force now. |
+| 2 | 1 | u8 | supported | 0..255 | The features of the first byte this firmware has. |
+| 3 | 1 | u8 | stored_ext | 0..255, enum firmware_feature_ext | The second byte of the mask the F-RAM record says. |
+| 4 | 1 | u8 | running_ext | 0..255, enum firmware_feature_ext | The second byte of the mask in force now. |
+| 5 | 1 | u8 | supported_ext | 0..255, enum firmware_feature_ext | The features of the second byte this firmware has. |
+
+Example watchdog and host-only stored, not yet running: data 2000FF010001 (stored=32, running=0, supported=255, stored_ext=1, running_ext=0, supported_ext=1)
+
+Note: A query with the single byte 02 is answered with the six-byte form; any other query, empty or not, with the three-byte form as before.
 
 ### 0x1B0 ELECTROMAGNET_CMD - Electromagnet coil
 
@@ -4028,7 +4090,7 @@ Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_do
 
 E. Enumerations
 
-[[ BEGIN GENERATED enums sha256=30ad14faf59911329b757c6262ba79734184b099496ce3c330176812b4436737 ]]
+[[ BEGIN GENERATED enums sha256=97fae663b7a33b32cc18ecbe0ba8214e5020784d70d468374580fe1cac36d8f4 ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 tool - Tool profile (prefix TOOL_, value)
@@ -4228,6 +4290,12 @@ firmware_feature - Optional firmware features (each one is off until switched on
 | 0x20 | COMMS_WATCHDOG | Communication watchdog of the stepper moves and of the electromagnet (silence of the host) |
 | 0x40 | MAGNET_RELEASE | With the communication watchdog: the electromagnet lets go when the host falls silent (without it, it holds) |
 | 0x80 | ESTOP_FOLLOW | The head follows the emergency stop frame 0x001 of the stack: it goes to its safe state on a stop, on a malformed frame and when the master falls silent |
+
+firmware_feature_ext - Optional firmware features of the second byte of the switch map (each one is off until switched on) (prefix FEATURE_EXT_, flags)
+
+| Value | Name | Title |
+|---|---|---|
+| 0x01 | WATCHDOG_HOST_ONLY | With the communication watchdog: only a frame with an identifier of the host (a command or a query from the host side) counts as a sign of life; the answers of other heads on the bus do not |
 
 motion_profile - Speed profile of a stepper move (prefix MOTION_PROFILE_, value)
 

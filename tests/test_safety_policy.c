@@ -14,6 +14,22 @@
 #include "urtc_can_ids.h"
 #include "vectors/safety_policy_vectors.h"
 
+static void test_host_frames(int *failures)
+{
+    int bad = 0;
+    for (int i = 0; i < SAFETY_VEC_COUNT(SAFETY_HOST_FRAME_CASES); i++) {
+        const safety_host_frame_case_t *c = &SAFETY_HOST_FRAME_CASES[i];
+        if (FwSafe_IsHostFrameId(c->id) != c->host) bad++;
+    }
+    TEST_ASSERT(bad == 0, "every identifier of URTC-COMMON is a frame of the host side or not, as the reference says");
+    int listed = 0;
+    for (uint16_t id = 0; id < 0x800; id++) listed += FwSafe_IsHostFrameId(id);
+    TEST_ASSERT(listed == (int)URTC_HOST_FRAME_ID_COUNT, "the search finds exactly the identifiers of the list");
+    TEST_ASSERT(FwSafe_IsHostFrameId(0x001) && FwSafe_IsHostFrameId(0x120) && !FwSafe_IsHostFrameId(0x095) && !FwSafe_IsHostFrameId(0x000), "the stop frame and a command are of the host, an impact report is not");
+    TEST_ASSERT(FwSafe_WatchdogFeeds(0, 0x095) && FwSafe_WatchdogFeeds(0, 0x000), "switch off: any frame is a sign of life, as before");
+    TEST_ASSERT(FwSafe_WatchdogFeeds(1, 0x120) && !FwSafe_WatchdogFeeds(1, 0x095) && !FwSafe_WatchdogFeeds(1, 0x300), "switch on: only a frame of the host side is");
+}
+
 static void test_vectors(int *failures)
 {
     int bad = 0;
@@ -88,6 +104,7 @@ int main(void)
     int failures = 0;
     printf("URTC host logic tests - fw_safety_policy.c\n");
     test_vectors(&failures);
+    test_host_frames(&failures);
     test_clear_edges(&failures);
     test_silence_limits(&failures);
     if (failures == 0) {

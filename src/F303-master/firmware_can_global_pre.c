@@ -55,7 +55,7 @@ static void send_quick_state(void) {
 
 void Handle_CAN_GlobalCommands_PreErrorGate(void) {
 
-        // Any frame of the host is a sign of life for the communication watchdog (works only while its switch runs).
+        // Any frame is a sign of life for the communication watchdog (works only while its switch runs); with the host-only switch on, only a frame of the host side is.
         Safety_NoteHostFrame();
 
         // Clear-error command (0x1B2): answered with the quick state, also during a critical error; it lifts the error only while its switch

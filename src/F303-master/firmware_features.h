@@ -26,6 +26,9 @@ void Features_Init(void);
 // The mask in force (what the record said at power-up).
 uint8_t Features_Running(void);
 uint8_t Features_Active(uint8_t feature_bit);
+// The same for the second byte of the switch map (FEAT_EXT_*).
+uint8_t Features_RunningExt(void);
+uint8_t Features_ActiveExt(uint8_t feature_bit);
 
 // 0x1AE: change the persistent switches; 0x1AF: query (and the answer to a change).
 void Features_HandleCommand(void);
