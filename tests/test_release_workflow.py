@@ -10,9 +10,6 @@ ROOT = Path(__file__).resolve().parent.parent
 WORKFLOW = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8").replace("\r\n", "\n")
 CODE = "\n".join(line for line in WORKFLOW.split("\n") if not line.lstrip().startswith("#"))
 
-# the optional token that tells the flasher and the web studio about a release: it is not a key and has a step of its own
-NOTIFY_TOKEN = "URTC_DISPATCH_TOKEN"
-
 
 def triggers() -> list[str]:
     block = re.search(r"(?m)^on:\n((?:  .*\n|\n)+)", CODE)
@@ -55,24 +52,14 @@ class WhatItMayDo(unittest.TestCase):
 
 
 class NoKeysAnywhere(unittest.TestCase):
-    def test_the_only_secret_is_the_optional_notification_token(self):
-        uses = re.findall(r"\$\{\{\s*secrets\.([A-Z0-9_]+)\s*\}\}", CODE)
-        self.assertEqual(uses, [NOTIFY_TOKEN])
+    def test_the_workflow_uses_no_secret_of_the_repository(self):
+        self.assertEqual(re.findall(r"\$\{\{\s*secrets\.([A-Z0-9_]+)\s*\}\}", CODE), [])
+        self.assertNotIn("URTC_DISPATCH_TOKEN", WORKFLOW)
 
     def test_nothing_signs_builds_or_reads_a_private_key(self):
         for forbidden in ("URTC_SIGNING_KEYS", "URTC_RELEASE_ED25519_PEM", "URTC_SIGNING_KEY_FILE", "URTC_RELEASE_KEY", "--sign",
                           "release_sign.py sign", "build_firmware", "gcc-arm-none-eabi", "cryptography", ".pem", "printenv", "set -x"):
             self.assertNotIn(forbidden, CODE)
-
-    def test_the_notification_token_has_a_step_of_its_own_and_is_optional(self):
-        steps = re.split(r"(?m)^      - name: ", CODE)
-        holders = [step for step in steps if f"secrets.{NOTIFY_TOKEN}" in step]
-        self.assertEqual(len(holders), 1)
-        step = holders[0]
-        self.assertIn(f'[ -z "${{{NOTIFY_TOKEN}:-}}" ]', step)
-        self.assertRegex(step, r"(?s)::notice::.*exit 0")
-        self.assertIn("urtc-firmware-released", step)
-        self.assertNotIn("exit 1", step)
 
 
 class WhatItChecksBeforePublishing(unittest.TestCase):

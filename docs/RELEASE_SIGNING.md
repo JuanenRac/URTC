@@ -130,17 +130,8 @@ sign again, upload again) and run the workflow once more. A version that already
 never replaced. The job has `contents: write` because GitHub shows drafts only to a token that can
 write; no other permission is granted and no action is used that is not pinned by commit.
 
-**Telling the flasher and the web studio.** After the release is published, the job can send a
-`repository_dispatch` event (type `urtc-firmware-released`, with the tag and the commit) to
-URTC-FLASHER and URTC-WEB-STUDIO, whose scheduled workflows also start on it. That needs one
-repository secret that you create yourself, named `URTC_DISPATCH_TOKEN`: a fine-grained token
-that can write to the contents of those two repositories (the permission GitHub asks for to send
-the event). Without the secret the step prints a notice and is skipped, and the release is
-unaffected. A release made from your own machine does not run the workflow, so it sends nothing.
-
-```
-gh secret set URTC_DISPATCH_TOKEN --repo JuanenRac/URTC
-```
+The workflow sends no notification and holds no secret of the repository: the flasher and the web studio
+look for the newest official release on their own schedule.
 
 The flasher and the web studio take their images from the newest official release (GitHub's "latest"):
 they keep no file that names another release to use in its place.
