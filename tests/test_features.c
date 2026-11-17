@@ -167,7 +167,7 @@ static void test_second_byte_and_formats(int *failures)
     raw[7] = 0x80;
     TEST_ASSERT(!Feat_ConfigDecode(raw, &d), "a change in the reserved bytes breaks the checksum");
     Feat_ConfigBlank(&c);
-    c.mask_ext = 0x02; Feat_ConfigSeal(&c);
+    c.mask_ext = 0x04; Feat_ConfigSeal(&c);
     memcpy(raw, &c, sizeof raw);
     TEST_ASSERT(!Feat_ConfigDecode(raw, &d) && Feat_ConfigMask(&d) == 0, "a bit of the second byte that this firmware does not have: the record is not trusted");
     memset(raw, 0xFF, sizeof raw);
