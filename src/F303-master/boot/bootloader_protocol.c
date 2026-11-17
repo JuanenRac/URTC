@@ -916,8 +916,9 @@ void HandleEndUpdate(uint8_t *data) {
     // against. The version is part of what the record signs, so it cannot be changed without breaking the signature.
     if (have_current && current_meta.state == META_STATE_APP_VALID) {
         // The minor field may carry the PATCH number in its high byte (see
-        // urtc_version_wire.h); the patch only takes part when both sides know it.
-        if (urtc_version_is_older(version_major, version_minor,
+        // urtc_version_wire.h); an image that declares none counts as patch 0 when the
+        // installed version has one (URTC_VERSION_LEGACY_IS_PATCH_ZERO).
+        if (urtc_version_rollback(version_major, version_minor,
                                   current_meta.version_major, current_meta.version_minor)
             && !update_downgrade_authorized) {
             CAN_SendVerifyFailReason(VERIFY_FAIL_REASON_ROLLBACK);
