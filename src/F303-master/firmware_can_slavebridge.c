@@ -104,6 +104,13 @@ void SlaveBridge_SetActuatorProbe(uint8_t (*probe)(void)) {
     actuators_off_probe = probe;
 }
 
+// The switch that lets the end through while a tool is active: none set, or an answer of 0, keeps the refusal (the default).
+static uint8_t (*allow_active_actuator)(void) = 0;
+
+void SlaveBridge_SetAllowActiveActuator(uint8_t (*allowed)(void)) {
+    allow_active_actuator = allowed;
+}
+
 static void SendCanResponse(uint32_t id, const uint8_t *data, uint8_t len) {
     if (HAL_CAN_GetTxMailboxesFreeLevel(&hcan) == 0) return;
     CAN_TxHeaderTypeDef txH;
@@ -316,7 +323,7 @@ void Handle_CAN_SlaveBridge(void) {
 // seconds for the confirmation, and the check takes a while on this chip); the verdict decides whether the slave is then told to install.
 void SlaveBridge_Service(void) {
     if (!slave_end_pending) return;
-    if (actuators_off_probe && !actuators_off_probe()) {
+    if (actuators_off_probe && !actuators_off_probe() && !(allow_active_actuator && allow_active_actuator())) {
         // A tool is active: nothing is verified, forwarded or confirmed (the slave stays as it is and times out on its own); 0x215 / 0x219 say why until the next start.
         end_refused_busy = 1;
         slave_end_pending = 0;

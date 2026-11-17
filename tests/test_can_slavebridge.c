@@ -108,6 +108,8 @@ static void rx(uint32_t id, uint32_t dlc, const uint8_t *data)
 
 static uint8_t probe_busy(void) { return 0; }
 static uint8_t probe_idle(void) { return 1; }
+static uint8_t allow_yes(void) { return 1; }
+static uint8_t allow_no(void) { return 0; }
 
 static const FakeTxFrame *tx(uint32_t id)
 {
@@ -710,6 +712,27 @@ void run_can_slavebridge_tests(int *failures)
         SlaveBridge_SetActuatorProbe(0);
         rx(0x214, 8, end_frame);
         TEST_ASSERT(write_count >= 1 && writes[write_count - 1].reg == 0x04, "without a probe nothing is refused");
+
+        // the switch that lets the end through: off (or answering 0) keeps the refusal, on forwards it
+        clear();
+        SlaveBridge_SetActuatorProbe(probe_busy);
+        SlaveBridge_SetAllowActiveActuator(allow_no);
+        rx(0x211, 8, start_frame);
+        clear();
+        rx(0x214, 8, end_frame);
+        TEST_ASSERT(write_count == 0 && read_count == 0, "with the switch off the end is still refused while a tool is active");
+        SlaveBridge_SetAllowActiveActuator(0);
+        rx(0x214, 8, end_frame);
+        TEST_ASSERT(write_count == 0 && read_count == 0, "without any switch function the end is refused as always");
+        SlaveBridge_SetAllowActiveActuator(allow_yes);
+        rx(0x211, 8, start_frame);
+        clear();
+        rx(0x214, 8, end_frame);
+        TEST_ASSERT(write_count >= 1 && writes[write_count - 1].reg == 0x04, "with the switch on the end is forwarded although a tool is active");
+        rx(0x219, 0, query);
+        TEST_ASSERT(!(tx(0x219) && tx(0x219)->data[0] == 0x08), "no refusal reason is reported when the switch let the end through");
+        SlaveBridge_SetAllowActiveActuator(0);
+        SlaveBridge_SetActuatorProbe(0);
     }
 
     // ---- other identifiers -----------------------------------------------------

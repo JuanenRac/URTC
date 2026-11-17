@@ -167,7 +167,7 @@ static void test_second_byte_and_formats(int *failures)
     raw[7] = 0x80;
     TEST_ASSERT(!Feat_ConfigDecode(raw, &d), "a change in the reserved bytes breaks the checksum");
     Feat_ConfigBlank(&c);
-    c.mask_ext = 0x02; Feat_ConfigSeal(&c);
+    c.mask_ext = 0x04; Feat_ConfigSeal(&c);
     memcpy(raw, &c, sizeof raw);
     TEST_ASSERT(!Feat_ConfigDecode(raw, &d) && Feat_ConfigMask(&d) == 0, "a bit of the second byte that this firmware does not have: the record is not trusted");
     memset(raw, 0xFF, sizeof raw);
@@ -181,8 +181,10 @@ static void test_second_byte_and_formats(int *failures)
     const uint8_t six[6] = { 0x46, 0x45, 0x41, 0x54, 0x20, 0x01 };
     TEST_ASSERT(Feat_ParseCommandEx(5, five, &mask, &ext, &extended) && mask == 0x20 && ext == 0 && !extended, "the five-byte form sets the second byte to zero");
     TEST_ASSERT(Feat_ParseCommandEx(6, six, &mask, &ext, &extended) && mask == 0x20 && ext == 1 && extended, "the six-byte form carries both bytes");
-    const uint8_t bad_ext[6] = { 0x46, 0x45, 0x41, 0x54, 0x20, 0x02 };
+    const uint8_t bad_ext[6] = { 0x46, 0x45, 0x41, 0x54, 0x20, 0x04 };
+    const uint8_t update_switch[6] = { 0x46, 0x45, 0x41, 0x54, 0x00, 0x02 };
     TEST_ASSERT(!Feat_ParseCommandEx(6, bad_ext, &mask, &ext, &extended), "a bit of the second byte that this firmware does not have is ignored");
+    TEST_ASSERT(Feat_ParseCommandEx(6, update_switch, &mask, &ext, &extended) && ext == FEAT_EXT_ALLOW_UPDATE_ACTIVE_ACTUATOR && FEAT_EXT_SUPPORTED == (FEAT_EXT_WATCHDOG_HOST_ONLY | FEAT_EXT_ALLOW_UPDATE_ACTIVE_ACTUATOR), "the switch that lets an update end while a tool is active is accepted and is off in a blank record");
     TEST_ASSERT(!Feat_ParseCommandEx(4, six, &mask, &ext, &extended) && !Feat_ParseCommandEx(7, six, &mask, &ext, &extended), "a short or a long 0x1AE is ignored");
     const uint8_t bad_magic[6] = { 0x46, 0x45, 0x41, 0x55, 0x20, 0x01 };
     TEST_ASSERT(!Feat_ParseCommandEx(6, bad_magic, &mask, &ext, &extended), "a six-byte command with a wrong magic is ignored");
@@ -202,7 +204,7 @@ static void test_second_byte_and_formats(int *failures)
     send(0x1AE, six, 6);
     Features_HandleCommand();
     r = find_tx(0x1AF);
-    TEST_ASSERT(r && r->dlc == 6 && r->data[0] == 0x20 && r->data[1] == 0 && r->data[3] == 1 && r->data[4] == 0 && r->data[5] == 1, "a six-byte 0x1AE is answered with six: stored now, running only after power-up");
+    TEST_ASSERT(r && r->dlc == 6 && r->data[0] == 0x20 && r->data[1] == 0 && r->data[3] == 1 && r->data[4] == 0 && r->data[5] == FEAT_EXT_SUPPORTED, "a six-byte 0x1AE is answered with six: stored now, running only after power-up");
     Features_Init();
     TEST_ASSERT(Features_Running() == 0x20 && Features_RunningExt() == 1 && Features_ActiveExt(FEAT_EXT_WATCHDOG_HOST_ONLY), "after the next power-up both bytes are in force");
     memcpy(raw, &fake_fram[FEAT_CONFIG_FRAM_ADDR], sizeof raw);

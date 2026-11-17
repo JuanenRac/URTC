@@ -213,6 +213,11 @@ volatile uint32_t led_host_override_expire_tick = 0;
 uint8_t animation_frame = 0;               // 0/1 - toggles the tool icon's animation frame
 
 
+// The switch ALLOW_UPDATE_ACTIVE_ACTUATOR of the second byte of the switch map: off unless the record in F-RAM turned it on at power-up.
+static uint8_t Main_AllowUpdateActiveActuator(void) {
+    return Features_ActiveExt(FEAT_EXT_ALLOW_UPDATE_ACTIVE_ACTUATOR);
+}
+
 int main(void) {
     // The application does not start at 0x08000000: the bootloader and its metadata page come first, so the vector table is moved to where this image is linked.
     // The address is written once (src/common/urtc_flash_layout.h) and tests/test_flash_layout.py holds the linker script to it; a wrong value here means that no
@@ -262,6 +267,7 @@ int main(void) {
     // Following the emergency stop frame of the stack: with its switch on the head powers up latched, like every node of the stack.
     Safety_EstopInit();
     SlaveBridge_SetActuatorProbe(Safety_ActuatorsOff);
+    SlaveBridge_SetAllowActiveActuator(Main_AllowUpdateActiveActuator);
 
     MX_GPIO_Post_Init();
     MX_CAN_Init();
