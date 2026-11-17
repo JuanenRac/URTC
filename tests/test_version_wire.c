@@ -76,6 +76,33 @@ void run_version_wire_tests(int *failures)
     TEST_ASSERT(!urtc_version_is_older(0, 3, 0, 3), "two legacy equal versions are not older");
     TEST_ASSERT(urtc_version_is_older(0, 2, 0, 3), "two legacy versions still compare by minor");
 
+    // The rule the bootloaders use: an image without a patch is patch 0 against an installed version that has one.
+    TEST_ASSERT(URTC_VERSION_LEGACY_IS_PATCH_ZERO == 1, "the stricter rule is the default of the bootloaders");
+    TEST_ASSERT(urtc_version_rollback(0, 3, 0, urtc_minor_field_pack(3, 4)), "an image with no patch is older than the same version installed at patch 4");
+    TEST_ASSERT(!urtc_version_rollback(0, 3, 0, urtc_minor_field_pack(3, 0)), "an image with no patch is the same as patch 0");
+    TEST_ASSERT(!urtc_version_rollback(0, 3, 0, 3), "two versions with no patch are equal");
+    TEST_ASSERT(!urtc_version_rollback(0, urtc_minor_field_pack(3, 1), 0, 3), "an image with a patch over an installed one with none is accepted");
+    TEST_ASSERT(!urtc_version_rollback(0, urtc_minor_field_pack(3, 4), 0, urtc_minor_field_pack(3, 4)), "the same version with a patch is accepted");
+    TEST_ASSERT(urtc_version_rollback(0, urtc_minor_field_pack(3, 3), 0, urtc_minor_field_pack(3, 4)), "a lower patch is still older");
+    TEST_ASSERT(!urtc_version_rollback(0, 4, 0, urtc_minor_field_pack(3, 9)), "a higher minor with no patch beats a higher patch");
+    TEST_ASSERT(urtc_version_rollback(0, 2, 0, urtc_minor_field_pack(3, 9)), "a lower minor is older");
+    // and the compatibility mode gives back the lenient rule, which the shared vectors describe
+    TEST_ASSERT(!urtc_version_is_older_mode(0, 3, 0, urtc_minor_field_pack(3, 4), 0), "compatibility mode: an image with no patch is accepted");
+    TEST_ASSERT(urtc_version_is_older_mode(0, 3, 0, urtc_minor_field_pack(3, 4), 1), "strict mode: the same image is older");
+    {
+        int same = 1;
+        for (int i = 0; i < URTC_VEC_COUNT(URTC_VEC_ORDER); i++) {
+            const urtc_vec_order_t *c = &URTC_VEC_ORDER[i];
+            uint32_t nf = urtc_minor_field_pack(c->cand_minor, c->cand_patch);
+            uint32_t cf = urtc_minor_field_pack(c->inst_minor, c->inst_patch);
+            /* where the candidate names a patch the two rules agree */
+            if (c->cand_patch != URTC_PATCH_UNKNOWN &&
+                urtc_version_is_older_mode(c->cand_major, nf, c->inst_major, cf, 0) !=
+                    urtc_version_is_older_mode(c->cand_major, nf, c->inst_major, cf, 1)) same = 0;
+        }
+        TEST_ASSERT(same, "the two rules only differ for an image that names no patch");
+    }
+
     // 0x7E9 companion frame.
     uint8_t pf[URTC_VERSION_PATCH_FRAME_DLC];
     urtc_version_patch_frame_build(pf, 0x01, 7, URTC_PATCH_FLAG_END_UPDATE_PATCH);

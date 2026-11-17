@@ -671,7 +671,16 @@ void run_bootloader_update_tests(int *failures)
     fresh();
     seed_metadata(META_STATE_APP_VALID, 0, urtc_minor_field_pack(4, 2), 3000);
     run_update(good(1500, 0, 4));
-    TEST_ASSERT(status_seen(STATUS_VERIFY_OK), "an image from before the patch extension (legacy minor) is accepted over the same minor");
+#if URTC_VERSION_LEGACY_IS_PATCH_ZERO
+    TEST_ASSERT(fail_reason() == VERIFY_FAIL_REASON_ROLLBACK && main_slot_blank(), "an image that names no patch (legacy minor) counts as patch 0 and is a rollback over the same minor with a patch");
+#else
+    TEST_ASSERT(status_seen(STATUS_VERIFY_OK), "an image from before the patch extension (legacy minor) is accepted over the same minor (compatibility mode)");
+#endif
+
+    fresh();
+    seed_metadata(META_STATE_APP_VALID, 0, urtc_minor_field_pack(4, 0), 3000);
+    run_update(good(1500, 0, 4));
+    TEST_ASSERT(status_seen(STATUS_VERIFY_OK), "an image that names no patch is the same as patch 0 and is installed over it");
 
     fresh();
     seed_metadata(META_STATE_APP_VALID, 1, 0, 3000);

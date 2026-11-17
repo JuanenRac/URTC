@@ -90,12 +90,20 @@ def minor_field_patch(field_value: int) -> int:
     return (high & PATCH_MAX) if high & PATCH_FLAG else PATCH_UNKNOWN
 
 
-def version_is_older(new_major: int, new_field: int, cur_major: int, cur_field: int) -> bool:
+#: The compatibility switch of src/common/urtc_version_wire.h (URTC_VERSION_LEGACY_IS_PATCH_ZERO): an incoming image that declares no patch counts as patch 0
+#: against an installed version that has one.
+LEGACY_IS_PATCH_ZERO = True
+
+
+def version_is_older(new_major: int, new_field: int, cur_major: int, cur_field: int, unknown_is_zero: bool | None = None) -> bool:
+    zero = LEGACY_IS_PATCH_ZERO if unknown_is_zero is None else unknown_is_zero
     if new_major != cur_major:
         return new_major < cur_major
     if minor_field_minor(new_field) != minor_field_minor(cur_field):
         return minor_field_minor(new_field) < minor_field_minor(cur_field)
     new_patch, cur_patch = minor_field_patch(new_field), minor_field_patch(cur_field)
+    if zero and new_patch == PATCH_UNKNOWN and cur_patch != PATCH_UNKNOWN:
+        new_patch = 0
     return new_patch != PATCH_UNKNOWN and cur_patch != PATCH_UNKNOWN and new_patch < cur_patch
 
 

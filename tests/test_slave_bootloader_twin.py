@@ -193,13 +193,23 @@ class FlashTests(unittest.TestCase):
         self.assertEqual(flash.read(twin.BACKUP_APP_ADDR, 2), b"\xff\xff")
         self.assertEqual(flash.read(twin.BACKUP_APP_ADDR + twin.PAGE - 2, 2), b"\x00\x00")
 
-    def test_the_version_rule_uses_the_patch_only_when_both_sides_know_it(self):
+    def test_the_version_rule_reads_an_image_without_a_patch_as_patch_zero(self):
         pack = twin.minor_field_pack
+        self.assertTrue(twin.LEGACY_IS_PATCH_ZERO)
         self.assertTrue(twin.version_is_older(0, pack(4, 0), 0, pack(5, 0)))
         self.assertTrue(twin.version_is_older(0, pack(5, 0), 0, pack(5, 1)))
-        self.assertFalse(twin.version_is_older(0, 5, 0, pack(5, 1)))
+        # an image that names no patch is patch 0 against an installed version that has one
+        self.assertTrue(twin.version_is_older(0, 5, 0, pack(5, 1)))
+        self.assertFalse(twin.version_is_older(0, 5, 0, pack(5, 0)))
+        self.assertFalse(twin.version_is_older(0, 5, 0, 5))
         self.assertFalse(twin.version_is_older(0, pack(5, 0), 0, 5))
         self.assertTrue(twin.version_is_older(0, pack(9, 9), 1, pack(0, 0)))
+
+    def test_the_compatibility_mode_gives_back_the_lenient_rule(self):
+        pack = twin.minor_field_pack
+        self.assertFalse(twin.version_is_older(0, 5, 0, pack(5, 1), unknown_is_zero=False))
+        self.assertTrue(twin.version_is_older(0, 5, 0, pack(5, 1), unknown_is_zero=True))
+        self.assertTrue(twin.version_is_older(0, 4, 0, pack(5, 1), unknown_is_zero=False))
 
 
 class ModelTests(unittest.TestCase):

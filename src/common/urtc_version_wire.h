@@ -57,11 +57,16 @@ static inline uint8_t urtc_minor_field_patch(uint32_t field)
 }
 
 // Returns 1 when the incoming image is OLDER than the installed one.
-// major and minor always decide; the patch only decides when BOTH sides know
-// it, so an image declared by a legacy flasher (no patch) is never rejected
-// against a same major.minor installed with a patch, and the other way round.
-static inline int urtc_version_is_older(uint32_t new_major, uint32_t new_minor_field,
-                                        uint32_t cur_major, uint32_t cur_minor_field)
+// major and minor always decide. The patch decides when BOTH sides know it.
+// When the installed side knows its patch and the incoming image declares none
+// (the minor field of a flasher that predates the patch), `unknown_is_zero`
+// chooses what that means: 0 accepts the image (the lenient rule of the shared
+// conformance vectors), 1 reads it as patch 0, because the signed record of such
+// an image covers patch 0 and it must not be a way to step down in patch
+// without the explicit authorization of the downgrade.
+static inline int urtc_version_is_older_mode(uint32_t new_major, uint32_t new_minor_field,
+                                             uint32_t cur_major, uint32_t cur_minor_field,
+                                             int unknown_is_zero)
 {
     uint8_t new_minor = urtc_minor_field_minor(new_minor_field);
     uint8_t cur_minor = urtc_minor_field_minor(cur_minor_field);
@@ -74,10 +79,37 @@ static inline int urtc_version_is_older(uint32_t new_major, uint32_t new_minor_f
     if (new_minor != cur_minor) {
         return new_minor < cur_minor;
     }
+    if (unknown_is_zero && new_patch == URTC_PATCH_UNKNOWN && cur_patch != URTC_PATCH_UNKNOWN) {
+        new_patch = 0;
+    }
     if (new_patch != URTC_PATCH_UNKNOWN && cur_patch != URTC_PATCH_UNKNOWN) {
         return new_patch < cur_patch;
     }
     return 0;
+}
+
+// The lenient rule: an image declared without a patch is never rejected
+// against a same major.minor installed with a patch, and the other way round.
+static inline int urtc_version_is_older(uint32_t new_major, uint32_t new_minor_field,
+                                        uint32_t cur_major, uint32_t cur_minor_field)
+{
+    return urtc_version_is_older_mode(new_major, new_minor_field, cur_major, cur_minor_field, 0);
+}
+
+// Compatibility switch of the bootloaders. 1 (the default): an incoming image
+// without a patch counts as patch 0 against an installed version that has one.
+// Build with -DURTC_VERSION_LEGACY_IS_PATCH_ZERO=0 to go back to the lenient
+// rule, for a fleet whose flasher still sends the minor field without a patch.
+#ifndef URTC_VERSION_LEGACY_IS_PATCH_ZERO
+#define URTC_VERSION_LEGACY_IS_PATCH_ZERO 1
+#endif
+
+// What the bootloaders of the main board and of the expansion board use.
+static inline int urtc_version_rollback(uint32_t new_major, uint32_t new_minor_field,
+                                        uint32_t cur_major, uint32_t cur_minor_field)
+{
+    return urtc_version_is_older_mode(new_major, new_minor_field, cur_major, cur_minor_field,
+                                      URTC_VERSION_LEGACY_IS_PATCH_ZERO);
 }
 
 // 0x7E9 payload: [0] answering side (same values as 0x7F9 byte 0),
