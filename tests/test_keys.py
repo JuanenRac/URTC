@@ -106,6 +106,22 @@ class VerifyTests(unittest.TestCase):
         self.assertIsNone(keys.extract(loc, good.replace("[4]", "[5]")))
 
 
+class ImageSigningKeysTests(unittest.TestCase):
+    def test_the_image_signing_keys_of_the_registry_are_the_ones_of_the_trust_table(self):
+        import json  # noqa: PLC0415
+        table = json.loads((ROOT / "keys" / "image_trust.json").read_text(encoding="utf-8"))["flavours"]
+        by_id = {k["id"]: k["public"] for k in REG["keys"]}
+        release = {k["state"]: k["public"] for k in table["release"]["keys"]}
+        self.assertEqual(by_id["urtc-image-signing-release-current"], release["current"])
+        self.assertEqual(by_id["urtc-image-signing-release-next"], release["next"])
+        self.assertEqual(by_id["urtc-image-signing-development"], table["dev"]["keys"][0]["public"])
+
+    def test_every_image_signing_key_is_also_looked_for_in_the_copy_the_flasher_pins(self):
+        for k in REG["keys"]:
+            if k["id"].startswith("urtc-image-signing-"):
+                self.assertIn(("URTC-FLASHER", "flasher_image_trust.py"), [(loc["repo"], loc["file"]) for loc in k["embedded_in"]], k["id"])
+
+
 class CommandTests(unittest.TestCase):
     def test_list_and_verify_run(self):
         self.assertEqual(keys.main(["list"]), 0)

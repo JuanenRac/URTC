@@ -55,6 +55,69 @@
           "pattern": "MASTER_DEV_HMAC_KEY_HEX\\s*=\\s*\"([0-9a-fA-F]{64})\""
         }
       ]
+    },
+    {
+      "id": "urtc-image-signing-release-current",
+      "algorithm": "ed25519",
+      "role": "Signs the application images of official builds: the key of the official table of the bootloaders (keys/image_trust.json, flavour release, state current). The flasher keeps a pinned copy to check the .imgsig of an image before it is written.",
+      "public": "80344f1a557fac5d2426c633342d17ddafd6b2a8bfd35efbe0e7a7acfdcce5f5",
+      "private_half": "Outside every repository. Not the key that signs release assets.",
+      "embedded_in": [
+        {
+          "repo": "URTC",
+          "file": "keys/image_trust.json",
+          "kind": "text",
+          "pattern": "(?s)\"release\":.*?\"state\":\\s*\"current\",\\s*\"public\":\\s*\"([0-9a-fA-F]{64})\""
+        },
+        {
+          "repo": "URTC-FLASHER",
+          "file": "flasher_image_trust.py",
+          "kind": "text",
+          "pattern": "\\(\"release current\", \"([0-9a-fA-F]{64})\"\\)"
+        }
+      ]
+    },
+    {
+      "id": "urtc-image-signing-release-next",
+      "algorithm": "ed25519",
+      "role": "The reserved next image-signing key of the official table of the bootloaders (keys/image_trust.json, flavour release, state next); the flasher keeps a pinned copy.",
+      "public": "ac856598a0ac8e45c5f3c66c597c83ccb6a9c0424a434222de14e59cd27c367b",
+      "private_half": "Outside every repository.",
+      "embedded_in": [
+        {
+          "repo": "URTC",
+          "file": "keys/image_trust.json",
+          "kind": "text",
+          "pattern": "(?s)\"release\":.*?\"state\":\\s*\"next\",\\s*\"public\":\\s*\"([0-9a-fA-F]{64})\""
+        },
+        {
+          "repo": "URTC-FLASHER",
+          "file": "flasher_image_trust.py",
+          "kind": "text",
+          "pattern": "\\(\"release next\", \"([0-9a-fA-F]{64})\"\\)"
+        }
+      ]
+    },
+    {
+      "id": "urtc-image-signing-development",
+      "algorithm": "ed25519",
+      "role": "The public development key of the bench table of the bootloaders (keys/image_trust.json, flavour dev); its seed is published on purpose, so an image signed with it proves nothing about who made it. The flasher keeps a pinned copy.",
+      "public": "81f29be04dfa58f37458e6182a027d83f12330265d61bd6bfcedb2ba8833b80c",
+      "private_half": "None: the seed is published on purpose (urtc_common.image_sig.DEV_SEED).",
+      "embedded_in": [
+        {
+          "repo": "URTC",
+          "file": "keys/image_trust.json",
+          "kind": "text",
+          "pattern": "(?s)\"dev\":.*?\"public\":\\s*\"([0-9a-fA-F]{64})\""
+        },
+        {
+          "repo": "URTC-FLASHER",
+          "file": "flasher_image_trust.py",
+          "kind": "text",
+          "pattern": "\\(\"development\", \"([0-9a-fA-F]{64})\"\\)"
+        }
+      ]
     }
   ],
   "secrets_not_stored_here": [
