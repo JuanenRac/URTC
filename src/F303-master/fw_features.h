@@ -24,7 +24,8 @@
 
 // The second byte of the switch map (the first one has all eight bits taken). Every switch of it is OFF unless the record says otherwise.
 #define FEAT_EXT_WATCHDOG_HOST_ONLY 0x01u  // with the communication watchdog: only a frame of the host side counts as a sign of life (see fw_safety_policy.h)
-#define FEAT_EXT_SUPPORTED          0x01u
+#define FEAT_EXT_ALLOW_UPDATE_ACTIVE_ACTUATOR 0x02u // the end of an update of a slave board is accepted while a tool is active (off: refused, as always)
+#define FEAT_EXT_SUPPORTED          0x03u
 
 // States reported in the 0x1BA answer (the enumeration pid_state of the protocol specification).
 #define PID_STATE_OFF_VALUE        0u

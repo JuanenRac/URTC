@@ -4090,7 +4090,7 @@ Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_do
 
 E. Enumerations
 
-[[ BEGIN GENERATED enums sha256=97fae663b7a33b32cc18ecbe0ba8214e5020784d70d468374580fe1cac36d8f4 ]]
+[[ BEGIN GENERATED enums sha256=042b8d29270e9e0ed9a353f1a30e53a63d48cc6622a6eab07056f9686be9c44d ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 tool - Tool profile (prefix TOOL_, value)
@@ -4296,6 +4296,7 @@ firmware_feature_ext - Optional firmware features of the second byte of the swit
 | Value | Name | Title |
 |---|---|---|
 | 0x01 | WATCHDOG_HOST_ONLY | With the communication watchdog: only a frame with an identifier of the host (a command or a query from the host side) counts as a sign of life; the answers of other heads on the bus do not |
+| 0x02 | ALLOW_UPDATE_ACTIVE_ACTUATOR | The end of an update of a slave board is accepted while a tool of the head is active (without it, as before, the end is refused with the reason ACTUATOR_ACTIVE); the check of the signature record then holds the safety ticks of the board for most of a second |
 
 motion_profile - Speed profile of a stepper move (prefix MOTION_PROFILE_, value)
 

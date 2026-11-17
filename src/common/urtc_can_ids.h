@@ -816,6 +816,7 @@
 
 /* Optional firmware features of the second byte of the switch map (each one is off until switched on) */
 #define URTC_FEATURE_EXT_WATCHDOG_HOST_ONLY 0x01u
+#define URTC_FEATURE_EXT_ALLOW_UPDATE_ACTIVE_ACTUATOR 0x02u
 
 /* Speed profile of a stepper move */
 #define URTC_MOTION_PROFILE_CONSTANT 0x00u
