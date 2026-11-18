@@ -4,6 +4,7 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **The pinned copy of the common library moves to 0.2.9:** the image record tools follow the current common library; nothing changes in what they do.
 - **A switch of its own for the refusal of the end of a slave update while a tool is active (`ALLOW_UPDATE_ACTIVE_ACTUATOR`, second byte of the switch map, off by default):** off, the end is refused as always (`0x215` VERIFY_FAIL, `0x219` ACTUATOR_ACTIVE); on, the master checks and relays it even though a tool runs. Changed with `0x1AE`, in force after the next power-up; host tests cover both states.
 
 - **The pinned copy of the image-signing keys in the flasher is now checked against the trust table:** the three public keys of the trust table (the official one, the reserved next one and the development one) are registered in `keys/registry.json` with the place of the flasher's pinned copy, so `tools/keys.py verify` compares that copy with `keys/image_trust.json` and the CI notices when one of them falls behind. Tested against the trust table and the places registered.
