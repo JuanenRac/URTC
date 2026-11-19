@@ -119,6 +119,7 @@ void Safety_EstopInit(void)
     EstopFollow_Reset(&estop);
     if (!Features_Active(FEAT_ESTOP_FOLLOW)) return;
     EstopFollow_SetTimeout(&estop, Features_EstopTimeoutMs());   // 0 = 100 ms; a value outside the limits is rejected and the default is used
+    Features_NoteEstopTimeoutInForce(estop.timeout_ms);          // what the query of the silence reports
     estop_apply((EstopFollowEffect_t){URTC_ERROR_REASON_ESTOP, 0u});   // like every node of the stack, the head powers up latched
 }
 

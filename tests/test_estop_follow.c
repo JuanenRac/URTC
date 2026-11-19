@@ -104,7 +104,7 @@ static void test_the_timeout_tables(int *failures)
     }
     TEST_ASSERT(bad == 0, "every value announced by the master gives the same effective timeout and status");
     TEST_ASSERT(ESTOP_TIMEOUT_MIN_MS == URTC_ESTOP_ALIVE_TIMEOUT_MIN_MS && ESTOP_TIMEOUT_MAX_MS == URTC_ESTOP_ALIVE_TIMEOUT_MAX_MS &&
-                URTC_ESTOP_ALIVE_TIMEOUT_MIN_MS == 20u && URTC_ESTOP_ALIVE_TIMEOUT_MAX_MS == 500u, "the limits are the ones of the specification");
+                URTC_ESTOP_ALIVE_TIMEOUT_MIN_MS == 40u && URTC_ESTOP_ALIVE_TIMEOUT_MAX_MS == 500u, "the limits are the ones of the specification");
 
     // Every one of the 65536 values: inside the limits it is taken, 0 is the default, anything else is rejected with the default; and the master
     // can only lower the timeout, never raise it.
@@ -113,14 +113,14 @@ static void test_the_timeout_tables(int *failures)
         uint8_t status;
         const uint16_t ms = EstopFollow_ResolveTimeout((uint16_t)v, &status);
         if (v == 0u) { if (ms != 100u || status != ESTOPF_TIMEOUT_OK) wrong++; }
-        else if (v >= 20u && v <= 500u) { if (ms != v || status != ESTOPF_TIMEOUT_OK) wrong++; }
+        else if (v >= 40u && v <= 500u) { if (ms != v || status != ESTOPF_TIMEOUT_OK) wrong++; }
         else if (ms != 100u || status != ESTOPF_TIMEOUT_REJECTED) wrong++;
         uint8_t mstatus;
         if (EstopFollow_EffectiveTimeout(100u, (uint16_t)v, &mstatus) > 100u) wrong++;
-        if (EstopFollow_EffectiveTimeout(20u, (uint16_t)v, &mstatus) > 20u) wrong++;
+        if (EstopFollow_EffectiveTimeout(40u, (uint16_t)v, &mstatus) > 40u) wrong++;
         if (EstopFollow_EffectiveTimeout(500u, (uint16_t)v, &mstatus) > 500u) wrong++;
     }
-    TEST_ASSERT(wrong == 0, "for all 65536 values: taken inside 20 to 500, default for 0, rejected outside, and the master never makes the head more tolerant");
+    TEST_ASSERT(wrong == 0, "for all 65536 values: taken inside 40 to 500, default for 0, rejected outside, and the master never makes the head more tolerant");
 
     EstopFollow_t n;
     EstopFollow_Reset(&n);
@@ -370,14 +370,20 @@ static void test_the_configured_silence_reaches_the_glue(int *failures)
     Safety_Service();
     TEST_ASSERT(system_error_flag == 1 && Safety_ErrorReason() == URTC_ERROR_REASON_ESTOP_SILENCE, "and latches one millisecond later");
 
-    boot_with_timeout(30);
+    boot_with_timeout(50);
     make_ready(100000);
-    fake_tick = 100000 + 30;
+    fake_tick = 100000 + 50;
     Safety_Service();
-    TEST_ASSERT(system_error_flag == 0, "a record with 30 ms: still ready at 30 ms");
-    fake_tick = 100000 + 31;
+    TEST_ASSERT(system_error_flag == 0, "a record with 50 ms: still ready at 50 ms");
+    fake_tick = 100000 + 51;
     Safety_Service();
-    TEST_ASSERT(system_error_flag == 1 && Safety_ErrorReason() == URTC_ERROR_REASON_ESTOP_SILENCE, "and latched at 31 ms, before the default would");
+    TEST_ASSERT(system_error_flag == 1 && Safety_ErrorReason() == URTC_ERROR_REASON_ESTOP_SILENCE, "and latched at 51 ms, before the default would");
+
+    boot_with_timeout(30);   // 20 to 39 ms were accepted before the lowest became 40 ms: now rejected, the default is used
+    make_ready(100000);
+    fake_tick = 100000 + 100;
+    Safety_Service();
+    TEST_ASSERT(system_error_flag == 0, "a record with 30 ms is rejected since the lowest is 40 ms: the default 100 ms is in use");
 
     boot_with_timeout(400);
     make_ready(100000);
@@ -418,6 +424,158 @@ static void test_the_clear_error_command_does_not_lift_a_stop(int *failures)
     TEST_ASSERT(Safety_ErrorReason() == URTC_ERROR_REASON_ESTOP, "the reason stays the one of the stop");
 }
 
+// ---- the silence of the master over the bus: 0x1AE with DLC 8 writes it, 0x1AF with the byte 03 or 04 asks for it --------------------------------------------
+static void feed(uint32_t id, const uint8_t *data, uint32_t dlc)
+{
+    fake_hal_reset_recording();
+    memset(rxData, 0, sizeof rxData);
+    if (data) memcpy(rxData, data, dlc);
+    rxHeader.StdId = id;
+    rxHeader.DLC = dlc;
+}
+
+static const FakeTxFrame *answer(void)
+{
+    for (int i = 0; i < fake_tx_count; i++) if (fake_tx[i].id == URTC_CAN_ID_FEATURES_RESP) return &fake_tx[i];
+    return 0;
+}
+
+static void test_the_wire_vectors(int *failures)
+{
+    int bad = 0;
+    for (int i = 0; i < ESTOP_VEC_COUNT(ESTOP_WRITE_CASES); i++) {
+        const estop_write_case_t *c = &ESTOP_WRITE_CASES[i];
+        uint8_t mask = 0xEE, mask_ext = 0xEE;
+        uint32_t timeout = 0xEEEEu;
+        const uint8_t ok = Feat_ParseWrite(c->dlc, c->data, &mask, &mask_ext, &timeout);
+        if (ok != c->valid) { bad++; continue; }
+        if (!ok) continue;
+        const uint32_t expected = (c->timeout_ms < 0) ? FEAT_TIMEOUT_KEEP : (uint32_t)c->timeout_ms;
+        if (mask != c->mask || mask_ext != c->mask_ext || timeout != expected) bad++;
+    }
+    TEST_ASSERT(bad == 0, "every write of 0x1AE of URTC-COMMON is accepted or ignored as the twin says, with the same masks and silence");
+    bad = 0;
+    for (int i = 0; i < ESTOP_VEC_COUNT(ESTOP_QUERY_CASES); i++) {
+        const estop_query_case_t *c = &ESTOP_QUERY_CASES[i];
+        if (Feat_QueryForm(c->dlc, c->data) != c->form) bad++;
+    }
+    TEST_ASSERT(bad == 0, "every query of 0x1AF gets the form the twin says");
+    bad = 0;
+    for (int i = 0; i < ESTOP_VEC_COUNT(ESTOP_ANSWER_CASES); i++) {
+        const estop_answer_case_t *c = &ESTOP_ANSWER_CASES[i];
+        uint8_t out[8];
+        Feat_EncodeResponseTimeout(c->stored, c->running, c->stored_ext, c->running_ext, c->timeout_ms, out);
+        if (memcmp(out, c->data, 8) != 0) bad++;
+    }
+    TEST_ASSERT(bad == 0, "the eight-byte answer is the one of the twin, silence high byte first");
+
+    // all 65536 values: the whole command is taken only for 0 and 40 to 500
+    int wrong = 0;
+    for (uint32_t v = 0; v <= 0xFFFFu; v++) {
+        const uint8_t cmd[8] = { 'F', 'E', 'A', 'T', 0x80, 0x00, (uint8_t)(v >> 8), (uint8_t)(v & 0xFFu) };
+        uint8_t mask, mask_ext;
+        uint32_t timeout;
+        const uint8_t ok = Feat_ParseWrite(8, cmd, &mask, &mask_ext, &timeout);
+        const uint8_t expect = (uint8_t)(v == 0u || (v >= URTC_ESTOP_ALIVE_TIMEOUT_MIN_MS && v <= URTC_ESTOP_ALIVE_TIMEOUT_MAX_MS));
+        if (ok != expect || (ok && timeout != v)) wrong++;
+    }
+    TEST_ASSERT(wrong == 0, "for all 65536 values a write is taken only for 0 and 40 to 500, and then as it is");
+}
+
+// A power-up that keeps the F-RAM as it is.
+static void power_up_again(void)
+{
+    fake_hal_reset_recording();
+    fake_tick = 100000;
+    system_error_flag = 0;
+    system_error_reason = 0;
+    thermal_fault_code = 0;
+    can_regs.ESR = 0;
+    Features_Init();
+    Safety_EstopInit();
+}
+
+static void test_the_silence_over_the_bus_through_the_glue(int *failures)
+{
+    boot_with_timeout(0);
+    const uint8_t q_in_force[1] = { 0x03 }, q_stored[1] = { 0x04 };
+    feed(URTC_CAN_ID_FEATURES_RESP, q_in_force, 1);
+    Features_HandleCommand();
+    const FakeTxFrame *r = answer();
+    TEST_ASSERT(r && r->dlc == 8 && r->data[0] == FEAT_ESTOP_FOLLOW && r->data[1] == FEAT_ESTOP_FOLLOW && r->data[6] == 0 && r->data[7] == 100,
+                "the query 03 answers the silence in force: the 100 ms of the default");
+    feed(URTC_CAN_ID_FEATURES_RESP, q_stored, 1);
+    Features_HandleCommand();
+    r = answer();
+    TEST_ASSERT(r && r->dlc == 8 && r->data[6] == 0 && r->data[7] == 0, "the query 04 answers the stored silence: 0, the default");
+
+    // a write of eight bytes stores the silence, answers with the stored value, and acts after the next power-up
+    const uint8_t w50[8] = { 'F', 'E', 'A', 'T', 0x80, 0x00, 0x00, 0x32 };
+    feed(URTC_CAN_ID_SET_FEATURES, w50, 8);
+    Features_HandleCommand();
+    r = answer();
+    TEST_ASSERT(r && r->dlc == 8 && r->data[0] == FEAT_ESTOP_FOLLOW && r->data[6] == 0 && r->data[7] == 50, "a write of 50 ms is answered with the eight-byte form and the stored value");
+    feed(URTC_CAN_ID_FEATURES_RESP, q_in_force, 1);
+    Features_HandleCommand();
+    r = answer();
+    TEST_ASSERT(r && r->data[7] == 100, "and the silence in force is still the old one until the next power-up");
+    power_up_again();
+    feed(URTC_CAN_ID_FEATURES_RESP, q_in_force, 1);
+    Features_HandleCommand();
+    r = answer();
+    TEST_ASSERT(r && r->data[6] == 0 && r->data[7] == 50, "after the power-up the silence in force is 50 ms");
+    make_ready(100000);
+    fake_tick = 100000 + 51;
+    Safety_Service();
+    TEST_ASSERT(system_error_flag == 1 && Safety_ErrorReason() == URTC_ERROR_REASON_ESTOP_SILENCE, "and the head latches after 50 ms of silence");
+
+    // the old forms keep the stored silence
+    boot_with_timeout(300);
+    const uint8_t five[5] = { 'F', 'E', 'A', 'T', 0x80 };
+    const uint8_t six[6] = { 'F', 'E', 'A', 'T', 0x80, 0x00 };
+    feed(URTC_CAN_ID_SET_FEATURES, five, 5);
+    Features_HandleCommand();
+    r = answer();
+    TEST_ASSERT(r && r->dlc == 3, "a five-byte write is still answered with three bytes");
+    feed(URTC_CAN_ID_SET_FEATURES, six, 6);
+    Features_HandleCommand();
+    r = answer();
+    TEST_ASSERT(r && r->dlc == 6, "a six-byte write is still answered with six bytes");
+    feed(URTC_CAN_ID_FEATURES_RESP, q_stored, 1);
+    Features_HandleCommand();
+    r = answer();
+    TEST_ASSERT(r && r->dlc == 8 && r->data[6] == 0x01 && r->data[7] == 0x2C, "and neither of them changed the stored silence (300 ms)");
+
+    // a write with 0 clears the silence
+    const uint8_t w0[8] = { 'F', 'E', 'A', 'T', 0x80, 0x00, 0x00, 0x00 };
+    feed(URTC_CAN_ID_SET_FEATURES, w0, 8);
+    Features_HandleCommand();
+    r = answer();
+    TEST_ASSERT(r && r->dlc == 8 && r->data[6] == 0 && r->data[7] == 0, "a write of 0 clears the stored silence (the default applies)");
+
+    // a value outside the limits: the whole command is ignored, nothing is written and nothing is answered
+    boot_with_timeout(300);
+    const uint8_t w39[8] = { 'F', 'E', 'A', 'T', 0x00, 0x00, 0x00, 0x27 };
+    const int writes = fake_fram_write_calls;
+    feed(URTC_CAN_ID_SET_FEATURES, w39, 8);
+    Features_HandleCommand();
+    TEST_ASSERT(fake_fram_write_calls == writes && fake_tx_count == 0, "a silence of 39 ms is ignored as a whole: nothing written, nothing answered");
+    const uint8_t seven[7] = { 'F', 'E', 'A', 'T', 0x00, 0x00, 0x32 };
+    feed(URTC_CAN_ID_SET_FEATURES, seven, 7);
+    Features_HandleCommand();
+    TEST_ASSERT(fake_fram_write_calls == writes && fake_tx_count == 0, "a DLC of 7 is ignored");
+
+    // ESTOP_FOLLOW off: nothing is in force
+    fake_hal_reset_recording();
+    memset(fake_fram, 0xFF, sizeof fake_fram);
+    Features_Init();
+    Safety_EstopInit();
+    feed(URTC_CAN_ID_FEATURES_RESP, q_in_force, 1);
+    Features_HandleCommand();
+    r = answer();
+    TEST_ASSERT(r && r->dlc == 8 && r->data[6] == 0 && r->data[7] == 0, "with the switch off the silence in force is 0");
+}
+
 int main(void)
 {
     int failures = 0;
@@ -435,6 +593,8 @@ int main(void)
     test_a_malformed_frame_and_a_wrong_length_are_a_stop(&failures);
     test_the_clear_error_command_does_not_lift_a_stop(&failures);
     test_the_configured_silence_reaches_the_glue(&failures);
+    test_the_wire_vectors(&failures);
+    test_the_silence_over_the_bus_through_the_glue(&failures);
     if (failures == 0) {
         printf("  OK   all emergency stop following host tests passed\n");
         return 0;
