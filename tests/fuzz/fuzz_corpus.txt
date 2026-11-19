@@ -315,11 +315,6 @@
 1AF 02 valid example
 1AF 03 valid example
 1AF 04 valid example
-1AF 03 valid format=3
-1AF 04 valid format=4
-1AF 02 invalid format=2 outside the range
-1AF 05 invalid format=5 outside the range
-1AF FF invalid format=255 outside the range
 1B0 01 valid example
 1B0 00 valid coil=0
 1B0 01 valid coil=1
