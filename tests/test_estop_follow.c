@@ -73,6 +73,8 @@ static void test_the_scenarios(int *failures)
         if (s->scenario != scenario) {
             scenario = s->scenario;
             EstopFollow_Reset(&n);
+            EstopFollow_SetTimeout(&n, ESTOP_SCENARIO_CFG[scenario].own);
+            if (ESTOP_SCENARIO_CFG[scenario].master) EstopFollow_SetMasterTimeout(&n, ESTOP_SCENARIO_CFG[scenario].master);
         }
         EstopFollowEffect_t e;
         if (s->kind == 0) e = EstopFollow_OnFrame(&n, s->t, s->data, s->dlc);
@@ -83,6 +85,49 @@ static void test_the_scenarios(int *failures)
     }
     TEST_ASSERT(bad == 0, "every step of every scenario of URTC-COMMON ends in the same state with the same effect");
     TEST_ASSERT(scenario + 1 == ESTOP_SCENARIO_COUNT, "all the scenarios were run");
+}
+
+static void test_the_timeout_tables(int *failures)
+{
+    int bad = 0;
+    for (int i = 0; i < ESTOP_VEC_COUNT(ESTOP_TIMEOUT_CONFIG_CASES); i++) {
+        const estop_timeout_config_case_t *c = &ESTOP_TIMEOUT_CONFIG_CASES[i];
+        uint8_t status = 255;
+        if (EstopFollow_ResolveTimeout(c->requested, &status) != c->ms || status != c->status) bad++;
+    }
+    TEST_ASSERT(bad == 0, "every configured value of URTC-COMMON resolves to the same milliseconds and status");
+    bad = 0;
+    for (int i = 0; i < ESTOP_VEC_COUNT(ESTOP_TIMEOUT_MASTER_CASES); i++) {
+        const estop_timeout_master_case_t *c = &ESTOP_TIMEOUT_MASTER_CASES[i];
+        uint8_t status = 255;
+        if (EstopFollow_EffectiveTimeout(c->own, c->master, &status) != c->ms || status != c->status) bad++;
+    }
+    TEST_ASSERT(bad == 0, "every value announced by the master gives the same effective timeout and status");
+    TEST_ASSERT(ESTOP_TIMEOUT_MIN_MS == URTC_ESTOP_ALIVE_TIMEOUT_MIN_MS && ESTOP_TIMEOUT_MAX_MS == URTC_ESTOP_ALIVE_TIMEOUT_MAX_MS &&
+                URTC_ESTOP_ALIVE_TIMEOUT_MIN_MS == 20u && URTC_ESTOP_ALIVE_TIMEOUT_MAX_MS == 500u, "the limits are the ones of the specification");
+
+    // Every one of the 65536 values: inside the limits it is taken, 0 is the default, anything else is rejected with the default; and the master
+    // can only lower the timeout, never raise it.
+    int wrong = 0;
+    for (uint32_t v = 0; v <= 0xFFFFu; v++) {
+        uint8_t status;
+        const uint16_t ms = EstopFollow_ResolveTimeout((uint16_t)v, &status);
+        if (v == 0u) { if (ms != 100u || status != ESTOPF_TIMEOUT_OK) wrong++; }
+        else if (v >= 20u && v <= 500u) { if (ms != v || status != ESTOPF_TIMEOUT_OK) wrong++; }
+        else if (ms != 100u || status != ESTOPF_TIMEOUT_REJECTED) wrong++;
+        uint8_t mstatus;
+        if (EstopFollow_EffectiveTimeout(100u, (uint16_t)v, &mstatus) > 100u) wrong++;
+        if (EstopFollow_EffectiveTimeout(20u, (uint16_t)v, &mstatus) > 20u) wrong++;
+        if (EstopFollow_EffectiveTimeout(500u, (uint16_t)v, &mstatus) > 500u) wrong++;
+    }
+    TEST_ASSERT(wrong == 0, "for all 65536 values: taken inside 20 to 500, default for 0, rejected outside, and the master never makes the head more tolerant");
+
+    EstopFollow_t n;
+    EstopFollow_Reset(&n);
+    TEST_ASSERT(n.timeout_ms == 100u && n.timeout_status == ESTOPF_TIMEOUT_OK, "a head nobody configured keeps 100 ms");
+    TEST_ASSERT(EstopFollow_SetTimeout(&n, 7u) == ESTOPF_TIMEOUT_REJECTED && n.timeout_ms == 100u, "a rejected value leaves the default in use");
+    TEST_ASSERT(EstopFollow_SetMasterTimeout(&n, 100u) == ESTOPF_TIMEOUT_REJECTED, "a rejected value stays reported when the master agrees");
+    TEST_ASSERT(EstopFollow_SetMasterTimeout(&n, 40u) == ESTOPF_TIMEOUT_MASTER_DIFFERS && n.timeout_ms == 40u, "a lower value of the master is obeyed");
 }
 
 static void test_the_constants(int *failures)
@@ -289,6 +334,76 @@ static void test_a_malformed_frame_and_a_wrong_length_are_a_stop(int *failures)
     TEST_ASSERT(system_error_flag == 1, "an empty frame is a stop");
 }
 
+// A power-up with the stop following on and this configured silence of the master in the F-RAM record.
+static void boot_with_timeout(uint16_t timeout_ms)
+{
+    fake_hal_reset_recording();
+    memset(fake_fram, 0xFF, sizeof fake_fram);
+    fake_fram_fail_reads = fake_fram_fail_writes = 0;
+    FeatConfig_t c;
+    Feat_ConfigBlank(&c);
+    c.mask = FEAT_ESTOP_FOLLOW;
+    Feat_ConfigSetEstopTimeoutMs(&c, timeout_ms);
+    Feat_ConfigSeal(&c);
+    memcpy(&fake_fram[FEAT_CONFIG_FRAM_ADDR], &c, sizeof c);
+    fake_tick = 100000;
+    fake_tick_step = 0;
+    active_tool = TOOL_SOLDERING_IRON;
+    system_error_flag = 0;
+    system_error_reason = 0;
+    thermal_fault_code = 0;
+    guards_reset = 0;
+    safe_state_calls = 0;
+    can_regs.ESR = 0;
+    Features_Init();
+    Safety_EstopInit();
+}
+
+static void test_the_configured_silence_reaches_the_glue(int *failures)
+{
+    boot_with_timeout(0);
+    make_ready(100000);
+    fake_tick = 100000 + 100;
+    Safety_Service();
+    TEST_ASSERT(system_error_flag == 0, "a record without a timeout keeps the 100 ms: still ready at the edge");
+    fake_tick = 100000 + 101;
+    Safety_Service();
+    TEST_ASSERT(system_error_flag == 1 && Safety_ErrorReason() == URTC_ERROR_REASON_ESTOP_SILENCE, "and latches one millisecond later");
+
+    boot_with_timeout(30);
+    make_ready(100000);
+    fake_tick = 100000 + 30;
+    Safety_Service();
+    TEST_ASSERT(system_error_flag == 0, "a record with 30 ms: still ready at 30 ms");
+    fake_tick = 100000 + 31;
+    Safety_Service();
+    TEST_ASSERT(system_error_flag == 1 && Safety_ErrorReason() == URTC_ERROR_REASON_ESTOP_SILENCE, "and latched at 31 ms, before the default would");
+
+    boot_with_timeout(400);
+    make_ready(100000);
+    fake_tick = 100000 + 400;
+    Safety_Service();
+    TEST_ASSERT(system_error_flag == 0, "a record with 400 ms waits the 400 ms");
+    fake_tick = 100000 + 401;
+    Safety_Service();
+    TEST_ASSERT(system_error_flag == 1, "and latches after them");
+
+    boot_with_timeout(5);   // below the limit: rejected, the default is used
+    make_ready(100000);
+    fake_tick = 100000 + 100;
+    Safety_Service();
+    TEST_ASSERT(system_error_flag == 0, "a record with 5 ms is rejected: the default 100 ms is in use");
+    fake_tick = 100000 + 101;
+    Safety_Service();
+    TEST_ASSERT(system_error_flag == 1, "and it latches after 100 ms");
+
+    boot_with_timeout(60000);   // above the limit: rejected as well, never accepted in silence
+    make_ready(100000);
+    fake_tick = 100000 + 101;
+    Safety_Service();
+    TEST_ASSERT(system_error_flag == 1, "a record with 60000 ms is rejected: the head does not wait for it");
+}
+
 static void test_the_clear_error_command_does_not_lift_a_stop(int *failures)
 {
     boot_with(FEAT_ESTOP_FOLLOW | FEAT_CLEAR_ERROR);
@@ -309,6 +424,7 @@ int main(void)
     printf("URTC host logic tests - following the emergency stop frame\n");
     test_the_frames(&failures);
     test_the_scenarios(&failures);
+    test_the_timeout_tables(&failures);
     test_the_constants(&failures);
     test_a_stop_is_never_refused(&failures);
     test_with_the_switch_off_nothing_changes(&failures);
@@ -318,6 +434,7 @@ int main(void)
     test_a_bus_off(&failures);
     test_a_malformed_frame_and_a_wrong_length_are_a_stop(&failures);
     test_the_clear_error_command_does_not_lift_a_stop(&failures);
+    test_the_configured_silence_reaches_the_glue(&failures);
     if (failures == 0) {
         printf("  OK   all emergency stop following host tests passed\n");
         return 0;

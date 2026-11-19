@@ -9,10 +9,15 @@
 //
 // One rule shapes everything: a stop is never refused. Any frame on the identifier that is not a well-formed release or heartbeat is a stop; only the
 // way out is checked. The head starts latched. A trip, a malformed frame, a heartbeat that says tripped and a bus-off latch it at once. A release moves
-// it to ready only when it is latched, the master was heard within URTC_ESTOP_ALIVE_TIMEOUT_MS, the epoch is the one of the stop it knows, the sequence is
+// it to ready only when it is latched, the master was heard within the timeout, the epoch is the one of the stop it knows, the sequence is
 // newer than the last one seen and, after a bus-off, a new heartbeat was heard. A ready head that hears no new heartbeat for the timeout latches again.
 // Time is in milliseconds and may wrap at 32 bits. This is not a certified safety function and never replaces a hardware emergency stop. The glue that
 // reads the switch, applies the safe state and lifts the error is in firmware_safety.c; nothing here has run on a board.
+//
+// The silence of the master is configurable per head (EstopFollow_SetTimeout), inside the hard limits URTC_ESTOP_ALIVE_TIMEOUT_MIN_MS and _MAX_MS: 0 means
+// the default (URTC_ESTOP_ALIVE_TIMEOUT_MS, 100 ms), a value outside the limits is rejected (the default is used and the status says ESTOPF_TIMEOUT_REJECTED),
+// never accepted in silence. If the master announces its own value (EstopFollow_SetMasterTimeout) the head uses the LOWER of the two: it is never more
+// tolerant than its own configuration.
 //
 // Header only, so every suite that links firmware_safety.c has it without another source file.
 // =============================================================================
@@ -38,6 +43,12 @@
 
 #define ESTOPF_REASON_UNSPECIFIED 0xFFu
 
+// Status of the timeout in use (the same codes as urtc_common.estop_follow).
+#define ESTOPF_TIMEOUT_OK              0u  // the configured value, or the default when none was set
+#define ESTOPF_TIMEOUT_REJECTED        1u  // the configured value was outside the limits: the default is in use
+#define ESTOPF_TIMEOUT_MASTER_DIFFERS  2u  // the master announced another value: the lower of the two is in use
+#define ESTOPF_TIMEOUT_MASTER_REJECTED 3u  // the master announced a value outside the limits: ignored
+
 #define ESTOPF_STATE_LATCHED 0u
 #define ESTOPF_STATE_READY   1u
 
@@ -61,6 +72,9 @@ typedef struct {
     uint8_t have_alive;
     uint32_t last_alive_ms;
     uint8_t busoff_wait;  // set by a bus-off: a release is refused until a new heartbeat arrives
+    uint16_t own_timeout_ms;   // the timeout of this head's configuration (after the limits were applied)
+    uint16_t timeout_ms;       // the timeout in use: never above own_timeout_ms
+    uint8_t timeout_status;    // ESTOPF_TIMEOUT_*
 } EstopFollow_t;
 
 static inline uint8_t EstopFollow_ReasonKnown(uint8_t reason)
@@ -106,6 +120,52 @@ static inline void EstopFollow_Reset(EstopFollow_t *n)
 {
     memset(n, 0, sizeof *n);
     n->latched = 1u;
+    n->own_timeout_ms = (uint16_t)URTC_ESTOP_ALIVE_TIMEOUT_MS;
+    n->timeout_ms = n->own_timeout_ms;
+    n->timeout_status = ESTOPF_TIMEOUT_OK;
+}
+
+// The milliseconds a configured value gives (0 = not set: the default) and, in *status, whether it was taken (OK) or rejected for being outside the limits.
+static inline uint16_t EstopFollow_ResolveTimeout(uint16_t requested_ms, uint8_t *status)
+{
+    *status = ESTOPF_TIMEOUT_OK;
+    if (requested_ms == 0u) return (uint16_t)URTC_ESTOP_ALIVE_TIMEOUT_MS;
+    if (requested_ms < URTC_ESTOP_ALIVE_TIMEOUT_MIN_MS || requested_ms > URTC_ESTOP_ALIVE_TIMEOUT_MAX_MS) {
+        *status = ESTOPF_TIMEOUT_REJECTED;
+        return (uint16_t)URTC_ESTOP_ALIVE_TIMEOUT_MS;
+    }
+    return requested_ms;
+}
+
+// The lower of the head's own value and the one the master announced (0 = nothing announced); a master value outside the limits is ignored.
+static inline uint16_t EstopFollow_EffectiveTimeout(uint16_t own_ms, uint16_t master_ms, uint8_t *status)
+{
+    *status = ESTOPF_TIMEOUT_OK;
+    if (master_ms == 0u) return own_ms;
+    if (master_ms < URTC_ESTOP_ALIVE_TIMEOUT_MIN_MS || master_ms > URTC_ESTOP_ALIVE_TIMEOUT_MAX_MS) {
+        *status = ESTOPF_TIMEOUT_MASTER_REJECTED;
+        return own_ms;
+    }
+    if (master_ms == own_ms) return own_ms;
+    *status = ESTOPF_TIMEOUT_MASTER_DIFFERS;
+    return master_ms < own_ms ? master_ms : own_ms;
+}
+
+// The configured timeout of this head (0 = the default). Call once after EstopFollow_Reset; returns the status (ESTOPF_TIMEOUT_*).
+static inline uint8_t EstopFollow_SetTimeout(EstopFollow_t *n, uint16_t requested_ms)
+{
+    n->own_timeout_ms = EstopFollow_ResolveTimeout(requested_ms, &n->timeout_status);
+    n->timeout_ms = n->own_timeout_ms;
+    return n->timeout_status;
+}
+
+// The master announced its timeout (0 = nothing): the head uses the lower of the two. A rejected own value stays reported when the master agrees.
+static inline uint8_t EstopFollow_SetMasterTimeout(EstopFollow_t *n, uint16_t announced_ms)
+{
+    uint8_t status;
+    n->timeout_ms = EstopFollow_EffectiveTimeout(n->own_timeout_ms, announced_ms, &status);
+    if (status != ESTOPF_TIMEOUT_OK || n->timeout_status != ESTOPF_TIMEOUT_REJECTED) n->timeout_status = status;
+    return n->timeout_status;
 }
 
 static inline uint8_t EstopFollow_State(const EstopFollow_t *n)
@@ -115,7 +175,7 @@ static inline uint8_t EstopFollow_State(const EstopFollow_t *n)
 
 static inline uint8_t EstopFollow_Alive_(const EstopFollow_t *n, uint32_t now_ms)
 {
-    return (uint8_t)(n->have_alive && (uint32_t)(now_ms - n->last_alive_ms) <= URTC_ESTOP_ALIVE_TIMEOUT_MS);
+    return (uint8_t)(n->have_alive && (uint32_t)(now_ms - n->last_alive_ms) <= n->timeout_ms);
 }
 
 static inline EstopFollowEffect_t EstopFollow_Stop_(EstopFollow_t *n, uint8_t reason)
