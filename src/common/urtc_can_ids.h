@@ -61,6 +61,8 @@
 #define URTC_MAGNET_SILENCE_MS 0x1388u  /* Silence of the host after which the electromagnet lets go (communication watchdog and release policy on) */
 #define URTC_ESTOP_CAN_ID 0x1u  /* Identifier of the emergency stop frame of the stack, which a head with the ESTOP_FOLLOW feature obeys (standard frame, eight bytes) */
 #define URTC_ESTOP_ALIVE_TIMEOUT_MS 0x64u  /* Silence of the master of the emergency stop after which a head that is ready goes back to its safe state (ESTOP_FOLLOW feature on) */
+#define URTC_ESTOP_ALIVE_TIMEOUT_MIN_MS 0x14u  /* Lowest silence of the master of the emergency stop a head accepts as its configured timeout; below it the value is rejected and the default is used (ESTOP_FOLLOW feature on) */
+#define URTC_ESTOP_ALIVE_TIMEOUT_MAX_MS 0x1F4u  /* Highest silence of the master of the emergency stop a head accepts as its configured timeout; above it the value is rejected and the default is used (ESTOP_FOLLOW feature on) */
 
 /* --- identifiers, and the length rule of every layout --- */
 #define URTC_CAN_ID_IMPACT_EVENT 0x095u  /* Impact register (touch probe, maximum priority) */

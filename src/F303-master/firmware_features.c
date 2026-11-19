@@ -27,6 +27,7 @@
 static FeatConfig_t persisted;     // what is in F-RAM now (blank when the chip is absent, blank or damaged)
 static uint8_t running_mask;       // read once at boot
 static uint8_t running_mask_ext;   // the second byte of the map, read at the same time
+static uint16_t running_estop_timeout_ms;   // ESTOP_FOLLOW silence of the master, read at the same time (0 = the default)
 
 // ---- the switches ------------------------------------------------------------------------------------
 static void read_persisted(void) {
@@ -119,6 +120,7 @@ void Features_Init(void) {
     read_persisted();
     running_mask = Feat_ConfigMask(&persisted);
     running_mask_ext = Feat_ConfigMaskExt(&persisted);
+    running_estop_timeout_ms = Feat_ConfigEstopTimeoutMs(&persisted);
     pid_state = PID_STATE_OFF_VALUE;
     if (running_mask & FEAT_THERMAL_PID) { pid_load(); pid_state = PID_STATE_RUNNING_VALUE; }
     HsiTrim_Init(&hsi, HSI_TRIM_DEFAULT);
@@ -128,6 +130,7 @@ void Features_Init(void) {
 
 uint8_t Features_Running(void) { return running_mask; }
 uint8_t Features_Active(uint8_t feature_bit) { return (uint8_t)((running_mask & feature_bit) != 0); }
+uint16_t Features_EstopTimeoutMs(void) { return running_estop_timeout_ms; }
 uint8_t Features_RunningExt(void) { return running_mask_ext; }
 uint8_t Features_ActiveExt(uint8_t feature_bit) { return (uint8_t)((running_mask_ext & feature_bit) != 0); }
 
@@ -140,6 +143,7 @@ void Features_HandleCommand(void) {
         Feat_ConfigBlank(&next);
         next.mask = mask;
         next.mask_ext = mask_ext;   // zero for the five-byte form: the switches of the second byte go off
+        next.estop_alive_timeout_ms = Feat_ConfigEstopTimeoutMs(&persisted);   // a change of the switches never loses the configured timeout
         Feat_ConfigSeal(&next);
         // Always written in the current format (16 bytes); a record of the first format is replaced here and never at power-up.
         if (FRAM_WriteBytes(FEAT_CONFIG_FRAM_ADDR, (const uint8_t *)&next, sizeof(next))) {

@@ -29,6 +29,8 @@ uint8_t Features_Active(uint8_t feature_bit);
 // The same for the second byte of the switch map (FEAT_EXT_*).
 uint8_t Features_RunningExt(void);
 uint8_t Features_ActiveExt(uint8_t feature_bit);
+// The silence of the master configured for ESTOP_FOLLOW in the record at power-up (0 = the default); the limits are applied by the logic that reads it.
+uint16_t Features_EstopTimeoutMs(void);
 
 // 0x1AE: change the persistent switches; 0x1AF: query (and the answer to a change).
 void Features_HandleCommand(void);

@@ -75,6 +75,12 @@ Effect: the frame is defined by the stack that carries it (it is the lowest
           switches an actuator on.
         - A ready head that hears no new heartbeat for 100 ms latches again with
           the reason ESTOP_SILENCE (10). A repeated or frozen heartbeat does not count.
+        The 100 ms is the default. A head can be configured with another silence of
+        the master (record of the switches in F-RAM, two bytes after the switch map,
+        0 = default) between ESTOP_ALIVE_TIMEOUT_MIN_MS (20 ms) and
+        ESTOP_ALIVE_TIMEOUT_MAX_MS (500 ms); a value outside those limits is rejected
+        and 100 ms is used. If a master announces its own value the head uses the
+        lower of the two, never a more tolerant one.
         The clear-error command 0x1B2 never lifts these errors. The reason is in byte
         6 of 0x111. This is not a certified safety function and never replaces a
         hardware emergency stop. Simulator evidence only: nothing has run on a board.
@@ -2155,11 +2161,11 @@ GENERATED REFERENCE (from the specification in URTC-COMMON)
 
 A. Summary
 
-[[ BEGIN GENERATED summary sha256=a0fb09481f44b105b6a0bac48150d9dbfdc5318a73ac4b31a1a621190fb12056 ]]
+[[ BEGIN GENERATED summary sha256=b51ba245b2b12b53882337dc4aced2cde30d46a286d182497e4e593a6a107fbb ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 URTC CAN protocol: protocol version 2, byte order big.
-107 identifiers, 25 tool profiles, 26 enumerations, 47 constants, 5 magic payloads, 27 registers of the expansion slave.
+107 identifiers, 25 tool profiles, 26 enumerations, 49 constants, 5 magic payloads, 27 registers of the expansion slave.
 
 Machine-readable specification of the CAN bus protocol of the URTC tool head: every identifier with its direction, length rule and payload layout, the magic payloads, the registers of the expansion slave, the version procedures and the SLCAN subset the host tools rely on. All multi-byte fields are big-endian.
 [[ END GENERATED summary ]]
@@ -4356,7 +4362,7 @@ clear_error_result - Outcome of the last clear-error command (prefix CLEAR_ERROR
 
 F. Constants
 
-[[ BEGIN GENERATED constants sha256=b64477564802eab3324366626fb7273942c0c6174fb34a06cf1c443cff72d9f7 ]]
+[[ BEGIN GENERATED constants sha256=73f7081c06644c31e0c370116650ad3459db8057abafd4e082011fa86075dad7 ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 | Name | Value | Unit | Group | Title |
@@ -4408,6 +4414,8 @@ Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_do
 | MAGNET_SILENCE_MS | 5000 | ms | timing | Silence of the host after which the electromagnet lets go (communication watchdog and release policy on) |
 | ESTOP_CAN_ID | 1 |  | protocol | Identifier of the emergency stop frame of the stack, which a head with the ESTOP_FOLLOW feature obeys (standard frame, eight bytes) |
 | ESTOP_ALIVE_TIMEOUT_MS | 100 | ms | timing | Silence of the master of the emergency stop after which a head that is ready goes back to its safe state (ESTOP_FOLLOW feature on) |
+| ESTOP_ALIVE_TIMEOUT_MIN_MS | 20 | ms | timing | Lowest silence of the master of the emergency stop a head accepts as its configured timeout; below it the value is rejected and the default is used (ESTOP_FOLLOW feature on) |
+| ESTOP_ALIVE_TIMEOUT_MAX_MS | 500 | ms | timing | Highest silence of the master of the emergency stop a head accepts as its configured timeout; above it the value is rejected and the default is used (ESTOP_FOLLOW feature on) |
 [[ END GENERATED constants ]]
 
 G. Magic payloads

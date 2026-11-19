@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **The silence of the master of the emergency stop is configurable per head:** with the stop following on, the time a ready head waits for a new heartbeat before it latches again is still 100 ms by default, and can be set between 20 and 500 ms in the record of the switches in F-RAM (two bytes after the switch map, little endian, 0 = the default; the record keeps its format). A value outside the limits is rejected and 100 ms is used, never accepted in silence; if a master announces its own value the head uses the lower of the two and is never more tolerant than its own configuration. A change of the switches through `0x1AE` keeps the timeout that is in the record. The decisions are the twin of `urtc_common.estop_follow` and replay its new tables and seven scenarios; host tests cover all 65536 values, the record, the glue and the survival of the timeout. Nothing here has run on a board: the check on a real head with a scope on the bus is still to do.
+
 ## [0.5.1] - Switch map second byte, emergency-stop following, update-end check in the main loop and stricter release set
 
 - **The pinned copy of the common library moves to 0.2.9:** the image record tools follow the current common library; nothing changes in what they do.

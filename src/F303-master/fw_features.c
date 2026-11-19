@@ -46,6 +46,11 @@ uint8_t Feat_ConfigMaskExt(const FeatConfig_t *c) {
     return c->mask_ext;
 }
 
+uint16_t Feat_ConfigEstopTimeoutMs(const FeatConfig_t *c) {
+    if (!Feat_ConfigIsValid(c) || has_unknown_bits(c)) return 0;
+    return c->estop_alive_timeout_ms;
+}
+
 uint8_t Feat_ConfigDecode(const uint8_t raw[FEAT_CONFIG_RAW_SIZE], FeatConfig_t *c) {
     FeatConfig_t next;
     uint32_t magic;

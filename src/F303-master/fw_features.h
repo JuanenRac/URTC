@@ -55,7 +55,8 @@ typedef struct __attribute__((packed)) {
     uint8_t  struct_version; // 2
     uint8_t  mask;           // the features of the first byte that are on
     uint8_t  mask_ext;       // the features of the second byte that are on
-    uint8_t  reserved[8];    // 0; room for a third byte without a new version
+    uint16_t estop_alive_timeout_ms; // ESTOP_FOLLOW: the silence of the master after which a ready head latches (little endian; 0 = the default of 100 ms)
+    uint8_t  reserved[6];    // 0; room for a third byte without a new version
     uint8_t  checksum;       // CRC-8/SMBUS over every byte above
 } FeatConfig_t; // 16 bytes
 
@@ -66,6 +67,8 @@ uint8_t Feat_ConfigIsValid(const FeatConfig_t *c);
 // The mask a record switches on: 0 for an invalid record (0xFF-filled F-RAM included) and for any bit this firmware does not have.
 uint8_t Feat_ConfigMask(const FeatConfig_t *c);
 uint8_t Feat_ConfigMaskExt(const FeatConfig_t *c); // the same for the second byte
+// The configured silence of the master for ESTOP_FOLLOW: 0 for an invalid record (the default is then used); the limits are applied by EstopFollow_SetTimeout.
+uint16_t Feat_ConfigEstopTimeoutMs(const FeatConfig_t *c);
 // Turns the 16 bytes read from F-RAM into the record in memory. 1 when they hold a sound record of version 1 (converted) or 2; 0 for anything else (erased,
 // zeroed, damaged, a version this firmware does not know, a bad checksum), and then *c is the blank record: every feature off.
 uint8_t Feat_ConfigDecode(const uint8_t raw[FEAT_CONFIG_RAW_SIZE], FeatConfig_t *c);
