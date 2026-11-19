@@ -77,10 +77,13 @@ Effect: the frame is defined by the stack that carries it (it is the lowest
           the reason ESTOP_SILENCE (10). A repeated or frozen heartbeat does not count.
         The 100 ms is the default. A head can be configured with another silence of
         the master (record of the switches in F-RAM, two bytes after the switch map,
-        0 = default) between ESTOP_ALIVE_TIMEOUT_MIN_MS (20 ms) and
+        0 = default) between ESTOP_ALIVE_TIMEOUT_MIN_MS (40 ms) and
         ESTOP_ALIVE_TIMEOUT_MAX_MS (500 ms); a value outside those limits is rejected
         and 100 ms is used. If a master announces its own value the head uses the
-        lower of the two, never a more tolerant one.
+        lower of the two, never a more tolerant one. The value is written with the
+        eight-byte form of 0x1AE and read with the queries 03 (in force) and 04
+        (stored) of 0x1AF, which answer with eight bytes (see 0x1AE and 0x1AF below);
+        the heartbeat itself is not changed.
         The clear-error command 0x1B2 never lifts these errors. The reason is in byte
         6 of 0x111. This is not a certified safety function and never replaces a
         hardware emergency stop. Simulator evidence only: nothing has run on a board.
@@ -2172,7 +2175,7 @@ Machine-readable specification of the CAN bus protocol of the URTC tool head: ev
 
 B. Index of identifiers
 
-[[ BEGIN GENERATED index sha256=d5328becfe48a0a414a8f060810deda60ff29086495007faffb51a8f82e7be46 ]]
+[[ BEGIN GENERATED index sha256=fa2cbfc9d06ea324d9fd45b02bf5c553552a257bf67a1d27171a1d7474a2881c ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 | ID | Name | Direction | DLC | Tools | Group | Title |
@@ -2220,8 +2223,8 @@ Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_do
 | 0x1AB | THERMAL_STATS_RESP | board to host | 8 | any | diagnostics | Lifetime thermal counters |
 | 0x1AC | SET_MULTINODE | host to board | 6 | any | configuration | Switch the multinode extension on or off (persistent, acts after the next power-up) |
 | 0x1AD | MULTINODE_CONFIG_RESP | both ways | any / 4 | any | configuration | The multinode switch: stored value, value in force, instance and node address |
-| 0x1AE | SET_FEATURES | host to board | 5 6 | any | configuration | Switch the optional firmware features on or off (persistent, acts after the next power-up) |
-| 0x1AF | FEATURES_RESP | both ways | any 1 / 3 / 6 | any | configuration | The optional firmware features: stored mask, mask in force and supported mask |
+| 0x1AE | SET_FEATURES | host to board | 5 6 8 | any | configuration | Switch the optional firmware features on or off (persistent, acts after the next power-up) |
+| 0x1AF | FEATURES_RESP | both ways | any 1 1 / 3 / 6 / 8 | any | configuration | The optional firmware features: stored mask, mask in force and supported mask |
 | 0x1B0 | ELECTROMAGNET_CMD | host to board | 1 | 13 | electromagnet | Electromagnet coil |
 | 0x1B2 | CLEAR_ERROR | host to board | 4 | any | global | Lift a latched critical error without a power cycle (feature CLEAR_ERROR, off by default) |
 | 0x1B8 | HEALTH_PROFILE | board to host | 8 | any | diagnostics | Periodic health frame of the board (only while the health feature runs) |
@@ -2288,7 +2291,7 @@ Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_do
 
 C. Field layouts and examples
 
-[[ BEGIN GENERATED layouts sha256=c86002d9a2e197e33e70fb7b224293ee8c040436d7131ed2ba07311b238c8c7c ]]
+[[ BEGIN GENERATED layouts sha256=2d366b8209058eb48f00a42bbda0fd74a9a35279a9b5f783d5623de56ddd5ed4 ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 ### 0x095 IMPACT_EVENT - Impact register (touch probe, maximum priority)
@@ -2956,7 +2959,7 @@ Example stored on, not yet running, address 5: data 01000005 (stored=1, running=
 
 ### 0x1AE SET_FEATURES - Switch the optional firmware features on or off (persistent, acts after the next power-up)
 
-host to board; handled by the application; tools: any; refused while a critical error is declared; the firmware accepts DLC 5-6.
+host to board; handled by the application; tools: any; refused while a critical error is declared; the firmware accepts DLC 5 or 6 or 8.
 
 request, DLC 5
 
@@ -2979,9 +2982,24 @@ request (extended), DLC 6
 
 Example watchdog on, only the host feeds it: data 464541542001 (magic=46454154, features=32, features_ext=1)
 
+request (estop_timeout), DLC 8
+
+| Byte | Width | Type | Field | Values | Note |
+|---|---|---|---|---|---|
+| 0 | 4 | bytes | magic | fixed 46454154 |  |
+| 4 | 1 | u8 | features | 0..255, enum firmware_feature | Bit mask of the first byte: the features to have on; the others are off. |
+| 5 | 1 | u8 | features_ext | 0..255, enum firmware_feature_ext | Bit mask of the second byte: the features to have on; the others are off. |
+| 6 | 2 | u16 | estop_timeout_ms | 0..500, ms | ESTOP_FOLLOW: the silence of the master after which a ready head goes back to its safe state. 0 clears the stored value (the default, 100 ms); otherwise ESTOP_ALIVE_TIMEOUT_MIN_MS to ESTOP_ALIVE_TIMEOUT_MAX_MS. A value outside the limits makes the firmware ignore the whole frame: nothing is changed and nothing is answered. |
+
+Example ESTOP_FOLLOW on with a silence of 50 ms: data 4645415480000032 (magic=46454154, features=128, features_ext=0, estop_timeout_ms=50)
+
+Example ESTOP_FOLLOW on, stored silence cleared (default): data 4645415480000000 (magic=46454154, features=128, features_ext=0, estop_timeout_ms=0)
+
 Note: Every feature is off on a board that was never written, with an erased or damaged record, or when a bit outside the supported mask is set. Any other payload or length is ignored.
 Note: Answered with 0x1AF, which reports the stored mask, the mask in force and the mask this firmware supports.
 Note: The five-byte form sets the second byte of the map to zero (every feature of it off) and is answered with the three-byte form of 0x1AF; the six-byte form is answered with the six-byte form. A host that only knows the five-byte form keeps working.
+Note: The eight-byte form also sets the silence of the master of ESTOP_FOLLOW (estop_timeout_ms, stored in the same record, in force after the next power-up like the switches). The five-byte and six-byte forms never touch it: they keep the stored value. The eight-byte form is answered with the eight-byte form of 0x1AF carrying the stored value. A value outside 0 and ESTOP_ALIVE_TIMEOUT_MIN_MS to ESTOP_ALIVE_TIMEOUT_MAX_MS is refused as a whole (ignored, as any invalid payload), so a host reads back with 0x1AF to see that nothing was stored. A host must ask the user before it writes this and must never write it while a firmware update is in progress.
+Note: A DLC of 7 is ignored.
 
 ### 0x1AF FEATURES_RESP - The optional firmware features: stored mask, mask in force and supported mask
 
@@ -3000,6 +3018,16 @@ request (extended), DLC 1
 | 0 | 1 | bytes | format | fixed 02 | Asks for the six-byte answer. |
 
 Example extended query: data 02 (format=02)
+
+request (estop_timeout), DLC 1
+
+| Byte | Width | Type | Field | Values | Note |
+|---|---|---|---|---|---|
+| 0 | 1 | u8 | format | 3..4 | Asks for the eight-byte answer. 3: the silence of the master in force now. 4: the silence stored in the record (0 = the default). Any other value gets the three-byte answer, as before. |
+
+Example ask the value in force: data 03 (format=3)
+
+Example ask the stored value: data 04 (format=4)
 
 response, DLC 3
 
@@ -3024,7 +3052,22 @@ response (extended), DLC 6
 
 Example watchdog and host-only stored, not yet running: data 2000FF010001 (stored=32, running=0, supported=255, stored_ext=1, running_ext=0, supported_ext=1)
 
-Note: A query with the single byte 02 is answered with the six-byte form; any other query, empty or not, with the three-byte form as before.
+response (estop_timeout), DLC 8
+
+| Byte | Width | Type | Field | Values | Note |
+|---|---|---|---|---|---|
+| 0 | 1 | u8 | stored | 0..255 | The first byte of the mask the F-RAM record says. |
+| 1 | 1 | u8 | running | 0..255 | The first byte of the mask in force now. |
+| 2 | 1 | u8 | supported | 0..255 | The features of the first byte this firmware has. |
+| 3 | 1 | u8 | stored_ext | 0..255, enum firmware_feature_ext | The second byte of the mask the F-RAM record says. |
+| 4 | 1 | u8 | running_ext | 0..255, enum firmware_feature_ext | The second byte of the mask in force now. |
+| 5 | 1 | u8 | supported_ext | 0..255, enum firmware_feature_ext | The features of the second byte this firmware has. |
+| 6 | 2 | u16 | estop_timeout_ms | 0..65535, ms | ESTOP_FOLLOW silence of the master. After a query 3 (or the answer to a write): the value in force now, 0 while ESTOP_FOLLOW is not running. After a query 4: the value stored in the record, 0 meaning the default. A board that announces this value is announcing its own master silence: a head takes the lower of its own and the announced one (see docs/ESTOP_FOLLOW_TIMEOUT.md). |
+
+Example ESTOP_FOLLOW running with a silence of 50 ms: data 8080FF0000030032 (stored=128, running=128, supported=255, stored_ext=0, running_ext=0, supported_ext=3, estop_timeout_ms=50)
+
+Note: A query with the single byte 02 is answered with the six-byte form; a query with 03 or 04 with the eight-byte form (the last two bytes are the silence of the master of ESTOP_FOLLOW, in force for 03, stored for 04); any other query, empty or not, with the three-byte form as before.
+Note: The eight-byte form is also the answer to a valid eight-byte write of 0x1AE, with the stored silence.
 
 ### 0x1B0 ELECTROMAGNET_CMD - Electromagnet coil
 
@@ -4362,7 +4405,7 @@ clear_error_result - Outcome of the last clear-error command (prefix CLEAR_ERROR
 
 F. Constants
 
-[[ BEGIN GENERATED constants sha256=73f7081c06644c31e0c370116650ad3459db8057abafd4e082011fa86075dad7 ]]
+[[ BEGIN GENERATED constants sha256=a5e7aab120623aaf6a70ffb9a53f6e57b8719d914d718b5ef927f0c4a54115cc ]]
 Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_doc.py. Do not edit between the markers.
 
 | Name | Value | Unit | Group | Title |
@@ -4414,7 +4457,7 @@ Generated from spec/can_protocol.json of URTC-COMMON by tools/generate_canbus_do
 | MAGNET_SILENCE_MS | 5000 | ms | timing | Silence of the host after which the electromagnet lets go (communication watchdog and release policy on) |
 | ESTOP_CAN_ID | 1 |  | protocol | Identifier of the emergency stop frame of the stack, which a head with the ESTOP_FOLLOW feature obeys (standard frame, eight bytes) |
 | ESTOP_ALIVE_TIMEOUT_MS | 100 | ms | timing | Silence of the master of the emergency stop after which a head that is ready goes back to its safe state (ESTOP_FOLLOW feature on) |
-| ESTOP_ALIVE_TIMEOUT_MIN_MS | 20 | ms | timing | Lowest silence of the master of the emergency stop a head accepts as its configured timeout; below it the value is rejected and the default is used (ESTOP_FOLLOW feature on) |
+| ESTOP_ALIVE_TIMEOUT_MIN_MS | 40 | ms | timing | Lowest silence of the master of the emergency stop a head accepts as its configured timeout; below it the value is rejected and the default is used (ESTOP_FOLLOW feature on) |
 | ESTOP_ALIVE_TIMEOUT_MAX_MS | 500 | ms | timing | Highest silence of the master of the emergency stop a head accepts as its configured timeout; above it the value is rejected and the default is used (ESTOP_FOLLOW feature on) |
 [[ END GENERATED constants ]]
 

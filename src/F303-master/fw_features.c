@@ -5,6 +5,7 @@
 // =============================================================================
 #include <string.h>
 #include "fw_features.h"
+#include "urtc_can_ids.h"
 
 static uint8_t crc8(const uint8_t *p, unsigned n) {
     uint8_t crc = 0;
@@ -94,6 +95,36 @@ uint8_t Feat_ParseCommandEx(uint8_t dlc, const uint8_t *data, uint8_t *mask, uin
     *mask_ext = ext;
     *extended = (uint8_t)(dlc == 6);
     return 1;
+}
+
+uint8_t Feat_ParseWrite(uint8_t dlc, const uint8_t *data, uint8_t *mask, uint8_t *mask_ext, uint32_t *timeout_ms) {
+    if (dlc != 5 && dlc != 6 && dlc != 8) return 0;
+    if (data[0] != 0x46 || data[1] != 0x45 || data[2] != 0x41 || data[3] != 0x54) return 0; // 'FEAT'
+    const uint8_t ext = (dlc >= 6) ? data[5] : 0;
+    if ((data[4] & (uint8_t)~FEAT_SUPPORTED) || (ext & (uint8_t)~FEAT_EXT_SUPPORTED)) return 0;
+    uint32_t silence = FEAT_TIMEOUT_KEEP;
+    if (dlc == 8) {
+        silence = (uint32_t)(((uint32_t)data[6] << 8) | data[7]);
+        if (silence != 0u && (silence < URTC_ESTOP_ALIVE_TIMEOUT_MIN_MS || silence > URTC_ESTOP_ALIVE_TIMEOUT_MAX_MS)) return 0; // a value outside the limits: the whole command is ignored
+    }
+    *mask = data[4];
+    *mask_ext = ext;
+    *timeout_ms = silence;
+    return 1;
+}
+
+uint8_t Feat_QueryForm(uint8_t dlc, const uint8_t *data) {
+    if (dlc != 1) return FEAT_QUERY_BASIC;
+    if (data[0] == 0x02) return FEAT_QUERY_EXTENDED;
+    if (data[0] == 0x03) return FEAT_QUERY_TIMEOUT_IN_FORCE;
+    if (data[0] == 0x04) return FEAT_QUERY_TIMEOUT_STORED;
+    return FEAT_QUERY_BASIC;
+}
+
+void Feat_EncodeResponseTimeout(uint8_t stored, uint8_t running, uint8_t stored_ext, uint8_t running_ext, uint16_t timeout_ms, uint8_t out[8]) {
+    Feat_EncodeResponseExt(stored, running, stored_ext, running_ext, out);
+    out[6] = (uint8_t)(timeout_ms >> 8);
+    out[7] = (uint8_t)(timeout_ms & 0xFFu);
 }
 
 uint8_t Feat_QueryWantsExtended(uint8_t dlc, const uint8_t *data) { return (uint8_t)(dlc == 1 && data[0] == 0x02); }

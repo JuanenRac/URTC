@@ -61,7 +61,7 @@
 #define URTC_MAGNET_SILENCE_MS 0x1388u  /* Silence of the host after which the electromagnet lets go (communication watchdog and release policy on) */
 #define URTC_ESTOP_CAN_ID 0x1u  /* Identifier of the emergency stop frame of the stack, which a head with the ESTOP_FOLLOW feature obeys (standard frame, eight bytes) */
 #define URTC_ESTOP_ALIVE_TIMEOUT_MS 0x64u  /* Silence of the master of the emergency stop after which a head that is ready goes back to its safe state (ESTOP_FOLLOW feature on) */
-#define URTC_ESTOP_ALIVE_TIMEOUT_MIN_MS 0x14u  /* Lowest silence of the master of the emergency stop a head accepts as its configured timeout; below it the value is rejected and the default is used (ESTOP_FOLLOW feature on) */
+#define URTC_ESTOP_ALIVE_TIMEOUT_MIN_MS 0x28u  /* Lowest silence of the master of the emergency stop a head accepts as its configured timeout; below it the value is rejected and the default is used (ESTOP_FOLLOW feature on) */
 #define URTC_ESTOP_ALIVE_TIMEOUT_MAX_MS 0x1F4u  /* Highest silence of the master of the emergency stop a head accepts as its configured timeout; above it the value is rejected and the default is used (ESTOP_FOLLOW feature on) */
 
 /* --- identifiers, and the length rule of every layout --- */
@@ -300,12 +300,21 @@
 #define URTC_SET_FEATURES_REQUEST_EXTENDED_MAGIC_OFFSET 0u
 #define URTC_SET_FEATURES_REQUEST_EXTENDED_FEATURES_OFFSET 4u
 #define URTC_SET_FEATURES_REQUEST_EXTENDED_FEATURES_EXT_OFFSET 5u
+#define URTC_DLC_SET_FEATURES_REQUEST_ESTOP_TIMEOUT_MIN 8u
+#define URTC_DLC_SET_FEATURES_REQUEST_ESTOP_TIMEOUT_MAX 8u
+#define URTC_SET_FEATURES_REQUEST_ESTOP_TIMEOUT_MAGIC_OFFSET 0u
+#define URTC_SET_FEATURES_REQUEST_ESTOP_TIMEOUT_FEATURES_OFFSET 4u
+#define URTC_SET_FEATURES_REQUEST_ESTOP_TIMEOUT_FEATURES_EXT_OFFSET 5u
+#define URTC_SET_FEATURES_REQUEST_ESTOP_TIMEOUT_ESTOP_TIMEOUT_MS_OFFSET 6u
 #define URTC_CAN_ID_FEATURES_RESP 0x1AFu  /* The optional firmware features: stored mask, mask in force and supported mask */
 #define URTC_DLC_FEATURES_RESP_REQUEST_MIN 0u
 #define URTC_DLC_FEATURES_RESP_REQUEST_MAX 8u
 #define URTC_DLC_FEATURES_RESP_REQUEST_EXTENDED_MIN 1u
 #define URTC_DLC_FEATURES_RESP_REQUEST_EXTENDED_MAX 1u
 #define URTC_FEATURES_RESP_REQUEST_EXTENDED_FORMAT_OFFSET 0u
+#define URTC_DLC_FEATURES_RESP_REQUEST_ESTOP_TIMEOUT_MIN 1u
+#define URTC_DLC_FEATURES_RESP_REQUEST_ESTOP_TIMEOUT_MAX 1u
+#define URTC_FEATURES_RESP_REQUEST_ESTOP_TIMEOUT_FORMAT_OFFSET 0u
 #define URTC_DLC_FEATURES_RESP_RESPONSE_MIN 3u
 #define URTC_DLC_FEATURES_RESP_RESPONSE_MAX 3u
 #define URTC_FEATURES_RESP_RESPONSE_STORED_OFFSET 0u
@@ -319,6 +328,15 @@
 #define URTC_FEATURES_RESP_RESPONSE_EXTENDED_STORED_EXT_OFFSET 3u
 #define URTC_FEATURES_RESP_RESPONSE_EXTENDED_RUNNING_EXT_OFFSET 4u
 #define URTC_FEATURES_RESP_RESPONSE_EXTENDED_SUPPORTED_EXT_OFFSET 5u
+#define URTC_DLC_FEATURES_RESP_RESPONSE_ESTOP_TIMEOUT_MIN 8u
+#define URTC_DLC_FEATURES_RESP_RESPONSE_ESTOP_TIMEOUT_MAX 8u
+#define URTC_FEATURES_RESP_RESPONSE_ESTOP_TIMEOUT_STORED_OFFSET 0u
+#define URTC_FEATURES_RESP_RESPONSE_ESTOP_TIMEOUT_RUNNING_OFFSET 1u
+#define URTC_FEATURES_RESP_RESPONSE_ESTOP_TIMEOUT_SUPPORTED_OFFSET 2u
+#define URTC_FEATURES_RESP_RESPONSE_ESTOP_TIMEOUT_STORED_EXT_OFFSET 3u
+#define URTC_FEATURES_RESP_RESPONSE_ESTOP_TIMEOUT_RUNNING_EXT_OFFSET 4u
+#define URTC_FEATURES_RESP_RESPONSE_ESTOP_TIMEOUT_SUPPORTED_EXT_OFFSET 5u
+#define URTC_FEATURES_RESP_RESPONSE_ESTOP_TIMEOUT_ESTOP_TIMEOUT_MS_OFFSET 6u
 #define URTC_CAN_ID_ELECTROMAGNET_CMD 0x1B0u  /* Electromagnet coil */
 #define URTC_DLC_ELECTROMAGNET_CMD_MIN 1u
 #define URTC_DLC_ELECTROMAGNET_CMD_MAX 1u

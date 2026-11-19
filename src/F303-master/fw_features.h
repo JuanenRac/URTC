@@ -81,6 +81,23 @@ uint8_t Feat_ParseCommand(uint8_t dlc, const uint8_t *data, uint8_t *mask);
 // 0x1AE with the second mask byte: DLC 5 (the first form; the second byte is zero, so every switch of it goes off) or DLC 6. *extended is 1 for DLC 6.
 uint8_t Feat_ParseCommandEx(uint8_t dlc, const uint8_t *data, uint8_t *mask, uint8_t *mask_ext, uint8_t *extended);
 
+// 0x1AE of any of its three lengths: DLC 5 (the first byte of the mask), 6 (both bytes) or 8 (both bytes and the silence of the master of ESTOP_FOLLOW).
+// 1 when the command is valid; anything else is ignored. *timeout_ms is the silence to store: FEAT_TIMEOUT_KEEP for the forms that do not carry one (the stored
+// one stays), otherwise 0 (clear it, the default applies) or a value inside URTC_ESTOP_ALIVE_TIMEOUT_MIN_MS and _MAX_MS; a value outside them makes the whole
+// command invalid, so nothing is changed. The silence is big endian on the bus (the byte 6 is the high one).
+#define FEAT_TIMEOUT_KEEP 0xFFFFFFFFUL
+uint8_t Feat_ParseWrite(uint8_t dlc, const uint8_t *data, uint8_t *mask, uint8_t *mask_ext, uint32_t *timeout_ms);
+
+// 0x1AF query forms.
+#define FEAT_QUERY_BASIC            0u  // three-byte answer
+#define FEAT_QUERY_EXTENDED         1u  // six-byte answer (the byte 02)
+#define FEAT_QUERY_TIMEOUT_IN_FORCE 2u  // eight-byte answer with the silence in force (the byte 03)
+#define FEAT_QUERY_TIMEOUT_STORED   3u  // eight-byte answer with the silence stored in the record (the byte 04)
+// Which answer a query gets: only a query of exactly one byte asks for more than the three-byte form.
+uint8_t Feat_QueryForm(uint8_t dlc, const uint8_t *data);
+// The eight-byte answer: the six bytes of the extended one, then the silence in milliseconds, high byte first.
+void Feat_EncodeResponseTimeout(uint8_t stored, uint8_t running, uint8_t stored_ext, uint8_t running_ext, uint16_t timeout_ms, uint8_t out[8]);
+
 // 0x1AF query: 1 when it asks for the six-byte answer (DLC 1, the byte 0x02); any other query gets the three-byte one.
 uint8_t Feat_QueryWantsExtended(uint8_t dlc, const uint8_t *data);
 

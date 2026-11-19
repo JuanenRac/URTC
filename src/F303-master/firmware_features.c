@@ -28,6 +28,7 @@ static FeatConfig_t persisted;     // what is in F-RAM now (blank when the chip 
 static uint8_t running_mask;       // read once at boot
 static uint8_t running_mask_ext;   // the second byte of the map, read at the same time
 static uint16_t running_estop_timeout_ms;   // ESTOP_FOLLOW silence of the master, read at the same time (0 = the default)
+static uint16_t in_force_estop_timeout_ms;  // the silence the logic of ESTOP_FOLLOW really uses (after the limits); 0 while that feature is not running
 
 // ---- the switches ------------------------------------------------------------------------------------
 static void read_persisted(void) {
@@ -121,6 +122,7 @@ void Features_Init(void) {
     running_mask = Feat_ConfigMask(&persisted);
     running_mask_ext = Feat_ConfigMaskExt(&persisted);
     running_estop_timeout_ms = Feat_ConfigEstopTimeoutMs(&persisted);
+    in_force_estop_timeout_ms = 0;   // Safety_EstopInit says what the logic really uses, when ESTOP_FOLLOW runs
     pid_state = PID_STATE_OFF_VALUE;
     if (running_mask & FEAT_THERMAL_PID) { pid_load(); pid_state = PID_STATE_RUNNING_VALUE; }
     HsiTrim_Init(&hsi, HSI_TRIM_DEFAULT);
@@ -131,30 +133,42 @@ void Features_Init(void) {
 uint8_t Features_Running(void) { return running_mask; }
 uint8_t Features_Active(uint8_t feature_bit) { return (uint8_t)((running_mask & feature_bit) != 0); }
 uint16_t Features_EstopTimeoutMs(void) { return running_estop_timeout_ms; }
+void Features_NoteEstopTimeoutInForce(uint16_t ms) { in_force_estop_timeout_ms = ms; }
 uint8_t Features_RunningExt(void) { return running_mask_ext; }
 uint8_t Features_ActiveExt(uint8_t feature_bit) { return (uint8_t)((running_mask_ext & feature_bit) != 0); }
 
 void Features_HandleCommand(void) {
-    uint8_t extended;   // whether the host speaks the form with the second mask byte: it is answered in the same form
+    uint8_t form = FEAT_QUERY_BASIC;   // which answer the host gets: the form it spoke (three, six or eight bytes)
     if (rxHeader.StdId == URTC_CAN_ID_SET_FEATURES) {
         uint8_t mask, mask_ext;
-        if (!Feat_ParseCommandEx((uint8_t)rxHeader.DLC, rxData, &mask, &mask_ext, &extended)) return; // anything else is ignored, like every magic-protected command
+        uint32_t silence;
+        if (!Feat_ParseWrite((uint8_t)rxHeader.DLC, rxData, &mask, &mask_ext, &silence)) return; // anything else is ignored, like every magic-protected command
+        form = (rxHeader.DLC == 8) ? FEAT_QUERY_TIMEOUT_STORED : (rxHeader.DLC == 6) ? FEAT_QUERY_EXTENDED : FEAT_QUERY_BASIC;
         FeatConfig_t next;
         Feat_ConfigBlank(&next);
         next.mask = mask;
         next.mask_ext = mask_ext;   // zero for the five-byte form: the switches of the second byte go off
-        Feat_ConfigSetEstopTimeoutMs(&next, Feat_ConfigEstopTimeoutMs(&persisted));   // a change of the switches never loses the configured timeout
+        // A change of the switches never loses the configured timeout; only the eight-byte form sets it (0 clears it).
+        Feat_ConfigSetEstopTimeoutMs(&next, (silence == FEAT_TIMEOUT_KEEP) ? Feat_ConfigEstopTimeoutMs(&persisted) : (uint16_t)silence);
         Feat_ConfigSeal(&next);
         // Always written in the current format (16 bytes); a record of the first format is replaced here and never at power-up.
         if (FRAM_WriteBytes(FEAT_CONFIG_FRAM_ADDR, (const uint8_t *)&next, sizeof(next))) {
             read_persisted(); // report what the chip really holds, not what was asked
         }
     } else if (rxHeader.StdId == URTC_CAN_ID_FEATURES_RESP) {
-        extended = Feat_QueryWantsExtended((uint8_t)rxHeader.DLC, rxData);
+        form = Feat_QueryForm((uint8_t)rxHeader.DLC, rxData);
     } else {
         return;
     }
-    if (extended) {
+    if (form == FEAT_QUERY_TIMEOUT_IN_FORCE || form == FEAT_QUERY_TIMEOUT_STORED) {
+        uint8_t out8[8];
+        // In force: what the logic uses now (0 while ESTOP_FOLLOW is not running). Stored: the record (0 = the default); also the answer to an eight-byte write.
+        const uint16_t ms = (form == FEAT_QUERY_TIMEOUT_IN_FORCE) ? in_force_estop_timeout_ms : Feat_ConfigEstopTimeoutMs(&persisted);
+        Feat_EncodeResponseTimeout(Feat_ConfigMask(&persisted), running_mask, Feat_ConfigMaskExt(&persisted), running_mask_ext, ms, out8);
+        send_frame(URTC_CAN_ID_FEATURES_RESP, out8, 8);
+        return;
+    }
+    if (form == FEAT_QUERY_EXTENDED) {
         uint8_t out6[6];
         Feat_EncodeResponseExt(Feat_ConfigMask(&persisted), running_mask, Feat_ConfigMaskExt(&persisted), running_mask_ext, out6);
         send_frame(URTC_CAN_ID_FEATURES_RESP, out6, 6);

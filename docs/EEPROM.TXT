@@ -494,7 +494,10 @@ DEFAULT ALL OFF, like the multinode switch: a blank, erased, damaged or
 missing record, or one whose checksum does not match, reads as every
 feature off. Written by CAN 0x1AE, read back with 0x1AF, read once at
 boot (a change acts after the next power-up). The erase command 0x192 does
-not touch it.
+not touch it. The silence of the master of the emergency stop (bytes 7 and 8
+of the record, low byte first, 0 = default) is written by the eight-byte form
+of 0x1AE (0, or 40 to 500 ms; anything else makes the whole command ignored);
+the five-byte and six-byte forms keep it.
 
 PID gains (address 992):
 Offset | Size | Field          | Type     | Notes
