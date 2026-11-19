@@ -143,7 +143,7 @@ void Features_HandleCommand(void) {
         Feat_ConfigBlank(&next);
         next.mask = mask;
         next.mask_ext = mask_ext;   // zero for the five-byte form: the switches of the second byte go off
-        next.estop_alive_timeout_ms = Feat_ConfigEstopTimeoutMs(&persisted);   // a change of the switches never loses the configured timeout
+        Feat_ConfigSetEstopTimeoutMs(&next, Feat_ConfigEstopTimeoutMs(&persisted));   // a change of the switches never loses the configured timeout
         Feat_ConfigSeal(&next);
         // Always written in the current format (16 bytes); a record of the first format is replaced here and never at power-up.
         if (FRAM_WriteBytes(FEAT_CONFIG_FRAM_ADDR, (const uint8_t *)&next, sizeof(next))) {

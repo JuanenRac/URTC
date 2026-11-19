@@ -523,20 +523,20 @@ static void test_estop_timeout_in_the_record(int *failures)
     uint8_t raw[FEAT_CONFIG_RAW_SIZE];
     Feat_ConfigBlank(&c);
     TEST_ASSERT(Feat_ConfigEstopTimeoutMs(&c) == 0, "a blank record has no configured silence of the master (the default)");
-    c.mask = FEAT_ESTOP_FOLLOW; c.estop_alive_timeout_ms = 250; Feat_ConfigSeal(&c);
+    c.mask = FEAT_ESTOP_FOLLOW; Feat_ConfigSetEstopTimeoutMs(&c, 250); Feat_ConfigSeal(&c);
     memcpy(raw, &c, sizeof raw);
     TEST_ASSERT(Feat_ConfigDecode(raw, &d) && Feat_ConfigEstopTimeoutMs(&d) == 250 && Feat_ConfigMask(&d) == FEAT_ESTOP_FOLLOW, "a sound record gives its timeout");
     TEST_ASSERT(raw[7] == 250 && raw[8] == 0, "the timeout is two bytes, little endian, at the start of the reserved area");
     raw[8] = 1;
     TEST_ASSERT(!Feat_ConfigDecode(raw, &d) && Feat_ConfigEstopTimeoutMs(&d) == 0, "a changed timeout breaks the checksum and reads as the default");
     Feat_ConfigBlank(&c);
-    c.estop_alive_timeout_ms = 250;   // not sealed: invalid
+    Feat_ConfigSetEstopTimeoutMs(&c, 250);   // not sealed: invalid
     TEST_ASSERT(Feat_ConfigEstopTimeoutMs(&c) == 0, "an invalid record gives no timeout");
 
     // a change of the switches through 0x1AE keeps the timeout that is in the record
     reset_world();
     Feat_ConfigBlank(&c);
-    c.mask = FEAT_ESTOP_FOLLOW; c.estop_alive_timeout_ms = 300; Feat_ConfigSeal(&c);
+    c.mask = FEAT_ESTOP_FOLLOW; Feat_ConfigSetEstopTimeoutMs(&c, 300); Feat_ConfigSeal(&c);
     memcpy(&fake_fram[FEAT_CONFIG_FRAM_ADDR], &c, sizeof c);
     Features_Init();
     TEST_ASSERT(Features_EstopTimeoutMs() == 300, "the timeout is read once at power-up");

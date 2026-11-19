@@ -343,7 +343,7 @@ static void boot_with_timeout(uint16_t timeout_ms)
     FeatConfig_t c;
     Feat_ConfigBlank(&c);
     c.mask = FEAT_ESTOP_FOLLOW;
-    c.estop_alive_timeout_ms = timeout_ms;
+    Feat_ConfigSetEstopTimeoutMs(&c, timeout_ms);
     Feat_ConfigSeal(&c);
     memcpy(&fake_fram[FEAT_CONFIG_FRAM_ADDR], &c, sizeof c);
     fake_tick = 100000;
