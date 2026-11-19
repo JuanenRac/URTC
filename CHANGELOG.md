@@ -4,11 +4,12 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.5.1] - Switch map second byte, emergency-stop following, update-end check in the main loop and stricter release set
+
 - **The pinned copy of the common library moves to 0.2.9:** the image record tools follow the current common library; nothing changes in what they do.
 - **A switch of its own for the refusal of the end of a slave update while a tool is active (`ALLOW_UPDATE_ACTIVE_ACTUATOR`, second byte of the switch map, off by default):** off, the end is refused as always (`0x215` VERIFY_FAIL, `0x219` ACTUATOR_ACTIVE); on, the master checks and relays it even though a tool runs. Changed with `0x1AE`, in force after the next power-up; host tests cover both states.
 
 - **The pinned copy of the image-signing keys in the flasher is now checked against the trust table:** the three public keys of the trust table (the official one, the reserved next one and the development one) are registered in `keys/registry.json` with the place of the flasher's pinned copy, so `tools/keys.py verify` compares that copy with `keys/image_trust.json` and the CI notices when one of them falls behind. Tested against the trust table and the places registered.
-- **The vendored copy of the common library is refreshed:** the fuzz corpus follows the current catalog again.
 
 - **An image that names no patch counts as patch 0 in the anti-rollback of both bootloaders:** until now the patch took part only when both the installed version and the incoming image carried one, so an image signed for X.Y.0 and declared with the minor field of a flasher that predates the patch could be installed over X.Y.Z with Z above 0 without the authorization of a downgrade (on the expansion board, which has no way to authorize one, it was the only way down in patch). The bootloaders now read such an image as patch 0 when the installed version has a patch, through `urtc_version_rollback` in `src/common/urtc_version_wire.h`. A fleet whose flasher still sends the minor field without a patch can build with `-DURTC_VERSION_LEGACY_IS_PATCH_ZERO=0` to keep the lenient rule. The host tests of both bootloaders and of the twin of the expansion bootloader cover the strict rule, the equal-version case and the compatibility mode. The shared conformance vectors keep describing the lenient rule through `urtc_version_is_older`. Not run on a board.
 
@@ -82,8 +83,6 @@ All notable changes to this project are documented here.
 - **The manual host test workflow measures the coverage of the firmware logic with gcov and fails under 93 percent:** the 58 C suites execute 93.9 percent of the lines of the 83 firmware sources they compile (the floor is the measured value, never above it); an empty floor runs the suites without the measurement.
 
 - **The identity frame declares the bit rate of the bus (protocol version 2):** the master firmware sends the code of the rate it was built for (1 Mbit/s, or 500 kbit/s with `URTC_CAN_LEGACY_500K`) in byte 5 of `0x1BB`, `URTC_PROTOCOL_VERSION` is 2, and the uptime of that frame is 16 bits that stop at 65535 s instead of 24 bits. A tool of the previous protocol version reads the frame with a wrong uptime and no rate; the new tools read both versions. `src/common/urtc_can_ids.h` is the generated header of the new specification, `docs/CANBUS.TXT` is regenerated, and the host test covers the layout, the stop of the uptime and every rate code. The code is built only in the CI; it has not been run on a board.
-
-## [Unreleased]
 
 ## [0.4.8] - The bus runs at 1 Mbit/s, the application images carry their own header and the expansion link gets a check byte
 
