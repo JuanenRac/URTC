@@ -82,7 +82,7 @@ extern I2C_HandleTypeDef hi2c1;
 // main board's own version history.
 #define BOOTLOADER_VERSION_MAJOR 0
 #define BOOTLOADER_VERSION_MINOR 3
-#define BOOTLOADER_VERSION_PATCH 5
+#define BOOTLOADER_VERSION_PATCH 6
 
 // -----------------------------------------------------------------------
 // No signing key. This bootloader holds no secret of any kind: the master
