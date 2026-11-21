@@ -19,7 +19,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Lizenz-GPL%203.0-blue.svg" alt="GPL 3.0">
-  <img src="https://img.shields.io/badge/Tests-48%20suites-2ea44f.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-319%20tests-2ea44f.svg" alt="Tests">
   <img src="https://img.shields.io/badge/Hardware-CERN%20OHL--S-orange.svg" alt="CERN OHL-S">
   <img src="https://img.shields.io/badge/Sprache-C-00599C.svg" alt="C">
   <img src="https://img.shields.io/badge/Plattform-STM32F303-003551.svg" alt="STM32">
@@ -42,6 +42,7 @@
 |---|---|
 | Version | `0.5.1` |
 | Reifegrad | Funktionsfähig |
+| Tests | 319 (`python -m unittest discover -s tests`), dazu 80 C-Host-Suiten (ctest) |
 | Technik | STM32F303 / bxCAN / 25 tool profiles |
 | Ziel | Eine Mikrocontroller-Platine (die Firmware); wird auf einem PC gebaut |
 | Auf echter Hardware | Noch nicht: für diese Version ist kein Lauf auf echter Hardware vermerkt |
@@ -405,7 +406,7 @@ Welche Versionen der URTC-Programme zusammenarbeiten und welche Protokollversion
 
 ## 🧪 Tests
 
-Die Firmware-Logik rund um die Hardware wird auf einem Computer getestet: `python tools/run_host_tests.py` baut und führt 62 C-Testsuiten (`tests/test_*.c`) mit dem Host-Compiler, einer Fake-HAL und den Sanitizern AddressSanitizer und UBSan mit `-fanalyzer` aus: die Bootloader, den Thermoschutz, den Dispatcher, die echten CAN-Handler der 13 Werkzeuge, die Heizungsregelkreise und die Blackbox, unter anderem. Die CI baut und linkt außerdem die vier Binärdateien und schlägt unter einer Abdeckungsschwelle der ausgeführten Zeilen der Firmware-Quellen fehl. Nichts davon lief auf einer Platine: Es gibt keine bestückte Platine, und die Host-Tests können nicht zeigen, dass Zeitverhalten, Treiber oder Leistungsstufen funktionieren. `python tools/c_quality.py` ergänzt drei Prüfungen, die der Compiler der Platine nicht macht: den Compiler des Rechners mit `-Wconversion` über jede Quelle, die die Suiten bauen, cppcheck und eine Obergrenze für die Länge von Kommentarblöcken (die übernommenen Sensortreiber bleiben ausgenommen, jeweils mit ihrer Begründung in `tools/c_quality.json`).
+Die Firmware-Logik rund um die Hardware wird auf einem Computer getestet: `python tools/run_host_tests.py` baut und führt 80 C-Testsuiten (`tests/test_*.c`) mit dem Host-Compiler, einer Fake-HAL und den Sanitizern AddressSanitizer und UBSan mit `-fanalyzer` aus: die Bootloader, den Thermoschutz, den Dispatcher, die echten CAN-Handler der 13 Werkzeuge, die Heizungsregelkreise und die Blackbox, unter anderem. Die CI baut und linkt außerdem die vier Binärdateien und schlägt unter einer Abdeckungsschwelle der ausgeführten Zeilen der Firmware-Quellen fehl. Nichts davon lief auf einer Platine: Es gibt keine bestückte Platine, und die Host-Tests können nicht zeigen, dass Zeitverhalten, Treiber oder Leistungsstufen funktionieren. `python tools/c_quality.py` ergänzt drei Prüfungen, die der Compiler der Platine nicht macht: den Compiler des Rechners mit `-Wconversion` über jede Quelle, die die Suiten bauen, cppcheck und eine Obergrenze für die Länge von Kommentarblöcken (die übernommenen Sensortreiber bleiben ausgenommen, jeweils mit ihrer Begründung in `tools/c_quality.json`).
 
 ## 🏗️ Build und Veröffentlichung
 
