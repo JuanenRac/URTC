@@ -12,7 +12,7 @@
 name: Notify central ecosystem dashboard
 
 on:
-  workflow_run:
+  workflow_run: # zizmor: ignore[dangerous-triggers] same-repository CI run, main only, no checkout or code execution from it
     workflows:
       - URTC CI baseline
     types:
