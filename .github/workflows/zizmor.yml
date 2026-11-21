@@ -1,0 +1,39 @@
+# =============================================================================
+# URTC Ecosystem - Static analysis of the workflows
+# Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
+# GPL-3.0-or-later - see LICENSE
+# =============================================================================
+# Calls the shared reusable workflow (zizmor), pinned by its full commit SHA.
+# Only findings of high severity fail the job.
+
+name: zizmor
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/**"
+      - ".github/actions/**"
+      - ".github/zizmor.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/**"
+      - ".github/actions/**"
+      - ".github/zizmor.yml"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: zizmor-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  zizmor:
+    name: zizmor
+    permissions:
+      contents: read
+    uses: JuanenRac/JuanenRac/.github/workflows/zizmor.yml@fe5fca0f22035148d35fa4eae45706de1ce556a1 # main
+    with:
+      min-severity: high
