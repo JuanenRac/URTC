@@ -19,7 +19,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/License-GPL%203.0-blue.svg" alt="GPL 3.0">
-  <img src="https://img.shields.io/badge/Tests-48%20suites-2ea44f.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-319%20tests-2ea44f.svg" alt="Tests">
   <img src="https://img.shields.io/badge/Hardware-CERN%20OHL--S-orange.svg" alt="CERN OHL-S">
   <img src="https://img.shields.io/badge/Language-C-00599C.svg" alt="C">
   <img src="https://img.shields.io/badge/Platform-STM32F303-003551.svg" alt="STM32">
@@ -42,6 +42,7 @@
 |---|---|
 | Version | `0.5.1` |
 | Maturity | Functional |
+| Tests | 319 (`python -m unittest discover -s tests`), plus 80 C host suites (ctest) |
 | Stack | STM32F303 / bxCAN / 25 tool profiles |
 | Target | A microcontroller board (the firmware); built on a PC |
 | On real hardware | Not yet: no run on real hardware is recorded for this version |
@@ -410,7 +411,7 @@ Which versions of the URTC programs work together, and which protocol version ea
 
 ## 🧪 Testing
 
-The firmware logic around the hardware is tested on a computer: `python tools/run_host_tests.py` builds and runs 62 C test suites (`tests/test_*.c`) with the host compiler, a fake HAL and the sanitizers AddressSanitizer and UBSan with `-fanalyzer`: the bootloaders, the thermal guard, the dispatcher, the real CAN handlers of the 13 tools, the heater control loops and the black box, among others. CI compiles and links the four binaries too and fails below a coverage floor of the executed lines of the firmware sources. None of it has run on a board: no populated board exists, and the host tests cannot show that the timing, the drivers or the power stages work. `python tools/c_quality.py` adds three checks that the compiler of the board does not make: the host compiler with `-Wconversion` over every source the suites build, cppcheck, and a limit on the length of comment blocks (the vendored sensor drivers are left out, each with its reason in `tools/c_quality.json`).
+The firmware logic around the hardware is tested on a computer: `python tools/run_host_tests.py` builds and runs 80 C test suites (`tests/test_*.c`) with the host compiler, a fake HAL and the sanitizers AddressSanitizer and UBSan with `-fanalyzer`: the bootloaders, the thermal guard, the dispatcher, the real CAN handlers of the 13 tools, the heater control loops and the black box, among others. CI compiles and links the four binaries too and fails below a coverage floor of the executed lines of the firmware sources. None of it has run on a board: no populated board exists, and the host tests cannot show that the timing, the drivers or the power stages work. `python tools/c_quality.py` adds three checks that the compiler of the board does not make: the host compiler with `-Wconversion` over every source the suites build, cppcheck, and a limit on the length of comment blocks (the vendored sensor drivers are left out, each with its reason in `tools/c_quality.json`).
 
 ## 🏗️ Build & Release
 
