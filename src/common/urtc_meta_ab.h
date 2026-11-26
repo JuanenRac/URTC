@@ -91,6 +91,11 @@ static inline uint8_t urtc_meta_ab_read(const UrtcMetaAbOps *ops, uint32_t paylo
     return 1;
 }
 
+// A payload equal to the newest one is not written again, unless a build that keeps more than the payload in a page says otherwise (urtc_vc_annex.h).
+#ifndef URTC_META_AB_SKIP_SAME
+#define URTC_META_AB_SKIP_SAME() 1
+#endif
+
 // Writes the payload as a new record in the page that does not hold the newest one. 1 when the new record reads back valid; 0 on a flash failure (the
 // previous record is still in force). A payload equal to the newest one is not written again.
 static inline uint8_t urtc_meta_ab_write_first(const UrtcMetaAbOps *ops, uint32_t payload_len, const uint8_t *payload, uint8_t first_page)
@@ -98,7 +103,7 @@ static inline uint8_t urtc_meta_ab_write_first(const UrtcMetaAbOps *ops, uint32_
     if (payload_len == 0 || payload_len > URTC_META_AB_MAX_PAYLOAD) return 0;
     uint32_t generation = 0;
     const int newest = urtc_meta_ab_newest(ops, payload_len, &generation);
-    if (newest >= 0 && memcmp(ops->page_ptr(ops->ctx, (uint8_t)newest) + URTC_META_AB_HEADER, payload, payload_len) == 0) return 1;
+    if (URTC_META_AB_SKIP_SAME() && newest >= 0 && memcmp(ops->page_ptr(ops->ctx, (uint8_t)newest) + URTC_META_AB_HEADER, payload, payload_len) == 0) return 1;
     // with no valid record yet the caller chooses the page (urtc_meta_migrate.h keeps the single-page log in page 0 untouched until page 1 holds a record)
     const uint8_t target = (newest < 0) ? (uint8_t)(first_page ? 1u : 0u) : (newest == 0 ? 1u : 0u);
     uint32_t next = generation + 1u;

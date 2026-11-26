@@ -6,6 +6,11 @@
 #include "stm32f3xx_hal.h"
 #include <string.h>
 #include "bootloader_common.h"
+#if URTC_BL_VERSION_COMPAT_COMMAND
+// With the stored version rule built in, this file is optimised for size: the 28 KB of the bootloader have no room for it otherwise. The signature and hash
+// files keep their optimisation, so the time of a verification does not change. As shipped (switch off) nothing here changes.
+#pragma GCC optimize ("Os")
+#endif
 #include "bootloader_flash.h"
 #include "bootloader_oled.h"
 #include "urtc_bl_serial.h"
@@ -16,6 +21,10 @@
 // holds its state in the log of one page moves over without losing the serial or the rollback counter (src/common/urtc_meta_migrate.h).
 #ifndef URTC_BL_META_AB
 #define URTC_BL_META_AB 0
+#endif
+#if URTC_BL_VERSION_COMPAT_COMMAND
+static unsigned char vc_force_write = 0;   // set while a change of the setting alone is written: the state is the same, the page is not
+#define URTC_META_AB_SKIP_SAME() (!vc_force_write)
 #endif
 #if URTC_BL_META_AB
 #include "urtc_meta_ab.h"
@@ -394,15 +403,13 @@ void VersionCompat_Read(uint32_t *mode, uint32_t *counter) {
 
 uint8_t VersionCompat_Store(uint32_t mode, uint32_t counter) {
     MetaAbState_t state;
-    uint8_t scratch[URTC_META_STATE_BYTES];
-    uint32_t generation;
     meta_ab_load(&state);
-    // as urtc_meta_ab_store_state: while there is no A/B record and page 0 holds the log of one page, the first record goes to page 1
-    const uint8_t first_page = (urtc_meta_ab_newest(&meta_ab_ops, URTC_META_STATE_BYTES, &generation) < 0 &&
-                                urtc_meta_legacy_state(meta_ab_ops.page_ptr(meta_ab_ops.ctx, 0u), scratch)) ? 1u : 0u;
     urtc_vc_record_pack(mode, counter, vc_annex);
     vc_annex_present = 1u;
-    return urtc_vc_annex_commit(&meta_ab_ops, (const uint8_t*)&state, first_page);
+    vc_force_write = 1u;
+    const uint8_t done = urtc_meta_ab_store_state(&meta_ab_ops, (const uint8_t*)&state);   // the same path as every other write
+    vc_force_write = 0u;
+    return done;
 }
 #endif
 

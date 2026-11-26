@@ -6,6 +6,11 @@
 #include "stm32f3xx_hal.h"
 #include <string.h>
 #include "bootloader_common.h"
+#if URTC_BL_VERSION_COMPAT_COMMAND
+// With the stored version rule built in, this file is optimised for size: the 28 KB of the bootloader have no room for it otherwise. The signature and hash
+// files keep their optimisation, so the time of a verification does not change. As shipped (switch off) nothing here changes.
+#pragma GCC optimize ("Os")
+#endif
 #include "bootloader_protocol.h"
 #include "bootloader_crypto.h"
 #include "bootloader_flash.h"
