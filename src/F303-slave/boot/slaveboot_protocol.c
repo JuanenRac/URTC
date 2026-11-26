@@ -24,6 +24,9 @@
 #include "slaveboot_flash.h"
 #include "urtc_version_wire.h"
 #include "urtc_slave_confirm.h"
+#if URTC_SLAVE_VERSION_COMPAT
+#include "urtc_version_compat.h"
+#endif
 
 // Defined here, read by the I2C1 interrupt handler's REG_STATUS read path.
 volatile uint8_t current_status = STATUS_LISTENING;
@@ -283,6 +286,10 @@ void BuildChallengeResponse(uint8_t out[16]) {
     else memset(out, 0, URTC_SLAVE_CONFIRM_NONCE_SIZE);
 }
 
+#if URTC_SLAVE_VERSION_COMPAT
+static uint8_t update_accept_patchless = 0;   // for the session in progress only: every accepted START clears it
+#endif
+
 void HandleStartUpdate(uint8_t *data) {
     // Parsed into locals and validated before the shared update_total_size
     // and update_declared_hw_id are touched, as the main board's bootloader
@@ -327,6 +334,9 @@ void HandleStartUpdate(uint8_t *data) {
     update_hmac_received = 0;
     update_awaiting_confirm = 0;
     update_counter_received = 0;
+#if URTC_SLAVE_VERSION_COMPAT
+    update_accept_patchless = 0;
+#endif
     update_record_counter = 0;
     MakeChallenge();
     page_buffer_fill = 0;
@@ -344,6 +354,23 @@ void HandleDigestExpected(uint8_t *data) {
     update_hmac_received = 1;
     update_last_activity_tick = HAL_GetTick();
 }
+
+#if URTC_SLAVE_VERSION_COMPAT
+// Register URTC_VC_SLAVE_REG, 1 byte. Only during a transfer, before the END frame.
+void HandleVersionCompat(uint8_t *data) {
+    if (!update_in_progress || update_failed || update_awaiting_confirm) return;
+    update_accept_patchless = (data[0] == URTC_VC_SLAVE_ACCEPT) ? 1u : 0u;
+    update_last_activity_tick = HAL_GetTick();
+}
+
+static int version_rollback_in_force(uint32_t new_major, uint32_t new_minor_field, uint32_t cur_major, uint32_t cur_minor_field) {
+    return urtc_version_is_older_mode(new_major, new_minor_field, cur_major, cur_minor_field,
+                                      update_accept_patchless ? 0 : URTC_VERSION_LEGACY_IS_PATCH_ZERO);
+}
+#define SLAVE_VERSION_ROLLBACK version_rollback_in_force
+#else
+#define SLAVE_VERSION_ROLLBACK urtc_version_rollback
+#endif
 
 // REG_RECORD_COUNTER, 4 bytes big-endian. Only before the END frame: after it the counter is already part of what was checked.
 void HandleRecordCounter(uint8_t *data) {
@@ -446,8 +473,8 @@ void HandleEndUpdate(uint8_t *data) {
         // The minor field may carry the PATCH number in its high byte (see
         // urtc_version_wire.h); an image that declares none counts as patch 0 when the
         // installed version has one (URTC_VERSION_LEGACY_IS_PATCH_ZERO).
-        if (urtc_version_rollback(version_major, version_minor,
-                                  current_meta.version_major, current_meta.version_minor)) {
+        if (SLAVE_VERSION_ROLLBACK(version_major, version_minor,
+                                   current_meta.version_major, current_meta.version_minor)) {
             current_status = STATUS_VERIFY_FAIL;
             verify_fail_reason = VERIFY_FAIL_REASON_ROLLBACK;
             update_in_progress = 0;

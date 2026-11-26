@@ -152,4 +152,11 @@ typedef struct {
 // master informed of progress.
 void CAN_SendHeartbeat(uint8_t status, uint8_t progress_percent);
 
+// URTC_BL_VERSION_COMPAT_COMMAND=1 keeps in the metadata how an image without a PATCH number is read, changed only by a signed command (urtc_version_compat.h,
+// docs/VERSION_COMPAT.md). OFF by default: the rule is the build option URTC_VERSION_LEGACY_IS_PATCH_ZERO and none of the code is compiled. It needs the two
+// metadata pages (URTC_BL_META_AB=1).
+#ifndef URTC_BL_VERSION_COMPAT_COMMAND
+#define URTC_BL_VERSION_COMPAT_COMMAND 0
+#endif
+
 #endif // BOOTLOADER_COMMON_H

@@ -318,6 +318,11 @@ if not "%META_AB%"=="0" if not "%META_AB%"=="1" (
     exit /b 1
 )
 set "MASTER_KEY_FLAGS=%MASTER_KEY_FLAGS% -DURTC_BL_META_AB=%META_AB%"
+REM The version rule kept in the board and changed by a signed command (docs\VERSION_COMPAT.md). All three are 0 by default; the one of the main bootloader
+REM needs the two metadata pages above.
+if "%URTC_BL_VERSION_COMPAT_COMMAND%"=="1" set "MASTER_KEY_FLAGS=%MASTER_KEY_FLAGS% -DURTC_BL_VERSION_COMPAT_COMMAND=1"
+if "%URTC_APP_VERSION_COMPAT_RELAY%"=="1" set "CFLAGS=%CFLAGS% -DURTC_APP_VERSION_COMPAT_RELAY=1"
+if "%URTC_SLAVE_VERSION_COMPAT%"=="1" set "CFLAGS=%CFLAGS% -DURTC_SLAVE_VERSION_COMPAT=1"
 
 REM -----------------------------------------------------------------------
 if "%TARGET%"=="all" set "DO_MASTER=1" & set "DO_SLAVE=1"

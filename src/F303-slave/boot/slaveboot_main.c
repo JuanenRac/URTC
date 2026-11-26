@@ -22,6 +22,9 @@
 #include "slaveboot_protocol.h"
 #include "slaveboot_flash.h"
 #include "urtc_version_wire.h"
+#if URTC_SLAVE_VERSION_COMPAT
+#include "urtc_version_compat.h"
+#endif
 
 IWDG_HandleTypeDef hiwdg;
 I2C_HandleTypeDef hi2c1;
@@ -250,6 +253,11 @@ void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef *hi2c) {
             case REG_END_UPDATE:
                 if (bytes_received == 9) QueueEndUpdate(&rx_buffer[1]);   // the hashing runs in the main loop
                 break;
+#if URTC_SLAVE_VERSION_COMPAT
+            case URTC_VC_SLAVE_REG:
+                if (bytes_received == 2) HandleVersionCompat(&rx_buffer[1]);
+                break;
+#endif
             default:
                 break; // unrecognized register - ignored rather than NACKed after the fact (I2C has no clean way to retroactively NACK a transaction already accepted at the address-match stage)
         }

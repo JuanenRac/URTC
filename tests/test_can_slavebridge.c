@@ -21,6 +21,11 @@
 #include "urtc_version_wire.h"
 #include "firmware_slave_attest.h"
 #include "urtc_slave_confirm.h"
+#include "urtc_flash_layout.h"
+#include "urtc_vc_annex.h"
+#ifndef URTC_APP_VERSION_COMPAT_RELAY
+#define URTC_APP_VERSION_COMPAT_RELAY 0   // the application as it ships
+#endif
 #include "boot_sig_cases.h"
 #include "boot/urtc_trust_dev.h"
 
@@ -218,6 +223,54 @@ static int confirm_matches(const BootSigCase *c, const uint8_t nonce[16])
     urtc_slave_confirm_message(message, nonce, c->sha256, c->hardware_id, (uint16_t)c->major, (uint16_t)c->minor_field, c->size, c->counter);
     SlaveAttest_Sha256(message, sizeof message, tag);
     return memcmp(tag, writes[w].data, 32) == 0;
+}
+
+// The page of the master with a complete record and, when `mode` is a mode, the annex a bootloader with the stored version rule writes.
+static void master_pages(uint32_t mode)
+{
+    fake_flash_erase_all();
+    uint8_t *page = (uint8_t *)(uintptr_t)URTC_MASTER_METADATA_B_ADDR;
+    urtc_vc_put_le32(page, URTC_META_AB_MAGIC);
+    urtc_vc_put_le32(page + 4, 1u);
+    memset(page + 8, 0, URTC_VC_ANNEX_PAYLOAD);
+    urtc_vc_put_le32(page + 8 + URTC_VC_ANNEX_PAYLOAD, urtc_meta_ab_crc(page + 4, 4u + URTC_VC_ANNEX_PAYLOAD));
+    if (mode != URTC_VC_MODE_NONE) urtc_vc_record_pack(mode, 3u, page + URTC_VC_ANNEX_OFFSET);
+}
+
+static void version_rule_tests(int *failures)
+{
+    if (!fake_flash_init()) { printf("  SKIP: cannot map the fake flash on this host\n"); return; }
+    const BootSigCase *slave = &BOOT_SIG_CASES[SLAVE_CASE];
+    Scenario good = { 1, 0, 0, 0, 0, 1, 0, 0, 0 };
+
+    master_pages(URTC_VC_MODE_ACCEPT_PATCHLESS);
+    clear(); use_dev_key();
+    play(slave, good);
+#if URTC_APP_VERSION_COMPAT_RELAY
+    int w = find_write(URTC_VC_SLAVE_REG);
+    TEST_ASSERT(w >= 0 && w < find_write(0x04) && writes[w].len == 1 && writes[w].data[0] == URTC_VC_SLAVE_ACCEPT,
+                "with the stored rule the slave is told before the END frame");
+    Scenario bad = good;
+    bad.damage_record = 1;
+    clear(); use_dev_key();
+    play(slave, bad);
+    TEST_ASSERT(find_write(URTC_VC_SLAVE_REG) < 0 && find_write(0x04) >= 0, "an image the master does not vouch for is never relaxed");
+    master_pages(URTC_VC_MODE_STRICT);
+    clear(); use_dev_key();
+    play(slave, good);
+    TEST_ASSERT(find_write(URTC_VC_SLAVE_REG) < 0 && find_write(0x0A) >= 0, "a stored strict rule writes nothing");
+    master_pages(URTC_VC_MODE_NONE);
+    clear(); use_dev_key();
+    play(slave, good);
+    TEST_ASSERT(find_write(URTC_VC_SLAVE_REG) < 0 && find_write(0x0A) >= 0, "nothing stored writes nothing");
+    fake_flash_erase_all();
+    clear(); use_dev_key();
+    play(slave, good);
+    TEST_ASSERT(find_write(URTC_VC_SLAVE_REG) < 0 && find_write(0x0A) >= 0, "a blank flash writes nothing");
+#else
+    TEST_ASSERT(find_write(URTC_VC_SLAVE_REG) < 0 && find_write(0x04) >= 0 && find_write(0x0A) >= 0,
+                "off: the stored rule is not read and the exchange is the one of always");
+#endif
 }
 
 static void attest_tests(int *failures)
@@ -748,7 +801,11 @@ int main(void)
 {
     int failures = 0;
     printf("URTC host logic tests - firmware_can_slavebridge.c\n");
+#if URTC_APP_VERSION_COMPAT_RELAY
+    if (!fake_flash_init()) { printf("  SKIP: cannot map the fake flash on this host\n"); return 0; }   // the relay reads the pages of the master
+#endif
     run_can_slavebridge_tests(&failures);
+    version_rule_tests(&failures);
     if (failures == 0) {
         printf("  OK   all CAN slave bridge host tests passed\n");
         return 0;

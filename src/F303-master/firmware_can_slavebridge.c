@@ -33,6 +33,15 @@
 #include "urtc_can_ids.h"
 #include "firmware_slave_attest.h"
 #include "urtc_slave_confirm.h"
+// URTC_APP_VERSION_COMPAT_RELAY=1: when the metadata of the master holds "accept an image without a patch" (urtc_vc_annex.h, written only by a bootloader built
+// with URTC_BL_VERSION_COMPAT_COMMAND), the slave is told so for this one update. OFF by default. The application only reads the pages.
+#ifndef URTC_APP_VERSION_COMPAT_RELAY
+#define URTC_APP_VERSION_COMPAT_RELAY 0
+#endif
+#if URTC_APP_VERSION_COMPAT_RELAY
+#include "urtc_flash_layout.h"
+#include "urtc_vc_annex.h"
+#endif
 
 // Slave register numbers - duplicated here rather than shared via a
 // common header, since the slave is a genuinely separate chip/project
@@ -319,6 +328,23 @@ void Handle_CAN_SlaveBridge(void) {
     }
 }
 
+#if URTC_APP_VERSION_COMPAT_RELAY
+static const uint8_t *vc_page_ptr(void *ctx, uint8_t page) {
+    (void)ctx;
+    return (const uint8_t *)(uintptr_t)(page == 0u ? URTC_MASTER_METADATA_ADDR : URTC_MASTER_METADATA_B_ADDR);
+}
+
+static void RelayVersionRule(void) {
+    const UrtcMetaAbOps ops = { vc_page_ptr, 0, 0, 0 };   // read only: urtc_vc_annex_load never erases or programs
+    uint32_t mode, counter;
+    urtc_vc_annex_load(&ops, &mode, &counter);
+    if (mode == URTC_VC_MODE_ACCEPT_PATCHLESS) {
+        uint8_t accept = URTC_VC_SLAVE_ACCEPT;
+        ExpansionI2C_SlaveWriteRegister(URTC_VC_SLAVE_REG, &accept, 1);   // a slave that does not know the register ignores it and stays strict
+    }
+}
+#endif
+
 // Main loop: the part of the end of a slave update that waits or takes long. The signature record is checked BEFORE the END frame reaches the slave (the slave waits only ten
 // seconds for the confirmation, and the check takes a while on this chip); the verdict decides whether the slave is then told to install.
 void SlaveBridge_Service(void) {
@@ -341,6 +367,9 @@ void SlaveBridge_Service(void) {
         uint8_t counter_bytes[4] = { (uint8_t)(counter >> 24), (uint8_t)(counter >> 16), (uint8_t)(counter >> 8), (uint8_t)counter };
         if (!ExpansionI2C_SlaveWriteRegister(REG_BOOT_RECORD_COUNTER, counter_bytes, 4)) vouched = 0;
     }
+#if URTC_APP_VERSION_COMPAT_RELAY
+    if (vouched) RelayVersionRule();   // before END: the slave judges the version when it receives it
+#endif
     ExpansionI2C_SlaveWriteRegister(REG_BOOT_END_UPDATE, data, 8);
     if (vouched) {
         ConfirmToSlave();

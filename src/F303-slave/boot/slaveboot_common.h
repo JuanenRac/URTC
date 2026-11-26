@@ -177,4 +177,10 @@ typedef struct {
 #define META_RECORD_SIZE  72u
 #define META_RECORD_SLOTS (2048u / META_RECORD_SIZE)
 
+// URTC_SLAVE_VERSION_COMPAT=1 lets the master relax, for ONE update session, how an image without a PATCH number is read (register 0x0D, urtc_version_compat.h,
+// docs/VERSION_COMPAT.md). OFF by default: the register is not read and the rule is the build option URTC_VERSION_LEGACY_IS_PATCH_ZERO. Nothing is stored here.
+#ifndef URTC_SLAVE_VERSION_COMPAT
+#define URTC_SLAVE_VERSION_COMPAT 0
+#endif
+
 #endif // BOOTLOADER_COMMON_H

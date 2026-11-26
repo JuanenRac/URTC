@@ -72,6 +72,19 @@ jobs:
           HYDRA_UMC_SKIP_HOST_TESTS: "1"
         shell: bash
         run: ./build_firmware.sh --clean
+      - name: Compile with the stored version rule switched on (compile and size only, the host suites ran above)
+        if: ${{ hashFiles('build_firmware.sh') != '' }}
+        env:
+          URTC_CI: "1"
+          URTC_BL_META_AB: "1"
+          URTC_BL_VERSION_COMPAT_COMMAND: "1"
+          URTC_APP_VERSION_COMPAT_RELAY: "1"
+          URTC_SLAVE_VERSION_COMPAT: "1"
+          HYDRA_UMC_SKIP_HOST_TESTS: "1"
+        shell: bash
+        run: |
+          ./build_firmware.sh --clean
+          python3 tools/bootloader_size.py
       - name: Check that every version tag agrees
         if: ${{ hashFiles('check_version_consistency.sh') != '' }}
         shell: bash

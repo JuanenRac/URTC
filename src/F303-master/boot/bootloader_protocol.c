@@ -17,6 +17,9 @@
 #include "urtc_bl_serial.h"
 #include "urtc_key_rotation.h"
 #include "urtc_key_rotation_cmd.h"
+#if URTC_BL_VERSION_COMPAT_COMMAND
+#include "urtc_version_compat.h"
+#endif
 
 static uint8_t CAN_WaitForFreeMailbox(void) {
     // 50 attempts x 1ms = 50ms max - a small fraction of the ~800ms IWDG
@@ -822,6 +825,20 @@ void HandleData(uint8_t *data, uint32_t dlc) {
     update_running_crc = CRC32_Update(update_running_crc, data, i);
 }
 
+// The anti-rollback comparison of the version. With the signed version rule built in, the mode kept in the metadata decides how an image without a patch
+// reads; as shipped it is the build option alone.
+#if URTC_BL_VERSION_COMPAT_COMMAND
+static int version_rollback_in_force(uint32_t new_major, uint32_t new_minor_field, uint32_t cur_major, uint32_t cur_minor_field) {
+    uint32_t mode, counter;
+    VersionCompat_Read(&mode, &counter);
+    return urtc_version_is_older_mode(new_major, new_minor_field, cur_major, cur_minor_field,
+                                      urtc_vc_unknown_is_zero(urtc_vc_effective_mode(mode, URTC_VERSION_LEGACY_IS_PATCH_ZERO)));
+}
+#define BL_VERSION_ROLLBACK version_rollback_in_force
+#else
+#define BL_VERSION_ROLLBACK urtc_version_rollback
+#endif
+
 void HandleEndUpdate(uint8_t *data) {
     if (!update_in_progress || update_failed) return;
     update_last_activity_tick = HAL_GetTick();
@@ -918,8 +935,8 @@ void HandleEndUpdate(uint8_t *data) {
         // The minor field may carry the PATCH number in its high byte (see
         // urtc_version_wire.h); an image that declares none counts as patch 0 when the
         // installed version has one (URTC_VERSION_LEGACY_IS_PATCH_ZERO).
-        if (urtc_version_rollback(version_major, version_minor,
-                                  current_meta.version_major, current_meta.version_minor)
+        if (BL_VERSION_ROLLBACK(version_major, version_minor,
+                                current_meta.version_major, current_meta.version_minor)
             && !update_downgrade_authorized) {
             CAN_SendVerifyFailReason(VERIFY_FAIL_REASON_ROLLBACK);
             update_in_progress = 0;
@@ -1065,8 +1082,58 @@ static void send_serial_result(uint8_t status, uint32_t serial) {
     HAL_CAN_AddTxMessage(&hcan, &txHeader, data, &mailbox);
 }
 
+#if URTC_BL_VERSION_COMPAT_COMMAND
+// ---- the signed command that changes the version rule (0x7EE with the indexes of urtc_version_compat.h, answered on 0x7EF) ------------------------------
+static uint8_t  compat_command[URTC_VC_COMMAND_SIZE];
+static uint16_t compat_chunks = 0;
+
+static void send_compat_answer(urtc_vc_status_t status) {
+    uint32_t mode, counter;
+    VersionCompat_Read(&mode, &counter);
+    if (!CAN_WaitForFreeMailbox()) return;
+    CAN_TxHeaderTypeDef txHeader;
+    uint8_t data[URTC_VC_ANSWER_SIZE];
+    uint32_t mailbox;
+    urtc_vc_answer_build(data, status, urtc_vc_effective_mode(mode, URTC_VERSION_LEGACY_IS_PATCH_ZERO), mode != URTC_VC_MODE_NONE, counter);
+    txHeader.StdId = URTC_CAN_ID_BOOTLOADER_SERIAL_RESULT;
+    txHeader.IDE = CAN_ID_STD;
+    txHeader.RTR = CAN_RTR_DATA;
+    txHeader.DLC = URTC_VC_ANSWER_SIZE;
+    txHeader.TransmitGlobalTime = DISABLE;
+    HAL_CAN_AddTxMessage(&hcan, &txHeader, data, &mailbox);
+}
+
+static void handle_compat_chunk(uint8_t chunk, const uint8_t *data) {
+    memcpy(&compat_command[chunk * URTC_VC_CHUNK_BYTES], data + 1, URTC_VC_CHUNK_BYTES);
+    compat_chunks = (uint16_t)(compat_chunks | (1u << chunk));
+    if (compat_chunks != URTC_VC_ALL_CHUNKS) return;
+    compat_chunks = 0;
+
+    const uint32_t uid[3] = {HAL_GetUIDw0(), HAL_GetUIDw1(), HAL_GetUIDw2()};
+    const TrustKeys_t *trust = Trust_Active();
+    uint32_t stored_mode = 0u, stored_counter = 0u, mode = 0u, counter = 0u;
+    VersionCompat_Read(&stored_mode, &stored_counter);
+    urtc_vc_status_t status = urtc_vc_decide(compat_command, uid, bl_node.serial, (const uint8_t (*)[URTC_ED25519_PUBLIC_KEY_SIZE])trust->keys, trust->count,
+                                             stored_counter, 1, update_in_progress, &mode, &counter);
+    memset(compat_command, 0, sizeof compat_command);
+    if (status == URTC_VC_NOT_FOR_ME) return;                  // another head: no answer
+    if (status == URTC_VC_OK && !VersionCompat_Store(mode, counter)) status = URTC_VC_FLASH_FAILED;
+    send_compat_answer(status);
+}
+#endif
+
 void HandleSerialChunk(uint8_t *data) {
     const uint8_t index = data[0];
+#if URTC_BL_VERSION_COMPAT_COMMAND
+    if (index == URTC_VC_QUERY_INDEX) {
+        send_compat_answer(URTC_VC_OK);
+        return;
+    }
+    if (index >= URTC_VC_CHUNK_BASE && index < URTC_VC_CHUNK_BASE + URTC_VC_CHUNKS) {
+        handle_compat_chunk((uint8_t)(index - URTC_VC_CHUNK_BASE), data);
+        return;
+    }
+#endif
     if (index >= URTC_SERIAL_CHUNKS) return;
     memcpy(&serial_command[index * URTC_SERIAL_CHUNK_BYTES], data + 1, URTC_SERIAL_CHUNK_BYTES);
     serial_chunks = (uint16_t)(serial_chunks | (1u << index));

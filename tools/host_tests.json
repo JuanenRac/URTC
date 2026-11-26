@@ -1805,6 +1805,125 @@
     "-Dmain=slave_main_entry",
     "-DURTC_SLAVE_MLX90640_TWO_SUBPAGES=1"
    ]
+  },
+  {
+   "name": "bootloader_version_compat",
+   "test": "tests/test_bootloader_version_compat.c",
+   "sources": [
+    "tests/host_hal/fake_hal.c",
+    "src/F303-master/boot/bootloader_protocol.c",
+    "src/F303-master/boot/bootloader_flash.c",
+    "src/F303-master/boot/bootloader_crypto.c",
+    "src/F303-master/boot/bootloader_trust.c",
+    "src/F303-master/boot/bootloader_ed25519.c"
+   ],
+   "includes": [
+    "tests",
+    "tests/host_hal",
+    "src/F303-master/boot",
+    "src/common",
+    "tests/vectors"
+   ],
+   "extra": [
+    "-Wno-cpp",
+    "-Wno-int-to-pointer-cast"
+   ],
+   "defines": [
+    "-DURTC_HOST_TEST",
+    "-DURTC_TRUST_DEV",
+    "-DURTC_BL_META_AB=1",
+    "-DURTC_BL_VERSION_COMPAT_COMMAND=1"
+   ]
+  },
+  {
+   "name": "bootloader_without_version_compat",
+   "test": "tests/test_bootloader_version_compat.c",
+   "sources": [
+    "tests/host_hal/fake_hal.c",
+    "src/F303-master/boot/bootloader_protocol.c",
+    "src/F303-master/boot/bootloader_flash.c",
+    "src/F303-master/boot/bootloader_crypto.c",
+    "src/F303-master/boot/bootloader_trust.c",
+    "src/F303-master/boot/bootloader_ed25519.c"
+   ],
+   "includes": [
+    "tests",
+    "tests/host_hal",
+    "src/F303-master/boot",
+    "src/common",
+    "tests/vectors"
+   ],
+   "extra": [
+    "-Wno-cpp",
+    "-Wno-int-to-pointer-cast"
+   ],
+   "defines": [
+    "-DURTC_HOST_TEST",
+    "-DURTC_TRUST_DEV",
+    "-DURTC_BL_META_AB=1"
+   ]
+  },
+  {
+   "name": "slaveboot_version_compat",
+   "test": "tests/test_slaveboot_version_compat.c",
+   "sources": [
+    "tests/host_hal/fake_hal.c",
+    "src/F303-slave/boot/slaveboot_protocol.c",
+    "src/F303-slave/boot/slaveboot_flash.c",
+    "src/F303-slave/boot/slaveboot_crypto.c"
+   ],
+   "includes": [
+    "tests",
+    "tests/host_hal",
+    "src/F303-slave/boot",
+    "src/common"
+   ],
+   "extra": [
+    "-Wno-cpp",
+    "-Wno-int-to-pointer-cast"
+   ],
+   "defines": [
+    "-DURTC_SLAVE_VERSION_COMPAT=1"
+   ]
+  },
+  {
+   "name": "slaveboot_without_version_compat",
+   "test": "tests/test_slaveboot_version_compat.c",
+   "sources": [
+    "tests/host_hal/fake_hal.c",
+    "src/F303-slave/boot/slaveboot_protocol.c",
+    "src/F303-slave/boot/slaveboot_flash.c",
+    "src/F303-slave/boot/slaveboot_crypto.c"
+   ],
+   "includes": [
+    "tests",
+    "tests/host_hal",
+    "src/F303-slave/boot",
+    "src/common"
+   ],
+   "extra": [
+    "-Wno-cpp",
+    "-Wno-int-to-pointer-cast"
+   ]
+  },
+  {
+   "name": "can_slavebridge_version_compat",
+   "test": "tests/test_can_slavebridge.c",
+   "sources": [
+    "tests/host_hal/fake_hal.c",
+    "src/F303-master/firmware_can_slavebridge.c",
+    "src/F303-master/firmware_slave_attest.c",
+    "src/common/urtc_ed25519.c"
+   ],
+   "includes": [
+    "tests",
+    "tests/host_hal",
+    "src/F303-master",
+    "src/common"
+   ],
+   "defines": [
+    "-DURTC_APP_VERSION_COMPAT_RELAY=1"
+   ]
   }
  ]
 }
