@@ -41,6 +41,7 @@
 #if URTC_APP_VERSION_COMPAT_RELAY
 #include "urtc_flash_layout.h"
 #include "urtc_vc_annex.h"
+#define REG_BOOT_VERSION_COMPAT URTC_VC_SLAVE_REG   // a register of the slave bootloader, like the REG_BOOT_* below
 #endif
 
 // Slave register numbers - duplicated here rather than shared via a
@@ -340,7 +341,7 @@ static void RelayVersionRule(void) {
     urtc_vc_annex_load(&ops, &mode, &counter);
     if (mode == URTC_VC_MODE_ACCEPT_PATCHLESS) {
         uint8_t accept = URTC_VC_SLAVE_ACCEPT;
-        ExpansionI2C_SlaveWriteRegister(URTC_VC_SLAVE_REG, &accept, 1);   // a slave that does not know the register ignores it and stays strict
+        ExpansionI2C_SlaveWriteRegister(REG_BOOT_VERSION_COMPAT, &accept, 1);   // a slave that does not know the register ignores it and stays strict
     }
 }
 #endif
