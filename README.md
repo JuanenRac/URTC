@@ -42,7 +42,7 @@
 |---|---|
 | Version | `0.5.1` |
 | Maturity | Functional |
-| Tests | 319 (`python -m unittest discover -s tests`), plus 80 C host suites (ctest) |
+| Tests | 319 (`python -m unittest discover -s tests`), plus 82 C host suites (ctest) |
 | Stack | STM32F303 / bxCAN / 25 tool profiles |
 | Target | A microcontroller board (the firmware); built on a PC |
 | On real hardware | Not yet: no run on real hardware is recorded for this version |

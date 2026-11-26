@@ -42,7 +42,7 @@
 |---|---|
 | バージョン | `0.5.1` |
 | 成熟度 | 機能する |
-| テスト | 319 (`python -m unittest discover -s tests`), 加えて C のホストスイート 80 個（ctest） |
+| テスト | 319 (`python -m unittest discover -s tests`), 加えて C のホストスイート 82 個（ctest） |
 | 技術 | STM32F303 / bxCAN / 25 tool profiles |
 | 対象 | マイコンボード（ファームウェア）。ビルドは PC で行います |
 | 実機での確認 | まだです：このバージョンについて実機での動作記録はありません |

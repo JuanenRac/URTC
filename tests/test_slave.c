@@ -147,8 +147,24 @@ static void test_pwm(int *failures)
 }
 
 // ---- the I2C link the master talks to -----------------------------------------------------------------------------------------------------
+// The model of the HAL for a STOP before the requested count: the bytes are stored (the pointer advances), XferCount is cleared, the error callback gets an
+// acknowledge failure, the receive-complete callback is not called and the end of the transaction is reported.
+static void master_writes_short_as_error(const uint8_t *bytes, uint32_t count, uint32_t error)
+{
+    HAL_I2C_AddrCallback(&hi2c1, I2C_DIRECTION_TRANSMIT, I2C_SLAVE_ADDRESS << 1);
+    for (uint32_t i = 0; i < count && i < fake_i2c_slave_rx_len; i++) fake_i2c_slave_rx_buffer[i] = bytes[i];
+    hi2c1.pBuffPtr = fake_i2c_slave_rx_buffer + count;
+    hi2c1.XferCount = 0;
+    hi2c1.ErrorCode = error;
+    HAL_I2C_ErrorCallback(&hi2c1);
+    HAL_I2C_ListenCpltCallback(&hi2c1);
+}
+
 static void master_writes(const uint8_t *bytes, uint32_t count)
 {
+#if URTC_SLAVE_SHORT_WRITE_DISPATCH
+    if (count < fake_i2c_slave_rx_len) { master_writes_short_as_error(bytes, count, HAL_I2C_ERROR_AF); return; }
+#endif
     // the master addresses the slave for a write, the HAL starts a receive into the buffer of the firmware, the master sends its bytes and stops
     HAL_I2C_AddrCallback(&hi2c1, I2C_DIRECTION_TRANSMIT, I2C_SLAVE_ADDRESS << 1);
     for (uint32_t i = 0; i < count && i < fake_i2c_slave_rx_len; i++) fake_i2c_slave_rx_buffer[i] = bytes[i];
@@ -265,6 +281,29 @@ static void test_link(int *failures)
     HAL_I2C_ListenCpltCallback(&hi2c1);
     HAL_I2C_ErrorCallback(&hi2c1);
     TEST_ASSERT(fake_i2c_listen_count == listens + 2, "after the end of a transfer or an error the link listens again");
+
+#if !URTC_SLAVE_WRITE_REASSEMBLY
+    // a write that stops early, as the HAL is expected to report it
+    stops = fake_tim_pwm_stops;
+    const uint8_t cut_stop[2] = {REG_PWM_STOP, 1};
+    master_writes_short_as_error(cut_stop, 2, HAL_I2C_ERROR_AF);
+#if URTC_SLAVE_SHORT_WRITE_DISPATCH
+    TEST_ASSERT(fake_tim_pwm_stops == stops + 1, "with the dispatch at the end of the transaction a short write is executed once");
+    HAL_I2C_ListenCpltCallback(&hi2c1);
+    TEST_ASSERT(fake_tim_pwm_stops == stops + 1, "and not again");
+    master_writes_short_as_error(cut_stop, 2, HAL_I2C_ERROR_BERR);
+    TEST_ASSERT(fake_tim_pwm_stops == stops + 1, "a write cut by a bus error is not executed");
+    // a repeated start: the pointer write ends where the read begins, with no STOP
+    const uint8_t pointer = REG_APP_VERSION;
+    HAL_I2C_AddrCallback(&hi2c1, I2C_DIRECTION_TRANSMIT, 0x84);
+    fake_i2c_slave_rx_buffer[0] = pointer;
+    hi2c1.pBuffPtr = fake_i2c_slave_rx_buffer + 1;
+    HAL_I2C_AddrCallback(&hi2c1, I2C_DIRECTION_RECEIVE, 0x84);
+    TEST_ASSERT(fake_i2c_slave_tx_len == 10, "the register selected by a write that a repeated start ends is the one read");
+#else
+    TEST_ASSERT(fake_tim_pwm_stops == stops, "in the default build a write that the HAL reports as an error is not executed");
+#endif
+#endif
 }
 
 #if URTC_SLAVE_WRITE_REASSEMBLY

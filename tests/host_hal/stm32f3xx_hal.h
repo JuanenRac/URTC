@@ -54,7 +54,11 @@ typedef struct { CAN_TypeDef *Instance; CAN_InitTypeDef Init; } CAN_HandleTypeDe
 typedef struct { void *Instance; TIM_Base_InitTypeDef Init; } TIM_HandleTypeDef;
 typedef struct { void *Instance; DMA_InitTypeDef Init; } DMA_HandleTypeDef;
 typedef struct { void *Instance; SPI_InitTypeDef Init; DMA_HandleTypeDef *hdmatx; } SPI_HandleTypeDef;
-typedef struct { void *Instance; I2C_InitTypeDef Init; uint32_t XferCount; } I2C_HandleTypeDef;
+typedef struct { void *Instance; I2C_InitTypeDef Init; uint32_t XferCount; uint8_t *pBuffPtr; uint32_t ErrorCode; } I2C_HandleTypeDef;
+#define HAL_I2C_ERROR_BERR 0x00000001u
+#define HAL_I2C_ERROR_ARLO 0x00000002u
+#define HAL_I2C_ERROR_AF   0x00000004u
+#define HAL_I2C_ERROR_OVR  0x00000008u
 typedef struct { void *Instance; ADC_InitTypeDef Init; } ADC_HandleTypeDef;
 typedef struct { void *Instance; struct { uint32_t Prescaler, Reload, Window; } Init; } IWDG_HandleTypeDef;
 #define IWDG_WINDOW_DISABLE 0x00000FFFu   // the value of the window register that turns the window off (any refresh is allowed); the HAL writes Init.Window to it as given

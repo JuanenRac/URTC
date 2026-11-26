@@ -440,7 +440,9 @@ HAL_StatusTypeDef HAL_I2C_Master_Receive(I2C_HandleTypeDef *h, uint16_t addr, ui
 HAL_StatusTypeDef HAL_I2C_EnableListen_IT(I2C_HandleTypeDef *h) { (void)h; fake_i2c_listen_count++; return HAL_OK; }
 HAL_StatusTypeDef HAL_I2C_Slave_Seq_Receive_IT(I2C_HandleTypeDef *h, uint8_t *data, uint16_t len, uint32_t option)
 {
-    (void)h; (void)option;
+    (void)option;
+    h->pBuffPtr = data;
+    h->ErrorCode = 0;
     fake_i2c_slave_rx_count++;
     fake_i2c_slave_rx_buffer = data;
     fake_i2c_slave_rx_len = len;

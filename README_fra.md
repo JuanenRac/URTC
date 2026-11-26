@@ -42,7 +42,7 @@
 |---|---|
 | Version | `0.5.1` |
 | Maturité | Fonctionnel |
-| Tests | 319 (`python -m unittest discover -s tests`), plus 80 suites C sur l'hôte (ctest) |
+| Tests | 319 (`python -m unittest discover -s tests`), plus 82 suites C sur l'hôte (ctest) |
 | Technologie | STM32F303 / bxCAN / 25 tool profiles |
 | Cible | Une carte à microcontrôleur (le firmware) ; compilé sur un PC |
 | Sur matériel réel | Pas encore : aucune exécution sur du matériel réel n'est consignée pour cette version |

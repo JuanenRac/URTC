@@ -48,6 +48,11 @@ static slave_write_asm_t write_asm;
 #endif
 volatile uint32_t i2c_link_crc_errors = 0;   // writes dropped because their check byte did not match (always 0 with URTC_SLAVE_LINK_CRC=0)
 
+// 1 = a write by the master that stops before the receive buffer is full is executed from the end of the transaction (the HAL of this family is expected to report that
+// STOP as an acknowledge failure and not to call the receive-complete callback; to be confirmed on a board). 0 (default) = only the receive-complete callback executes a write.
+#ifndef URTC_SLAVE_SHORT_WRITE_DISPATCH
+#define URTC_SLAVE_SHORT_WRITE_DISPATCH 0
+#endif
 static uint8_t rx_buffer[8 + LINK_CRC_BYTES]; // largest real write is 4 bytes (1 register + 3 payload, REG_PWM_CONFIGURE/REG_PWM_PULSE) - sized with margin; one more for the check byte
 static uint8_t tx_buffer[32 + LINK_CRC_BYTES]; // largest real read is 32 bytes (REG_MLX_RAW_CHUNK/REG_MLX_CALIBRATED_CHUNK); one more for the check byte
 static uint8_t pending_read_register = 0xFF;
@@ -61,10 +66,31 @@ void I2CLink_Init(void) {
     HAL_I2C_EnableListen_IT(&hi2c1);
 }
 
+#if URTC_SLAVE_SHORT_WRITE_DISPATCH
+void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef *hi2c);
+static uint8_t write_armed = 0;   // a receive is running and no callback has executed it yet
+
+// The bytes of a short write are counted from the pointer of the HAL, which it advances for every byte it stores; XferCount is not used, the error path clears it.
+static void DispatchShortWrite(I2C_HandleTypeDef *hi2c) {
+    if (!write_armed) return;
+    write_armed = 0;
+    uint32_t received = (uint32_t)(hi2c->pBuffPtr - rx_buffer);
+    if (received == 0 || received >= sizeof(rx_buffer)) return;
+    hi2c->XferCount = (uint16_t)(sizeof(rx_buffer) - received);
+    HAL_I2C_SlaveRxCpltCallback(hi2c);
+}
+#endif
+
 void HAL_I2C_AddrCallback(I2C_HandleTypeDef *hi2c, uint8_t TransferDirection, uint16_t AddrMatchCode) {
     (void)AddrMatchCode;
+#if URTC_SLAVE_SHORT_WRITE_DISPATCH
+    if (TransferDirection != I2C_DIRECTION_TRANSMIT) DispatchShortWrite(hi2c);   // a repeated start: the write ends here, without a STOP
+#endif
     if (TransferDirection == I2C_DIRECTION_TRANSMIT) {   // the direction is the MASTER's: it transmits, so this slave receives
         HAL_I2C_Slave_Seq_Receive_IT(hi2c, rx_buffer, sizeof(rx_buffer), I2C_LAST_FRAME);
+#if URTC_SLAVE_SHORT_WRITE_DISPATCH
+        write_armed = 1;
+#endif
     } else {
         uint8_t len = 1;
         switch (pending_read_register) {
@@ -122,6 +148,9 @@ void HAL_I2C_AddrCallback(I2C_HandleTypeDef *hi2c, uint8_t TransferDirection, ui
 }
 
 void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef *hi2c) {
+#if URTC_SLAVE_SHORT_WRITE_DISPATCH
+    write_armed = 0;
+#endif
     uint32_t bytes_received = sizeof(rx_buffer) - hi2c->XferCount;
     if (bytes_received == 0) return;
     i2c_link_last_activity_tick = HAL_GetTick();
@@ -250,9 +279,15 @@ void HAL_I2C_SlaveTxCpltCallback(I2C_HandleTypeDef *hi2c) {
 }
 
 void HAL_I2C_ListenCpltCallback(I2C_HandleTypeDef *hi2c) {
+#if URTC_SLAVE_SHORT_WRITE_DISPATCH
+    DispatchShortWrite(hi2c);
+#endif
     HAL_I2C_EnableListen_IT(hi2c);
 }
 
 void HAL_I2C_ErrorCallback(I2C_HandleTypeDef *hi2c) {
+#if URTC_SLAVE_SHORT_WRITE_DISPATCH
+    if (hi2c->ErrorCode & ~(uint32_t)HAL_I2C_ERROR_AF) write_armed = 0;   // a bus error, lost arbitration or overrun: the bytes are not trusted
+#endif
     HAL_I2C_EnableListen_IT(hi2c);
 }

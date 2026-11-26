@@ -42,7 +42,7 @@
 |---|---|
 | Versión | `0.5.1` |
 | Madurez | Funcional |
-| Tests | 319 (`python -m unittest discover -s tests`), más 80 suites C en el host (ctest) |
+| Tests | 319 (`python -m unittest discover -s tests`), más 82 suites C en el host (ctest) |
 | Tecnología | STM32F303 / bxCAN / 25 tool profiles |
 | Destino | Una placa con microcontrolador (el firmware); se compila en un PC |
 | En hardware real | Todavía no: no consta ninguna ejecución en hardware real para esta versión |
