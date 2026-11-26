@@ -13,6 +13,11 @@ the firmware of this repository carries it. **All of it is off by default**: wit
 
 Set them in the environment of `build_firmware.sh` or `build_firmware.bat`. The official release workflow sets none of them.
 
+## Size
+
+The main bootloader has 28 KB of code. With its switch on, `bootloader_flash.c` and `bootloader_protocol.c` are optimised for size, or the image does not fit;
+the signature and hash files keep their optimisation. The bootloader then leaves about 2 KB free. With the switch off nothing about the build changes.
+
 ## Where the mode is kept
 
 In the main board, as 16 bytes at offset 128 of whichever metadata page holds the newest record (`src/common/urtc_vc_annex.h`). The record itself does not
@@ -39,4 +44,6 @@ including a flash failure at every step of the writes. Nothing was tried on a bo
 6. Cut the power while a command is being written (repeat a number of times): the board starts, the application runs and the mode is the old or the new one.
 7. With the head on strict and then on accept, repeat step 2 and 3 for a slave update. Check that the master writes register `0x0D` (link analyser) only in accept
    mode and that the slave forgets it after a new start of the update.
-8. Flash the released bootloaders back and check that the board starts and keeps its serial and rollback counter.
+8. With the main bootloader switch on, run several complete updates (and one with the power cut during the copy): the flash and protocol files are built
+   for size there, so check that no watchdog reset appears and that the transfer takes about the same time.
+9. Flash the released bootloaders back and check that the board starts and keeps its serial and rollback counter.
