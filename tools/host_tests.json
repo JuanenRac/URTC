@@ -1240,6 +1240,44 @@
    ]
   },
   {
+   "name": "slave_short_write",
+   "test": "tests/test_slave.c",
+   "sources": [
+    "tests/host_hal/fake_hal.c",
+    "tests/host_hal/fake_i2c_bus.c",
+    "src/F303-slave/slave_main.c",
+    "src/F303-slave/slave_i2c_link.c",
+    "src/F303-slave/slave_pwm.c",
+    "src/F303-slave/slave_i2c_sensors.c",
+    "src/F303-slave/melexis_mlx90640/MLX90640_API.c",
+    "src/F303-slave/melexis_mlx90642/MLX90642.c"
+   ],
+   "includes": [
+    "tests",
+    "tests/host_hal",
+    "src/F303-slave",
+    "src/F303-slave/melexis_mlx90640",
+    "src/F303-slave/melexis_mlx90641",
+    "src/F303-slave/melexis_mlx90642",
+    "src/common",
+    "src/F303-master"
+   ],
+   "extra": [
+    "-Wno-cpp",
+    "-Wno-int-to-pointer-cast"
+   ],
+   "libs": [
+    "-lm"
+   ],
+   "unsanitize": [
+    "-fno-sanitize=shift-base"
+   ],
+   "defines": [
+    "-DURTC_SLAVE_SHORT_WRITE_DISPATCH=1",
+    "-Dmain=slave_main_entry"
+   ]
+  },
+  {
    "name": "slave_write_reassembly",
    "test": "tests/test_slave.c",
    "sources": [
@@ -1490,6 +1528,31 @@
     "-Wno-int-to-pointer-cast"
    ],
    "defines": [
+    "-Dmain=slaveboot_main_entry"
+   ]
+  },
+  {
+   "name": "slaveboot_main_short_write",
+   "test": "tests/test_slaveboot_main.c",
+   "sources": [
+    "tests/host_hal/fake_hal.c",
+    "src/F303-slave/boot/slaveboot_main.c",
+    "src/F303-slave/boot/slaveboot_protocol.c",
+    "src/F303-slave/boot/slaveboot_flash.c",
+    "src/F303-slave/boot/slaveboot_crypto.c"
+   ],
+   "includes": [
+    "tests",
+    "tests/host_hal",
+    "src/F303-slave/boot",
+    "src/common"
+   ],
+   "extra": [
+    "-Wno-cpp",
+    "-Wno-int-to-pointer-cast"
+   ],
+   "defines": [
+    "-DURTC_SLAVE_SHORT_WRITE_DISPATCH=1",
     "-Dmain=slaveboot_main_entry"
    ]
   },

@@ -42,7 +42,7 @@
 |---|---|
 | Version | `0.5.1` |
 | Reifegrad | Funktionsfähig |
-| Tests | 319 (`python -m unittest discover -s tests`), dazu 80 C-Host-Suiten (ctest) |
+| Tests | 319 (`python -m unittest discover -s tests`), dazu 82 C-Host-Suiten (ctest) |
 | Technik | STM32F303 / bxCAN / 25 tool profiles |
 | Ziel | Eine Mikrocontroller-Platine (die Firmware); wird auf einem PC gebaut |
 | Auf echter Hardware | Noch nicht: für diese Version ist kein Lauf auf echter Hardware vermerkt |

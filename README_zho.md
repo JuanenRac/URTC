@@ -42,7 +42,7 @@
 |---|---|
 | 版本 | `0.5.1` |
 | 成熟度 | 可用 |
-| 测试 | 319 (`python -m unittest discover -s tests`), 另有 80 个 C 主机测试套件（ctest） |
+| 测试 | 319 (`python -m unittest discover -s tests`), 另有 82 个 C 主机测试套件（ctest） |
 | 技术栈 | STM32F303 / bxCAN / 25 tool profiles |
 | 目标 | 微控制器板（固件）；在电脑上构建 |
 | 真实硬件 | 尚未：此版本没有在真实硬件上运行的记录 |

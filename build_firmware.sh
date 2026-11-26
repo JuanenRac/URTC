@@ -266,6 +266,13 @@ case "${URTC_SLAVE_LINK_CRC:-0}" in
     1) CFLAGS="$CFLAGS -DURTC_SLAVE_LINK_CRC=1" ;;
     *) echo "URTC_SLAVE_LINK_CRC must be 0 or 1 (got '${URTC_SLAVE_LINK_CRC}')" >&2; exit 1 ;;
 esac
+# URTC_SLAVE_SHORT_WRITE_DISPATCH=1 builds the bootloader and the application of the expansion slave so that a write of the master that stops before the receive buffer
+# is full is executed at the end of the transaction; the default, 0, executes writes only from the receive-complete callback. Which of the two the chip needs is a bench test.
+case "${URTC_SLAVE_SHORT_WRITE_DISPATCH:-0}" in
+    0) ;;
+    1) CFLAGS="$CFLAGS -DURTC_SLAVE_SHORT_WRITE_DISPATCH=1" ;;
+    *) echo "URTC_SLAVE_SHORT_WRITE_DISPATCH must be 0 or 1 (got '${URTC_SLAVE_SHORT_WRITE_DISPATCH}')" >&2; exit 1 ;;
+esac
 
 HAL_OK=1
 for f in $HAL_MODULES; do

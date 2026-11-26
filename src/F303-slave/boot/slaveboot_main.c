@@ -34,6 +34,11 @@ I2C_HandleTypeDef hi2c1;
 // 32). tx_buffer's size (10) matches REG_QUERY_VERSION's own 10-byte
 // response, the largest read.
 // -----------------------------------------------------------------------
+// 1 = a write by the master that stops before the receive buffer is full is executed from the end of the transaction (the HAL of this family is expected to report that
+// STOP as an acknowledge failure and not to call the receive-complete callback; to be confirmed on a board). 0 (default) = only the receive-complete callback executes a write.
+#ifndef URTC_SLAVE_SHORT_WRITE_DISPATCH
+#define URTC_SLAVE_SHORT_WRITE_DISPATCH 0
+#endif
 static uint8_t rx_buffer[33];
 static uint8_t tx_buffer[16];   // REG_CHALLENGE's 16 bytes are now the longest answer (REG_QUERY_VERSION has 10)
 static uint8_t pending_read_register = 0xFF; // 0xFF = none set yet; a read before any register write has a value to serve reads REG_STATUS by default, chosen deliberately below rather than left undefined
@@ -134,12 +139,33 @@ void I2C1_ER_IRQHandler(void) {
 // HAL also clears XferCount on that path, so a short write cannot be
 // recovered from the error callback by reading it.
 // -----------------------------------------------------------------------
+#if URTC_SLAVE_SHORT_WRITE_DISPATCH
+void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef *hi2c);
+static uint8_t write_armed = 0;   // a receive is running and no callback has executed it yet
+
+// The bytes of a short write are counted from the pointer of the HAL, which it advances for every byte it stores; XferCount is not used, the error path clears it.
+static void DispatchShortWrite(I2C_HandleTypeDef *hi2c) {
+    if (!write_armed) return;
+    write_armed = 0;
+    uint32_t received = (uint32_t)(hi2c->pBuffPtr - rx_buffer);
+    if (received == 0 || received >= sizeof(rx_buffer)) return;
+    hi2c->XferCount = (uint16_t)(sizeof(rx_buffer) - received);
+    HAL_I2C_SlaveRxCpltCallback(hi2c);
+}
+#endif
+
 void HAL_I2C_AddrCallback(I2C_HandleTypeDef *hi2c, uint8_t TransferDirection, uint16_t AddrMatchCode) {
     (void)AddrMatchCode;
+#if URTC_SLAVE_SHORT_WRITE_DISPATCH
+    if (TransferDirection != I2C_DIRECTION_TRANSMIT) DispatchShortWrite(hi2c);   // a repeated start: the write ends here, without a STOP
+#endif
     // The direction is the one of the MASTER (STM32 HAL): TRANSMIT is a write by the master, which this slave receives; RECEIVE is a read by the master.
     if (TransferDirection == I2C_DIRECTION_TRANSMIT) {
         // Master is about to WRITE to us.
         HAL_I2C_Slave_Seq_Receive_IT(hi2c, rx_buffer, sizeof(rx_buffer), I2C_LAST_FRAME);
+#if URTC_SLAVE_SHORT_WRITE_DISPATCH
+        write_armed = 1;
+#endif
     } else {
         // Master is about to READ from us - serve whatever
         // pending_read_register currently holds (set by a prior 1-byte
@@ -190,6 +216,9 @@ void HAL_I2C_AddrCallback(I2C_HandleTypeDef *hi2c, uint8_t TransferDirection, ui
 }
 
 void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef *hi2c) {
+#if URTC_SLAVE_SHORT_WRITE_DISPATCH
+    write_armed = 0;
+#endif
     uint32_t bytes_received = sizeof(rx_buffer) - hi2c->XferCount;
     if (bytes_received == 0) return; // shouldn't happen (AddrCallback always requests >0), guarded anyway rather than risk reading rx_buffer[0] from a transaction that never actually sent anything
 
@@ -236,10 +265,16 @@ void HAL_I2C_ListenCpltCallback(I2C_HandleTypeDef *hi2c) {
     // done - listen mode disables itself when this fires, by HAL's own
     // design, so it's re-armed here on every single transaction rather
     // than being something enabled once at init and forgotten.
+#if URTC_SLAVE_SHORT_WRITE_DISPATCH
+    DispatchShortWrite(hi2c);
+#endif
     HAL_I2C_EnableListen_IT(hi2c);
 }
 
 void HAL_I2C_ErrorCallback(I2C_HandleTypeDef *hi2c) {
+#if URTC_SLAVE_SHORT_WRITE_DISPATCH
+    if (hi2c->ErrorCode & ~(uint32_t)HAL_I2C_ERROR_AF) write_armed = 0;   // a bus error, lost arbitration or overrun: the bytes are not trusted
+#endif
     // Bus error, arbitration lost, or similar - re-arm listening rather
     // than leaving this chip silently deaf to the link bus until the next
     // full power cycle. Doesn't attempt to salvage whatever transaction
