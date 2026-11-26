@@ -50,6 +50,13 @@ void HandleEndUpdate(uint8_t *data);
 void HandleConfirm(uint8_t *data);
 // REG_RECORD_COUNTER, 4 bytes big-endian: the signed counter of the record the master verified. Before the END frame only.
 void HandleRecordCounter(uint8_t *data);
+
+// Register URTC_VC_SLAVE_REG, 1 byte (urtc_version_compat.h): relaxes the version rule for the session in progress. Built in only with
+// URTC_SLAVE_VERSION_COMPAT=1 (slaveboot_common.h, off by default).
+#include "slaveboot_common.h"
+#if URTC_SLAVE_VERSION_COMPAT
+void HandleVersionCompat(uint8_t *data);
+#endif
 // The rollback floor (REG_COUNTER_FLOOR) and its 4-byte big-endian answer.
 uint32_t Counter_Floor(void);
 void BuildCounterFloorResponse(uint8_t out[4]);
