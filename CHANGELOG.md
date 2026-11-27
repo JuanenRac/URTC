@@ -6,7 +6,7 @@ All notable changes to this project are documented here.
 
 - **The compatibility table of the release notes is current:** `docs/COMPATIBILITY.md`, which the notes of a release carry, still named versions of long ago; it is the current copy of URTC-COMMON.
 
-- **The coverage of the C host suites is the union of the lines the suites run:** `tools/run_host_tests.py` kept, for each source, the best figure of any one suite, so the lines that only another suite runs were not counted. It now reads the lines of every suite (`gcov -t`) and counts a line as run when any suite ran it, and as runnable when any suite compiled it.
+- **The coverage of the C host suites is the union of the lines the suites run:** `tools/run_host_tests.py` kept, for each source, the best figure of any one suite, so the lines that only another suite runs were not counted. It now reads the lines of every suite (`gcov -t`) and counts a line as run when any suite ran it, and as runnable when any suite compiled it. Measured this way the suites run 95.9% of the lines, and the floor of the manual workflow is 95.
 
 ## [0.5.2] - Configurable emergency-stop silence over CAN, short-write option for the slave link and fault-injection host tests
 
