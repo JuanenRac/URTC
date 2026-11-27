@@ -15,9 +15,9 @@ on:
         required: false
         default: ""
       coverage_floor:
-        description: "Build the suites with gcov counters and fail under this percentage of executed lines (the measured value is 93.9; empty: no measurement)"
+        description: "Build the suites with gcov counters and fail under this percentage of executed lines (the measured value is 95.9; empty: no measurement)"
         required: false
-        default: "93"
+        default: "95"
 
 permissions:
   contents: read

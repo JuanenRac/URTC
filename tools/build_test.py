@@ -153,15 +153,15 @@ def run_python_tests(config: dict) -> None:
         tests_dir = ROOT / pytest.get("dir", "tests")
         if tests_dir.is_dir():
             environment = python_environment(pytest.get("pythonpath", ["."]))
-            probe = subprocess.run([sys.executable, "-m", "pytest", "--version"], capture_output=True, text=True, env=environment)
+            probe = subprocess.run([sys.executable, "-m", "pytest", "--version"], capture_output=True, text=True, encoding="utf-8", errors="replace", env=dict(environment, PYTHONIOENCODING="utf-8"))
             if probe.returncode != 0 and pytest.get("install"):
                 print("PYTEST=MISSING installing pytest for the tests of this repository")
-                installed = subprocess.run([sys.executable, "-m", "pip", "install", "--quiet", "pytest>=8"], capture_output=True, text=True, env=environment)
+                installed = subprocess.run([sys.executable, "-m", "pip", "install", "--quiet", "pytest>=8"], capture_output=True, text=True, encoding="utf-8", errors="replace", env=dict(environment, PYTHONIOENCODING="utf-8"))
                 if installed.returncode != 0:
                     detail = ((installed.stderr or installed.stdout).strip().splitlines() or [""])[-1][:200]
                     print(f"PYTEST_TESTS=SKIPPED pytest is not installed and could not be ({detail})")
                     return
-                probe = subprocess.run([sys.executable, "-m", "pytest", "--version"], capture_output=True, text=True, env=environment)
+                probe = subprocess.run([sys.executable, "-m", "pytest", "--version"], capture_output=True, text=True, encoding="utf-8", errors="replace", env=dict(environment, PYTHONIOENCODING="utf-8"))
             if probe.returncode != 0:
                 print("PYTEST_TESTS=SKIPPED pytest is not installed")
             else:
@@ -234,6 +234,9 @@ def light_check(manifest: dict, stack: str, config: dict) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(errors="replace")  # the output of a tool may hold characters the console cannot write
     parser = argparse.ArgumentParser(description="Run a non-versioning build check for this repository.")
     parser.add_argument("--check", action="store_true", help="the light check: nothing is built and no test is run")
     args = parser.parse_args(argv)

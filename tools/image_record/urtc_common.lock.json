@@ -1,10 +1,10 @@
 {
   "format": 1,
-  "urtc_common_version": "0.3.1",
+  "urtc_common_version": "0.3.2",
   "files": {
     "__init__.py": {
       "from": "src/urtc_common/__init__.py",
-      "sha256": "97768a6bb4355e096c403fe637de7ba9cf9c3589537d8838fe68034c3b10a582"
+      "sha256": "6ccf1bfe070a5d48ddf816ff90a85f5678dd03c4d8221e93db50b1bf7559a6e3"
     },
     "ed25519.py": {
       "from": "src/urtc_common/ed25519.py",

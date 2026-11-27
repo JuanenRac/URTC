@@ -5,6 +5,7 @@
     {"image": "MAIN", "version": "0.4.9", "counter": 2},
     {"image": "MAIN", "version": "0.5.0", "counter": 3},
     {"image": "MAIN", "version": "0.5.1", "counter": 4},
+    {"image": "MAIN", "version": "0.5.2", "counter": 5},
     {"image": "SLAVE", "version": "0.3.3", "counter": 3}
   ]
 }

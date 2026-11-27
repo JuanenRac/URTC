@@ -274,6 +274,32 @@ static void test_deferred_and_window(int *failures)
     TEST_ASSERT(SLAVEBOOT_LISTEN_WINDOW_MS > 0 && SLAVEBOOT_LISTEN_WINDOW_MS <= 5000, "the window of the build is positive and short");
 }
 
+// A flash program or erase that fails, at every one of them in turn from START to the last record: the update never reports VERIFY_OK or resets over a main
+// slot that does not hold the image, and what the next boot accepts as an application is that image.
+static void test_flash_fault_at_every_operation(int *failures)
+{
+    int bad_end = 0, bad_boot = 0, refused[2] = {0, 0};
+    for (int erase = 0; erase < 2; erase++) {
+        for (int nth = 1; nth <= (erase ? 12 : 400); nth++) {
+            fresh();
+            if (erase) fake_flash_fail_erase_nth = nth; else fake_flash_fail_program_nth = nth;
+            run_update(good(200, 0, urtc_minor_field_pack(2, 0)));
+            fake_flash_fail_erase_nth = fake_flash_fail_program_nth = 0;
+            FirmwareMetadata_t m;
+            if (current_status == STATUS_VERIFY_OK) {
+                if (!main_slot_equals_image(200) || !Metadata_Read(&m) || m.state != META_STATE_APP_VALID) bad_end++;
+            } else {
+                refused[erase]++;
+                if (fake_reset_count != 0 || (current_status != STATUS_ERROR && current_status != STATUS_VERIFY_FAIL)) bad_end++;
+            }
+            if (ApplicationIsValid() && !main_slot_equals_image(200)) bad_boot++;
+        }
+    }
+    TEST_ASSERT(refused[0] >= 100 && refused[1] >= 1, "the sweep does reach failing writes and failing erases");
+    TEST_ASSERT(bad_end == 0, "a failed flash operation ends in an error without a reset, and VERIFY_OK always means the image is installed");
+    TEST_ASSERT(bad_boot == 0, "after any failed flash operation the next boot only accepts the complete image");
+}
+
 int main(void)
 {
     int fails = 0;
@@ -742,6 +768,7 @@ int main(void)
     TEST_ASSERT(e[1] == URTC_PATCH_UNKNOWN, "legacy metadata (no patch flag): the patch is unknown, never 0");
 
     test_deferred_and_window(failures);
+    test_flash_fault_at_every_operation(failures);
 
     if (fails == 0) {
         printf("  OK   all expansion slave bootloader update host tests passed\n");

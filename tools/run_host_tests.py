@@ -126,54 +126,58 @@ COVERAGE_PREFIX = str(SETTINGS.get("coverage_prefix", "src/"))
 COVERAGE_EXCLUDE = tuple(SETTINGS.get("coverage_exclude", ()))
 SUITES = build_suites(SETTINGS) if SETTINGS["suites"] else ()
 
-_GCOV_FILE = re.compile(r"^File '(.+)'$")
-_GCOV_LINES = re.compile(r"^Lines executed:([0-9.]+)% of (\d+)$")
+_GCOV_ROW = re.compile(r"^\s*([0-9]+\*?|-|#{5}|={5}|\${5}|%{5}):\s*([0-9]+):(.*)$")
+
+Lines = tuple[frozenset[int], frozenset[int]]   # (the lines that ran, the lines that can run)
 
 
-def parse_gcov(output: str) -> dict[str, tuple[int, int]]:
-    """{source file: (executed lines, executable lines)} from the text of ``gcov -n``; only the ``.c`` files under the coverage prefix."""
-    found: dict[str, tuple[int, int]] = {}
-    current: str | None = None
+def parse_gcov(output: str) -> dict[str, Lines]:
+    """{source file: (executed lines, executable lines)}, as line numbers, from the text of ``gcov -t``; only the ``.c`` files under the coverage prefix."""
+    found: dict[str, tuple[set[int], set[int]]] = {}
+    current: tuple[set[int], set[int]] | None = None
     root = ROOT.as_posix()
     for line in output.splitlines():
-        match = _GCOV_FILE.match(line.strip())
-        if match:
-            current = match.group(1).replace("\\", "/")
+        match = _GCOV_ROW.match(line)
+        if not match:
             continue
-        match = _GCOV_LINES.match(line.strip())
-        if match and current is not None:
-            total = int(match.group(2))
-            executed = round(float(match.group(1)) * total / 100)
-            short = current[len(root) + 1:] if current.startswith(root + "/") else current
-            if short.endswith(".c") and short.startswith(COVERAGE_PREFIX) and not short.startswith(COVERAGE_EXCLUDE):
-                done, count = found.get(short, (0, 0))
-                found[short] = (max(done, executed), max(count, total))
-            current = None
-    return found
+        count, number, text = match.group(1), int(match.group(2)), match.group(3)
+        if number == 0:   # the header of a file: "Source:...", "Graph:..." and so on
+            if text.startswith("Source:"):
+                name = text[len("Source:"):].strip().replace("\\", "/")
+                short = name[len(root) + 1:] if name.startswith(root + "/") else name
+                wanted = short.endswith(".c") and short.startswith(COVERAGE_PREFIX) and not short.startswith(COVERAGE_EXCLUDE)
+                current = found.setdefault(short, (set(), set())) if wanted else None
+            continue
+        if current is None or count == "-":
+            continue
+        current[1].add(number)
+        if count[0].isdigit() and count.rstrip("*") != "0":
+            current[0].add(number)
+    return {name: (frozenset(done), frozenset(all_lines)) for name, (done, all_lines) in found.items() if all_lines}
 
 
-def merge_coverage(parts: list[dict[str, tuple[int, int]]]) -> dict[str, tuple[int, int]]:
-    """The best a file did in any suite (a line run by one suite counts; the counters of different suites are not added)."""
-    merged: dict[str, tuple[int, int]] = {}
+def merge_coverage(parts: list[dict[str, Lines]]) -> dict[str, Lines]:
+    """The union of the suites: a line counts as run when any suite ran it, and as runnable when any suite compiled it."""
+    merged: dict[str, Lines] = {}
     for part in parts:
-        for name, (done, count) in part.items():
-            old = merged.get(name, (0, 0))
-            merged[name] = (max(old[0], done), max(old[1], count))
+        for name, (done, runnable) in part.items():
+            old_done, old_runnable = merged.get(name, (frozenset(), frozenset()))
+            merged[name] = (old_done | done, old_runnable | runnable)
     return merged
 
 
-def coverage_percent(files: dict[str, tuple[int, int]]) -> float:
-    total = sum(count for _, count in files.values())
-    return 100.0 * sum(done for done, _ in files.values()) / total if total else 0.0
+def coverage_percent(files: dict[str, Lines]) -> float:
+    total = sum(len(runnable) for _, runnable in files.values())
+    return 100.0 * sum(len(done) for done, _ in files.values()) / total if total else 0.0
 
 
 def binary_name(stem: str) -> str:
     return stem + (".exe" if os.name == "nt" else "")
 
 
-def measure_coverage(selected: list["Suite"], compiler: str, build_dir: Path) -> dict[str, tuple[int, int]]:
+def measure_coverage(selected: list["Suite"], compiler: str, build_dir: Path) -> dict[str, Lines]:
     """Builds every suite again with ``--coverage -O0`` (no sanitizers), runs it and reads the counters with gcov."""
-    parts: list[dict[str, tuple[int, int]]] = []
+    parts: list[dict[str, Lines]] = []
     for suite in selected:
         work = build_dir / "coverage" / suite.name
         if work.exists():
@@ -187,7 +191,7 @@ def measure_coverage(selected: list["Suite"], compiler: str, build_dir: Path) ->
             return {}
         subprocess.run([str(binary)], cwd=ROOT, capture_output=True)
         for gcda in work.rglob("*.gcda"):
-            out = subprocess.run(["gcov", "-n", "-o", str(gcda.parent), str(gcda)], cwd=work, capture_output=True, text=True).stdout
+            out = subprocess.run(["gcov", "-t", "-o", str(gcda.parent), str(gcda)], cwd=work, capture_output=True, text=True, encoding="utf-8", errors="replace").stdout
             parts.append(parse_gcov(out))
     return merge_coverage(parts)
 
@@ -225,8 +229,8 @@ def command(suite: Suite, compiler: str, binary: Path) -> list[str]:
 def is_gcc_with_analyzer(compiler: str) -> bool:
     """True for a gcc that has -fanalyzer (10 or newer); clang and old gcc are skipped."""
     try:
-        out = subprocess.run([compiler, "-dumpfullversion", "-dumpversion"], capture_output=True, text=True).stdout.strip()
-        banner = subprocess.run([compiler, "--version"], capture_output=True, text=True).stdout
+        out = subprocess.run([compiler, "-dumpfullversion", "-dumpversion"], capture_output=True, text=True, encoding="utf-8", errors="replace").stdout.strip()
+        banner = subprocess.run([compiler, "--version"], capture_output=True, text=True, encoding="utf-8", errors="replace").stdout
     except OSError:
         return False
     if "clang" in banner.lower() or "gcc" not in banner.lower() and "free software foundation" not in banner.lower():
@@ -259,7 +263,7 @@ def analyze(selected: list[Suite], compiler: str) -> bool:
     pairs = analysis_sources(selected)
     failed = []
     for suite, source in pairs:
-        result = subprocess.run(analyze_command(suite, compiler, source), cwd=ROOT, capture_output=True, text=True)
+        result = subprocess.run(analyze_command(suite, compiler, source), cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace")
         if result.returncode != 0 or "warning:" in result.stderr:
             failed.append(source)
             print(f"ANALYZER {source}:\n{result.stderr}")
@@ -329,16 +333,16 @@ def run_with_ctest(selected: list[Suite], compiler: str, build_dir: Path, jobs: 
         shutil.rmtree(work)
     work.mkdir(parents=True)
     (work / "CMakeLists.txt").write_text(cmake_lists(selected, compiler), encoding="utf-8", newline="\n")
-    configure = subprocess.run(["cmake", "-S", str(work), "-B", str(work / "out"), "-G", "Unix Makefiles"], capture_output=True, text=True)
+    configure = subprocess.run(["cmake", "-S", str(work), "-B", str(work / "out"), "-G", "Unix Makefiles"], capture_output=True, text=True, encoding="utf-8", errors="replace")
     if configure.returncode != 0:
         print(configure.stdout + configure.stderr)
         print("FAIL cmake could not configure the suites")
         return [suite.name for suite in selected]
-    built = subprocess.run(["cmake", "--build", str(work / "out"), "--parallel", str(jobs), "--", "--keep-going"], capture_output=True, text=True)
+    built = subprocess.run(["cmake", "--build", str(work / "out"), "--parallel", str(jobs), "--", "--keep-going"], capture_output=True, text=True, encoding="utf-8", errors="replace")
     if built.returncode != 0:
         print(built.stdout[-6000:] + built.stderr[-6000:])
         print("FAIL a suite did not compile")
-    ran = subprocess.run(["ctest", "--output-on-failure"], cwd=work / "out", capture_output=True, text=True)
+    ran = subprocess.run(["ctest", "--output-on-failure"], cwd=work / "out", capture_output=True, text=True, encoding="utf-8", errors="replace")
     print(ran.stdout, end="")
     if ran.stderr:
         print(ran.stderr, end="")
@@ -392,6 +396,9 @@ def choose_runner(requested: str) -> str:
 
 
 def main(argv: list[str]) -> int:
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(errors="replace")  # the output of a tool may hold characters the console cannot write
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--list", action="store_true", help="print the suites and exit")
     parser.add_argument("--only", action="append", help="run only this suite (repeatable)")
@@ -455,8 +462,8 @@ def main(argv: list[str]) -> int:
         percent = coverage_percent(covered)
         listed = all_firmware_sources()
         never = [name for name in listed if name not in covered]
-        for name, (done, count) in sorted(covered.items()):
-            print(f"  {100.0 * done / count if count else 0.0:6.1f}%  {done:5}/{count:<5} {name}")
+        for name, (done, runnable) in sorted(covered.items()):
+            print(f"  {100.0 * len(done) / len(runnable):6.1f}%  {len(done):5}/{len(runnable):<5} {name}")
         print(f"COVERAGE {percent:.1f}% of the lines of {len(covered)} firmware sources the suites compile ({len(never)} of {len(listed)} sources are compiled by no suite)")
         if percent < args.coverage_floor:
             print(f"COVERAGE=FAIL below the floor of {args.coverage_floor:g}%")

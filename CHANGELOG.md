@@ -5,6 +5,17 @@ All notable changes to this project are documented here.
 ## [Unreleased]
 
 - **The way an image without a patch number is read can be kept in the board and changed by a signed command (off by default):** three build switches, `URTC_BL_VERSION_COMPAT_COMMAND` (main bootloader, with `URTC_BL_META_AB`), `URTC_APP_VERSION_COMPAT_RELAY` (main application) and `URTC_SLAVE_VERSION_COMPAT` (slave bootloader). With them at 0, the default, none of the code is compiled and the strict rule is unchanged. On, the mode sits next to the metadata record without changing it, only a signed command with a higher counter changes it, the slave is relaxed for one update session at a time and the signed rollback counter still applies. Tried on host programs only, including a flash failure at every step; see `docs/VERSION_COMPAT.md`.
+- **The README files say that the official trust table of the bootloaders holds the release keys:** they still said it was empty until the image-signing key was created. That key exists and `keys/image_trust.json` holds it, with a reserved next one. Eight languages.
+
+- **The compatibility table of the release notes is current:** `docs/COMPATIBILITY.md`, which the notes of a release carry, still named versions of long ago; it is the current copy of URTC-COMMON.
+
+- **The coverage of the C host suites is the union of the lines the suites run:** `tools/run_host_tests.py` kept, for each source, the best figure of any one suite, so the lines that only another suite runs were not counted. It now reads the lines of every suite (`gcov -t`) and counts a line as run when any suite ran it, and as runnable when any suite compiled it. Measured this way the suites run 95.9% of the lines, and the floor of the manual workflow is 95.
+
+## [0.5.2] - Configurable emergency-stop silence over CAN, short-write option for the slave link and fault-injection host tests
+
+- **More host tests of the update paths:** a flash write or erase that fails is injected at every operation of an update in both bootloaders (no success, no reset and no accepted application without the complete image), and the SHA-256 of the slave attestation is checked on a message whose padding needs a second block. The firmware is unchanged.
+
+- **The README files state the real number of C host test suites:** the text and the file tree said 63 or 80 while the list of suites has 82; a test now compares them in the eight languages.
 
 - **A build option executes the short writes of the expansion slave link:** with `URTC_SLAVE_SHORT_WRITE_DISPATCH=1` the bootloader and the application of the slave execute, at the end of the transaction (or at a repeated start), a write that stopped before the receive buffer was full, counting the bytes from the pointer of the HAL; a write cut by a bus error, lost arbitration or an overrun is not executed. The default is 0 and nothing changes. The host suites run the slave in both models; which one the chip follows has not been tried on a board.
 
