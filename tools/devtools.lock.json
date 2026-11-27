@@ -17,8 +17,8 @@
     "tools/make_structure.py": "27615e9b6374cbb6cc21b52d52bad4e9db1c9307319a8910b4b75c4ecb9fe5c8",
     "tools/pretty_run.py": "1698bfec531568afaf5319f0a220e9bf7c0087f39cbf5e6e88e7035bfc1327c5",
     "tools/run_host_tests.py": "1bddb35dfb3d227f5ba8f0d972b74e0a4afad87c838836aa14080323588d00ac",
-    "tools/status_lights.py": "db9c7af17940a645fd027fcf1113b83d5e6ee521173cc85cb295fcef791ee74d",
-    "tools/sync_manifests.py": "07c0c34233d17a33127164b2a40dd7277504758f656cf193c33a8ac4cd880c06",
+    "tools/status_lights.py": "79c7dcebb2e9c2dcb278e96ad21e068d32ec26faeb566dc60388494f4cc6de86",
+    "tools/sync_manifests.py": "a12202988d734ea8c0be62b086b6ad688ae999d48ccd9c722a36160ac354aba0",
     "tools/universal_readme_check.py": "ad56c0a62fd7cb0a74291c62324b8234bfa904737926158db8bcac24175ffeaf"
   }
 }
