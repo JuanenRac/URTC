@@ -40,7 +40,7 @@
 
 | | |
 |---|---|
-| Version | `0.5.1` |
+| Version | `0.5.2` |
 | Reifegrad | Funktionsfähig |
 | Tests | 320 (`python -m unittest discover -s tests`), dazu 82 C-Host-Suiten (ctest) |
 | Technik | STM32F303 / bxCAN / 25 tool profiles |

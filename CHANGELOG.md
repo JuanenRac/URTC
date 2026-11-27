@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.5.2] - Configurable emergency-stop silence over CAN, short-write option for the slave link and fault-injection host tests
+
 - **More host tests of the update paths:** a flash write or erase that fails is injected at every operation of an update in both bootloaders (no success, no reset and no accepted application without the complete image), and the SHA-256 of the slave attestation is checked on a message whose padding needs a second block. The firmware is unchanged.
 
 - **The README files state the real number of C host test suites:** the text and the file tree said 63 or 80 while the list of suites has 82; a test now compares them in the eight languages.

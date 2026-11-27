@@ -40,7 +40,7 @@
 
 | | |
 |---|---|
-| 版本 | `0.5.1` |
+| 版本 | `0.5.2` |
 | 成熟度 | 可用 |
 | 测试 | 320 (`python -m unittest discover -s tests`), 另有 82 个 C 主机测试套件（ctest） |
 | 技术栈 | STM32F303 / bxCAN / 25 tool profiles |
