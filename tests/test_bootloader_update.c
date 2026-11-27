@@ -537,6 +537,32 @@ static void test_metadata_log(int *failures)
     TEST_ASSERT(Metadata_Read(&got) && got.version_minor == 3, "a record with a wrong CRC is ignored and the previous one stays in force");
 }
 
+// A flash program or erase that fails, at every one of them in turn from START to the last record: the update never reports VERIFY_OK or resets over a main
+// slot that does not hold the image, and what the next boot accepts as an application is that image.
+static void test_flash_fault_at_every_operation(int *failures)
+{
+    int bad_end = 0, bad_boot = 0, refused[2] = {0, 0};
+    for (int erase = 0; erase < 2; erase++) {
+        for (int nth = 1; nth <= (erase ? 12 : 200); nth++) {
+            fresh();
+            if (erase) fake_flash_fail_erase_nth = nth; else fake_flash_fail_program_nth = nth;
+            run_update(good(20, 0, urtc_minor_field_pack(1, 0)));
+            fake_flash_fail_erase_nth = fake_flash_fail_program_nth = 0;
+            FirmwareMetadata_t m;
+            if (status_seen(STATUS_VERIFY_OK)) {
+                if (!main_slot_equals_image(20) || !Metadata_Read(&m) || m.state != META_STATE_APP_VALID) bad_end++;
+            } else {
+                refused[erase]++;
+                if (fake_reset_count != 0 || (!status_seen(STATUS_ERROR) && fail_reason() < 0)) bad_end++;
+            }
+            if (ApplicationIsValid() && !main_slot_equals_image(20)) bad_boot++;
+        }
+    }
+    TEST_ASSERT(refused[0] >= 20 && refused[1] >= 1, "the sweep does reach failing writes and failing erases");
+    TEST_ASSERT(bad_end == 0, "a failed flash operation ends in an error without a reset, and VERIFY_OK always means the image is installed");
+    TEST_ASSERT(bad_boot == 0, "after any failed flash operation the next boot only accepts the complete image");
+}
+
 void run_bootloader_update_tests(int *failures)
 {
     void *m = mmap(0, IMG_MAX, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_32BIT, -1, 0);
@@ -895,6 +921,7 @@ void run_bootloader_update_tests(int *failures)
     test_trust_in_the_update(failures);
     test_signed_counter(failures);
     test_metadata_log(failures);
+    test_flash_fault_at_every_operation(failures);
 }
 
 int main(void)

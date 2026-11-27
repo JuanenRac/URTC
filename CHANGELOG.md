@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **More host tests of the update paths:** a flash write or erase that fails is injected at every operation of an update in both bootloaders (no success, no reset and no accepted application without the complete image), and the SHA-256 of the slave attestation is checked on a message whose padding needs a second block. The firmware is unchanged.
+
 - **The README files state the real number of C host test suites:** the text and the file tree said 63 or 80 while the list of suites has 82; a test now compares them in the eight languages.
 
 - **A build option executes the short writes of the expansion slave link:** with `URTC_SLAVE_SHORT_WRITE_DISPATCH=1` the bootloader and the application of the slave execute, at the end of the transaction (or at a repeated start), a write that stopped before the receive buffer was full, counting the bytes from the pointer of the HAL; a write cut by a bus error, lost arbitration or an overrun is not executed. The default is 0 and nothing changes. The host suites run the slave in both models; which one the chip follows has not been tried on a board.
