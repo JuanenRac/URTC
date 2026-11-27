@@ -1,10 +1,10 @@
 {
   "format": 1,
-  "urtc_common_version": "0.3.0",
+  "urtc_common_version": "0.3.1",
   "files": {
     "COMPATIBILITY.md": {
       "from": "docs/COMPATIBILITY.md",
-      "sha256": "b3c59a4267c00aa50f4e826ad1d40a4b821184a63aea882e7be1b01907aa6720"
+      "sha256": "54a9d0c1c98aab12cf76eea68a592c68ba58ed03e12c9091d058b881ef8d611a"
     }
   }
 }
