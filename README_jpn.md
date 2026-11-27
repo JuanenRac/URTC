@@ -19,7 +19,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/License-GPL%203.0-blue.svg" alt="GPL 3.0">
-  <img src="https://img.shields.io/badge/Tests-320%20tests-2ea44f.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-322%20tests-2ea44f.svg" alt="Tests">
   <img src="https://img.shields.io/badge/Hardware-CERN%20OHL--S-orange.svg" alt="CERN OHL-S">
   <img src="https://img.shields.io/badge/Language-C-00599C.svg" alt="C">
   <img src="https://img.shields.io/badge/Platform-STM32F303-003551.svg" alt="STM32">
@@ -42,7 +42,7 @@
 |---|---|
 | バージョン | `0.5.2` |
 | 成熟度 | 機能する |
-| テスト | 320 (`python -m unittest discover -s tests`), 加えて C のホストスイート 82 個（ctest） |
+| テスト | 322 (`python -m unittest discover -s tests`), 加えて C のホストスイート 82 個（ctest） |
 | 技術 | STM32F303 / bxCAN / 25 tool profiles |
 | 対象 | マイコンボード（ファームウェア）。ビルドは PC で行います |
 | 実機での確認 | まだです：このバージョンについて実機での動作記録はありません |
