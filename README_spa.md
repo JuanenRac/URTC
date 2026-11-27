@@ -19,7 +19,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Licencia-GPL%203.0-blue.svg" alt="GPL 3.0">
-  <img src="https://img.shields.io/badge/Tests-320%20tests-2ea44f.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-322%20tests-2ea44f.svg" alt="Tests">
   <img src="https://img.shields.io/badge/Hardware-CERN%20OHL--S-orange.svg" alt="CERN OHL-S">
   <img src="https://img.shields.io/badge/Lenguaje-C-00599C.svg" alt="C">
   <img src="https://img.shields.io/badge/Plataforma-STM32F303-003551.svg" alt="STM32">
@@ -42,7 +42,7 @@
 |---|---|
 | Versión | `0.5.2` |
 | Madurez | Funcional |
-| Tests | 320 (`python -m unittest discover -s tests`), más 82 suites C en el host (ctest) |
+| Tests | 322 (`python -m unittest discover -s tests`), más 82 suites C en el host (ctest) |
 | Tecnología | STM32F303 / bxCAN / 25 tool profiles |
 | Destino | Una placa con microcontrolador (el firmware); se compila en un PC |
 | En hardware real | Todavía no: no consta ninguna ejecución en hardware real para esta versión |

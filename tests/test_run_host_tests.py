@@ -1,9 +1,12 @@
 """tools/run_host_tests.py is the one list of host C suites: every tests/test_*.c is in it and every file it names exists."""
 import importlib.util
 import os
+import shutil
 import sys
+import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parent.parent
 _spec = importlib.util.spec_from_file_location("run_host_tests", ROOT / "tools" / "run_host_tests.py")
@@ -141,22 +144,53 @@ if __name__ == "__main__":
     unittest.main()
 
 
+def gcov_file(name: str, rows) -> str:
+    """The text ``gcov -t`` prints for one source: ``rows`` are (count, line number)."""
+    head = f"        -:    0:Source:{ROOT.as_posix()}/{name}\n        -:    0:Graph:t.gcno\n        -:    0:Runs:1\n"
+    return head + "".join(f"{count:>9}:{number:>5}:    code;\n" for count, number in rows)
+
+
 class CoverageTests(unittest.TestCase):
-    GCOV = (
-        "File '" + ROOT.as_posix() + "/src/F303-master/a.c'\nLines executed:50.00% of 10\nCreating 'a.c.gcov'\n\n"
-        "File '" + ROOT.as_posix() + "/tests/host_hal/fake_hal.c'\nLines executed:28.97% of 107\n\n"
-        "File '" + ROOT.as_posix() + "/src/F303-master/a.h'\nLines executed:100.00% of 3\n\n"
-        "File '" + ROOT.as_posix() + "/src/F303-master/b.c'\nLines executed:100.00% of 4\n"
-    )
+    GCOV = (gcov_file("src/F303-master/a.c", [("3", 1), ("#####", 2), ("-", 3), ("=====", 4), ("2*", 5)])
+            + gcov_file("tests/host_hal/fake_hal.c", [("1", 1)])
+            + gcov_file("src/F303-master/a.h", [("1", 1)])
+            + "File 'summary'\nLines executed:50.00% of 4\n"
+            + gcov_file("src/F303-master/b.c", [("%%%%%", 7), ("$$$$$", 8), ("1", 9)])
+            + gcov_file("src/F303-master/empty.c", [("-", 1)]))
 
-    def test_only_the_c_files_of_the_firmware_sources_are_counted(self):
-        self.assertEqual(runner.parse_gcov(self.GCOV), {"src/F303-master/a.c": (5, 10), "src/F303-master/b.c": (4, 4)})
+    def test_only_the_runnable_lines_of_the_c_files_of_the_firmware_sources_are_counted(self):
+        self.assertEqual(runner.parse_gcov(self.GCOV), {"src/F303-master/a.c": (frozenset({1, 5}), frozenset({1, 2, 4, 5})),
+                                                        "src/F303-master/b.c": (frozenset({9}), frozenset({7, 8, 9}))})
 
-    def test_the_best_of_the_suites_counts_for_a_file_and_the_percentage_is_over_all_lines(self):
-        merged = runner.merge_coverage([{"src/x.c": (2, 10)}, {"src/x.c": (7, 10), "src/y.c": (5, 5)}])
-        self.assertEqual(merged, {"src/x.c": (7, 10), "src/y.c": (5, 5)})
-        self.assertAlmostEqual(runner.coverage_percent(merged), 80.0)
+    def test_a_line_run_by_any_suite_counts_once_and_the_percentage_is_over_all_lines(self):
+        def lines(done, runnable):
+            return frozenset(done), frozenset(runnable)
+
+        merged = runner.merge_coverage([{"src/x.c": lines({1, 2}, range(1, 11))}, {"src/x.c": lines({2, 3, 4}, range(1, 11)), "src/y.c": lines({1}, {1})}])
+        self.assertEqual(merged, {"src/x.c": lines({1, 2, 3, 4}, range(1, 11)), "src/y.c": lines({1}, {1})})
+        self.assertAlmostEqual(runner.coverage_percent(merged), 100.0 * 5 / 11)
         self.assertEqual(runner.coverage_percent({}), 0.0)
+
+    def test_the_lines_that_only_one_set_of_options_compiles_are_added_to_the_file(self):
+        merged = runner.merge_coverage([{"src/x.c": (frozenset({1}), frozenset({1, 2}))}, {"src/x.c": (frozenset({5}), frozenset({1, 5}))}])
+        self.assertEqual(merged, {"src/x.c": (frozenset({1, 5}), frozenset({1, 2, 5}))})
+
+    @unittest.skipUnless(os.environ.get("CI") and shutil.which("gcc") and shutil.which("gcov"), "compiles with gcc: on a build machine only")
+    def test_two_suites_that_run_different_lines_add_up_with_the_real_gcov(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder).resolve()
+            (root / "src").mkdir()
+            (root / "src" / "f.c").write_text("int f(int a)\n{\n    if (a) {\n        return 1;\n    }\n    return 2;\n}\n", encoding="utf-8")
+            suites = []
+            for name, value in (("one", 1), ("zero", 0)):
+                (root / f"{name}.c").write_text(f"int f(int);\nint main(void)\n{{\n    return f({value}) == 0;\n}}\n", encoding="utf-8")
+                suites.append(runner.Suite(name, f"{name}.c", ("src/f.c",), (), sanitize=False))
+            with mock.patch.object(runner, "ROOT", root), mock.patch.object(runner, "COVERAGE_PREFIX", "src/"), mock.patch.object(runner, "COVERAGE_EXCLUDE", ()):
+                alone = [runner.measure_coverage([suite], shutil.which("gcc"), root / "build") for suite in suites]
+                both = runner.measure_coverage(suites, shutil.which("gcc"), root / "build")
+        for part in alone:
+            self.assertLess(runner.coverage_percent(part), 100.0)
+        self.assertEqual(runner.coverage_percent(both), 100.0)
 
     def test_the_sources_listed_for_the_report_are_the_c_files_under_src(self):
         sources = runner.all_firmware_sources()
