@@ -17,6 +17,7 @@ From those two fields, and from the files of the repository, the tool computes t
 
     Hardware, Integration   none / host-test / simulator: orange at most; bench: yellow at most; field: green
                             (a manifest with ``"hardware_bound": false`` has no hardware: these rows are not limited by the evidence)
+    Security, Updates, Writing   A.R.M.O.R. repositories only: the same ceiling as Hardware when the manifest is hardware bound; Security is never green
     Software, Tests, Documentation   green only when the repository has tests and a CI workflow (and, with --ci auto, the last run of the
                             default branch is green); otherwise yellow at most
     every row               a repository of maturity scaffolding / experimental / alpha / prototype: yellow at most
@@ -27,6 +28,11 @@ The tool only moves lights. It never reads or writes the sentence of a row: the 
     python tools/status_lights.py --suggest    # list the rows that could be better by the manifest and the evidence; writes nothing
     python tools/status_lights.py --apply      # lower every light above its ceiling in the eight READMEs and in the source of the generator
     python tools/status_lights.py --apply --raise   # also raise a hardware / integration light one step when the evidence allows it
+    python tools/status_lights.py --check --strict-evidence   # also fail when the manifest claims bench / field evidence and the Hardware row is red
+
+``--strict-evidence`` (or ``ARMOR_STRICT_EVIDENCE=1``, which is what a ci_validate reads) is off by default: without it the same contradiction is
+only listed by --suggest. With it, a manifest whose ``evidence`` is bench or field (and which has hardware) fails when its Hardware row is red:
+either the evidence is not that high or the row is not red.
 
 ``--repo PATH`` works on another repository (default: the repository this file sits in). ``--ci auto|off`` (default: off for --check, auto otherwise)
 asks ``gh run list`` for the last run of the default branch.
@@ -49,6 +55,8 @@ NAMES = {"red": RED, "orange": ORANGE, "yellow": YELLOW, "green": GREEN, "white"
 WORDS = {value: key for key, value in NAMES.items()}
 EVIDENCE_LEVELS = ("none", "host-test", "simulator", "bench", "field")
 EVIDENCE_CEILING = {"none": ORANGE, "host-test": ORANGE, "simulator": ORANGE, "bench": YELLOW, "field": GREEN}
+HARDWARE_LIKE = ("hardware", "integration", "security", "updates", "writing")   # the rows that share the ceiling of the hardware evidence
+ARMOR_ONLY = ("security", "updates", "writing")   # in the other families these rows are read as "other"
 LOW_MATURITY = {"scaffolding", "experimental", "alpha", "prototype"}
 LANGUAGE_FILES = ("README.md", "README_spa.md", "README_fra.md", "README_ita.md", "README_deu.md", "README_zho.md", "README_jpn.md", "README_por.md")
 HEADING = re.compile("^## (?:\U0001F6A6|\U0001F4A1) ")
@@ -69,6 +77,12 @@ def kind_of(label: str) -> str:
         return "integration"
     if "hardware" in text or "board" in text or "firmware on" in text:
         return "hardware"
+    if "security" in text:
+        return "security"
+    if text.startswith("update"):
+        return "updates"
+    if text.startswith("writing"):
+        return "writing"
     if text.startswith("test"):
         return "tests"
     if text.startswith("documentation") or text == "docs":
@@ -173,8 +187,10 @@ def ceiling(kind: str, manifest: dict, tests: bool, ci: bool, ci_now: str) -> tu
     if str(manifest.get("maturity", "")).lower() in LOW_MATURITY:
         lower(YELLOW, f"maturity {manifest.get('maturity')}")
     evidence = manifest.get("evidence", "none")
-    if kind in ("hardware", "integration") and manifest.get("hardware_bound", True) is not False:
+    if kind in HARDWARE_LIKE and manifest.get("hardware_bound", True) is not False:
         lower(EVIDENCE_CEILING.get(evidence, ORANGE), f"evidence {evidence}")
+    if kind == "security":
+        lower(YELLOW, "security is never green: no independent review shows it")
     if kind in ("software", "tests", "docs"):
         if not tests:
             lower(YELLOW, "no tests in the repository")
@@ -200,14 +216,31 @@ def evaluate(root: Path, ci_mode: str) -> dict:
     for number, row in enumerate(rows):
         label, light = row[0], row[1]
         kind = kind_of(label)
+        if kind in ARMOR_ONLY and not (root / "armor.project.json").is_file():
+            kind = "other"
         top, why = ceiling(kind, manifest, tests, ci, ci_now)
         items.append({"index": number, "label": label, "kind": kind, "light": light, "ceiling": top, "why": why})
     return {"manifest": manifest, "items": items, "ci": ci_now}
 
 
-def problems_of(root: Path, state: dict) -> list[str]:
+def strict_evidence_default() -> bool:
+    return os.environ.get("ARMOR_STRICT_EVIDENCE", "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def evidence_contradictions(root: Path, state: dict) -> list[str]:
+    """The manifest claims bench or field evidence, the repository has hardware and its Hardware row is red."""
+    manifest = state.get("manifest", {})
+    if manifest.get("evidence") not in ("bench", "field") or manifest.get("hardware_bound", True) is False:
+        return []
+    return [f"{root.name}: manifest evidence is {manifest.get('evidence')} but row {item['label']!r} is red: lower the evidence or raise the row"
+            for item in state["items"] if item["kind"] == "hardware" and item["light"] == RED]
+
+
+def problems_of(root: Path, state: dict, strict: bool | None = None) -> list[str]:
     problems = []
     manifest = state["manifest"]
+    if strict if strict is not None else strict_evidence_default():
+        problems.extend(evidence_contradictions(root, state))
     evidence = manifest.get("evidence")
     if evidence is None:
         problems.append(f"{root.name}: the manifest has no 'evidence' (one of {', '.join(EVIDENCE_LEVELS)})")
@@ -240,7 +273,7 @@ def problems_of(root: Path, state: dict) -> list[str]:
     return problems
 
 
-def run_in_ci(root: Path) -> list[str]:
+def run_in_ci(root: Path, strict: bool | None = None) -> list[str]:
     """What a ci_validate calls: the reasons to fail (a light above its ceiling, no evidence in the manifest, the eight READMEs with different lights). Offline."""
     english = root / "README.md"
     if not english.is_file() or read_table(english.read_bytes().decode("utf-8")) is None:
@@ -249,7 +282,7 @@ def run_in_ci(root: Path) -> list[str]:
         state = evaluate(root, "off")
     except SystemExit:
         return [f"{root.name}: the Project status table or the manifest cannot be read (python tools/status_lights.py --check says what)"]
-    return problems_of(root, state)
+    return problems_of(root, state, strict)
 
 
 def patch_armor_source(root: Path, wanted: list[str]) -> str | None:
@@ -258,11 +291,12 @@ def patch_armor_source(root: Path, wanted: list[str]) -> str | None:
     if not source.is_file():
         return None
     text = source.read_bytes().decode("utf-8")
-    start = text.find('"status": [')
-    if start < 0:
+    found = re.search(r"""(["'])status\1: \[""", text)
+    if found is None:
         return None
+    start = found.start()
     depth, end = 0, None
-    for position in range(start + len('"status": '), len(text)):
+    for position in range(found.end() - 1, len(text)):
         if text[position] == "[":
             depth += 1
         elif text[position] == "]":
@@ -271,13 +305,13 @@ def patch_armor_source(root: Path, wanted: list[str]) -> str | None:
                 end = position + 1
                 break
     block = text[start:end]
-    pairs = list(re.finditer(r'("(\w+)",\s*")(green|yellow|orange|red)(")', block))
+    pairs = list(re.finditer(r"""((["'])(\w+)\2,\s*(["']))(green|yellow|orange|red)(\4)""", block))
     if len(pairs) != len(wanted):
         fail(f"{source.name}: {len(pairs)} rows in the source but {len(wanted)} in the README")
     out, last = [], 0
     for match, light in zip(pairs, wanted, strict=True):
-        out.append(block[last:match.start(3)] + WORDS[light])
-        last = match.end(3)
+        out.append(block[last:match.start(5)] + WORDS[light])
+        last = match.end(5)
     out.append(block[last:])
     new = text[:start] + "".join(out) + text[end:]
     if new != text:
@@ -340,7 +374,7 @@ def apply(root: Path, state: dict, allow_raise: bool) -> int:
         light = item["light"]
         if light in ORDER and ORDER.index(light) > ORDER.index(item["ceiling"]):
             light = item["ceiling"]
-        elif allow_raise and item["kind"] in ("hardware", "integration") and light in ORDER and ORDER.index(light) < ORDER.index(item["ceiling"]):
+        elif allow_raise and item["kind"] in ("hardware", "integration", "updates", "writing") and light in ORDER and ORDER.index(light) < ORDER.index(item["ceiling"]):
             light = ORDER[ORDER.index(light) + 1]
         wanted.append(light)
     changed = 0
@@ -380,11 +414,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--repo", default=str(Path(__file__).resolve().parents[1]))
     parser.add_argument("--ci", choices=("auto", "off"), default=None)
     parser.add_argument("--raise", dest="allow_raise", action="store_true")
+    parser.add_argument("--strict-evidence", action="store_true", help="also fail when the manifest claims bench or field evidence and the Hardware row is red")
     args = parser.parse_args(argv)
     root = Path(args.repo).resolve()
     state = evaluate(root, args.ci or ("off" if args.check else "auto"))
     if args.check:
-        problems = problems_of(root, state)
+        problems = problems_of(root, state, True if args.strict_evidence else None)
         for line in problems:
             print(line, file=sys.stderr)
         if problems:
@@ -393,6 +428,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"STATUS_LIGHTS=PASS {root.name}")
         return 0
     if args.suggest:
+        for line in evidence_contradictions(root, state):
+            print(line)
         for item in state["items"]:
             if item["light"] in ORDER and ORDER.index(item["light"]) < ORDER.index(item["ceiling"]):
                 print(f"{root.name}: {item['label']}: {WORDS[item['light']]} could reach {WORDS[item['ceiling']]} (kind {item['kind']}; a person decides, the sentence must say what ran)")
