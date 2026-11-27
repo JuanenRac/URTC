@@ -40,7 +40,7 @@
 
 | | |
 |---|---|
-| バージョン | `0.5.1` |
+| バージョン | `0.5.2` |
 | 成熟度 | 機能する |
 | テスト | 320 (`python -m unittest discover -s tests`), 加えて C のホストスイート 82 個（ctest） |
 | 技術 | STM32F303 / bxCAN / 25 tool profiles |

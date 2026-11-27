@@ -40,7 +40,7 @@
 
 | | |
 |---|---|
-| Versión | `0.5.1` |
+| Versión | `0.5.2` |
 | Madurez | Funcional |
 | Tests | 320 (`python -m unittest discover -s tests`), más 82 suites C en el host (ctest) |
 | Tecnología | STM32F303 / bxCAN / 25 tool profiles |

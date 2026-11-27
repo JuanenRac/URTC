@@ -2,7 +2,7 @@
   "schema_version": "1.1",
   "ecosystem": "URTC",
   "name": "URTC",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "min_common": "0.3.0",
   "role": "firmware",
   "stack": "firmware-c",
@@ -31,7 +31,7 @@
     {
       "name": "URTC_MAIN_FIRMWARE",
       "kind": "app",
-      "version": "0.5.1",
+      "version": "0.5.2",
       "target": "stm32f303cc",
       "source": {
         "file": "src/F303-master/firmware_common.h",
@@ -41,7 +41,7 @@
     {
       "name": "URTC_MAIN_BOOTLOADER",
       "kind": "bootloader",
-      "version": "0.5.3",
+      "version": "0.5.4",
       "target": "stm32f303cc",
       "source": {
         "file": "src/F303-master/boot/bootloader_common.h",
