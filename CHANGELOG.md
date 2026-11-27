@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **The README files state the real number of C host test suites:** the text and the file tree said 63 or 80 while the list of suites has 82; a test now compares them in the eight languages.
+
 - **A build option executes the short writes of the expansion slave link:** with `URTC_SLAVE_SHORT_WRITE_DISPATCH=1` the bootloader and the application of the slave execute, at the end of the transaction (or at a repeated start), a write that stopped before the receive buffer was full, counting the bytes from the pointer of the HAL; a write cut by a bus error, lost arbitration or an overrun is not executed. The default is 0 and nothing changes. The host suites run the slave in both models; which one the chip follows has not been tried on a board.
 
 - **The README states a real, countable number of tests:** the At a glance table and the badge of the eight READMEs give the number of Python tests that the suite reports (`python -m unittest discover -s tests`) and name the number of C host suites that `ctest` runs, instead of only saying that the suite passes; a test keeps both numbers in step with the code, and the C suite count in the text is the real one.

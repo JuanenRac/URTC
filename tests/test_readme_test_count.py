@@ -41,6 +41,18 @@ class ReadmeTestCountTests(unittest.TestCase):
             row = glance_row((ROOT / name).read_text(encoding="utf-8"))
             self.assertIn(f"{real} ", row.split("),", 1)[-1] if ")," in row else row, name)
 
+    def test_the_text_and_the_tree_name_the_real_number_of_c_host_suites(self):
+        real = str(host_suites())
+        for name in READMES:
+            lines = (ROOT / name).read_text(encoding="utf-8").splitlines()
+            tree = [line for line in lines if line.startswith("├── tests/")]
+            self.assertEqual([re.findall(r"\d+", line) for line in tree], [[real]], name)
+            for line in lines:
+                if "tools/run_host_tests.py`" in line:
+                    stated = re.findall(r"run_host_tests\.py`(?:, |，)(\d+)", line) + re.findall(r"(?<![\d.])(\d+) ?(?:个 ?)?(?:C ?)?(?:test suites|suites|Suiten|C-Testsuiten|conjuntos|suite|スイート|测试套件)", line)
+                    for number in stated:
+                        self.assertEqual(number, real, f"{name}: {line[:80]}")
+
     def test_the_row_is_readable_by_the_dashboard_parser(self):
         row = glance_row((ROOT / "README.md").read_text(encoding="utf-8"))
         self.assertRegex(row, r"^\d+ \(`python -m unittest discover -s tests`\)")
