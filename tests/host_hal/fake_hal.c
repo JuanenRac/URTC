@@ -156,6 +156,9 @@ void fake_flash_erase_all(void)
     fake_rx_queue_count = 0;
 }
 
+int fake_flash_erase_calls(void) { return erase_calls; }
+int fake_flash_program_calls(void) { return program_calls; }
+
 HAL_StatusTypeDef HAL_FLASH_Unlock(void) { return HAL_OK; }
 HAL_StatusTypeDef HAL_FLASH_Lock(void) { return HAL_OK; }
 

@@ -26,4 +26,11 @@ uint8_t Serial_ReadNewest(uint32_t *serial, uint32_t *counter);
 // Keeps a new record: in a blank slot when there is one, else the page is recycled (the newest metadata state and the new record are written again).
 uint8_t Serial_Store(uint32_t serial, uint32_t counter);
 
+#if URTC_BL_VERSION_COMPAT_COMMAND
+// The stored version rule (urtc_version_compat.h) and the counter of the command that wrote it; both 0 when nothing is stored.
+void VersionCompat_Read(uint32_t *mode, uint32_t *counter);
+// Stores them with the state in force, in a new record. 1 on success; on a failure the previous record and setting are still in force.
+uint8_t VersionCompat_Store(uint32_t mode, uint32_t counter);
+#endif
+
 #endif // BOOTLOADER_FLASH_H

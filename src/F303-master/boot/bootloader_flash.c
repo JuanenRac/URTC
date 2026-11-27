@@ -6,6 +6,11 @@
 #include "stm32f3xx_hal.h"
 #include <string.h>
 #include "bootloader_common.h"
+#if URTC_BL_VERSION_COMPAT_COMMAND
+// With the stored version rule built in, this file is optimised for size: the 28 KB of the bootloader have no room for it otherwise. The signature and hash
+// files keep their optimisation, so the time of a verification does not change. As shipped (switch off) nothing here changes.
+#pragma GCC optimize ("Os")
+#endif
 #include "bootloader_flash.h"
 #include "bootloader_oled.h"
 #include "urtc_bl_serial.h"
@@ -17,12 +22,22 @@
 #ifndef URTC_BL_META_AB
 #define URTC_BL_META_AB 0
 #endif
+#if URTC_BL_VERSION_COMPAT_COMMAND
+static unsigned char vc_force_write = 0;   // set while a change of the setting alone is written: the state is the same, the page is not
+#define URTC_META_AB_SKIP_SAME() (!vc_force_write)
+#endif
 #if URTC_BL_META_AB
 #include "urtc_meta_ab.h"
 #include "urtc_meta_migrate.h"
 #ifndef URTC_MASTER_METADATA_B_ADDR
 #error "URTC_BL_META_AB=1 needs URTC_MASTER_METADATA_B_ADDR: the address of a free 2 KB page (check that the bootloader image ends before it)"
 #endif
+#endif
+#if URTC_BL_VERSION_COMPAT_COMMAND
+#if !URTC_BL_META_AB
+#error "URTC_BL_VERSION_COMPAT_COMMAND=1 needs URTC_BL_META_AB=1: the setting is kept in the two metadata pages"
+#endif
+#include "urtc_vc_annex.h"
 #endif
 
 static uint32_t crc32_table[256];
@@ -343,8 +358,23 @@ static uint8_t meta_ab_erase(void *ctx, uint8_t page) {
     return metadata_page_erase_at(page == 0u ? METADATA_ADDR : URTC_MASTER_METADATA_B_ADDR);
 }
 
+#if URTC_BL_VERSION_COMPAT_COMMAND
+_Static_assert(URTC_VC_ANNEX_PAYLOAD == URTC_META_STATE_BYTES, "the annex is read from the pages of this state");
+_Static_assert(8u + URTC_VC_ANNEX_PAYLOAD + 4u <= URTC_VC_ANNEX_OFFSET, "the annex does not overlap the record");
+// The annex of the next record: taken from the record in force before every write, so that no write of the state or the serial loses the setting.
+static uint8_t vc_annex[URTC_VC_RECORD_SIZE];
+static uint8_t vc_annex_present = 0;
+#endif
+
 static uint8_t meta_ab_program(void *ctx, uint8_t page, uint32_t offset, const uint8_t *data, uint32_t len) {
     (void)ctx;
+#if URTC_BL_VERSION_COMPAT_COMMAND
+    // offset 0 is the magic, programmed last: the annex goes in just before it, so a page that has a magic has its annex whole.
+    if (offset == 0u && vc_annex_present &&
+        !Flash_WriteVerified((page == 0u ? METADATA_ADDR : URTC_MASTER_METADATA_B_ADDR) + URTC_VC_ANNEX_OFFSET, vc_annex, URTC_VC_RECORD_SIZE)) {
+        return 0;
+    }
+#endif
     return Flash_WriteVerified((page == 0u ? METADATA_ADDR : URTC_MASTER_METADATA_B_ADDR) + offset, data, len);
 }
 
@@ -357,8 +387,31 @@ static void meta_ab_load(MetaAbState_t *state) {
 
 // The first A/B record of a board that holds the single-page layout goes to page 1, so the old log stays readable until the new record is complete.
 static uint8_t meta_ab_store(const MetaAbState_t *state) {
+#if URTC_BL_VERSION_COMPAT_COMMAND
+    uint32_t mode, counter;
+    urtc_vc_annex_load(&meta_ab_ops, &mode, &counter);
+    vc_annex_present = (mode != URTC_VC_MODE_NONE) ? 1u : 0u;
+    if (vc_annex_present) urtc_vc_record_pack(mode, counter, vc_annex);
+#endif
     return urtc_meta_ab_store_state(&meta_ab_ops, (const uint8_t*)state);
 }
+
+#if URTC_BL_VERSION_COMPAT_COMMAND
+void VersionCompat_Read(uint32_t *mode, uint32_t *counter) {
+    urtc_vc_annex_load(&meta_ab_ops, mode, counter);
+}
+
+uint8_t VersionCompat_Store(uint32_t mode, uint32_t counter) {
+    MetaAbState_t state;
+    meta_ab_load(&state);
+    urtc_vc_record_pack(mode, counter, vc_annex);
+    vc_annex_present = 1u;
+    vc_force_write = 1u;
+    const uint8_t done = urtc_meta_ab_store_state(&meta_ab_ops, (const uint8_t*)&state);   // the same path as every other write
+    vc_force_write = 0u;
+    return done;
+}
+#endif
 
 uint8_t Metadata_Read(FirmwareMetadata_t *out) {
     MetaAbState_t state;

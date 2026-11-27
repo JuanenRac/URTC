@@ -146,6 +146,8 @@ extern SCB_Type fake_scb;
 // count down to the Nth operation (0 = disabled).
 extern int fake_flash_fail_erase_nth;
 extern int fake_flash_fail_program_nth;
+int fake_flash_erase_calls(void);     // how many erases and programs have run since the flash was cleared, to fail the nth one from now
+int fake_flash_program_calls(void);
 extern uint32_t fake_tick;
 extern uint32_t fake_tick_step;
 int fake_flash_init(void);                    // maps the flash, returns 1 on success

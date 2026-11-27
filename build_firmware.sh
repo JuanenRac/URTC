@@ -351,6 +351,17 @@ case "$META_AB" in
     *) echo "URTC_BL_META_AB must be 0 or 1 (got '$META_AB')"; exit 1 ;;
 esac
 MASTER_KEY_FLAGS="$MASTER_KEY_FLAGS -DURTC_BL_META_AB=$META_AB"
+# The version rule kept in the board and changed by a signed command (docs/VERSION_COMPAT.md). All three are 0 by default; the one of the main bootloader needs
+# the two metadata pages above.
+for switch in URTC_BL_VERSION_COMPAT_COMMAND URTC_APP_VERSION_COMPAT_RELAY URTC_SLAVE_VERSION_COMPAT; do
+    case "${!switch:-0}" in
+        0|1) ;;
+        *) echo "$switch must be 0 or 1 (got '${!switch}')" >&2; exit 1 ;;
+    esac
+done
+if [ "${URTC_BL_VERSION_COMPAT_COMMAND:-0}" = "1" ]; then MASTER_KEY_FLAGS+=" -DURTC_BL_VERSION_COMPAT_COMMAND=1"; fi
+if [ "${URTC_APP_VERSION_COMPAT_RELAY:-0}" = "1" ]; then CFLAGS="$CFLAGS -DURTC_APP_VERSION_COMPAT_RELAY=1"; fi
+if [ "${URTC_SLAVE_VERSION_COMPAT:-0}" = "1" ]; then CFLAGS="$CFLAGS -DURTC_SLAVE_VERSION_COMPAT=1"; fi
 
 # The firmware directory is a single coherent build set, never a history of
 # mixed component versions. Preserve non-generated material, but remove every
