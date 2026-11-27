@@ -220,8 +220,19 @@ static int confirm_matches(const BootSigCase *c, const uint8_t nonce[16])
     return memcmp(tag, writes[w].data, 32) == 0;
 }
 
+// FIPS 180-2 example of 56 bytes: the length no longer fits after the padding byte, so the digest takes a second block.
+static void attest_sha256_two_block_padding_test(int *failures)
+{
+    static const uint8_t want[32] = {0x24, 0x8d, 0x6a, 0x61, 0xd2, 0x06, 0x38, 0xb8, 0xe5, 0xc0, 0x26, 0x93, 0x0c, 0x3e, 0x60, 0x39,
+                                     0xa3, 0x3c, 0xe4, 0x59, 0x64, 0xff, 0x21, 0x67, 0xf6, 0xec, 0xed, 0xd4, 0x19, 0xdb, 0x06, 0xc1};
+    uint8_t got[32];
+    SlaveAttest_Sha256((const uint8_t *)"abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq", 56u, got);
+    TEST_ASSERT(memcmp(got, want, 32) == 0, "the SHA-256 of a 56-byte message is that of the standard");
+}
+
 static void attest_tests(int *failures)
 {
+    attest_sha256_two_block_padding_test(failures);
     const BootSigCase *slave = &BOOT_SIG_CASES[SLAVE_CASE];
     Scenario good = { 1, 0, 0, 0, 0, 1, 0, 0, 0 };
     for (int i = 0; i < 16; i++) scenario_nonce[i] = (uint8_t)(0xA0 + i);
