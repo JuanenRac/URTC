@@ -442,7 +442,7 @@ URTC/
 ├── ani/                                               OLED 的动画
 ├── keys/                                              只有公钥，绝无私钥
 ├── docs/                                              CAN 协议、引脚、签名、威胁模型、数据手册
-├── tests/                                             82 个 C 主机测试套件
+├── tests/                                             87 个 C 主机测试套件
 ├── tools/                                             主机测试运行器、发布工具、共用检查
 ├── images/                                            横幅和本 README 的图片
 ├── .github/                                           CI 工作流以及 Issue 和 Pull Request 模板

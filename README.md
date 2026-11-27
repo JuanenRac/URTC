@@ -456,7 +456,7 @@ URTC/
 ├── ani/                                               the animations of the OLED
 ├── keys/                                              public keys only, never a private one
 ├── docs/                                              CAN protocol, pinouts, signing, threat model, datasheets
-├── tests/                                             82 C host test suites
+├── tests/                                             87 C host test suites
 ├── tools/                                             host test runner, release tools, shared checks
 ├── images/                                            banner and the pictures of this README
 ├── .github/                                           CI workflow, issue and pull-request templates

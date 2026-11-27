@@ -447,7 +447,7 @@ URTC/
 ├── ani/                                               die Animationen des OLED
 ├── keys/                                              nur öffentliche Schlüssel, nie ein privater
 ├── docs/                                              CAN-Protokoll, Pinbelegungen, Signierung, Bedrohungsmodell, Datenblätter
-├── tests/                                             82 C-Host-Testsuiten
+├── tests/                                             87 C-Host-Testsuiten
 ├── tools/                                             Host-Testläufer, Release-Werkzeuge, gemeinsame Prüfungen
 ├── images/                                            Banner und Bilder dieses READMEs
 ├── .github/                                           CI-Workflow sowie Vorlagen für Issues und Pull Requests

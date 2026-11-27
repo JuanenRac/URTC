@@ -460,7 +460,7 @@ URTC/
 ├── ani/                                               las animaciones del OLED
 ├── keys/                                              solo claves públicas, nunca una privada
 ├── docs/                                              protocolo CAN, patillajes, firma, modelo de amenazas, hojas de datos
-├── tests/                                             82 suites de pruebas de host en C
+├── tests/                                             87 suites de pruebas de host en C
 ├── tools/                                             ejecutor de pruebas de host, herramientas de release, comprobaciones compartidas
 ├── images/                                            banner e imágenes de este README
 ├── .github/                                           flujo de CI y plantillas de issues y pull requests
