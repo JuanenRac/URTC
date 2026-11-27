@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **The README files say that the official trust table of the bootloaders holds the release keys:** they still said it was empty until the image-signing key was created. That key exists and `keys/image_trust.json` holds it, with a reserved next one. Eight languages.
+
 - **The compatibility table of the release notes is current:** `docs/COMPATIBILITY.md`, which the notes of a release carry, still named versions of long ago; it is the current copy of URTC-COMMON.
 
 - **The coverage of the C host suites is the union of the lines the suites run:** `tools/run_host_tests.py` kept, for each source, the best figure of any one suite, so the lines that only another suite runs were not counted. It now reads the lines of every suite (`gcov -t`) and counts a line as run when any suite ran it, and as runnable when any suite compiled it. Measured this way the suites run 95.9% of the lines, and the floor of the manual workflow is 95.

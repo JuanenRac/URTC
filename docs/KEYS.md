@@ -29,8 +29,8 @@ and the release workflow only checks the signatures with the public key.
 
 The main bootloader holds no secret and no HMAC key: it trusts the public Ed25519 keys of its trust table (`keys/image_trust.json`, see
 [`FIRMWARE_SIGNING.TXT`](FIRMWARE_SIGNING.TXT)). The bench table holds a public development key (its seed is published with the shared
-reference), so a bootloader built with it proves nothing about who made an image; the official table is empty until the maintainer creates
-the image-signing key, which is not the key that signs release assets. Its private half stays outside every repository.
+reference), so a bootloader built with it proves nothing about who made an image; the official table holds the public
+release image-signing keys (current and reserved next), which are not the key that signs release assets. Its private half stays outside every repository.
 
 The HMAC key in the table above is the public development key of the main bootloader of the earlier generation. It lives in `firmware_signing.py`
 (only to keep producing the HMAC those bootloaders check). It proves nothing about who made an image: it exists so that anybody can build and test.
@@ -62,7 +62,7 @@ skipped, so run it with `--strict` on a machine that has all of them before a re
 
 The three public keys of the trust table are also in the registry (`urtc-image-signing-release-current`, `urtc-image-signing-release-next` and `urtc-image-signing-development`) because the flasher keeps a pinned copy of them to check the signature record of an image before it writes it; `tools/keys.py verify` compares that copy with the table in `keys/image_trust.json`.
 
-The keys that authenticate an application image on the bus are a different set from the release key above and are listed in `keys/image_trust.json`: a `dev` table (a public development key, bench builds only) and a `release` table that stays empty until the maintainer provisions the image-signing key. Only public keys are written there. `python tools/image_trust.py validate` checks the file, `python tools/image_trust.py check BIN master|slave dev|release` checks that a compiled bootloader holds exactly that table at its fixed offset, and `python tools/image_trust.py fingerprints release` prints the key ids the local release tool pins before it signs anything.
+The keys that authenticate an application image on the bus are a different set from the release key above and are listed in `keys/image_trust.json`: a `dev` table (a public development key, bench builds only) and a `release` table with the public release image-signing keys (current and reserved next). Only public keys are written there. `python tools/image_trust.py validate` checks the file, `python tools/image_trust.py check BIN master|slave dev|release` checks that a compiled bootloader holds exactly that table at its fixed offset, and `python tools/image_trust.py fingerprints release` prints the key ids the local release tool pins before it signs anything.
 
 ## The other ecosystems
 
