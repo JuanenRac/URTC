@@ -187,7 +187,7 @@ def measure_coverage(selected: list["Suite"], compiler: str, build_dir: Path) ->
             return {}
         subprocess.run([str(binary)], cwd=ROOT, capture_output=True)
         for gcda in work.rglob("*.gcda"):
-            out = subprocess.run(["gcov", "-n", "-o", str(gcda.parent), str(gcda)], cwd=work, capture_output=True, text=True).stdout
+            out = subprocess.run(["gcov", "-n", "-o", str(gcda.parent), str(gcda)], cwd=work, capture_output=True, text=True, encoding="utf-8", errors="replace").stdout
             parts.append(parse_gcov(out))
     return merge_coverage(parts)
 
@@ -225,8 +225,8 @@ def command(suite: Suite, compiler: str, binary: Path) -> list[str]:
 def is_gcc_with_analyzer(compiler: str) -> bool:
     """True for a gcc that has -fanalyzer (10 or newer); clang and old gcc are skipped."""
     try:
-        out = subprocess.run([compiler, "-dumpfullversion", "-dumpversion"], capture_output=True, text=True).stdout.strip()
-        banner = subprocess.run([compiler, "--version"], capture_output=True, text=True).stdout
+        out = subprocess.run([compiler, "-dumpfullversion", "-dumpversion"], capture_output=True, text=True, encoding="utf-8", errors="replace").stdout.strip()
+        banner = subprocess.run([compiler, "--version"], capture_output=True, text=True, encoding="utf-8", errors="replace").stdout
     except OSError:
         return False
     if "clang" in banner.lower() or "gcc" not in banner.lower() and "free software foundation" not in banner.lower():
@@ -259,7 +259,7 @@ def analyze(selected: list[Suite], compiler: str) -> bool:
     pairs = analysis_sources(selected)
     failed = []
     for suite, source in pairs:
-        result = subprocess.run(analyze_command(suite, compiler, source), cwd=ROOT, capture_output=True, text=True)
+        result = subprocess.run(analyze_command(suite, compiler, source), cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace")
         if result.returncode != 0 or "warning:" in result.stderr:
             failed.append(source)
             print(f"ANALYZER {source}:\n{result.stderr}")
@@ -329,16 +329,16 @@ def run_with_ctest(selected: list[Suite], compiler: str, build_dir: Path, jobs: 
         shutil.rmtree(work)
     work.mkdir(parents=True)
     (work / "CMakeLists.txt").write_text(cmake_lists(selected, compiler), encoding="utf-8", newline="\n")
-    configure = subprocess.run(["cmake", "-S", str(work), "-B", str(work / "out"), "-G", "Unix Makefiles"], capture_output=True, text=True)
+    configure = subprocess.run(["cmake", "-S", str(work), "-B", str(work / "out"), "-G", "Unix Makefiles"], capture_output=True, text=True, encoding="utf-8", errors="replace")
     if configure.returncode != 0:
         print(configure.stdout + configure.stderr)
         print("FAIL cmake could not configure the suites")
         return [suite.name for suite in selected]
-    built = subprocess.run(["cmake", "--build", str(work / "out"), "--parallel", str(jobs), "--", "--keep-going"], capture_output=True, text=True)
+    built = subprocess.run(["cmake", "--build", str(work / "out"), "--parallel", str(jobs), "--", "--keep-going"], capture_output=True, text=True, encoding="utf-8", errors="replace")
     if built.returncode != 0:
         print(built.stdout[-6000:] + built.stderr[-6000:])
         print("FAIL a suite did not compile")
-    ran = subprocess.run(["ctest", "--output-on-failure"], cwd=work / "out", capture_output=True, text=True)
+    ran = subprocess.run(["ctest", "--output-on-failure"], cwd=work / "out", capture_output=True, text=True, encoding="utf-8", errors="replace")
     print(ran.stdout, end="")
     if ran.stderr:
         print(ran.stderr, end="")
@@ -392,6 +392,9 @@ def choose_runner(requested: str) -> str:
 
 
 def main(argv: list[str]) -> int:
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(errors="replace")  # the output of a tool may hold characters the console cannot write
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--list", action="store_true", help="print the suites and exit")
     parser.add_argument("--only", action="append", help="run only this suite (repeatable)")

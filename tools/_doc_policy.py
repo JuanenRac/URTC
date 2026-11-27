@@ -72,6 +72,8 @@ def _is_git_work_tree(root: Path) -> bool:
             ("git", "rev-parse", "--is-inside-work-tree"),
             cwd=root,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
             check=False,
