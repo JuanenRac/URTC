@@ -31,9 +31,10 @@ URTC (tag `v<main application version>`, for example `v0.3.5`), 17 files, or
 | slave application | `URTC_SLAVE_FIRMWARE_v<ver>.bin`, `.hex`, `.bin.sha256`, `.bin.manifest.json` |
 | index | `firmware_manifest.json` |
 
-The two application manifests carry `hmac_sha256` (the signature the
-bootloader expects), `signing_key_kind` and `signing_key_id`; every manifest
-carries `sha256`, `crc32`, `size_bytes` and `hardware_id`.
+The two application manifests carry `signing_key_kind`; `hmac_sha256` (for the
+bootloaders of the earlier generation) and `signing_key_id` are there only when the
+build was given such a key, and the signature record the current bootloaders check
+is the file `<bin>.imgsig`. Every manifest carries `sha256`, `crc32`, `size_bytes` and `hardware_id`.
 
 URTC-SMART-RACK and URTC-VISION-TOOL: `URTC_SMART_RACK_FIRMWARE_v<ver>.bin`,
 `.hex`, `.bin.sha256` (and `.elf` with `--with-elf`); likewise
@@ -94,8 +95,8 @@ never return a pre-release. A release whose application images are signed with
 the public development key (`signing_key_kind: "dev"`) is therefore published
 as a **pre-release** ("bench"): `tools/publish_release_assets.py` refuses it
 as an official release, and with `--allow-dev-key` it adds `--prerelease` to
-the printed command. Until the first release signed with a private production
-key exists, the clients reach the bench images by tag
+the printed command. The official releases are signed with a private production key; the clients reach
+a bench pre-release only by tag
 (`sync_firmware.py --release v0.3.8`, `sync-firmware.mjs --tag <tag>`); they keep no copy of their own.
 
 ## The flasher and the web studio keep no copy of the images
