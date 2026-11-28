@@ -9,6 +9,7 @@
 #include "firmware_control_thermal.h"
 #include "fw_safety_policy.h"
 #include "fw_estop_follow.h"
+#include "fw_estop_announce.h"
 #include "firmware_multinode.h"
 #include "urtc_can_ids.h"
 
@@ -113,8 +114,22 @@ static void estop_apply(EstopFollowEffect_t effect)
     }
 }
 
+#if URTC_ESTOP_MASTER_ANNOUNCE
+static EstopAnnounce_t estop_announce;
+
+uint8_t Safety_HandleEstopAnnounce(void)
+{
+    if (!Features_Active(FEAT_ESTOP_FOLLOW)) return 0;
+    if (EstopAnnounce_OnFrame(&estop_announce, &estop, HAL_GetTick(), rxData, (uint8_t)rxHeader.DLC)) Features_NoteEstopTimeoutInForce(estop.timeout_ms);
+    return 1;
+}
+#endif
+
 void Safety_EstopInit(void)
 {
+#if URTC_ESTOP_MASTER_ANNOUNCE
+    estop_announce.have_seq = 0u;
+#endif
     estop_bus_off_seen = 0;
     EstopFollow_Reset(&estop);
     if (!Features_Active(FEAT_ESTOP_FOLLOW)) return;

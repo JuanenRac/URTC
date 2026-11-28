@@ -43,5 +43,8 @@ void Safety_EstopInit(void);
 // A frame whose identifier is URTC_ESTOP_CAN_ID is in rxHeader/rxData: 1 when the head took it (the switch is on), 0 when it is to be ignored. It acts
 // before the multi-head filter and before the error gate, because a stop must reach every head and must never be refused.
 uint8_t Safety_HandleEstopFrame(void);
+#if defined(URTC_ESTOP_MASTER_ANNOUNCE) && URTC_ESTOP_MASTER_ANNOUNCE
+uint8_t Safety_HandleEstopAnnounce(void);   // fw_estop_announce.h; only in a build with the option on
+#endif
 
 #endif // FIRMWARE_SAFETY_H

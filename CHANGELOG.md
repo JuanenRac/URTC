@@ -15,6 +15,8 @@ All notable changes to this project are documented here.
 
 - **The coverage of the C host suites is the union of the lines the suites run:** `tools/run_host_tests.py` kept, for each source, the best figure of any one suite, so the lines that only another suite runs were not counted. It now reads the lines of every suite (`gcov -t`) and counts a line as run when any suite ran it, and as runnable when any suite compiled it. Measured this way the suites run 95.9% of the lines, and the floor of the manual workflow is 95.
 
+- **The master of the stop can announce its silence (off as shipped, `URTC_ESTOP_MASTER_ANNOUNCE`):** a head with `ESTOP_FOLLOW` takes the lower of its own value and the announced one, from a frame that names its origin; host tests only, see `docs/ESTOP_MASTER_ANNOUNCE.md`.
+
 ## [0.5.2] - Configurable emergency-stop silence over CAN, short-write option for the slave link and fault-injection host tests
 
 - **More host tests of the update paths:** a flash write or erase that fails is injected at every operation of an update in both bootloaders (no success, no reset and no accepted application without the complete image), and the SHA-256 of the slave attestation is checked on a message whose padding needs a second block. The firmware is unchanged.

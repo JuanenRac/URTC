@@ -322,6 +322,7 @@ REM The version rule kept in the board and changed by a signed command (docs\VER
 REM needs the two metadata pages above.
 if "%URTC_BL_VERSION_COMPAT_COMMAND%"=="1" set "MASTER_KEY_FLAGS=%MASTER_KEY_FLAGS% -DURTC_BL_VERSION_COMPAT_COMMAND=1"
 if "%URTC_APP_VERSION_COMPAT_RELAY%"=="1" set "CFLAGS=%CFLAGS% -DURTC_APP_VERSION_COMPAT_RELAY=1"
+if "%URTC_ESTOP_MASTER_ANNOUNCE%"=="1" set "CFLAGS=%CFLAGS% -DURTC_ESTOP_MASTER_ANNOUNCE=1"
 if "%URTC_SLAVE_VERSION_COMPAT%"=="1" set "CFLAGS=%CFLAGS% -DURTC_SLAVE_VERSION_COMPAT=1"
 
 REM -----------------------------------------------------------------------
