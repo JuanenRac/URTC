@@ -65,30 +65,36 @@ different transport:
 
 1. Master writes `REG_START_UPDATE` (declares size + HardwareID). A
    HardwareID mismatch or oversized declaration is rejected before a
-   single byte is written — this chip's own HardwareID
-   (`0x0303CB01`) and HMAC signing key are both deliberately different
-   from the main board's own, so an image meant for one can never
-   accidentally verify against the other.
+   single byte is written — this chip's own HardwareID (`0x0303CB01`)
+   is deliberately different from the main board's own, so an image
+   meant for one is never installed on the other. The slave makes a
+   fresh nonce for the session (`REG_CHALLENGE`).
 2. Master writes `REG_DIGEST_EXPECTED` (the full 32-byte SHA-256 in one
    transaction — I2C has no equivalent to CAN's 8-byte-per-frame
-   ceiling, so this doesn't need the main board's own 4-chunk split).
+   ceiling, so this doesn't need splitting) and `REG_RECORD_COUNTER`
+   (the signed rollback counter of the Ed25519 record the master
+   verified).
 3. Firmware data streams in via repeated `REG_DATA` writes (up to 32
    bytes per transaction), landing in the **backup slot only**. A
    dropped link or power failure during this phase leaves the chip
    exactly as capable of running its existing application as before —
    nothing about the main slot has been touched.
 4. Master writes `REG_END_UPDATE` (CRC32 + declared version), which
-   triggers verification: completeness, then CRC32, then HMAC-SHA256,
-   then anti-rollback against the currently-installed version. Any
-   single failure aborts here — `REG_STATUS` reports which — and the
-   main slot remains untouched.
-5. Only once every check passes does the bootloader erase the main slot
-   and copy the verified backup into it, page by page, with read-back
-   verification on the copy itself. `REG_PROGRESS` reports 0-100
-   through this phase — this chip can't push a heartbeat proactively
-   the way the main board's own bootloader does over CAN (an I2C slave
-   only ever answers when asked), so the link-bus master polls this
-   register instead of being told.
+   triggers what the slave can check alone: completeness, then CRC32,
+   then the SHA-256 of the backup slot, then the rollback counter, then
+   the version rule. Any single failure aborts here — `REG_STATUS`
+   reports which — and the main slot remains untouched. This bootloader
+   holds no key: it does not check who made the image.
+5. The slave then waits for `REG_CONFIRM`, the master's confirmation
+   that it verified the signature record of this image in this session
+   (`urtc_slave_confirm.h`). Without it, or with a wrong one, the update
+   fails closed. Only after the confirmation does the bootloader erase
+   the main slot and copy the backup into it, page by page, with
+   read-back verification on the copy itself. `REG_PROGRESS` reports
+   0-100 through this phase — this chip can't push a heartbeat
+   proactively the way the main board's own bootloader does over CAN (an
+   I2C slave only ever answers when asked), so the link-bus master polls
+   this register instead of being told.
 6. `SCB->VTOR` relocates to the main slot's vector table and control
    jumps to the application, which redundantly repeats the same
    relocation as the first line of its own `main()` — same defensive

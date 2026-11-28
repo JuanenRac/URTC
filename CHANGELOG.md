@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **The READMEs of the bootloaders describe the checks they make:** the one of the expansion slave still described its own signing key and an HMAC-SHA256 check, and left out the confirmation of the main board; the one of the main board named a signing key it does not hold. No firmware change.
+
 - **The way an image without a patch number is read can be kept in the board and changed by a signed command (off by default):** three build switches, `URTC_BL_VERSION_COMPAT_COMMAND` (main bootloader, with `URTC_BL_META_AB`), `URTC_APP_VERSION_COMPAT_RELAY` (main application) and `URTC_SLAVE_VERSION_COMPAT` (slave bootloader). With them at 0, the default, none of the code is compiled and the strict rule is unchanged. On, the mode sits next to the metadata record without changing it, only a signed command with a higher counter changes it, the slave is relaxed for one update session at a time and the signed rollback counter still applies. Tried on host programs only, including a flash failure at every step; see `docs/VERSION_COMPAT.md`.
 - **The README files say that the official trust table of the bootloaders holds the release keys:** they still said it was empty until the image-signing key was created. That key exists and `keys/image_trust.json` holds it, with a reserved next one. Eight languages.
 
