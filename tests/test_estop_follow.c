@@ -18,6 +18,7 @@
 #include "firmware_fram.h"
 #include "firmware_safety.h"
 #include "fw_estop_follow.h"
+#include "fw_estop_announce.h"
 #include "urtc_can_ids.h"
 #include "vectors/estop_follow_vectors.h"
 
@@ -576,6 +577,86 @@ static void test_the_silence_over_the_bus_through_the_glue(int *failures)
     TEST_ASSERT(r && r->dlc == 8 && r->data[6] == 0 && r->data[7] == 0, "with the switch off the silence in force is 0");
 }
 
+#if URTC_ESTOP_MASTER_ANNOUNCE
+// ---- the silence announced by the master (only in the suite built with the option on) --------------------------------------------------------
+static uint8_t announce_bytes(uint32_t now_ms, uint8_t source, uint16_t ms, uint16_t seq, uint8_t spoil, uint32_t dlc)
+{
+    uint8_t d[8] = { ESTOPA_KIND_TIMEOUT, source, (uint8_t)(ms & 0xFFu), (uint8_t)(ms >> 8), (uint8_t)(seq & 0xFFu), (uint8_t)(seq >> 8), 0, 0 };
+    d[6] = (uint8_t)(d[2] ^ 0xFFu);
+    d[7] = (uint8_t)((d[3] ^ 0xFFu) ^ spoil);
+    fake_tick = now_ms;
+    memset(rxData, 0, sizeof rxData);
+    memcpy(rxData, d, sizeof d);
+    rxHeader.StdId = URTC_ESTOP_ANNOUNCE_CAN_ID;
+    rxHeader.DLC = dlc;
+    return Safety_HandleEstopAnnounce();
+}
+
+static void announce(uint32_t now_ms, uint16_t ms, uint16_t seq) { (void)announce_bytes(now_ms, ESTOPF_SOURCE_BRAIN, ms, seq, 0, 8); }
+
+// 1 when a head that last heard the master at `heard` is stopped by the silence after `ms` and not before.
+static uint8_t silence_is(uint32_t heard, uint32_t ms)
+{
+    fake_tick = heard + ms;
+    Safety_Service();
+    if (system_error_flag) return 0;
+    fake_tick = heard + ms + 1u;
+    Safety_Service();
+    return (uint8_t)(system_error_flag == 1 && Safety_ErrorReason() == URTC_ERROR_REASON_ESTOP_SILENCE);
+}
+
+static void test_the_announced_silence(int *failures)
+{
+    boot_with(0);
+    TEST_ASSERT(announce_bytes(100000, ESTOPF_SOURCE_BRAIN, 50, 1, 0, 8) == 0 && system_error_flag == 0, "with the stop following off the frame is not taken");
+
+    boot_with(FEAT_ESTOP_FOLLOW);
+    make_ready(100000);
+    announce(100006, 50, 1);
+    TEST_ASSERT(system_error_flag == 0 && silence_is(100000, 50), "a shorter silence of the master is taken: 50 ms instead of the 100 of the head");
+
+    boot_with(FEAT_ESTOP_FOLLOW);
+    make_ready(100000);
+    announce(100006, 500, 1);
+    TEST_ASSERT(silence_is(100000, URTC_ESTOP_ALIVE_TIMEOUT_MS), "a longer one never makes the head more patient than its configuration");
+
+    boot_with(FEAT_ESTOP_FOLLOW);
+    make_ready(100000);
+    (void)announce_bytes(100006, ESTOPF_SOURCE_CM5, 50, 1, 0, 8);
+    (void)announce_bytes(100007, ESTOPF_SOURCE_SLOT_FIRST, 50, 2, 0, 8);
+    (void)announce_bytes(100008, ESTOPF_SOURCE_BRAIN, 50, 3, 1, 8);
+    (void)announce_bytes(100009, ESTOPF_SOURCE_BRAIN, 50, 4, 0, 7);
+    announce(100010, URTC_ESTOP_ALIVE_TIMEOUT_MIN_MS - 1u, 5);
+    announce(100011, URTC_ESTOP_ALIVE_TIMEOUT_MAX_MS + 1u, 6);
+    TEST_ASSERT(system_error_flag == 0 && silence_is(100000, URTC_ESTOP_ALIVE_TIMEOUT_MS),
+                "another origin, a wrong complement, a wrong length and a value outside the limits are ignored and stop nothing");
+
+    boot_with(FEAT_ESTOP_FOLLOW);
+    make_ready(100000);
+    announce(100006, 50, 10);
+    announce(100007, 0, 10);
+    announce(100008, 0, 9);
+    TEST_ASSERT(silence_is(100000, 50), "a repeated or older sequence changes nothing");
+
+    boot_with(FEAT_ESTOP_FOLLOW);
+    make_ready(100000);
+    announce(100006, 50, 10);
+    announce(100007, 0, 11);
+    TEST_ASSERT(silence_is(100000, URTC_ESTOP_ALIVE_TIMEOUT_MS), "0 gives the head its own silence back");
+
+    boot_with(FEAT_ESTOP_FOLLOW);
+    announce(100000, 50, 1);   // latched, no heartbeat heard yet
+    make_ready(100001);
+    TEST_ASSERT(silence_is(100001, URTC_ESTOP_ALIVE_TIMEOUT_MS), "without the heartbeat of the master an announcement is ignored");
+
+    announce(200000, 50, 1);   // after that stop the master is silent: ignored
+    frame_kind(200010, ESTOPF_KIND_ALIVE, ESTOPF_ALIVE_TRIPPED, 0, 4, 100);
+    announce(200011, 60, 1);   // heard again, still latched: the count of a restarted master is taken
+    frame_kind(200015, ESTOPF_KIND_RELEASE, 0, 0, 4, 101);
+    TEST_ASSERT(system_error_flag == 0 && silence_is(200010, 60), "after a stop a restarted master announces again from its first number");
+}
+#endif
+
 int main(void)
 {
     int failures = 0;
@@ -595,6 +676,9 @@ int main(void)
     test_the_configured_silence_reaches_the_glue(&failures);
     test_the_wire_vectors(&failures);
     test_the_silence_over_the_bus_through_the_glue(&failures);
+#if URTC_ESTOP_MASTER_ANNOUNCE
+    test_the_announced_silence(&failures);
+#endif
     if (failures == 0) {
         printf("  OK   all emergency stop following host tests passed\n");
         return 0;

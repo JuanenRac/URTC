@@ -37,6 +37,7 @@
 #include "firmware_can_thermalinspection.h"
 #include "firmware_can_dispatch_routing.h"
 #include "firmware_safety.h"
+#include "fw_estop_announce.h"
 #include "can_rx_queue.h"
 
 #include <string.h>
@@ -93,6 +94,12 @@ static void CanDispatch_ProcessFrame(void) {
         if (rxHeader.StdId == URTC_ESTOP_CAN_ID && Safety_HandleEstopFrame()) {
             return;
         }
+#if URTC_ESTOP_MASTER_ANNOUNCE
+        // The silence the master of that stop announces (fw_estop_announce.h), for every head like the stop itself.
+        if (rxHeader.StdId == URTC_ESTOP_ANNOUNCE_CAN_ID && Safety_HandleEstopAnnounce()) {
+            return;
+        }
+#endif
 
         // Several tool heads on one bus (off unless the persistent switch is on; see
         // firmware_multinode.c). Returns 0 at once while the switch is off, so the

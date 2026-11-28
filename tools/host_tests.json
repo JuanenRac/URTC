@@ -581,6 +581,31 @@
    ]
   },
   {
+   "name": "estop_follow_announce",
+   "test": "tests/test_estop_follow.c",
+   "sources": [
+    "tests/host_hal/fake_hal.c",
+    "src/F303-master/firmware_safety.c",
+    "src/F303-master/fw_safety_policy.c",
+    "src/F303-master/fw_features.c",
+    "src/F303-master/firmware_features.c",
+    "src/F303-master/firmware_fram.c",
+    "src/F303-master/pid_control.c",
+    "src/F303-master/health_profile.c",
+    "src/F303-master/hsi_trim.c",
+    "src/F303-master/motion_profile.c"
+   ],
+   "includes": [
+    "tests",
+    "tests/host_hal",
+    "src/F303-master/",
+    "src/common"
+   ],
+   "defines": [
+    "-DURTC_ESTOP_MASTER_ANNOUNCE=1"
+   ]
+  },
+  {
    "name": "can_tools",
    "test": "tests/test_can_tools.c",
    "sources": [
